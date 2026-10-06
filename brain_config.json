@@ -1,0 +1,102 @@
+{
+    "system_settings": {
+        "model_id": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
+        "max_batch_size": 10,
+        "polling_interval_seconds": 1800,
+        "min_polling_interval": 300,
+        "max_polling_interval": 14400,
+        "global_system_prompt": "You are an elite, avant-garde creative director for a premium cinematic stock footage agency (like Adobe Stock or Pond5). Your goal is to write prompts for a state-of-the-art AI video generator. STRICT COMPLIANCE RULES: 1. NEVER use the names of artists, real people, or fictional characters. 2. NEVER use the phrase 'in the style of'. 3. NEVER reference third-party IP, logos, trademarks, or specific branded objects (e.g., do not describe specific car models, laptops, or smartphones). 4. NEVER describe recognizable human faces. If humans are included, they MUST be completely anonymous (e.g., silhouettes, shot from behind, extreme top-down angles, or macro shots of hands only). 5. Focus entirely on photorealistic, high-end commercial concepts: macro nature, fluid dynamics, luxury abstract textures, and anonymous lifestyle B-roll. Describe the precise lighting, camera choreography, and visceral textures."
+    },
+    "profitable_niches": [
+        "Macro cinematography of bioluminescent flora and exotic photorealistic fungi",
+        "Hyper-realistic fluid dynamics and abstract 4K ink mixing in zero gravity",
+        "Anonymous cinematic silhouettes of a human figure walking in atmospheric foggy environments",
+        "Macro shots of anonymous human hands engaging in tactile crafts (pottery, woodworking) with highly detailed textures",
+        "Abstract luxury motion backgrounds featuring rippling silk, liquid gold, and moving glass",
+        "Drone-view topological landscapes of pristine, untouched natural environments (no modern architecture)",
+        "Microscopic cellular biology and organic molecular formations glowing with cinematic lighting"
+    ],
+    "creative_themes": [
+        "a slow build of tension releasing into explosive, colorful catharsis",
+        "sterile geometric perfection interrupted by beautiful, chaotic organic growth",
+        "melancholic isolation transforming into a warm, awe-inspiring lighting revelation",
+        "hypnotic, rhythmic repetition breaking into sudden, fluid freedom",
+        "the uncanny fusion of industrial brutalism and delicate natural flora",
+        "a stark, intimidating presence softening into an expression of profound empathy"
+    ],
+    "wildcards": {
+        "lighting": [
+            "golden hour backlighting that transitions into a bioluminescent glow",
+            "clinical fluorescent overheads suddenly shattered by harsh, rhythmic neon strobes",
+            "soft diffused overcast light pierced by a single, moving volumetric god-ray",
+            "dramatic chiaroscuro contrast with evolving, liquid-like colored gel reflections"
+        ],
+        "camera": [
+            "starts locked-off, then executes a rapid snap-zoom into a smooth, orbiting macro pan",
+            "seamless cinematic hyperlapse transitioning into ultra-slow-motion bullet time",
+            "fluid FPV drone dive that seamlessly morphs into a stabilized, slow-push tracking shot",
+            "extreme low-angle dutch tilt that slowly rotates into a perfect, symmetrical top-down view"
+        ],
+        "action_evolution": [
+            "The primary subject physically transforms, shifts state, or sheds a layer mid-shot.",
+            "The environmental physics suddenly alter, turning falling elements into anti-gravity suspension.",
+            "A secondary, unexpected element enters the frame, completely altering the lighting and mood.",
+            "The speed of the action ramps from real-time to extreme slow-motion at the climax."
+        ],
+        "imperfections": [
+            "anamorphic lens flares reacting to the evolving light sources",
+            "subtle 35mm film grain and halation around high-contrast edges",
+            "dynamic depth-of-field racking focus from the extreme foreground to the background action",
+            "smudged foreground glass catching cinematic light leaks"
+        ]
+    },
+    "use_cases": [{
+            "id": "ltx_2_3_commercial_broll",
+            "target_queue_count": 50,
+            "randomness_percentage": 85,
+            "duration_range": [5.0, 10.0],
+            "template_instruction": "Generate {0} distinct prompts describing a premium cinematic video clip. The niche is '{1}' and the underlying emotional theme is '{2}'. The prompt MUST describe a multi-stage action where the scene and camera evolve over time. First, predict the ideal duration required to capture this complex motion (between {3} and {4} seconds). Format each item STRICTLY like this: 1. [DURATION: 8.5] Your prompt text here...",
+            "worker_parameters": {
+                "output_type": "video",
+                "model_type": "ltx-2.3-22b",
+                "width": 1024,
+                "height": 576,
+                "fps": 24.0,
+                "enhance_prompt": false,
+                "num_takes": 1
+            }
+        },
+        {
+            "id": "ltx_2_3_vfx_elements",
+            "target_queue_count": 30,
+            "randomness_percentage": 95,
+            "duration_range": [4.0, 8.0],
+            "template_instruction": "Generate {0} distinct prompts for high-speed VFX elements and macro textures. Focus on complex, multi-stage physics simulations (e.g., fluid dynamics morphing into shattering glass) shot on a pure black background for easy compositing. The niche is '{1}' and theme is '{2}'. Predict the ideal duration (between {3} and {4} seconds) for this slow-motion sequence. Format each item STRICTLY like this: 1. [DURATION: 6.0] Your prompt text here...",
+            "worker_parameters": {
+                "output_type": "vfx_video",
+                "model_type": "ltx-2.3-22b",
+                "width": 1024,
+                "height": 576,
+                "fps": 60.0,
+                "enhance_prompt": false,
+                "num_takes": 1
+            }
+        },
+        {
+            "id": "ltx_2_3_motion_backgrounds",
+            "target_queue_count": 20,
+            "randomness_percentage": 60,
+            "duration_range": [8.0, 15.0],
+            "template_instruction": "Generate {0} distinct prompts for abstract, luxury motion backgrounds suitable for corporate presentations or website headers. The niche is '{1}' and theme is '{2}'. Focus on slow, mesmerizing movements of textures like glass, metallic waves, or soft glowing geometry. NO HUMANS allowed. Predict the ideal duration (between {3} and {4} seconds) needed for this slow, evolving loop. Format each item STRICTLY like this: 1. [DURATION: 12.0] Your prompt text here...",
+            "worker_parameters": {
+                "output_type": "abstract_video",
+                "model_type": "ltx-2.3-22b",
+                "width": 1536,
+                "height": 864,
+                "fps": 24.0,
+                "enhance_prompt": false,
+                "num_takes": 1
+            }
+        }
+    ]
+}

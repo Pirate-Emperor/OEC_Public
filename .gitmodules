@@ -1,0 +1,12 @@
+[submodule "oec_deploy"]
+	path = oec_deploy
+	url = https://github.com/Killer4K-N/OEC_Deploy.git
+[submodule "oec_aireos/Full_Model"]
+	path = oec_aireos/Full_Model
+	url = https://github.com/Killer4K-N/OEC_AireOS_Full_Model.git
+[submodule "oec_aireos/Freezed"]
+	path = oec_aireos/Freezed
+	url = https://github.com/Killer4K-N/OEC_AireOS_Freezed.git
+[submodule "oec_aireos/MOE"]
+	path = oec_aireos/MOE
+	url = https://github.com/Killer4K-N/OEC_AireOS_MOE.git

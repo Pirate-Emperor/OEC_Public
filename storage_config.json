@@ -1,0 +1,13 @@
+{
+    "discord_webhook_url": "https://discord.com/api/webhooks/1533177733893456072/k00r0ZVwjLcQKSR2YJX0KIjj8pxLEjHin04btTS6oR_vTbBdU_HsFiHJ2so_ZpATuHHl",
+    "polling_interval_seconds": 300,
+    "directories": [{
+            "name": "models",
+            "target_allocation_gb": 200
+        },
+        {
+            "name": "outputs",
+            "target_allocation_gb": 1
+        }
+    ]
+}
