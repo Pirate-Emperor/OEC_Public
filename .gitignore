@@ -62,3 +62,5 @@ service-account*.json
 gpu/
 Wan2.1/
 LTX-2/
+
+Miniconda3-latest-Linux-x86_64.sh
