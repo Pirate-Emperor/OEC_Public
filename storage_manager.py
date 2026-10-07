@@ -13,7 +13,7 @@ from core_config import SYSTEM_DIRS
 # Reserves fixed disk space using Posix Fallocate and triggers Discord alerts.
 # ==============================================================================
 
-CONFIG_FILE = os.path.join(os.getcwd(), "storage_config.json")
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "storage_config.json")
 RESERVE_FILENAME = ".storage_reserve.bin"
 LOCK_FILENAME = ".storage_pause.lock"
 
@@ -51,7 +51,7 @@ def test_discord_webhook(webhook_url):
     """Instantly tests the Discord webhook integration."""
     print("\n[TEST] Initiating Discord Webhook Test...")
     if not webhook_url or webhook_url == "YOUR_DISCORD_WEBHOOK_URL_HERE":
-        print("❌ ERROR: Please paste a valid Discord Webhook URL into storage_config.json first.")
+        print("❌ ERROR: Configure the Discord webhook in the environment variable named by storage_config.json.")
         return
         
     msg_body = "✅ **AIEROS Storage Manager:** Discord webhook integration is working perfectly! The cluster is online."
@@ -139,7 +139,7 @@ def get_actual_folder_size(folder_path):
 def load_config():
     if not os.path.exists(CONFIG_FILE):
         default_config = {
-            "discord_webhook_url": "YOUR_DISCORD_WEBHOOK_URL_HERE",
+            "discord_webhook_env": "AIEROS_DISCORD_WEBHOOK_URL",
             "polling_interval_seconds": 300,
             "directories": [
                 {"name": "models", "target_allocation_gb": 250},
@@ -173,7 +173,8 @@ def manage_allocations():
     while True:
         config = load_config() 
         polling_interval = config.get("polling_interval_seconds", 300)
-        webhook_url = config.get("discord_webhook_url", "")
+        webhook_env = config.get("discord_webhook_env", "AIEROS_DISCORD_WEBHOOK_URL")
+        webhook_url = os.environ.get(webhook_env, "")
         
         for dir_cfg in config.get("directories", []):
             dir_name = dir_cfg["name"]
@@ -226,11 +227,17 @@ def manage_allocations():
                     
                 except AttributeError:
                     logging.error("os.posix_fallocate is not supported on this OS.")
-                    os.close(fd)
+                    try:
+                        os.close(fd)
+                    except (NameError, OSError):
+                        pass
                     break
                 except OSError as e:
                     logging.error(f"[{dir_name}] Failed to allocate space (Disk might be completely full): {e}")
-                    os.close(fd)
+                    try:
+                        os.close(fd)
+                    except (NameError, OSError):
+                        pass
 
         time.sleep(polling_interval)
 
