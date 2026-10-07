@@ -37,6 +37,13 @@ for name in notebooks:
         if cell.get("cell_type") != "code":
             continue
         source = "".join(cell.get("source", []))
+        # Notebook shell/magic cells are valid Jupyter syntax but not Python.
+        lines = source.splitlines()
+        if any(
+            line.lstrip().startswith(("!", "%", "%%"))
+            for line in lines
+        ):
+            continue
         ast.parse(source, filename=f"{name}:cell:{index}")
 
     source_all = chr(10).join(
