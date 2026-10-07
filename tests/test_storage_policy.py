@@ -2,6 +2,7 @@ import json
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from storage_policy import (
@@ -54,6 +55,23 @@ class StoragePolicyTests(unittest.TestCase):
             (nested / "b.bin").write_bytes(b"b" * 50)
             self.assertEqual(directory_size_bytes(root), 150)
 
+    def test_estimate_hf_repo_bytes_uses_metadata(self):
+        fake_sibling_a = type("Sibling", (), {"rfilename": "a.safetensors", "size": 100, "lfs": None})()
+        fake_sibling_b = type("Sibling", (), {"rfilename": "config.json", "size": 25, "lfs": None})()
+        fake_info = type("Info", (), {"siblings": [fake_sibling_a, fake_sibling_b], "used_storage": 125})()
+
+        class FakeApi:
+            def model_info(self, **kwargs):
+                return fake_info
+
+        fake_hf = type("HF", (), {"HfApi": lambda: FakeApi()})
+        with mock.patch.dict(__import__("sys").modules, {"huggingface_hub": fake_hf}):
+            from storage_policy import estimate_hf_repo_bytes
+            self.assertEqual(estimate_hf_repo_bytes("org/repo"), 125)
+            self.assertEqual(
+                estimate_hf_repo_bytes("org/repo", filenames=["a.safetensors", "config.json"]),
+                125,
+            )
     def test_preflight_uses_fresh_quota(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
