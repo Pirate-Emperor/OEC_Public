@@ -81,3 +81,7 @@ Miniconda3-latest-Linux-x86_64.sh
 .ssh/
 .viminfo
 Documents/NVIDIA Nsight Compute/
+
+# Local compiler/autotune state
+.flex_gemm/
+.gitconfig
