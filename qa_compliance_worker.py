@@ -20,7 +20,8 @@ from PIL import Image
 
 # STRICT DISK MANAGER IMPORT
 from purge_manager import DiskPurgeManager
-from storage_manager import release_reserve, resume_reserve
+from storage_manager import managed_storage_operation, storage_preflight
+from storage_policy import BYTES_PER_GB, estimate_hf_repo_bytes
 
 # ==============================================================================
 # 2. GLOBAL LOGGING & CRASH CATCHER (Must be defined first)
@@ -89,29 +90,51 @@ class QANode:
             print(f"[QA-NODE-GPU{self.gpu_id}] Model verified on disk.")
             return
 
-        print(f"[QA-NODE-GPU{self.gpu_id}] Model missing from disk. Downloading from Hugging Face...")
-        release_reserve('models')
-        
+        print(f"[QA-NODE-GPU{self.gpu_id}] Model missing from disk. Estimating required download size...")
+        required_gb = estimate_hf_repo_bytes(self.repo_id) / BYTES_PER_GB
+        safety_gb = max(
+            0.0,
+            float(os.environ.get("AIEROS_MODEL_DOWNLOAD_SAFETY_GB", "2.0")),
+        )
+        required_gb += safety_gb
+        print(
+            f"[QA-NODE-GPU{self.gpu_id}] Conservative model download budget: "
+            f"{required_gb:.2f} GB"
+        )
+
         offline_status = os.environ.get("HF_HUB_OFFLINE", "0")
         os.environ["HF_HUB_OFFLINE"] = "0"
-        
+
         try:
-            for attempt in range(5):
-                try:
-                    snapshot_download(
-                        repo_id=self.repo_id, 
-                        cache_dir=SYSTEM_DIRS['models']
+            with managed_storage_operation(
+                "models",
+                required_gb=required_gb,
+                require_fresh_quota=True,
+                minimum_free_gb=float(
+                    os.environ.get("AIEROS_MODEL_MIN_FREE_GB", "2.0")
+                ),
+            ):
+                for attempt in range(5):
+                    try:
+                        snapshot_download(
+                            repo_id=self.repo_id,
+                            cache_dir=SYSTEM_DIRS["models"],
+                        )
+                        print(f"[QA-NODE-GPU{self.gpu_id}] Download successful.")
+                        break
+                    except Exception as e:
+                        sleep_time = 15 * (attempt + 1)
+                        print(
+                            f"[QA-NODE-GPU{self.gpu_id}] Download error: "
+                            f"{type(e).__name__}. Retrying in {sleep_time}s..."
+                        )
+                        time.sleep(sleep_time)
+                else:
+                    raise RuntimeError(
+                        f"Failed to download {self.repo_id} after 5 attempts."
                     )
-                    print(f"[QA-NODE-GPU{self.gpu_id}] Download successful.")
-                    break
-                except Exception as e:
-                    sleep_time = 15 * (attempt + 1)
-                    print(f"[QA-NODE-GPU{self.gpu_id}] Download error: {e}. Retrying in {sleep_time}s...")
-                    time.sleep(sleep_time)
         finally:
-            resume_reserve('models')
-        
-        os.environ["HF_HUB_OFFLINE"] = offline_status
+            os.environ["HF_HUB_OFFLINE"] = offline_status
 
     def load_vlm(self):
         print(f"[QA-NODE-GPU{self.gpu_id}] Initializing Qwen2-VL-7B-Instruct for Strict Compliance Checking...")
@@ -210,15 +233,24 @@ class QANode:
             
             print(f"[QA-NODE] Applying Quality Improver: Trimming to {trim_duration}s and fading out...")
             
-            subprocess.run([
-                "ffmpeg", "-y", "-i", raw_vid_path,
-                "-vf", f"fade=t=out:st={fade_start}:d=0.5", 
-                "-t", str(trim_duration), 
-                "-c:v", "libx264", "-profile:v", "high", "-pix_fmt", "yuv420p",
-                "-crf", "16", "-r", "24",
-                "-movflags", "+faststart",
-                target_path
-            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            raw_size_gb = os.path.getsize(raw_vid_path) / BYTES_PER_GB
+            with managed_storage_operation(
+                "outputs",
+                required_gb=max(0.05, raw_size_gb * 1.25),
+                require_fresh_quota=False,
+                minimum_free_gb=float(
+                    os.environ.get("AIEROS_OUTPUT_MIN_FREE_GB", "0.05")
+                ),
+            ):
+                subprocess.run([
+                    "ffmpeg", "-y", "-i", raw_vid_path,
+                    "-vf", f"fade=t=out:st={fade_start}:d=0.5",
+                    "-t", str(trim_duration),
+                    "-c:v", "libx264", "-profile:v", "high", "-pix_fmt", "yuv420p",
+                    "-crf", "16", "-r", "24",
+                    "-movflags", "+faststart",
+                    target_path
+                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
             return True
         except Exception as e:
             print(f"[QA-NODE] Quality Improver failed: {e}")
