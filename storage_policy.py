@@ -360,6 +360,61 @@ class StoragePolicy:
         )
 
 
+
+def estimate_hf_repo_bytes(
+    repo_id: str,
+    filenames: Optional[list[str]] = None,
+    revision: Optional[str] = None,
+    timeout: float = 30.0,
+) -> int:
+    """Estimate the remote Hugging Face payload size without downloading it.
+
+    Hugging Face Hub exposes repository file sizes when files_metadata=True.
+    This function is intentionally lazy-imported so storage policy remains
+    usable when huggingface_hub is not installed.
+    """
+    try:
+        from huggingface_hub import HfApi
+    except ImportError as exc:
+        raise RuntimeError(
+            "huggingface_hub is required to estimate a Hugging Face download size"
+        ) from exc
+
+    api = HfApi()
+    info = api.model_info(
+        repo_id=repo_id,
+        revision=revision,
+        files_metadata=True,
+        timeout=timeout,
+    )
+
+    siblings = getattr(info, "siblings", None) or []
+    sizes: dict[str, int] = {}
+
+    for sibling in siblings:
+        name = getattr(sibling, "rfilename", None)
+        size = getattr(sibling, "size", None)
+        if size is None:
+            lfs = getattr(sibling, "lfs", None)
+            size = getattr(lfs, "size", None) if lfs is not None else None
+        if name and size is not None:
+            sizes[str(name)] = max(0, int(size))
+
+    if filenames is None:
+        used_storage = getattr(info, "used_storage", None)
+        if used_storage is not None:
+            return max(0, int(used_storage))
+        return sum(sizes.values())
+
+    missing = [filename for filename in filenames if filename not in sizes]
+    if missing:
+        raise RuntimeError(
+            f"Hugging Face metadata did not expose sizes for requested files "
+            f"in {repo_id}: {missing}"
+        )
+
+    return sum(sizes[filename] for filename in filenames)
+
 def format_bytes(value: Optional[int]) -> str:
     if value is None:
         return "unknown"
