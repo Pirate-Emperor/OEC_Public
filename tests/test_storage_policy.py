@@ -89,6 +89,24 @@ class StoragePolicyTests(unittest.TestCase):
             )
             self.assertFalse(ok)
 
+    def test_preflight_blocks_directory_target_overrun(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "existing.bin").write_bytes(b"x" * 90)
+            policy = StoragePolicy(
+                {
+                    "quota_snapshot_path": str(root / "missing-quota.json"),
+                    "quota_snapshot_max_age_seconds": 60,
+                }
+            )
+            ok, reason = policy.preflight(
+                root,
+                required_bytes=20,
+                target_bytes=100,
+            )
+            self.assertFalse(ok)
+            self.assertIn("directory target", reason)
+
     def test_preflight_can_fallback_to_filesystem(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
