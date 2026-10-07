@@ -9,15 +9,29 @@ import shutil
 # ==============================================================================
 
 def load_env_file():
-    """Reads a .env file from the home directory and loads it into os.environ FIRST."""
+    """Reads ~/.env and loads values into os.environ, expanding only OEC path variables."""
     env_path = os.path.expanduser("~/.env")
+    path_keys = {
+        "AIEROS_BASE_DIR",
+        "AIEROS_MODELS_DIR",
+        "AIEROS_DATASETS_DIR",
+        "AIEROS_CACHE_DIR",
+        "AIEROS_OUTPUTS_DIR",
+        "AIEROS_INPUTS_DIR",
+        "AIEROS_LOGS_DIR",
+    }
+
     if os.path.exists(env_path):
-        with open(env_path, "r") as f:
+        with open(env_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
                     key, val = line.split("=", 1)
-                    os.environ[key.strip()] = val.strip().strip("'").strip('"')
+                    key = key.strip()
+                    val = val.strip().strip("'").strip('"')
+                    if key in path_keys:
+                        val = os.path.expanduser(os.path.expandvars(val))
+                    os.environ[key] = val
         print(f"[CORE] Secrets & Config loaded successfully from {env_path}")
     else:
         print(f"[CORE] No .env file found at {env_path}. Using hardcoded defaults.")
