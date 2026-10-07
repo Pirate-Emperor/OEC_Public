@@ -22,6 +22,8 @@ notebooks = [
     "pipeline_trellis_3d_only.ipynb",
     "pipeline_wan_video.ipynb",
     "pipeline_flux_only.ipynb",
+    "phase1_test_compute_node.ipynb",
+    "phase1_test_login_node.ipynb",
 ]
 legacy_reserve = ("release_reserve(", "resume_reserve(")
 required_storage_markers = (
