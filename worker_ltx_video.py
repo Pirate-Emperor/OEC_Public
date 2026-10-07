@@ -354,12 +354,14 @@ def worker_process(gpu_id, sync_barrier=None, master_gpu="0", should_purge=True,
     
     # ---------------------------------------------------------
     # MULTI-GPU SYNCHRONIZATION & PURGE MECHANIC
-            print(f"[GPU {gpu_id}] Executing Distributed Cluster Purge...")
-            ClusterPurgeManager.sync_and_purge("Lightricks/LTX-2.3", cluster_gpus, f"GPU {gpu_id}")
-            ClusterPurgeManager.sync_and_purge("google/gemma-3-12b-it-qat-q4_0-unquantized", cluster_gpus, f"GPU {gpu_id}")
-        else:
-            print(f"[GPU {gpu_id}] VRAM loaded. Proceeding to job queue (Skipping cluster purge).")
-            
+    if cluster_gpus > 1:
+        print(f"[GPU {gpu_id}] Executing Distributed Cluster Purge...")
+        ClusterPurgeManager.sync_and_purge(
+            "Lightricks/LTX-2.3", cluster_gpus, f"GPU {gpu_id}"
+        )
+        ClusterPurgeManager.sync_and_purge(
+            "google/gemma-3-12b-it-qat-q4_0-unquantized", cluster_gpus, f"GPU {gpu_id}"
+        )
     elif sync_barrier:
         print(f"[GPU {gpu_id}] VRAM loaded. Waiting for local node synchronization...")
         sync_barrier.wait() 
