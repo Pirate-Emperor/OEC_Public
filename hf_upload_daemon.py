@@ -15,6 +15,7 @@ from huggingface_hub import HfApi
 
 # 1. IMPORT CORE CONFIG
 from core_config import UPLOAD_BATCH_SIZE_GB, HF_DATASET_REPO, QUEUE_DB_PATH, SYSTEM_DIRS
+from storage_manager import storage_preflight_path, managed_storage_operation
 
 log_path = os.path.join(SYSTEM_DIRS['logs'], "upload_daemon.log")
 logging.basicConfig(
@@ -102,6 +103,18 @@ class HFUploadDaemon:
     def __init__(self, auto_confirm: bool = False):
         self.api = HfApi()
         self.batch_limit_bytes = UPLOAD_BATCH_SIZE_GB * (1024**3)
+        self.partial_batch_max_age_seconds = max(
+            60,
+            int(os.environ.get("AIEROS_UPLOAD_PARTIAL_BATCH_MAX_AGE_SECONDS", "1800")),
+        )
+        self.archive_headroom_factor = max(
+            1.05,
+            float(os.environ.get("AIEROS_UPLOAD_ARCHIVE_HEADROOM_FACTOR", "1.15")),
+        )
+        self.archive_min_free_gb = max(
+            0.1,
+            float(os.environ.get("AIEROS_UPLOAD_ARCHIVE_MIN_FREE_GB", "1.0")),
+        )
         self.db_path = QUEUE_DB_PATH
         self.is_running = True
         
