@@ -1,5 +1,6 @@
 import json
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -8,6 +9,35 @@ import storage_manager
 
 
 class StorageManagerTests(unittest.TestCase):
+    def test_storage_preflight_path_can_use_fresh_quota(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            quota_path = root / "quota.json"
+            quota_path.write_text(
+                json.dumps({
+                    "used_bytes": 50 * 1024**3,
+                    "limit_bytes": 100 * 1024**3,
+                    "timestamp": time.time(),
+                }),
+                encoding="utf-8",
+            )
+            config_path = root / "storage_config.json"
+            config_path.write_text(
+                json.dumps({
+                    "quota_snapshot_path": str(quota_path),
+                    "quota_snapshot_max_age_seconds": 60,
+                    "directories": [],
+                }),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(storage_manager, "CONFIG_FILE", str(config_path)):
+                ok, reason = storage_manager.storage_preflight_path(
+                    root,
+                    required_gb=1,
+                    require_fresh_quota=True,
+                )
+                self.assertTrue(ok, reason)
     def test_managed_storage_operation_restores_reserve(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
