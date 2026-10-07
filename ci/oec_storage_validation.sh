@@ -39,8 +39,7 @@ for name in notebooks:
         source = "".join(cell.get("source", []))
         ast.parse(source, filename=f"{name}:cell:{index}")
 
-    source_all = "
-".join(
+    source_all = chr(10).join(
         "".join(cell.get("source", []))
         for cell in nb.get("cells", [])
         if cell.get("cell_type") == "code"
