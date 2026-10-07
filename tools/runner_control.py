@@ -158,23 +158,33 @@ def write_runner_env(runner: Path) -> None:
     if not proxy:
         return
 
-    lines = [
-        "LANG=" + os.environ.get("LANG", "en_US.UTF-8"),
-    ]
-    for key in ("LD_LIBRARY_PATH",):
-        if os.environ.get(key):
-            lines.append(f"{key}={os.environ[key]}")
+    env_file = runner / ".env"
+    existing = []
+    if env_file.is_file():
+        existing = [
+            line for line in env_file.read_text().splitlines()
+            if line and not line.startswith(("http_proxy=", "https_proxy=", "HTTP_PROXY=", "HTTPS_PROXY=", "no_proxy=", "NO_PROXY="))
+        ]
 
     # GitHub recommends lowercase proxy variables on Linux.
-    lines.append(f"https_proxy={proxy}")
-    if os.environ.get("http_proxy") or os.environ.get("HTTP_PROXY"):
-        lines.append(f"http_proxy={os.environ.get('http_proxy') or os.environ['HTTP_PROXY']}")
+    lines = existing
+    if not any(line.startswith("https_proxy=") for line in lines):
+        lines.append(f"https_proxy={proxy}")
+    else:
+        lines = [line for line in lines if not line.startswith("https_proxy=")]
+        lines.append(f"https_proxy={proxy}")
+
+    http_proxy = os.environ.get("http_proxy") or os.environ.get("HTTP_PROXY")
+    if http_proxy:
+        lines = [line for line in lines if not line.startswith("http_proxy=")]
+        lines.append(f"http_proxy={http_proxy}")
 
     no_proxy = os.environ.get("no_proxy")
     if no_proxy:
+        lines = [line for line in lines if not line.startswith("no_proxy=")]
         lines.append(f"no_proxy={no_proxy}")
 
-    (runner / ".env").write_text("\n".join(lines) + "\n")
+    env_file.write_text("\n".join(lines) + "\n")
 
 
 def download_runner(runner: Path, version: str) -> None:
@@ -323,9 +333,9 @@ def list_runners(_: argparse.Namespace) -> None:
         return
 
     found = []
-    for runner_file in root.glob("*/actions-runner/.runner"):
-        runner = runner_file.parent
-        found.append(runner)
+    for runner_file in root.rglob(".runner"):
+        if runner_file.is_file() and runner_file.parent.name == "actions-runner":
+            found.append(runner_file.parent)
 
     if not found:
         print(f"No configured runners under {root}")
