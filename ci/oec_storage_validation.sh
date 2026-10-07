@@ -41,6 +41,7 @@ with tempfile.TemporaryDirectory() as temp:
     assert payload["limit_bytes"] == 100 * 1024**3
 
 print("QUOTA SNAPSHOT WRITER: PASS")
+PY
 
 echo "=== RESERVE ALLOCATION TEST ==="
 
