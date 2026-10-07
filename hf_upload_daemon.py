@@ -192,9 +192,10 @@ class HFUploadDaemon:
             
             conn.commit()
             
-            if current_size >= self.batch_limit_bytes or (len(batch_ids) > 0 and current_size > 0): 
-                if current_size >= self.batch_limit_bytes:
-                     return batch_ids, batch_files, current_size
+            # Flush a complete batch immediately. Partial batches remain queued
+            # until the caller explicitly requests a timed/forced flush.
+            if current_size >= self.batch_limit_bytes:
+                return batch_ids, batch_files, current_size
             return [], [], 0
 
     def process_queue(self):
