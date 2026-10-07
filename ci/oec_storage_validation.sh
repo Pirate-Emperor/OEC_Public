@@ -11,12 +11,14 @@ hostname
 whoami
 
 echo "=== PYTHON SYNTAX ==="
-python -m py_compile storage_policy.py storage_manager.py worker_ltx_video.py qa_compliance_worker.py tools/quota_snapshot.py tests/test_storage_policy.py tests/test_storage_manager.py tests/test_inference_storage_integration.py
+python -m py_compile storage_policy.py storage_manager.py purge_manager.py worker_ltx_video.py qa_compliance_worker.py hf_upload_daemon.py tools/quota_snapshot.py tests/test_storage_policy.py tests/test_storage_manager.py tests/test_inference_storage_integration.py tests/test_upload_daemon_storage.py tests/test_purge_manager_safety.py
 
 echo "=== UNIT TESTS ==="
 python tests/test_storage_policy.py
 python tests/test_storage_manager.py
 python tests/test_inference_storage_integration.py
+python tests/test_upload_daemon_storage.py
+python tests/test_purge_manager_safety.py
 
 echo "=== QUOTA SNAPSHOT WRITER TEST ==="
 python - <<'PY'
