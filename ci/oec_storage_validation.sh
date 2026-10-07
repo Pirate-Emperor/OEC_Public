@@ -5,7 +5,8 @@ OEC_DIR="$HOME/OEC"
 cd "$OEC_DIR"
 
 echo "=== OEC STORAGE VALIDATION ==="
-echo "RUNNER_NAME=\${RUNNER_NAME:-unknown}"
+export PYTHONPATH="$OEC_DIR:${PYTHONPATH:-}"
+echo "RUNNER_NAME=${RUNNER_NAME:-unknown}"
 hostname
 whoami
 
