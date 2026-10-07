@@ -36,18 +36,20 @@ class JsonRpcResponse(BaseModel):
     error: Optional[Dict[str, Any]] = None
     id: str | int
 
-SECRET_KEY = os.environ.get("OEC_JWT_SECRET", "super-secret-dev-key-do-not-use-in-prod")
+SECRET_KEY = os.environ.get("OEC_JWT_SECRET")
+REQUIRED_SCOPE = "read:spatial_graph"
 
 def verify_jwt_token(request: Request) -> Dict[str, Any]:
     """
     Enforces Row-Level Security (RLS) constraints.
     Validates the JWT to ensure the DeepSeek orchestrator only queries authorized realms.
     """
+    if not SECRET_KEY or len(SECRET_KEY) < 32:
+        raise HTTPException(status_code=503, detail="JWT authentication is not configured securely")
+
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
-        # In production, this raises a 401. For local DevCluster testing, we fallback to mock scopes.
-        logger.warning("No JWT provided. Bipartite IFC defaulting to 'development_mode' scopes.")
-        return {"sub": "orchestrator_agent", "scopes": ["read:public_lore", "read:spatial_graph"]}
+        raise HTTPException(status_code=401, detail="Bearer token required")
     
     token = auth_header.split(" ")[1]
     try:
@@ -93,11 +95,13 @@ async def mcp_endpoint(rpc_req: JsonRpcRequest, auth_payload: Dict[str, Any] = D
         if rpc_req.method == "query_spatial_memory":
             query = rpc_req.params.get("query", "") if rpc_req.params else ""
             scopes = auth_payload.get("scopes", [])
-            
+            if REQUIRED_SCOPE not in scopes:
+                raise HTTPException(status_code=403, detail="Insufficient scope")
+
             pointers = execute_hybrid_rag_query(query, scopes)
             
             result_payload = {
-                "pointers": [p.dict() for p in pointers],
+                "pointers": [p.model_dump() for p in pointers],
                 "meta": {
                     "count": len(pointers),
                     "latency_ms": round((time.time() - start_time) * 1000, 2),
@@ -115,7 +119,7 @@ async def mcp_endpoint(rpc_req: JsonRpcRequest, auth_payload: Dict[str, Any] = D
             
     except Exception as e:
         logger.error(f"Internal MCP Error: {e}")
-        error_payload = {"code": -32603, "message": "Internal JSON-RPC Error", "data": str(e)}
+        error_payload = {"code": -32603, "message": "Internal JSON-RPC Error"}
         return JsonRpcResponse(id=rpc_req.id, error=error_payload)
 
 if __name__ == "__main__":
