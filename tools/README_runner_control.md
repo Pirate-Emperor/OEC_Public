@@ -69,3 +69,46 @@ For nbconvert, do not use a foreground !./run.sh cell. The controller starts the
 ## Version
 
 The default pinned runner version is 2.337.0. Override it with --version during setup.
+
+## Detailed help
+
+The controller has separate help for every command:
+
+    python ~/OEC/tools/runner_control.py --help
+    python ~/OEC/tools/runner_control.py setup --help
+    python ~/OEC/tools/runner_control.py start --help
+    python ~/OEC/tools/runner_control.py stop --help
+    python ~/OEC/tools/runner_control.py status --help
+    python ~/OEC/tools/runner_control.py remove --help
+    python ~/OEC/tools/runner_control.py download --help
+    python ~/OEC/tools/runner_control.py list --help
+
+## A100 Installation_Setup normalization
+
+The A100 host has these Installation_Setup notebooks:
+
+- ~/OEC/gpu/project/Installation_Setup.ipynb
+- ~/OEC/gpu/a3/Installation_Setup.ipynb
+- ~/OEC/gpu/a4/Installation_Setup.ipynb
+- ~/OEC/gpu/connector_1/Installation_Setup.ipynb
+- ~/OEC/gpu/connector_2/Installation_Setup.ipynb
+- ~/OEC/gpu/connector_3/Installation_Setup.ipynb
+
+Use the central normalizer rather than editing runner cells individually:
+
+    python ~/OEC/tools/normalize_installation_setup.py --dry-run
+    python ~/OEC/tools/normalize_installation_setup.py
+
+The normalizer removes old runner download/configuration/start cells, removes matching
+Installation_Setup Jupyter checkpoints, and replaces them with cells that call the
+central runner controller. It does not contain or write registration tokens.
+
+The notebook metadata defaults preserve the currently observed repository and runner
+names. They can be overridden at runtime with RUNNER_REPO_URL, RUNNER_NAME,
+RUNNER_LABELS, and RUNNER_TOKEN_ENV.
+
+## Runner location rule
+
+The controller rejects any runner directory outside OEC_ROOT/gpu. This prevents a
+notebook launched from another working directory from accidentally installing a
+runner into the notebook's current directory.
