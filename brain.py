@@ -11,6 +11,8 @@ import argparse
 from datetime import datetime
 
 from core_config import SYSTEM_DIRS
+from storage_manager import managed_storage_operation
+from storage_policy import BYTES_PER_GB, estimate_hf_repo_bytes
 
 import torch
 from transformers import pipeline
@@ -71,19 +73,67 @@ class TheBrain:
     def _initialize_llm(self):
         model_id = self.config["system_settings"]["model_id"]
         print(f"[THE BRAIN] Loading Heavy Reasoning Engine: {model_id}...")
-        
+
         try:
-            # FIX: Removed model_kwargs entirely to prevent parameter rejection errors.
-            # Passing torch_dtype directly is the safest method for Hugging Face pipelines.
-            self.llm = pipeline(
-                "text-generation",
-                model=model_id,
-                torch_dtype=torch.bfloat16,
-                device_map="auto"
-            )
+            # Local paths are already materialized and require no network/storage admission.
+            if os.path.isdir(os.path.expanduser(model_id)):
+                self.llm = pipeline(
+                    "text-generation",
+                    model=os.path.expanduser(model_id),
+                    torch_dtype=torch.bfloat16,
+                    device_map="auto",
+                )
+            else:
+                from huggingface_hub import snapshot_download
+
+                try:
+                    snapshot_download(
+                        repo_id=model_id,
+                        cache_dir=SYSTEM_DIRS["models"],
+                        local_files_only=True,
+                    )
+                    print("[THE BRAIN] Reasoning model verified in local HF cache.")
+                    self.llm = pipeline(
+                        "text-generation",
+                        model=model_id,
+                        torch_dtype=torch.bfloat16,
+                        device_map="auto",
+                    )
+                except Exception:
+                    required_gb = (
+                        estimate_hf_repo_bytes(model_id) / BYTES_PER_GB
+                        + max(
+                            0.0,
+                            float(
+                                os.environ.get(
+                                    "AIEROS_MODEL_DOWNLOAD_SAFETY_GB",
+                                    "2.0",
+                                )
+                            ),
+                        )
+                    )
+                    print(
+                        f"[THE BRAIN] Model cache incomplete. "
+                        f"Storage admission budget: {required_gb:.2f} GB"
+                    )
+                    with managed_storage_operation(
+                        "models",
+                        required_gb=required_gb,
+                        require_fresh_quota=True,
+                        minimum_free_gb=float(
+                            os.environ.get("AIEROS_MODEL_MIN_FREE_GB", "2.0")
+                        ),
+                    ):
+                        self.llm = pipeline(
+                            "text-generation",
+                            model=model_id,
+                            torch_dtype=torch.bfloat16,
+                            device_map="auto",
+                        )
+
             print("[THE BRAIN] A100 Neural Logic initialized. Ready to dream.")
         except Exception as e:
-            print(f"[CRITICAL] LLM Initialization Failed: {e}")
+            print(f"[CRITICAL] LLM Initialization Failed: {type(e).__name__}: {e}")
             sys.exit(1)
 
     def get_current_job_count(self, use_case_id):
