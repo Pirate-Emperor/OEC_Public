@@ -243,10 +243,10 @@ class HFUploadDaemon:
     def process_queue(self):
         logging.info("Daemon started. Polling queue in background...")
         while self.is_running:
-            batch_ids, tar_path = [], None
+            batch_ids, tar_path, batch_forced = [], None, False
             
             try:
-                batch_ids, batch_files, total_size = self._get_pending_batch()
+                batch_ids, batch_files, total_size, batch_forced = self._get_pending_batch()
                 
                 if not batch_ids:
                     # Short sleep loop so it responds to Ctrl+C quickly
@@ -255,7 +255,16 @@ class HFUploadDaemon:
                         time.sleep(1)
                     continue
                 
-                logging.info(f"Batch threshold reached! Packing {len(batch_ids)//2} asset pairs ({total_size / (1024**3):.2f} GB)...")
+                if batch_forced:
+                    logging.info(
+                        f"Timed partial flush: packing {len(batch_ids)//2} asset pairs "
+                        f"({total_size / (1024**3):.2f} GB)..."
+                    )
+                else:
+                    logging.info(
+                        f"Batch threshold reached! Packing {len(batch_ids)//2} asset pairs "
+                        f"({total_size / (1024**3):.2f} GB)..."
+                    )
                 
                 with sqlite3.connect(self.db_path) as conn:
                     conn.execute(f"UPDATE assets SET status = 'ARCHIVING' WHERE id IN ({','.join(map(str, batch_ids))})")
@@ -280,8 +289,24 @@ class HFUploadDaemon:
                 start_id = batch_ids[0]
                 
                 tar_name = f"{timestamp}_batch_{start_id}_{num_pairs}items_{size_mb}MB_{asset_type}_{model_name}.tar.gz"
-                tar_path = os.path.join(SYSTEM_DIRS['cache'], tar_name)
-                
+                tar_path = os.path.join(SYSTEM_DIRS["cache"], tar_name)
+
+                archive_budget_bytes = int(
+                    total_size * self.archive_headroom_factor
+                    + 128 * 1024 * 1024
+                )
+                archive_budget_gb = archive_budget_bytes / (1024**3)
+                ok, reason = storage_preflight_path(
+                    SYSTEM_DIRS["cache"],
+                    required_gb=archive_budget_gb,
+                    require_fresh_quota=True,
+                    minimum_free_gb=self.archive_min_free_gb,
+                )
+                if not ok:
+                    raise RuntimeError(
+                        f"Archive storage admission denied: {reason}"
+                    )
+
                 with tarfile.open(tar_path, "w:gz") as tar:
                     for file_path in batch_files:
                         tar.add(file_path, arcname=Path(file_path).name)
