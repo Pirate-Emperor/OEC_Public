@@ -68,9 +68,8 @@ os.makedirs(REJECTED_DIR, exist_ok=True)
 try:
     from qwen_vl_utils import process_vision_info
 except ImportError:
-    print("[QA-NODE] qwen-vl-utils not found. Installing via Pip...")
-    subprocess.run([sys.executable, "-m", "pip", "install", "qwen-vl-utils", "torchvision"], check=True)
-    from qwen_vl_utils import process_vision_info
+    process_vision_info = None
+    print("[QA-NODE] qwen-vl-utils is not installed; VLM QA cannot run until the dependency is installed.")
 
 class QANode:
     def __init__(self, gpu_id=0, purge_after_load=True):
