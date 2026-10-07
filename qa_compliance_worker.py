@@ -20,7 +20,7 @@ from PIL import Image
 
 # STRICT DISK MANAGER IMPORT
 from purge_manager import DiskPurgeManager
-from storage_manager import managed_storage_operation, storage_preflight
+from storage_manager import managed_storage_operation
 from storage_policy import BYTES_PER_GB, estimate_hf_repo_bytes
 
 # ==============================================================================
@@ -85,12 +85,18 @@ class QANode:
     def _ensure_downloaded_robustly(self):
         from huggingface_hub import snapshot_download
         
-        target_dir = DiskPurgeManager.get_hf_cache_dir(self.repo_id)
-        if os.path.exists(target_dir):
-            print(f"[QA-NODE-GPU{self.gpu_id}] Model verified on disk.")
+        try:
+            snapshot_download(
+                repo_id=self.repo_id,
+                cache_dir=SYSTEM_DIRS["models"],
+                local_files_only=True,
+            )
+            print(f"[QA-NODE-GPU{self.gpu_id}] Model verified in local HF cache.")
             return
+        except Exception:
+            pass
 
-        print(f"[QA-NODE-GPU{self.gpu_id}] Model missing from disk. Estimating required download size...")
+        print(f"[QA-NODE-GPU{self.gpu_id}] Model missing or incomplete. Estimating required download size...")
         required_gb = estimate_hf_repo_bytes(self.repo_id) / BYTES_PER_GB
         safety_gb = max(
             0.0,
