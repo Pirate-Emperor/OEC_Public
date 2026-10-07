@@ -4,6 +4,7 @@ import logging
 import urllib.request
 import json
 import argparse
+import shutil
 
 # Import unified directories
 from core_config import SYSTEM_DIRS
@@ -136,6 +137,165 @@ def get_actual_folder_size(folder_path):
         logging.error(f"Error calculating folder size for {folder_path}: {e}")
     return total_size
 
+
+def _dir_cfg(config, dir_name):
+    for item in config.get("directories", []):
+        if item.get("name") == dir_name:
+            return item
+    raise SystemExit(f"Unknown managed storage directory: {dir_name}")
+
+
+def _folder_path(dir_name):
+    folder = SYSTEM_DIRS.get(dir_name)
+    if not folder:
+        raise SystemExit(f"Storage directory is not defined by core_config: {dir_name}")
+    return os.path.abspath(os.path.expanduser(folder))
+
+
+def _reserve_path(folder_path):
+    return os.path.join(folder_path, RESERVE_FILENAME)
+
+
+def _lock_path(folder_path):
+    return os.path.join(folder_path, LOCK_FILENAME)
+
+
+def _reserve_size_bytes(folder_path):
+    path = _reserve_path(folder_path)
+    try:
+        return os.path.getsize(path) if os.path.isfile(path) else 0
+    except OSError:
+        return 0
+
+
+def _filesystem_free_bytes(folder_path):
+    try:
+        return shutil.disk_usage(folder_path).free
+    except OSError:
+        return 0
+
+
+def _status_for(config, dir_name, required_gb=0.0, margin_gb=0.0):
+    cfg = _dir_cfg(config, dir_name)
+    folder = _folder_path(dir_name)
+    os.makedirs(folder, exist_ok=True)
+
+    actual_bytes = get_actual_folder_size(folder)
+    target_bytes = int(float(cfg["target_allocation_gb"]) * (1024**3))
+    reserve_bytes = _reserve_size_bytes(folder)
+    free_bytes = _filesystem_free_bytes(folder)
+    lock_path = _lock_path(folder)
+    locked = os.path.exists(lock_path)
+    required_bytes = int(max(0.0, required_gb) * (1024**3))
+    margin_bytes = int(max(0.0, margin_gb) * (1024**3))
+
+    # The reserve file is intentionally treated as reclaimable capacity.
+    # This is the conservative quota budget the manager controls even when
+    # quota_check is available only from the login node.
+    managed_headroom = max(target_bytes - actual_bytes, 0)
+    safe_headroom = max(managed_headroom - margin_bytes, 0)
+    safe_for_request = (
+        actual_bytes + required_bytes + margin_bytes <= target_bytes
+        and free_bytes + reserve_bytes >= required_bytes + margin_bytes
+    )
+
+    return {
+        "directory": dir_name,
+        "path": folder,
+        "actual_bytes": actual_bytes,
+        "actual_gb": actual_bytes / (1024**3),
+        "target_bytes": target_bytes,
+        "target_gb": float(cfg["target_allocation_gb"]),
+        "reserve_bytes": reserve_bytes,
+        "reserve_gb": reserve_bytes / (1024**3),
+        "filesystem_free_bytes": free_bytes,
+        "filesystem_free_gb": free_bytes / (1024**3),
+        "managed_headroom_bytes": managed_headroom,
+        "managed_headroom_gb": managed_headroom / (1024**3),
+        "safe_headroom_bytes": safe_headroom,
+        "safe_headroom_gb": safe_headroom / (1024**3),
+        "required_gb": max(0.0, required_gb),
+        "margin_gb": max(0.0, margin_gb),
+        "locked": locked,
+        "safe_for_request": safe_for_request,
+    }
+
+
+def print_status(config, dir_name=None, required_gb=0.0, margin_gb=0.0, as_json=False):
+    names = [dir_name] if dir_name else [x["name"] for x in config.get("directories", [])]
+    states = [_status_for(config, name, required_gb, margin_gb) for name in names]
+
+    if as_json:
+        print(json.dumps(states[0] if dir_name else states, indent=2))
+        return states
+
+    print("==================================================")
+    print("AIEROS Storage Manager Status")
+    print("==================================================")
+    for state in states:
+        print(f"[{state['directory']}] {state['path']}")
+        print(f"  Actual usage        : {state['actual_gb']:.2f} GB")
+        print(f"  Managed target      : {state['target_gb']:.2f} GB")
+        print(f"  Managed headroom    : {state['managed_headroom_gb']:.2f} GB")
+        print(f"  Reserve file        : {state['reserve_gb']:.2f} GB")
+        print(f"  Filesystem free     : {state['filesystem_free_gb']:.2f} GB")
+        print(f"  Download lock       : {'YES' if state['locked'] else 'NO'}")
+        if state["required_gb"] > 0:
+            print(f"  Requested capacity  : {state['required_gb']:.2f} GB")
+            print(f"  Safety margin       : {state['margin_gb']:.2f} GB")
+            print(f"  Request is safe     : {'YES' if state['safe_for_request'] else 'NO'}")
+        print()
+
+
+def check_capacity(config, dir_name, required_gb, margin_gb=2.0):
+    state = _status_for(config, dir_name, required_gb, margin_gb)
+    if not state["safe_for_request"]:
+        print_status(config, dir_name, required_gb, margin_gb)
+        raise SystemExit(
+            f"Insufficient managed headroom for {required_gb:.2f} GB in '{dir_name}'. "
+            f"Safe headroom: {state['safe_headroom_gb']:.2f} GB."
+        )
+    print(
+        f"[STORAGE] {dir_name}: request {required_gb:.2f} GB is within "
+        f"managed safe headroom {state['safe_headroom_gb']:.2f} GB."
+    )
+    return state
+
+
+def release_checked(config, dir_name, required_gb=0.0, margin_gb=2.0):
+    check_capacity(config, dir_name, required_gb, margin_gb)
+    release_reserve(dir_name)
+
+
+def resume_and_restore(config, dir_name):
+    resume_reserve(dir_name)
+    cfg = _dir_cfg(config, dir_name)
+    folder = _folder_path(dir_name)
+    target_bytes = int(float(cfg["target_allocation_gb"]) * (1024**3))
+    actual_bytes = get_actual_folder_size(folder)
+    reserve_needed = max(target_bytes - actual_bytes, 0)
+
+    if reserve_needed <= 0:
+        logging.info(f"[{dir_name}] No reserve needed; managed target already reached.")
+        return
+
+    reserve_file = _reserve_path(folder)
+    fd = None
+    try:
+        fd = os.open(reserve_file, os.O_CREAT | os.O_WRONLY)
+        os.ftruncate(fd, reserve_needed)
+        os.posix_fallocate(fd, 0, reserve_needed)
+        logging.info(
+            f"[{dir_name}] Reserve restored: {reserve_needed / (1024**3):.2f} GB."
+        )
+    finally:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+
 def load_config():
     if not os.path.exists(CONFIG_FILE):
         default_config = {
@@ -239,33 +399,74 @@ def manage_allocations():
 
         time.sleep(polling_interval)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="AIEROS Multi-Directory Storage Manager",
-        epilog="""
-================================================================================
-HOW IT WORKS:
-This script prevents 'Disk Full' crashes during 24/7 AI generation. It creates 
-massive dummy files (.storage_reserve.bin) to aggressively pre-allocate space. 
-When your AI workers need to download a huge model, they temporarily 'release' 
-this dummy file to make room, then 'resume' it later.
+        description=(
+            "AIEROS Multi-Directory Storage Manager. Maintains reclaimable reserve "
+            "files and prevents managed storage areas from crossing configured limits."
+        ),
+        epilog="""COMMANDS:
+  python storage_manager.py
+      Run the continuous reserve-management loop.
 
-COMMANDS:
-  python storage_manager.py           -> Starts the continuous monitoring daemon.
-  python storage_manager.py --clean   -> Instantly deletes all dummy files to free space.
-================================================================================
-        """,
-        formatter_class=argparse.RawTextHelpFormatter
+  python storage_manager.py --status
+      Show actual usage, managed target, reserve size, and filesystem free space.
+
+  python storage_manager.py --check models --required-gb 12 --margin-gb 2
+      Verify that a download can safely fit in the managed models allocation.
+
+  python storage_manager.py --release models --required-gb 12
+      Verify capacity, then release the models reserve and create the pause lock.
+      The caller must later use --resume to restore protection.
+
+  python storage_manager.py --resume models
+      Remove the pause lock and immediately recreate the reserve to the target.
+
+  python storage_manager.py --clean
+      Delete all reserve and lock files to reclaim space immediately.
+
+  python storage_manager.py --test-webhook
+      Send a test Discord notification using the configured environment variable.
+
+DESIGN:
+  The reserve file is deliberate: it reserves quota-controlled capacity without
+  placing AI computation on the login node. True quota_check output is not assumed
+  to be available from a compute node; the manager therefore uses its configured
+  target as the conservative managed budget and also checks filesystem free space.
+
+SECURITY:
+  Discord webhook URLs and runner/API secrets must be supplied through environment
+  variables or another secret store. Never put them in this file or a notebook.
+""",
+        formatter_class=argparse.RawTextHelpFormatter,
     )
-    
-    parser.add_argument("--test-webhook", action="store_true", help="Instantly fire a test message to the configured Discord webhook.")
-    parser.add_argument("--clean", action="store_true", help="Instantly locate and delete all .storage_reserve.bin and .storage_pause.lock files to free up disk space.")
-    
-    args = parser.parse_args()
 
+    parser.add_argument("--status", action="store_true", help="Show managed storage status instead of starting the daemon.")
+    parser.add_argument("--check", metavar="DIR", help="Check whether a requested download fits safely in one managed directory.")
+    parser.add_argument("--required-gb", type=float, default=0.0, help="Expected additional storage required, in GiB (used by --check/--release).")
+    parser.add_argument("--margin-gb", type=float, default=2.0, help="Safety margin in GiB for capacity checks (default: 2).")
+    parser.add_argument("--release", metavar="DIR", help="Release the reserve for a managed directory after a capacity check.")
+    parser.add_argument("--resume", metavar="DIR", help="Resume reserve protection and recreate the reserve immediately.")
+    parser.add_argument("--json", action="store_true", help="With --status, emit machine-readable JSON.")
+    parser.add_argument("--test-webhook", action="store_true", help="Send a test Discord notification using the configured environment variable.")
+    parser.add_argument("--clean", action="store_true", help="Delete all reserve and pause-lock files immediately.")
+
+    args = parser.parse_args()
     config = load_config()
 
-    if args.test_webhook:
+    if not config:
+        raise SystemExit("Storage configuration could not be loaded.")
+
+    if args.status:
+        print_status(config, as_json=args.json)
+    elif args.check:
+        check_capacity(config, args.check, args.required_gb, args.margin_gb)
+    elif args.release:
+        release_checked(config, args.release, args.required_gb, args.margin_gb)
+    elif args.resume:
+        resume_and_restore(config, args.resume)
+    elif args.test_webhook:
         webhook_env = config.get("discord_webhook_env", "AIEROS_DISCORD_WEBHOOK_URL")
         test_discord_webhook(os.environ.get(webhook_env, ""))
     elif args.clean:
@@ -277,3 +478,4 @@ COMMANDS:
             print("\n[STORAGE] Shutdown requested. Cleaning up reserve files...")
             clean_all_reserves(config)
             print("[STORAGE] Exited safely.")
+
