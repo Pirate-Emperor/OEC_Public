@@ -152,7 +152,8 @@ def clear_system_trash():
             except Exception as e:
                 print(f"[CORE] Could not clean {path}: {e}")
                 
-# Auto-initialize non-interactive parts when imported by worker nodes
+# Auto-configure storage and proxy environment when imported by workers.
+# Destructive cleanup remains explicit via initialize_environment() so imports
+# have no filesystem-deletion side effects.
 map_storage()
 set_hpc_proxies()
-clear_system_trash()
