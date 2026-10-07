@@ -10,6 +10,53 @@ echo "RUNNER_NAME=${RUNNER_NAME:-unknown}"
 hostname
 whoami
 
+echo "=== NOTEBOOK JSON / AST VALIDATION ==="
+python - <<'PY'
+import ast
+import json
+from pathlib import Path
+
+notebooks = [
+    "pipeline_ltx_video.ipynb",
+    "pipeline_trellis_3d.ipynb",
+    "pipeline_trellis_3d_only.ipynb",
+    "pipeline_wan_video.ipynb",
+    "pipeline_flux_only.ipynb",
+]
+legacy_reserve = ("release_reserve(", "resume_reserve(")
+required_storage_markers = (
+    "managed_storage_operation",
+    "estimate_hf_repo_bytes",
+)
+
+for name in notebooks:
+    nb = json.loads(Path(name).read_text(encoding="utf-8"))
+    for index, cell in enumerate(nb.get("cells", [])):
+        if cell.get("cell_type") != "code":
+            continue
+        source = "".join(cell.get("source", []))
+        ast.parse(source, filename=f"{name}:cell:{index}")
+
+    source_all = "
+".join(
+        "".join(cell.get("source", []))
+        for cell in nb.get("cells", [])
+        if cell.get("cell_type") == "code"
+    )
+
+    assert not any(token in source_all for token in legacy_reserve), (
+        f"{name} still contains legacy reserve API calls"
+    )
+
+    has_model_load = "from_pretrained(" in source_all or "snapshot_download(" in source_all
+    if has_model_load:
+        assert "managed_storage_operation" in source_all, (
+            f"{name} has model loading without storage admission"
+        )
+
+print("Notebook JSON/AST validation: PASS")
+PY
+
 echo "=== PYTHON SYNTAX ==="
 python -m py_compile storage_policy.py storage_manager.py purge_manager.py worker_ltx_video.py qa_compliance_worker.py hf_upload_daemon.py tools/quota_snapshot.py tests/test_storage_policy.py tests/test_storage_manager.py tests/test_inference_storage_integration.py tests/test_upload_daemon_storage.py tests/test_purge_manager_safety.py
 
