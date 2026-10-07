@@ -416,6 +416,7 @@ def managed_storage_operation(
             handle.flush()
             os.fsync(handle.fileno())
 
+        operation_error = None
         try:
             if os.path.exists(reserve_file):
                 os.remove(reserve_file)
@@ -425,7 +426,11 @@ def managed_storage_operation(
                 float(required_gb),
             )
             yield
+        except BaseException as exc:
+            operation_error = exc
+            raise
         finally:
+            restore_error = None
             try:
                 if os.path.exists(lock_file):
                     os.remove(lock_file)
@@ -435,7 +440,10 @@ def managed_storage_operation(
                     RESERVE_FILENAME,
                     LOCK_FILENAME,
                 )
-                reserve_needed = max(0, int(target_gb * BYTES_PER_GB) - decision.actual_bytes)
+                reserve_needed = max(
+                    0,
+                    int(target_gb * BYTES_PER_GB) - decision.actual_bytes,
+                )
                 ensure_reserve_file(
                     reserve_file,
                     reserve_needed,
@@ -447,12 +455,15 @@ def managed_storage_operation(
                     reserve_needed / BYTES_PER_GB,
                 )
             except Exception as exc:
+                restore_error = exc
                 logging.error(
                     "Failed to restore storage reserve for '%s': %s",
                     dir_name,
                     type(exc).__name__,
                 )
-                raise
+
+            if restore_error is not None and operation_error is None:
+                raise restore_error
 
 
 def print_status(config):
