@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-OEC_DIR="$HOME/OEC"
+OEC_DIR="${OEC_DIR:-$HOME/OEC}"
 cd "$OEC_DIR"
 
 echo "=== OEC STORAGE VALIDATION ==="
