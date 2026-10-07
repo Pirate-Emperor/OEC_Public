@@ -5,7 +5,6 @@ print("[SYSTEM] Core proxies, storage mapping, and HF Auth executed automaticall
 import os
 import sys
 import subprocess
-import shutil
 import random
 import time
 import glob
@@ -20,7 +19,8 @@ import numpy as np
 
 # STRICT DISK MANAGER IMPORT
 from purge_manager import DiskPurgeManager, ClusterPurgeManager
-from storage_manager import release_reserve, resume_reserve
+from storage_manager import managed_storage_operation
+from storage_policy import BYTES_PER_GB, estimate_hf_repo_bytes
 
 os.environ["TORCH_COMPILE_DISABLE"] = "1"
 os.environ["TORCHDYNAMO_DISABLE"] = "1"
@@ -30,40 +30,44 @@ os.environ["HF_HUB_USE_XET"] = "0"
 os.environ["no_proxy"] = "localhost, 127.0.0.1, ::1, 0.0.0.0"
 os.environ["NO_PROXY"] = "localhost, 127.0.0.1, ::1, 0.0.0.0"
 
-# 2. DEPENDENCY & REPO SETUP (Must run before heavy imports)
-print("Verifying xformers (v0.0.28.post3 for Torch 2.5.1)...")
-subprocess.run([sys.executable, "-m", "pip", "install", "xformers==0.0.28.post3", "--no-deps", "--no-build-isolation"], check=False)
-
+# 2. RUNTIME DEPENDENCY / SOURCE PATHS
+# Runtime workers must not install packages or clone repositories as an import
+# side effect. Prepare the pinned LTX-2 checkout explicitly beforehand.
 LTX_REPO_URL = "https://github.com/Lightricks/LTX-2.git"
-LTX_REPO_DIR = os.path.abspath(os.path.join(os.getcwd(), "LTX-2"))
 LTX_COMMIT_SHA = "ae855f8538843825f9015a419cf4ba5edaf5eec2"
+LTX_REPO_DIR = os.path.abspath(
+    os.environ.get(
+        "AIEROS_LTX_REPO_DIR",
+        os.path.join(core_config.SYSTEM_DIRS["cache"], "third_party", "LTX-2"),
+    )
+)
 LTX_CORE_DIR = os.path.join(LTX_REPO_DIR, "packages", "ltx-core")
 
-if os.path.exists(LTX_REPO_DIR) and not os.path.exists(LTX_CORE_DIR):
-    print(f"[SYSTEM] Detected corrupt/incomplete clone at {LTX_REPO_DIR}. Wiping...")
-    shutil.rmtree(LTX_REPO_DIR)
+def ensure_ltx_runtime():
+    """Validate the explicitly prepared pinned LTX runtime without mutating it."""
+    if not os.path.isdir(LTX_CORE_DIR):
+        raise RuntimeError(
+            "LTX-2 runtime is not prepared. Expected the pinned checkout at "
+            f"{LTX_REPO_DIR}. Run the explicit LTX setup step before starting the worker."
+        )
 
-if not os.path.exists(LTX_REPO_DIR):
-    print(f"[SYSTEM] Cloning {LTX_REPO_URL}...")
-    subprocess.run(["git", "init", LTX_REPO_DIR], check=True)
-    subprocess.run(["git", "remote", "add", "origin", LTX_REPO_URL], cwd=LTX_REPO_DIR, check=True)
-    subprocess.run(["git", "fetch", "--depth", "1", "origin", LTX_COMMIT_SHA], cwd=LTX_REPO_DIR, check=True)
-    subprocess.run(["git", "checkout", LTX_COMMIT_SHA], cwd=LTX_REPO_DIR, check=True)
-    
-    print("[SYSTEM] Installing ltx-core and ltx-pipelines from cloned repo...")
-    subprocess.run(
-        [sys.executable, "-m", "pip", "install", "--force-reinstall", "--no-deps", "-e",
-         LTX_CORE_DIR,
-         "-e", os.path.join(LTX_REPO_DIR, "packages", "ltx-pipelines")],
-        check=True,
-    )
+    try:
+        import xformers  # noqa: F401
+    except ImportError as exc:
+        raise RuntimeError(
+            "xformers is not installed in the active environment. "
+            "Install it during environment setup; the inference worker will not "
+            "pip-install dependencies at runtime."
+        ) from exc
 
-# Inject repo paths into Python's module search so we can import them below
-sys.path.insert(0, os.path.join(LTX_REPO_DIR, "packages", "ltx-pipelines", "src"))
-sys.path.insert(0, os.path.join(LTX_REPO_DIR, "packages", "ltx-core", "src"))
-print("[SYSTEM] LTX-2 codebase successfully installed and mapped!")
+    pipeline_src = os.path.join(LTX_REPO_DIR, "packages", "ltx-pipelines", "src")
+    core_src = os.path.join(LTX_CORE_DIR, "src")
+    if pipeline_src not in sys.path:
+        sys.path.insert(0, pipeline_src)
+    if core_src not in sys.path:
+        sys.path.insert(0, core_src)
 
-# 3. HEAVY ML IMPORTS
+# 3. HEAVY ML IMPORTS# 3. HEAVY ML IMPORTS
 import torch
 import gradio as gr
 from huggingface_hub import hf_hub_download, snapshot_download
@@ -117,8 +121,7 @@ def get_best_gpu():
         print(f"[SYSTEM] Auto-selected GPU {best_gpu} ({memory_free[best_gpu]} MB free)")
         return str(best_gpu)
     except Exception as e:
-        print(f"[SYSTEM] Failed to auto-allocate GPU: {e}. Defaulting to GPU 0.")
-        return "0"
+        raise RuntimeError(f"Could not determine available GPU memory via nvidia-smi: {e}") from e
 
 # ==============================================================================
 # 5. ML PATCHES & PIPELINE LOADING
@@ -180,10 +183,54 @@ def apply_fuse_patches():
     SafetensorsStateDictLoader.load = _patched_load
     print("[FUSE-PATCH] SafetensorsStateDictLoader.load replaced (chunked-read)")
 
+def _estimate_ltx_model_download_gb():
+    """Conservative remote-size estimate used only when the local cache is incomplete."""
+    ltx_files = [
+        "ltx-2.3-22b-distilled-1.1.safetensors",
+        "ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+    ]
+    total_bytes = estimate_hf_repo_bytes(
+        "Lightricks/LTX-2.3",
+        filenames=ltx_files,
+    )
+    total_bytes += estimate_hf_repo_bytes(
+        "google/gemma-3-12b-it-qat-q4_0-unquantized",
+    )
+    safety_gb = max(
+        0.0,
+        float(os.environ.get("AIEROS_MODEL_DOWNLOAD_SAFETY_GB", "2.0")),
+    )
+    return total_bytes / BYTES_PER_GB + safety_gb
+
+
+def _estimate_output_gb(duration, output_type="video"):
+    """Estimate a conservative per-take output budget before encoding."""
+    if output_type != "video":
+        return max(0.02, float(os.environ.get("AIEROS_IMAGE_OUTPUT_BUDGET_GB", "0.05")))
+
+    bitrate_mbps = max(
+        1.0,
+        float(os.environ.get("AIEROS_OUTPUT_ESTIMATE_BITRATE_MBPS", "100")),
+    )
+    safety_factor = max(
+        1.0,
+        float(os.environ.get("AIEROS_OUTPUT_ESTIMATE_SAFETY_FACTOR", "2.0")),
+    )
+    estimated_bytes = (
+        max(0.1, float(duration))
+        * bitrate_mbps
+        * 1_000_000
+        / 8.0
+        * safety_factor
+    )
+    return estimated_bytes / BYTES_PER_GB
+
+
 def load_pipeline_instance(gpu_id):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+    ensure_ltx_runtime()
     apply_fuse_patches()
-    
+
     from ltx_core.quantization import QuantizationPolicy
     from ltx_pipelines.distilled import DistilledPipeline
 
@@ -205,14 +252,30 @@ def load_pipeline_instance(gpu_id):
         gemma_root = snapshot_download(repo_id="google/gemma-3-12b-it-qat-q4_0-unquantized", local_files_only=True)
         print(f"[GPU {gpu_id}] Cache hit! Models verified offline.")
     except Exception:
-        print(f"[GPU {gpu_id}] Cache miss or partial. Pausing storage manager for massive download...")
-        release_reserve('models')
-        try:
-            distilled_checkpoint_path = robust_download(hf_hub_download, repo_id="Lightricks/LTX-2.3", filename="ltx-2.3-22b-distilled-1.1.safetensors")
-            spatial_upsampler_path = robust_download(hf_hub_download, repo_id="Lightricks/LTX-2.3", filename="ltx-2.3-spatial-upscaler-x2-1.1.safetensors")
-            gemma_root = robust_download(snapshot_download, repo_id="google/gemma-3-12b-it-qat-q4_0-unquantized")
-        finally:
-            resume_reserve('models')
+        print(f"[GPU {gpu_id}] Cache miss or partial. Estimating required download size before transfer...")
+        required_gb = _estimate_ltx_model_download_gb()
+        print(f"[GPU {gpu_id}] Conservative model download budget: {required_gb:.2f} GB")
+
+        with managed_storage_operation(
+            "models",
+            required_gb=required_gb,
+            require_fresh_quota=True,
+            minimum_free_gb=float(os.environ.get("AIEROS_MODEL_MIN_FREE_GB", "2.0")),
+        ):
+            distilled_checkpoint_path = robust_download(
+                hf_hub_download,
+                repo_id="Lightricks/LTX-2.3",
+                filename="ltx-2.3-22b-distilled-1.1.safetensors",
+            )
+            spatial_upsampler_path = robust_download(
+                hf_hub_download,
+                repo_id="Lightricks/LTX-2.3",
+                filename="ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+            )
+            gemma_root = robust_download(
+                snapshot_download,
+                repo_id="google/gemma-3-12b-it-qat-q4_0-unquantized",
+            )
 
     print(f"[GPU {gpu_id}] Loading DistilledPipeline...")
     pipeline = DistilledPipeline(
@@ -274,9 +337,13 @@ def generate_asset(pipeline, target_gpu_id, input_image, prompt: str, duration: 
 
             output_video_path = AIEROS_OUTPUT_DIR / f"{base_filename}.mp4"
             output_json_path = AIEROS_OUTPUT_DIR / f"{base_filename}_info.json"
-            
-            encode_video(video=video, fps=fps, audio=None, output_path=str(output_video_path), video_chunks_number=video_chunks_number)
-            
+
+            output_budget_gb = _estimate_output_gb(duration, output_type)
+            print(
+                f"[GPU {target_gpu_id}] Output storage budget: "
+                f"{output_budget_gb:.3f} GB for this take"
+            )
+
             metadata = {
                 "timestamp": timestamp,
                 "model_type": MODEL_TYPE,
@@ -291,9 +358,23 @@ def generate_asset(pipeline, target_gpu_id, input_image, prompt: str, duration: 
                     "audio_muted": True
                 }
             }
-            with open(output_json_path, "w") as json_file:
-                json.dump(metadata, json_file, indent=4)
-                
+            with managed_storage_operation(
+                "outputs",
+                required_gb=output_budget_gb,
+                require_fresh_quota=False,
+                minimum_free_gb=float(os.environ.get("AIEROS_OUTPUT_MIN_FREE_GB", "0.05")),
+            ):
+                encode_video(
+                    video=video,
+                    fps=fps,
+                    audio=None,
+                    output_path=str(output_video_path),
+                    video_chunks_number=video_chunks_number,
+                )
+
+                with open(output_json_path, "w", encoding="utf-8") as json_file:
+                    json.dump(metadata, json_file, indent=4)
+
             print(f"[GPU {target_gpu_id}] Saved SILENT {output_type} to: {output_video_path}")
             return str(output_video_path), str(output_json_path), current_seed
         
