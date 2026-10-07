@@ -372,6 +372,18 @@ def managed_storage_operation(
                 f"Storage directory '{dir_name}' already has an active operation"
             )
 
+        # Re-check after obtaining the exclusive lock so two callers cannot
+        # both pass a stale preflight and then consume the same headroom.
+        ok, reason = policy.preflight(
+            folder_path,
+            required_bytes=max(0.0, float(required_gb)) * BYTES_PER_GB,
+            minimum_free_bytes=max(0.0, float(minimum_free_gb)) * BYTES_PER_GB,
+            require_fresh_quota=require_fresh_quota,
+            target_bytes=int(target_gb * BYTES_PER_GB),
+        )
+        if not ok:
+            raise RuntimeError(f"Storage admission denied for '{dir_name}': {reason}")
+
         with open(lock_file, "w", encoding="utf-8") as handle:
             handle.write(f"pid={os.getpid()}\ntime={time.time():.6f}\n")
             handle.flush()
