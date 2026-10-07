@@ -165,7 +165,9 @@ for repo in . oec_deploy oec_aireos/Full_Model oec_aireos/Freezed oec_aireos/MOE
 done
 
 echo "=== CORE IMPORT SMOKE ==="
-python - <<'PY'
+TEST_PYTHON="${GPU_PYTHON:-python}"
+echo "Import-test interpreter: $TEST_PYTHON"
+"$TEST_PYTHON" - <<'PY'
 import core_config
 import brain
 import storage_manager
