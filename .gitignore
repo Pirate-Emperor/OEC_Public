@@ -64,3 +64,20 @@ Wan2.1/
 LTX-2/
 
 Miniconda3-latest-Linux-x86_64.sh
+
+# System / user-home state -- never part of OEC
+.Xauthority
+.anaconda/
+.bash_history
+.bash_logout
+.bashrc
+.config/
+.forward
+.ipython/
+.jupyter/
+.local/
+.profile
+.screenrc
+.ssh/
+.viminfo
+Documents/NVIDIA Nsight Compute/
