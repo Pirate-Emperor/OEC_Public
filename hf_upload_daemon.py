@@ -387,36 +387,43 @@ if __name__ == "__main__":
     if args.generate_dummy:
         print("\n[TESTING] Generating dummy payload to trigger upload threshold...")
         queue = AssetQueue()
-        dummy_dir = os.path.join(SYSTEM_DIRS['outputs'], "videos")
-        os.makedirs(dummy_dir, exist_ok=True)
-        
-        for i in range(2): # Generates 600MB total
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            vid_name = f"{timestamp}_video_dummy_{i}.mp4"
-            json_name = f"{timestamp}_video_dummy_{i}_info.json"
-            vid_path = os.path.join(dummy_dir, vid_name)
-            json_path = os.path.join(dummy_dir, json_name)
-            
-            # Write 300MB of zero-bytes to simulate a large video instantly
-            print(f"Creating large dummy file: {vid_name} (~300MB)...")
-            with open(vid_path, "wb") as f:
-                f.write(b'\0' * (300 * 1024 * 1024))
-            
-            # Write paired JSON metadata
-            with open(json_path, "w") as f:
-                json.dump({
-                    "timestamp": timestamp, 
-                    "model_type": "dummy_test_model", 
-                    "output_type": "video", 
-                    "file_name": vid_name, 
-                    "generation_parameters": {"dummy_data": True, "size": "300MB"}
-                }, f, indent=4)
-            
-            # Queue them
-            queue.submit(vid_path, json_path)
-            time.sleep(1) 
-            
-        print("[TESTING] Dummy files queued successfully! Starting daemon...\n")
+
+        with managed_storage_operation(
+            "outputs",
+            required_gb=0.65,
+            require_fresh_quota=False,
+            minimum_free_gb=0.05,
+        ):
+            dummy_dir = os.path.join(SYSTEM_DIRS["outputs"], "videos")
+            os.makedirs(dummy_dir, exist_ok=True)
+
+            for i in range(2):
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                vid_name = f"{timestamp}_video_dummy_{i}.mp4"
+                json_name = f"{timestamp}_video_dummy_{i}_info.json"
+                vid_path = os.path.join(dummy_dir, vid_name)
+                json_path = os.path.join(dummy_dir, json_name)
+
+                print(f"Creating large dummy file: {vid_name} (~300MB)...")
+                with open(vid_path, "wb") as f:
+                    f.write(b"\0" * (300 * 1024 * 1024))
+
+                with open(json_path, "w", encoding="utf-8") as f:
+                    json.dump({
+                        "timestamp": timestamp,
+                        "model_type": "dummy_test_model",
+                        "output_type": "video",
+                        "file_name": vid_name,
+                        "generation_parameters": {
+                            "dummy_data": True,
+                            "size": "300MB",
+                        },
+                    }, f, indent=4)
+
+                queue.submit(vid_path, json_path)
+                time.sleep(1)
+
+            print("[TESTING] Dummy files queued successfully! Starting daemon...\n")
 
     daemon = HFUploadDaemon(auto_confirm=args.auto_confirm)
     daemon.process_queue()
