@@ -11,12 +11,39 @@ hostname
 whoami
 
 echo "=== PYTHON SYNTAX ==="
-python -m py_compile storage_policy.py storage_manager.py tests/test_storage_policy.py
+python -m py_compile storage_policy.py storage_manager.py tools/quota_snapshot.py tests/test_storage_policy.py tests/test_storage_manager.py
 
 echo "=== UNIT TESTS ==="
 python tests/test_storage_policy.py
+python tests/test_storage_manager.py
+
+echo "=== QUOTA SNAPSHOT WRITER TEST ==="
+python - <<'PY'
+import json
+import tempfile
+from pathlib import Path
+
+from tools import quota_snapshot
+
+with tempfile.TemporaryDirectory() as temp:
+    output = Path(temp) / "quota_snapshot.json"
+    quota_snapshot.atomic_write(
+        output,
+        {
+            "used_bytes": 40 * 1024**3,
+            "limit_bytes": 100 * 1024**3,
+            "timestamp": 1.0,
+            "source": "test",
+        },
+    )
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["used_bytes"] == 40 * 1024**3
+    assert payload["limit_bytes"] == 100 * 1024**3
+
+print("QUOTA SNAPSHOT WRITER: PASS")
 
 echo "=== RESERVE ALLOCATION TEST ==="
+
 python - <<'PY'
 import os
 import tempfile
