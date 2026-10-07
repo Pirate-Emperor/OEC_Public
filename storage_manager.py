@@ -289,6 +289,33 @@ def _webhook_url(config):
     return os.environ.get(env_name, "")
 
 
+def storage_preflight_path(
+    folder_path,
+    required_gb,
+    require_fresh_quota=False,
+    minimum_free_gb=0,
+):
+    """Admission control for an arbitrary OEC-managed path without a directory target."""
+    config = load_config()
+    if not config:
+        return False, "storage configuration is unavailable"
+
+    path = os.path.abspath(os.path.expanduser(str(folder_path)))
+    if not os.path.isdir(path):
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError as exc:
+            return False, f"could not create storage path: {type(exc).__name__}"
+
+    policy = StoragePolicy(config)
+    return policy.preflight(
+        path,
+        required_bytes=max(0.0, float(required_gb)) * BYTES_PER_GB,
+        minimum_free_bytes=max(0.0, float(minimum_free_gb)) * BYTES_PER_GB,
+        require_fresh_quota=require_fresh_quota,
+    )
+
+
 def storage_preflight(
     dir_name,
     required_gb,
