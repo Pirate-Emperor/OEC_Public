@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import getpass
-import hashlib
 import os
 import signal
 import subprocess
@@ -347,59 +346,266 @@ def list_runners(_: argparse.Namespace) -> None:
 
 
 def parser() -> argparse.ArgumentParser:
+    examples = """
+Examples:
+  # Show all runners under ~/OEC/gpu
+  python ~/OEC/tools/runner_control.py list
+
+  # Configure a runner using a token from the environment
+  export ACTION_TOKEN='CURRENT_GITHUB_RUNNER_REGISTRATION_TOKEN'
+  python ~/OEC/tools/runner_control.py setup \
+      --repo-url https://github.com/Killer4K-N/Connector_1 \
+      --name connector-4 \
+      --labels gpu,a100,connector-4
+
+  # Start/stop/status from any working directory
+  python ~/OEC/tools/runner_control.py start --name connector-4
+  python ~/OEC/tools/runner_control.py status --name connector-4
+  python ~/OEC/tools/runner_control.py stop --name connector-4
+
+Security:
+  Never commit runner registration/removal tokens to notebooks or source files.
+  Prefer --token-env, --token-file, or --token-stdin over --token because
+  command-line arguments can be visible in shell history and process listings.
+""".strip()
+
     p = argparse.ArgumentParser(
-        description="Manage GitHub Actions runners under OEC/gpu."
+        prog="runner_control.py",
+        description=(
+            "Manage GitHub Actions self-hosted runners on the HPC host.\n"
+            "All runner installations are constrained to OEC_ROOT/gpu.\n"
+            "The default OEC_ROOT is ~/OEC."
+        ),
+        epilog=examples,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    sub = p.add_subparsers(dest="command", required=True)
+    sub = p.add_subparsers(
+        dest="command",
+        required=True,
+        metavar="{setup,start,stop,status,remove,download,list}",
+    )
 
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--name", help="GitHub runner name")
-    common.add_argument("--runner-dir", help="Runner directory; must be under OEC/gpu")
-    
-    setup = sub.add_parser("setup", parents=[common], help="Download/configure a runner")
-    setup.add_argument("--repo-url", default=DEFAULT_REPO)
-    setup.add_argument("--labels", default="gpu,a100")
-    setup.add_argument("--runnergroup", default="Default")
-    setup.add_argument("--work", default="_work")
-    setup.add_argument("--version", default=DEFAULT_VERSION)
-    setup.add_argument("--replace", action="store_true")
-    setup.add_argument("--no-default-labels", action="store_true")
-    setup.add_argument("--token")
-    setup.add_argument("--token-env", default="ACTION_TOKEN")
-    setup.add_argument("--token-file")
-    setup.add_argument("--token-stdin", action="store_true")
-    setup.add_argument("--non-interactive", action="store_true")
+    common.add_argument(
+        "--name",
+        help=(
+            "GitHub runner name. With the default layout the runner is stored at "
+            "~/OEC/gpu/<name>/actions-runner."
+        ),
+    )
+    common.add_argument(
+        "--runner-dir",
+        help=(
+            "Explicit runner directory. It must resolve inside OEC_ROOT/gpu; "
+            "use this when the on-disk directory does not match the runner name."
+        ),
+    )
+
+    setup = sub.add_parser(
+        "setup",
+        parents=[common],
+        help="Download and register a runner with GitHub.",
+        description=(
+            "Download the pinned GitHub Actions runner when needed and register it "
+            "against a repository/organization URL.\n"
+            "Requires a runner name and a valid registration token."
+        ),
+        epilog="""Example:
+  export ACTION_TOKEN='CURRENT_TOKEN'
+  python ~/OEC/tools/runner_control.py setup \
+      --repo-url https://github.com/Killer4K-N/Connector_1 \
+      --name connector-4 \
+      --labels gpu,a100,connector-4
+
+Notes:
+  - The target can be a repository or organization URL accepted by config.sh.
+  - --labels controls custom labels; default labels are also added unless
+    --no-default-labels is supplied.
+  - --replace requests replacement of an existing conflicting registration.
+  - Tokens are never printed by this tool.""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    setup.add_argument(
+        "--repo-url", default=DEFAULT_REPO, metavar="URL",
+        help=f"GitHub repository/organization target URL (default: {DEFAULT_REPO}).",
+    )
+    setup.add_argument(
+        "--labels", default="gpu,a100", metavar="LABELS",
+        help='Comma-separated custom labels (default: "gpu,a100").',
+    )
+    setup.add_argument(
+        "--runnergroup", default="Default", metavar="GROUP",
+        help='GitHub runner group (default: "Default").',
+    )
+    setup.add_argument(
+        "--work", default="_work", metavar="DIR",
+        help='Runner work directory relative to the runner install (default: "_work").',
+    )
+    setup.add_argument(
+        "--version", default=DEFAULT_VERSION, metavar="VERSION",
+        help=f"Runner release version to install when missing (default: {DEFAULT_VERSION}).",
+    )
+    setup.add_argument(
+        "--replace", action="store_true",
+        help="Replace an existing conflicting runner registration.",
+    )
+    setup.add_argument(
+        "--no-default-labels", action="store_true",
+        help="Do not add GitHub's automatically detected default labels.",
+    )
+    setup.add_argument(
+        "--token", metavar="TOKEN",
+        help="Runner registration token. Prefer --token-env/--token-file/--token-stdin.",
+    )
+    setup.add_argument(
+        "--token-env", default="ACTION_TOKEN", metavar="NAME",
+        help='Read the token from this environment variable (default: "ACTION_TOKEN").',
+    )
+    setup.add_argument(
+        "--token-file", metavar="PATH",
+        help="Read the token from a local file.",
+    )
+    setup.add_argument(
+        "--token-stdin", action="store_true",
+        help="Read one token line from standard input.",
+    )
+    setup.add_argument(
+        "--non-interactive", action="store_true",
+        help="Fail instead of prompting when no token source is available.",
+    )
     setup.set_defaults(func=run_config)
 
-    start = sub.add_parser("start", parents=[common])
+    start = sub.add_parser(
+        "start",
+        parents=[common],
+        help="Start a configured runner in the background.",
+        description=(
+            "Start the runner's ./run.sh detached from the calling terminal.\n"
+            "If the exact Runner.Listener process is already running, no duplicate "
+            "runner is started."
+        ),
+        epilog="""Examples:
+  python ~/OEC/tools/runner_control.py start --name connector-3
+  python ~/OEC/tools/runner_control.py start \
+      --runner-dir ~/OEC/gpu/connector-3/actions-runner
+
+The runner log is written to <runner-dir>/runner.log.""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     start.set_defaults(func=start_runner)
 
-    stop = sub.add_parser("stop", parents=[common])
+    stop = sub.add_parser(
+        "stop",
+        parents=[common],
+        help="Stop a running runner without unregistering it.",
+        description=(
+            "Send SIGTERM only to Runner.Listener processes belonging to the selected "
+            "runner directory, then wait for them to exit."
+        ),
+        epilog="""Example:
+  python ~/OEC/tools/runner_control.py stop --name connector-3
+
+Stopping leaves the runner registered with GitHub but offline.""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     stop.set_defaults(func=stop_runner)
 
-    status = sub.add_parser("status", parents=[common])
+    status = sub.add_parser(
+        "status",
+        parents=[common],
+        help="Show local runner registration and process state.",
+        description=(
+            "Report whether the runner directory exists, whether the runner is "
+            "configured, whether its exact Runner.Listener process is running, "
+            "and the registered runner name/server URL when readable."
+        ),
+        epilog="""Examples:
+  python ~/OEC/tools/runner_control.py status --name connector-3
+  python ~/OEC/tools/runner_control.py status \
+      --runner-dir ~/OEC/gpu/connector-3/actions-runner""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     status.set_defaults(func=status_runner)
 
-    remove = sub.add_parser("remove", parents=[common])
-    remove.add_argument("--token")
-    remove.add_argument("--token-env", default="ACTION_TOKEN")
-    remove.add_argument("--token-file")
-    remove.add_argument("--token-stdin", action="store_true")
-    remove.add_argument("--non-interactive", action="store_true")
+    remove = sub.add_parser(
+        "remove",
+        parents=[common],
+        help="Unregister a runner from GitHub.",
+        description=(
+            "Use config.sh remove to unregister the selected runner. "
+            "This does not delete the local runner directory."
+        ),
+        epilog="""Example:
+  export ACTION_TOKEN='CURRENT_REMOVE_TOKEN'
+  python ~/OEC/tools/runner_control.py remove --name connector-3
+
+Use the runner removal token issued for the same repository/organization.""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    remove.add_argument(
+        "--token", metavar="TOKEN",
+        help="Runner removal token. Prefer --token-env/--token-file/--token-stdin.",
+    )
+    remove.add_argument(
+        "--token-env", default="ACTION_TOKEN", metavar="NAME",
+        help='Read the token from this environment variable (default: "ACTION_TOKEN").',
+    )
+    remove.add_argument(
+        "--token-file", metavar="PATH",
+        help="Read the token from a local file.",
+    )
+    remove.add_argument(
+        "--token-stdin", action="store_true",
+        help="Read one token line from standard input.",
+    )
+    remove.add_argument(
+        "--non-interactive", action="store_true",
+        help="Fail instead of prompting when no token source is available.",
+    )
     remove.set_defaults(func=remove_runner)
 
-    dl = sub.add_parser("download", parents=[common])
-    dl.add_argument("--version", default=DEFAULT_VERSION)
-    dl.set_defaults(func=lambda a: download_runner(
-        require_runner_dir(
-            Path(a.runner_dir).expanduser()
-            if a.runner_dir
-            else runner_dir_from_name(a.name)
+    dl = sub.add_parser(
+        "download",
+        parents=[common],
+        help="Download runner binaries without registering a runner.",
+        description=(
+            "Install the requested GitHub Actions runner version into the selected "
+            "runner directory. Existing runner binaries are left untouched when "
+            "config.sh is already present."
         ),
-        a.version,
-    ))
+        epilog="""Example:
+  python ~/OEC/tools/runner_control.py download \
+      --runner-dir ~/OEC/gpu/connector-4/actions-runner \
+      --version 2.337.0""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    dl.add_argument(
+        "--version", default=DEFAULT_VERSION, metavar="VERSION",
+        help=f"Runner release version to download (default: {DEFAULT_VERSION}).",
+    )
+    dl.set_defaults(
+        func=lambda a: download_runner(
+            require_runner_dir(
+                Path(a.runner_dir).expanduser()
+                if a.runner_dir
+                else runner_dir_from_name(a.name)
+            ),
+            a.version,
+        )
+    )
 
-    sub.add_parser("list").set_defaults(func=list_runners)
+    list_parser = sub.add_parser(
+        "list",
+        help="List configured runners found recursively under OEC/gpu.",
+        description=(
+            "Search OEC_ROOT/gpu/**/actions-runner/.runner and show each configured "
+            "runner with its local running/stopped state."
+        ),
+        epilog="Example:\n  python ~/OEC/tools/runner_control.py list",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    list_parser.set_defaults(func=list_runners)
+
     return p
 
 
