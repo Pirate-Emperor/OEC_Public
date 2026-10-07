@@ -311,11 +311,27 @@ class StoragePolicy:
         required_bytes: int,
         minimum_free_bytes: int = 0,
         require_fresh_quota: bool = False,
+        target_bytes: Optional[int] = None,
     ) -> tuple[bool, str]:
-        """Check whether a potentially large operation should be allowed to start."""
+        """Check whether a potentially large operation should be allowed to start.
+
+        When target_bytes is supplied, the operation must also fit inside the
+        remaining capacity of that logical OEC directory.
+        """
         required_bytes = max(0, int(required_bytes))
         minimum_free_bytes = max(0, int(minimum_free_bytes))
         quota = self.get_quota_snapshot()
+
+        if target_bytes is not None:
+            target_bytes = max(0, int(target_bytes))
+            current_bytes = directory_size_bytes(folder_path)
+            directory_remaining = max(0, target_bytes - current_bytes)
+            if required_bytes + minimum_free_bytes > directory_remaining:
+                return (
+                    False,
+                    "operation exceeds remaining directory target capacity: "
+                    f"remaining={directory_remaining} required={required_bytes + minimum_free_bytes}",
+                )
 
         if quota is not None:
             available = quota.available_bytes
