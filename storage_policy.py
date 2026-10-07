@@ -196,11 +196,11 @@ def ensure_reserve_file(
         # Never leave a failed allocation looking like a valid reserve. Restore
         # the previous size, or remove the newly-created file entirely.
         try:
-            if original_exists:
+            if original_exists and fd is not None:
                 os.ftruncate(fd, original_size)
-            else:
+            elif not original_exists:
                 os.unlink(reserve_path)
-        except OSError:
+        except (OSError, TypeError):
             pass
         raise
     finally:
