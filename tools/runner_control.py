@@ -396,6 +396,9 @@ def parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = parser().parse_args()
 
+    if args.command == "setup" and not args.name:
+        raise SystemExit("setup requires --name, even when --runner-dir is provided.")
+
     if args.command in {"setup", "start", "stop", "status", "remove", "download"}:
         if not args.name and not args.runner_dir:
             raise SystemExit("Provide --name or --runner-dir.")
