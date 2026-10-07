@@ -309,14 +309,14 @@ def storage_preflight(
     os.makedirs(folder_path, exist_ok=True)
 
     policy = StoragePolicy(config)
+    target_gb = float(dir_cfg.get("target_allocation_gb", 0))
     ok, reason = policy.preflight(
         folder_path,
         required_bytes=max(0.0, float(required_gb)) * BYTES_PER_GB,
         minimum_free_bytes=max(0.0, float(minimum_free_gb)) * BYTES_PER_GB,
         require_fresh_quota=require_fresh_quota,
+        target_bytes=int(target_gb * BYTES_PER_GB),
     )
-
-    target_gb = float(dir_cfg.get("target_allocation_gb", 0))
     if float(required_gb) > target_gb:
         return False, (
             f"requested operation ({required_gb:.2f} GB) exceeds the "
