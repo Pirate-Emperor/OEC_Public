@@ -13,30 +13,84 @@ from core_config import SYSTEM_DIRS
 # ==============================================================================
 
 class DiskPurgeManager:
+    # Purge is intentionally limited to descendants of these OEC-managed roots.
+    PURGE_ROOT_KEYS = ("models", "cache", "outputs", "inputs")
+
     @staticmethod
     def get_hf_cache_dir(repo_id: str) -> str:
         """Resolves the exact hidden Hugging Face cache directory for a repo."""
         folder_name = "models--" + repo_id.replace("/", "--")
-        return os.path.join(SYSTEM_DIRS['models'], "hub", folder_name)
+        return os.path.join(SYSTEM_DIRS["models"], "hub", folder_name)
 
-    @staticmethod
-    def purge_directory(target_dir: str, label: str = "Directory"):
-        """Surgically deletes a directory and reclaims disk space."""
-        if os.path.exists(target_dir):
-            print(f"\n[DISK MANAGER] ⚠️ PURGE EXECUTING for {label} ⚠️")
-            try:
-                gc.collect()
-                time.sleep(2) # Brief pause to ensure all Python file handles are released
-                shutil.rmtree(target_dir, ignore_errors=True)
-                print(f"[DISK MANAGER] ✅ Successfully wiped: {target_dir}")
-                print(f"[DISK MANAGER] ⚡ Assets now exist purely in VRAM.\n")
-            except Exception as e:
-                print(f"[DISK MANAGER] ❌ Warning: Could not purge {target_dir}: {e}")
+    @classmethod
+    def _safe_purge_path(cls, target_dir: str) -> str:
+        """Resolve and validate a purge target before deletion."""
+        raw_path = os.path.expanduser(str(target_dir))
+        candidate_raw = os.path.abspath(raw_path)
 
-    @staticmethod
-    def purge_hf_model(repo_id: str):
-        target_dir = DiskPurgeManager.get_hf_cache_dir(repo_id)
-        DiskPurgeManager.purge_directory(target_dir, f"HF Model: '{repo_id}'")
+        if os.path.islink(candidate_raw):
+            raise ValueError("refusing to purge a symlink path")
+
+        candidate = os.path.realpath(candidate_raw)
+        roots = [
+            os.path.realpath(os.path.expanduser(SYSTEM_DIRS[key]))
+            for key in cls.PURGE_ROOT_KEYS
+            if SYSTEM_DIRS.get(key)
+        ]
+
+        for root in roots:
+            if candidate == root:
+                raise ValueError("refusing to purge an OEC storage root itself")
+            if os.path.commonpath([candidate, root]) == root:
+                return candidate
+
+        raise ValueError("purge target is outside approved OEC storage roots")
+
+    @classmethod
+    def purge_directory(cls, target_dir: str, label: str = "Directory"):
+        """Surgically deletes a directory only when it is inside an OEC storage root."""
+        try:
+            safe_target = cls._safe_purge_path(target_dir)
+        except (OSError, ValueError) as exc:
+            print(f"[DISK MANAGER] ❌ Refusing unsafe purge target: {type(exc).__name__}")
+            return False
+
+        if not os.path.exists(safe_target):
+            return True
+
+        print(f"\n[DISK MANAGER] ⚠️ PURGE EXECUTING for {label} ⚠️")
+        try:
+            gc.collect()
+            time.sleep(0.25)
+
+            size_bytes = 0
+            for root, _, files in os.walk(safe_target):
+                for filename in files:
+                    path = os.path.join(root, filename)
+                    try:
+                        if not os.path.islink(path):
+                            size_bytes += os.path.getsize(path)
+                    except OSError:
+                        pass
+
+            shutil.rmtree(safe_target)
+            print(
+                f"[DISK MANAGER] ✅ Successfully wiped: {safe_target} "
+                f"({size_bytes / (1024**3):.2f} GB reclaimed)"
+            )
+            print("[DISK MANAGER] ⚡ Assets now exist purely in VRAM.\n")
+            return True
+        except Exception as exc:
+            print(
+                f"[DISK MANAGER] ❌ Purge failed for {safe_target}: "
+                f"{type(exc).__name__}"
+            )
+            return False
+
+    @classmethod
+    def purge_hf_model(cls, repo_id: str):
+        target_dir = cls.get_hf_cache_dir(repo_id)
+        return cls.purge_directory(target_dir, f"HF Model: '{repo_id}'")
 
 class ClusterPurgeManager:
     """
