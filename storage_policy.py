@@ -184,11 +184,25 @@ def ensure_reserve_file(
             "os.posix_fallocate is required for a real storage reserve on this platform"
         )
 
+    original_exists = reserve_path.exists()
+    original_size = reserve_path.stat().st_size if original_exists else 0
+
     fd = None
     try:
         fd = os.open(reserve_path, os.O_CREAT | os.O_RDWR, 0o600)
         os.ftruncate(fd, required_bytes)
         fallocate(fd, 0, required_bytes)
+    except Exception:
+        # Never leave a failed allocation looking like a valid reserve. Restore
+        # the previous size, or remove the newly-created file entirely.
+        try:
+            if original_exists:
+                os.ftruncate(fd, original_size)
+            else:
+                os.unlink(reserve_path)
+        except OSError:
+            pass
+        raise
     finally:
         if fd is not None:
             os.close(fd)
