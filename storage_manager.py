@@ -326,6 +326,96 @@ def storage_preflight(
     return ok, reason
 
 
+@contextlib.contextmanager
+def managed_storage_operation(
+    dir_name,
+    required_gb,
+    require_fresh_quota=True,
+    minimum_free_gb=0,
+):
+    """Run one large storage-producing operation with exclusive reserve control.
+
+    The directory lock is held for the entire operation. This prevents the
+    background manager or a second managed operation from rebuilding/releasing
+    the reserve concurrently.
+    """
+    config = load_config()
+    if not config:
+        raise RuntimeError("storage configuration is unavailable")
+
+    _directory_config(config, dir_name)
+    folder_path = SYSTEM_DIRS.get(dir_name, dir_name)
+    os.makedirs(folder_path, exist_ok=True)
+
+    policy = StoragePolicy(config)
+    target_gb = float(_directory_config(config, dir_name).get("target_allocation_gb", 0))
+    ok, reason = policy.preflight(
+        folder_path,
+        required_bytes=max(0.0, float(required_gb)) * BYTES_PER_GB,
+        minimum_free_bytes=max(0.0, float(minimum_free_gb)) * BYTES_PER_GB,
+        require_fresh_quota=require_fresh_quota,
+        target_bytes=int(target_gb * BYTES_PER_GB),
+    )
+    if not ok:
+        raise RuntimeError(f"Storage admission denied for '{dir_name}': {reason}")
+
+    lock_ttl_seconds = float(config.get("lock_ttl_seconds", DEFAULT_LOCK_TTL_SECONDS))
+    tolerance_bytes = int(
+        float(config.get("reserve_resize_tolerance_mb", 64)) * BYTES_PER_MB
+    )
+    lock_file = os.path.join(folder_path, LOCK_FILENAME)
+    reserve_file = os.path.join(folder_path, RESERVE_FILENAME)
+
+    with _directory_lock(folder_path):
+        if _pause_lock_active(folder_path, lock_ttl_seconds):
+            raise RuntimeError(
+                f"Storage directory '{dir_name}' already has an active operation"
+            )
+
+        with open(lock_file, "w", encoding="utf-8") as handle:
+            handle.write(f"pid={os.getpid()}\ntime={time.time():.6f}\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+
+        try:
+            if os.path.exists(reserve_file):
+                os.remove(reserve_file)
+            logging.info(
+                "Managed storage operation STARTED for '%s' (required %.2f GB).",
+                dir_name,
+                float(required_gb),
+            )
+            yield
+        finally:
+            try:
+                if os.path.exists(lock_file):
+                    os.remove(lock_file)
+                decision = policy.evaluate(
+                    folder_path,
+                    int(target_gb * BYTES_PER_GB),
+                    RESERVE_FILENAME,
+                    LOCK_FILENAME,
+                )
+                reserve_needed = max(0, int(target_gb * BYTES_PER_GB) - decision.actual_bytes)
+                ensure_reserve_file(
+                    reserve_file,
+                    reserve_needed,
+                    tolerance_bytes=tolerance_bytes,
+                )
+                logging.info(
+                    "Managed storage operation FINISHED for '%s'; reserve restored to %.2f GB.",
+                    dir_name,
+                    reserve_needed / BYTES_PER_GB,
+                )
+            except Exception as exc:
+                logging.error(
+                    "Failed to restore storage reserve for '%s': %s",
+                    dir_name,
+                    type(exc).__name__,
+                )
+                raise
+
+
 def print_status(config):
     """Print quota and per-directory status without modifying storage."""
     policy = StoragePolicy(config)
