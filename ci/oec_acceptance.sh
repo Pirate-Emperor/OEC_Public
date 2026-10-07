@@ -157,6 +157,12 @@ git fetch origin main || true
 git submodule sync --recursive
 git submodule update --init --recursive
 
+for submodule in oec_deploy oec_aireos/Full_Model oec_aireos/Freezed oec_aireos/MOE; do
+    git -C "$submodule" fetch origin main
+    git -C "$submodule" checkout main
+    git -C "$submodule" reset --hard origin/main
+done
+
 echo "=== PYTHON COMPILE ==="
 for repo in . oec_deploy oec_aireos/Full_Model oec_aireos/Freezed oec_aireos/MOE; do
     while IFS= read -r -d '' pyfile; do
