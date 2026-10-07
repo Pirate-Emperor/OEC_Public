@@ -182,34 +182,63 @@ class HFUploadDaemon:
             logging.error(f"Failed to clean up cache/db: {e}")
 
     def _get_pending_batch(self):
+        now = time.time()
+
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            
-            cursor.execute("SELECT id, asset_path, json_path, total_size_bytes FROM assets WHERE status = 'PENDING'")
+            cursor.execute(
+                "SELECT id, asset_path, json_path, total_size_bytes, timestamp "
+                "FROM assets WHERE status = 'PENDING' ORDER BY id ASC"
+            )
             rows = cursor.fetchall()
-            
+
             batch_ids, batch_files = [], []
             current_size = 0
-            
+            oldest_timestamp = None
+
             for row in rows:
-                row_id, a_path, j_path, size = row
+                row_id, a_path, j_path, size, timestamp = row
+
                 if os.path.exists(a_path) and os.path.exists(j_path):
                     batch_ids.append(row_id)
                     batch_files.extend([a_path, j_path])
                     current_size += size
-                    
+
+                    if oldest_timestamp is None:
+                        try:
+                            oldest_timestamp = datetime.strptime(
+                                timestamp,
+                                "%Y-%m-%d %H:%M:%S",
+                            ).timestamp()
+                        except (TypeError, ValueError):
+                            oldest_timestamp = now
+
                     if current_size >= self.batch_limit_bytes:
                         break
                 else:
-                    cursor.execute("UPDATE assets SET status = 'FAILED_MISSING_FILE' WHERE id = ?", (row_id,))
-            
+                    cursor.execute(
+                        "UPDATE assets SET status = 'FAILED_MISSING_FILE' WHERE id = ?",
+                        (row_id,),
+                    )
+
             conn.commit()
-            
-            # Flush a complete batch immediately. Partial batches remain queued
-            # until the caller explicitly requests a timed/forced flush.
-            if current_size >= self.batch_limit_bytes:
-                return batch_ids, batch_files, current_size
-            return [], [], 0
+
+        if not batch_ids:
+            return [], [], 0, False
+
+        if current_size >= self.batch_limit_bytes:
+            return batch_ids, batch_files, current_size, False
+
+        age = max(0.0, now - (oldest_timestamp or now))
+        if age >= self.partial_batch_max_age_seconds:
+            logging.info(
+                "Partial upload batch aged %.0fs; forcing flush of %.2f GB.",
+                age,
+                current_size / (1024**3),
+            )
+            return batch_ids, batch_files, current_size, True
+
+        return [], [], 0, False
 
     def process_queue(self):
         logging.info("Daemon started. Polling queue in background...")
