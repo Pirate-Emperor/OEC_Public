@@ -1,7 +1,16 @@
 {
     "discord_webhook_env": "AIEROS_DISCORD_WEBHOOK_URL",
     "polling_interval_seconds": 300,
-    "directories": [{
+    "warning_threshold_fraction": 0.85,
+    "critical_threshold_fraction": 0.95,
+    "warning_free_gb": 10,
+    "critical_free_gb": 3,
+    "quota_snapshot_path": "~/.cache/aieros/quota_snapshot.json",
+    "quota_snapshot_max_age_seconds": 900,
+    "reserve_resize_tolerance_mb": 64,
+    "lock_ttl_seconds": 21600,
+    "directories": [
+        {
             "name": "models",
             "target_allocation_gb": 200
         },
