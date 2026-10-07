@@ -216,28 +216,26 @@ def manage_allocations():
                     alert_triggered[dir_name] = True
             else:
                 reserve_needed_bytes = target_bytes - actual_size_bytes
+                fd = None
                 try:
                     fd = os.open(reserve_file, os.O_CREAT | os.O_WRONLY)
                     os.ftruncate(fd, int(reserve_needed_bytes))
                     os.posix_fallocate(fd, 0, int(reserve_needed_bytes))
-                    os.close(fd)
-                    
+
                     logging.info(f"[{dir_name}] Actual: {actual_size_gb:.2f} GB | Reserved: {(reserve_needed_bytes / (1024**3)):.2f} GB | Locked: {target_gb} GB")
                     alert_triggered[dir_name] = False
-                    
+
                 except AttributeError:
                     logging.error("os.posix_fallocate is not supported on this OS.")
-                    try:
-                        os.close(fd)
-                    except (NameError, OSError):
-                        pass
                     break
                 except OSError as e:
                     logging.error(f"[{dir_name}] Failed to allocate space (Disk might be completely full): {e}")
-                    try:
-                        os.close(fd)
-                    except (NameError, OSError):
-                        pass
+                finally:
+                    if fd is not None:
+                        try:
+                            os.close(fd)
+                        except OSError:
+                            pass
 
         time.sleep(polling_interval)
 
@@ -268,7 +266,8 @@ COMMANDS:
     config = load_config()
 
     if args.test_webhook:
-        test_discord_webhook(config.get("discord_webhook_url", ""))
+        webhook_env = config.get("discord_webhook_env", "AIEROS_DISCORD_WEBHOOK_URL")
+        test_discord_webhook(os.environ.get(webhook_env, ""))
     elif args.clean:
         clean_all_reserves(config)
     else:
