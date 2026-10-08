@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import json
 import os
 import signal
 import subprocess
@@ -15,6 +16,7 @@ import shutil
 import sys
 import tarfile
 import time
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -52,6 +54,196 @@ def load_core_config() -> None:
         if str(root) not in sys.path:
             sys.path.insert(0, str(root))
         __import__("core_config")
+
+
+def _github_auth_token() -> str:
+    for name in ("GH_TOKEN", "GITHUB_TOKEN"):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+
+    gh = shutil.which("gh")
+    if gh:
+        try:
+            result = subprocess.run(
+                [gh, "auth", "token"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+    return ""
+
+
+def _github_repo_from_server_url(server_url: str) -> str:
+    parsed = urllib.parse.urlparse(server_url.strip())
+    parts = [part for part in parsed.path.strip("/").split("/") if part]
+    if parsed.hostname != "github.com" or len(parts) < 2:
+        return ""
+    return f"{parts[0]}/{parts[1]}"
+
+
+def _runner_identity(runner: Path) -> tuple[str, str]:
+    metadata = runner / ".runner"
+    if not metadata.is_file():
+        return "", ""
+
+    try:
+        info = json.loads(metadata.read_text())
+    except (OSError, json.JSONDecodeError):
+        return "", ""
+
+    name = str(info.get("name") or info.get("runnerName") or "").strip()
+    server_url = str(info.get("serverUrl") or info.get("gitHubUrl") or "").strip()
+    return name, server_url
+
+
+def _github_request(
+    method: str,
+    endpoint: str,
+    token: str,
+    *,
+    timeout: float = 20.0,
+) -> dict:
+    request = urllib.request.Request(
+        f"https://api.github.com/{endpoint.lstrip('/')}",
+        method=method,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2026-03-10",
+            "User-Agent": "oec-runner-control",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = response.read().decode("utf-8")
+            return json.loads(payload) if payload else {}
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"GitHub API {method} {endpoint} failed: HTTP {exc.code}: {body[:500]}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"GitHub API {method} {endpoint} failed: {exc}") from exc
+
+
+def _github_runner_record(runner: Path, *, token: str | None = None) -> dict | None:
+    auth = token or _github_auth_token()
+    if not auth:
+        return None
+
+    name, server_url = _runner_identity(runner)
+    repo = _github_repo_from_server_url(server_url)
+    if not name or not repo:
+        return None
+
+    payload = _github_request(
+        "GET",
+        f"repos/{repo}/actions/runners?per_page=100",
+        auth,
+    )
+    for item in payload.get("runners", []):
+        if item.get("name") == name:
+            return item
+    return None
+
+
+def _github_state_text(record: dict | None) -> str:
+    if record is None:
+        return "unavailable/not-registered"
+    status = str(record.get("status") or "unknown")
+    busy = bool(record.get("busy"))
+    activity = "busy" if busy else "idle"
+    return f"{status}/{activity}"
+
+
+def wait_for_github_state(
+    runner: Path,
+    desired: str,
+    *,
+    timeout: float,
+    poll_interval: float = 2.0,
+) -> dict | None:
+    token = _github_auth_token()
+    if not token:
+        print("GitHub state not verified: no GH_TOKEN/GITHUB_TOKEN/gh auth available.")
+        return None
+
+    deadline = time.time() + timeout
+    last = None
+    while time.time() < deadline:
+        record = _github_runner_record(runner, token=token)
+        last = record
+        if desired == "offline":
+            if record is not None and record.get("status") == "offline":
+                print(f"GitHub runner state: {_github_state_text(record)}")
+                return record
+        elif desired == "online-idle":
+            if (
+                record is not None
+                and record.get("status") == "online"
+                and not record.get("busy")
+            ):
+                print(f"GitHub runner state: {_github_state_text(record)}")
+                return record
+        time.sleep(poll_interval)
+
+    state = _github_state_text(last)
+    raise SystemExit(
+        f"GitHub runner did not reach {desired} within {timeout:.0f}s; last observed state: {state}"
+    )
+
+
+def delete_github_runner(runner: Path) -> bool:
+    token = _github_auth_token()
+    if not token:
+        return False
+
+    name, server_url = _runner_identity(runner)
+    repo = _github_repo_from_server_url(server_url)
+    if not name or not repo:
+        return False
+
+    record = _github_runner_record(runner, token=token)
+    if record is None:
+        print("GitHub runner already absent.")
+        return True
+
+    runner_id = record.get("id")
+    if not runner_id:
+        return False
+
+    try:
+        _github_request(
+            "DELETE",
+            f"repos/{repo}/actions/runners/{runner_id}",
+            token,
+        )
+    except RuntimeError as exc:
+        print(f"GitHub API removal failed: {exc}")
+        return False
+
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        if _github_runner_record(runner, token=token) is None:
+            print(f"GitHub runner removed: {name}")
+            return True
+        time.sleep(2)
+
+    print(f"GitHub runner deletion requested but registry still contains: {name}")
+    return False
+
+
+def _delete_local_runner_directory(runner: Path) -> None:
+    if runner.exists():
+        shutil.rmtree(runner)
+    if runner.exists():
+        raise SystemExit(f"Failed to delete runner directory: {runner}")
+    print(f"Runner directory deleted: {runner}")
 
 
 def _read_proc_link(path: Path) -> str:
@@ -409,6 +601,12 @@ def start_runner(args: argparse.Namespace) -> None:
     pids = listener_pids(runner)
     if pids:
         print(f"Runner already running: PID {pids[0]}")
+        if not args.no_github_wait:
+            wait_for_github_state(
+                runner,
+                "online-idle",
+                timeout=args.github_timeout,
+            )
         return
 
     write_runner_env(runner)
@@ -436,6 +634,12 @@ def start_runner(args: argparse.Namespace) -> None:
         pids = listener_pids(runner)
         if pids:
             print(f"Runner is running: Listener PID {pids[0]}")
+            if not args.no_github_wait:
+                wait_for_github_state(
+                    runner,
+                    "online-idle",
+                    timeout=args.github_timeout,
+                )
             return
         if proc.poll() is not None:
             break
@@ -444,6 +648,12 @@ def start_runner(args: argparse.Namespace) -> None:
     pids = listener_pids(runner)
     if pids:
         print(f"Runner is running: Listener PID {pids[0]}")
+        if not args.no_github_wait:
+            wait_for_github_state(
+                runner,
+                "online-idle",
+                timeout=args.github_timeout,
+            )
         return
 
     rc = proc.poll()
@@ -459,7 +669,6 @@ def start_runner(args: argparse.Namespace) -> None:
         f"(run.sh rc={rc}).\nLog: {log_path}\nLast log lines:\n{tail}"
     )
 
-
 def stop_runner(args: argparse.Namespace) -> None:
     runner = require_runner_dir(
         Path(args.runner_dir).expanduser()
@@ -470,6 +679,12 @@ def stop_runner(args: argparse.Namespace) -> None:
     pids = listener_pids(runner)
     if not pids:
         print("Runner is not running.")
+        if not args.no_github_wait:
+            wait_for_github_state(
+                runner,
+                "offline",
+                timeout=args.github_timeout,
+            )
         return
 
     for pid in pids:
@@ -478,16 +693,25 @@ def stop_runner(args: argparse.Namespace) -> None:
         except ProcessLookupError:
             pass
 
-    deadline = time.time() + 10
-    while time.time() < deadline and listener_pids(runner):
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        remaining = listener_pids(runner)
+        if not remaining:
+            print("Local runner process stopped.")
+            break
         time.sleep(0.25)
-
-    remaining = listener_pids(runner)
-    if remaining:
-        print(f"Runner still running: {remaining}")
     else:
-        print("Runner stopped.")
+        remaining = listener_pids(runner)
+        raise SystemExit(
+            f"Runner did not stop cleanly; Runner.Listener PIDs still present: {remaining}"
+        )
 
+    if not args.no_github_wait:
+        wait_for_github_state(
+            runner,
+            "offline",
+            timeout=args.github_timeout,
+        )
 
 def remove_runner(args: argparse.Namespace) -> None:
     load_core_config()
@@ -498,18 +722,53 @@ def remove_runner(args: argparse.Namespace) -> None:
         else runner_dir_from_name(args.name)
     )
 
-    if not (runner / ".runner").is_file():
-        print(f"Runner is not configured: {runner}")
-        return
+    remote_removed = False
+    try:
+        if (runner / ".runner").is_file():
+            # Stop first so the GitHub registry can transition to offline before
+            # removal. Do not let an external supervisor silently hide failure.
+            stop_args = argparse.Namespace(
+                runner_dir=str(runner),
+                name=args.name,
+                no_github_wait=args.no_github_wait,
+                github_timeout=args.github_timeout,
+            )
+            try:
+                stop_runner(stop_args)
+            except SystemExit as exc:
+                print(f"Warning: stop before remove reported: {exc}")
 
-    subprocess.run(
-        ["./config.sh", "remove", "--unattended", "--token", token(args)],
-        cwd=runner,
-        env=os.environ.copy(),
-        check=True,
-    )
-    print(f"Runner removed from GitHub: {runner}")
+            remote_removed = delete_github_runner(runner)
 
+            if not remote_removed:
+                # Fall back to the official runner removal token path when API
+                # deletion is unavailable or insufficiently authorized.
+                try:
+                    removal_token = token(args)
+                except SystemExit:
+                    removal_token = ""
+                if removal_token:
+                    subprocess.run(
+                        ["./config.sh", "remove", "--unattended", "--token", removal_token],
+                        cwd=runner,
+                        env=os.environ.copy(),
+                        check=True,
+                    )
+                    remote_removed = True
+                    print("GitHub runner removed via config.sh.")
+                else:
+                    print(
+                        "Warning: GitHub runner could not be removed because no "
+                        "authorized API token or removal token was available."
+                    )
+    finally:
+        _delete_local_runner_directory(runner)
+
+    if not remote_removed and (runner / ".runner").exists():
+        raise SystemExit("Local runner directory deleted, but GitHub removal was not confirmed.")
+    if not remote_removed:
+        raise SystemExit("Local runner directory deleted; GitHub removal was not confirmed.")
+    print("Runner removal complete.")
 
 def status_runner(args: argparse.Namespace) -> None:
     runner = require_runner_dir(
@@ -529,12 +788,16 @@ def status_runner(args: argparse.Namespace) -> None:
 
     if configured:
         try:
-            import json
             info = json.loads((runner / ".runner").read_text())
             print(f"Runner    : {info.get('name', args.name)}")
             print(f"Server    : {info.get('serverUrl', 'unknown')}")
         except Exception:
             pass
+
+        if not args.no_github:
+            record = _github_runner_record(runner)
+            print(f"GitHub    : {_github_state_text(record)}")
+
 
 
 def list_runners(_: argparse.Namespace) -> None:
@@ -543,6 +806,7 @@ def list_runners(_: argparse.Namespace) -> None:
         print(f"No GPU runner directory: {root}")
         return
 
+    auth_available = bool(_github_auth_token())
     found = []
     for runner_file in root.rglob(".runner"):
         if runner_file.is_file() and runner_file.parent.name == "actions-runner":
@@ -554,8 +818,13 @@ def list_runners(_: argparse.Namespace) -> None:
 
     for runner in sorted(found):
         pids = listener_pids(runner)
-        print(f"{runner} | {'RUNNING' if pids else 'STOPPED'}")
-
+        local_state = "RUNNING" if pids else "STOPPED"
+        if auth_available:
+            github = _github_runner_record(runner)
+            github_state = _github_state_text(github)
+            print(f"{runner} | LOCAL={local_state} | GITHUB={github_state}")
+        else:
+            print(f"{runner} | {local_state}")
 
 def parser() -> argparse.ArgumentParser:
     examples = """
@@ -704,6 +973,14 @@ Notes:
 The runner log is written to <runner-dir>/runner.log.""",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    start.add_argument(
+        "--github-timeout", type=float, default=60.0,
+        help="Seconds to wait for GitHub online/idle after start (default: 60).",
+    )
+    start.add_argument(
+        "--no-github-wait", action="store_true",
+        help="Skip GitHub-side state verification.",
+    )
     start.set_defaults(func=start_runner)
 
     stop = sub.add_parser(
@@ -719,6 +996,14 @@ The runner log is written to <runner-dir>/runner.log.""",
 
 Stopping leaves the runner registered with GitHub but offline.""",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    stop.add_argument(
+        "--github-timeout", type=float, default=60.0,
+        help="Seconds to wait for GitHub offline after stop (default: 60).",
+    )
+    stop.add_argument(
+        "--no-github-wait", action="store_true",
+        help="Skip GitHub-side state verification.",
     )
     stop.set_defaults(func=stop_runner)
 
@@ -736,6 +1021,10 @@ Stopping leaves the runner registered with GitHub but offline.""",
   python ~/OEC/tools/runner_control.py status \
       --runner-dir ~/OEC/gpu/connector-3/actions-runner""",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    status.add_argument(
+        "--no-github", action="store_true",
+        help="Do not query the GitHub runner registry.",
     )
     status.set_defaults(func=status_runner)
 
@@ -773,6 +1062,14 @@ Use the runner removal token issued for the same repository/organization.""",
     remove.add_argument(
         "--non-interactive", action="store_true",
         help="Fail instead of prompting when no token source is available.",
+    )
+    remove.add_argument(
+        "--github-timeout", type=float, default=60.0,
+        help="Seconds to wait for GitHub offline during removal (default: 60).",
+    )
+    remove.add_argument(
+        "--no-github-wait", action="store_true",
+        help="Skip GitHub-side state verification before removal.",
     )
     remove.set_defaults(func=remove_runner)
 
