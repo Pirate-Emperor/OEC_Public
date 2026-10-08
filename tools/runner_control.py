@@ -795,8 +795,11 @@ def status_runner(args: argparse.Namespace) -> None:
             pass
 
         if not args.no_github:
-            record = _github_runner_record(runner)
-            print(f"GitHub    : {_github_state_text(record)}")
+            try:
+                record = _github_runner_record(runner)
+                print(f"GitHub    : {_github_state_text(record)}")
+            except RuntimeError as exc:
+                print(f"GitHub    : unavailable ({exc})")
 
 
 
@@ -820,9 +823,12 @@ def list_runners(_: argparse.Namespace) -> None:
         pids = listener_pids(runner)
         local_state = "RUNNING" if pids else "STOPPED"
         if auth_available:
-            github = _github_runner_record(runner)
-            github_state = _github_state_text(github)
-            print(f"{runner} | LOCAL={local_state} | GITHUB={github_state}")
+            try:
+                github = _github_runner_record(runner)
+                github_state = _github_state_text(github)
+                print(f"{runner} | LOCAL={local_state} | GITHUB={github_state}")
+            except RuntimeError as exc:
+                print(f"{runner} | LOCAL={local_state} | GITHUB=unavailable ({exc})")
         else:
             print(f"{runner} | {local_state}")
 
