@@ -1,0 +1,172 @@
+name: Runner Control Unit Regression
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Exercise runner control lifecycle with fake runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile tools/runner_control.py
+
+          OEC_ROOT="$RUNNER_TEMP/fake-oec" python - <<'PY'
+          import json
+          import os
+          import shutil
+          import stat
+          import subprocess
+          import tempfile
+          import time
+          from pathlib import Path
+          import importlib.util
+
+          root = Path(os.environ["OEC_ROOT"])
+          runner = root / "gpu" / "unit-test" / "actions-runner"
+          (runner / "bin").mkdir(parents=True)
+
+          shutil.copy2("/usr/bin/sleep", runner / "bin" / "Runner.Listener")
+          os.chmod(runner / "bin" / "Runner.Listener", stat.S_IRWXU)
+
+          (runner / ".runner").write_text(json.dumps({
+              "name": "unit-test",
+              "serverUrl": "https://invalid.example/no/repo",
+          }))
+
+          (runner / "run.sh").write_text(
+              "#!/usr/bin/env bash\n"
+              "set -euo pipefail\n"
+              "exec ./bin/Runner.Listener 300\n"
+          )
+          os.chmod(runner / "run.sh", stat.S_IRWXU)
+
+          (runner / "config.sh").write_text(
+              "#!/usr/bin/env bash\n"
+              "set -euo pipefail\n"
+              "test \"$1\" = remove\n"
+              "test \"$3\" = --token\n"
+              "test -n \"$4\"\n"
+              "rm -f .runner\n"
+          )
+          os.chmod(runner / "config.sh", stat.S_IRWXU)
+
+          spec = importlib.util.spec_from_file_location("runner_control", "tools/runner_control.py")
+          rc = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(rc)
+
+          assert rc.listener_pids(runner) == []
+
+          start = subprocess.run(
+              ["python", "tools/runner_control.py", "start",
+               "--runner-dir", str(runner), "--no-github-wait"],
+              text=True, capture_output=True, check=True,
+          )
+          assert "Runner is running: Listener PID" in start.stdout, start.stdout
+
+          start2 = subprocess.run(
+              ["python", "tools/runner_control.py", "start",
+               "--runner-dir", str(runner), "--no-github-wait"],
+              text=True, capture_output=True, check=True,
+          )
+          assert "Runner already running: PID" in start2.stdout, start2.stdout
+
+          status = subprocess.run(
+              ["python", "tools/runner_control.py", "status",
+               "--runner-dir", str(runner), "--no-github"],
+              text=True, capture_output=True, check=True,
+          )
+          assert "Running   : True" in status.stdout, status.stdout
+
+          stop = subprocess.run(
+              ["python", "tools/runner_control.py", "stop",
+               "--runner-dir", str(runner), "--no-github-wait"],
+              text=True, capture_output=True, check=True,
+          )
+          assert "Local runner process stopped." in stop.stdout, stop.stdout
+
+          status2 = subprocess.run(
+              ["python", "tools/runner_control.py", "status",
+               "--runner-dir", str(runner), "--no-github"],
+              text=True, capture_output=True, check=True,
+          )
+          assert "Running   : False" in status2.stdout, status2.stdout
+
+          shutil.rmtree(runner)
+          runner.mkdir(parents=True)
+          (runner / ".runner").write_text(json.dumps({
+              "name": "unit-remove",
+              "serverUrl": "https://invalid.example/no/repo",
+          }))
+          (runner / "config.sh").write_text(
+              "#!/usr/bin/env bash\n"
+              "set -euo pipefail\n"
+              "test \"$1\" = remove\n"
+              "test \"$3\" = --token\n"
+              "test -n \"$4\"\n"
+              "rm -f .runner\n"
+          )
+          os.chmod(runner / "config.sh", stat.S_IRWXU)
+
+          env = os.environ.copy()
+          env.pop("GITHUB_TOKEN", None)
+          env.pop("GH_TOKEN", None)
+
+          remove = subprocess.run(
+              ["python", "tools/runner_control.py", "remove",
+               "--runner-dir", str(runner),
+               "--token", "unit-test-token",
+               "--no-github-wait"],
+              text=True, capture_output=True, env=env,
+          )
+          assert remove.returncode == 0, remove.stdout + remove.stderr
+          assert not runner.exists(), runner
+
+          # Mock the GitHub-side state machine independently of the network.
+          states = iter([
+              {"name": "unit-github", "status": "offline", "busy": False, "id": 123},
+          ])
+          original_record = rc._github_runner_record
+          rc._github_auth_token = lambda: "test-token"
+          rc._github_runner_record = lambda runner, token=None: next(states)
+
+          fake = root / "gpu" / "github-test" / "actions-runner"
+          fake.mkdir(parents=True)
+          (fake / ".runner").write_text(json.dumps({
+              "name": "unit-github",
+              "serverUrl": "https://github.com/Killer4K-N/Connector_1",
+          }))
+
+          seen = rc.wait_for_github_state(fake, "offline", timeout=2, poll_interval=0.01)
+          assert seen["status"] == "offline"
+
+          rc._github_runner_record = lambda runner, token=None: {
+              "name": "unit-github", "status": "online", "busy": False, "id": 123
+          }
+          seen = rc.wait_for_github_state(fake, "online-idle", timeout=2, poll_interval=0.01)
+          assert seen["status"] == "online" and not seen["busy"]
+
+          deleted = []
+          rc._github_runner_record = lambda runner, token=None: (
+              {"name": "unit-github", "status": "offline", "busy": False, "id": 123}
+              if not deleted else None
+          )
+          rc._github_request = lambda method, endpoint, token, timeout=20.0: (
+              deleted.append((method, endpoint)) or {}
+          )
+          assert rc.delete_github_runner(fake) is True
+          assert deleted == [("DELETE", "repos/Killer4K-N/Connector_1/actions/runners/123")]
+
+          print("RUNNER_CONTROL_UNIT_REGRESSION=PASS")
+          PY
