@@ -83,29 +83,22 @@ The controller has separate help for every command:
     python ~/OEC/tools/runner_control.py download --help
     python ~/OEC/tools/runner_control.py list --help
 
-## A100 Installation_Setup normalization
+## A100 Installation_Setup notebooks
 
-The A100 host has these Installation_Setup notebooks:
+The installation notebooks remain notebook-owned setup documents. The runner controller
+does not rewrite them, inject runner-directory paths into them, or remove their token
+cells.
 
-- ~/OEC/gpu/project/Installation_Setup.ipynb
-- ~/OEC/gpu/a3/Installation_Setup.ipynb
-- ~/OEC/gpu/a4/Installation_Setup.ipynb
-- ~/OEC/gpu/connector_1/Installation_Setup.ipynb
-- ~/OEC/gpu/connector_2/Installation_Setup.ipynb
-- ~/OEC/gpu/connector_3/Installation_Setup.ipynb
+For runner setup/start/stop/remove, the notebook can invoke:
+    
+    python ~/OEC/tools/runner_control.py setup --repo-url https://github.com/Killer4K-N/Connector_1 --name connector-2 --labels gpu,a100,connector-2
+    python ~/OEC/tools/runner_control.py start --name connector-2
+    python ~/OEC/tools/runner_control.py stop --name connector-2
+    python ~/OEC/tools/runner_control.py remove --name connector-2
 
-Use the central normalizer rather than editing runner cells individually:
-
-    python ~/OEC/tools/normalize_installation_setup.py --dry-run
-    python ~/OEC/tools/normalize_installation_setup.py
-
-The normalizer removes old runner download/configuration/start cells, removes matching
-Installation_Setup Jupyter checkpoints, and replaces them with cells that call the
-central runner controller. It does not contain or write registration tokens.
-
-The notebook metadata defaults preserve the currently observed repository and runner
-names. They can be overridden at runtime with RUNNER_REPO_URL, RUNNER_NAME,
-RUNNER_LABELS, and RUNNER_TOKEN_ENV.
+The controller resolves the established `connector_2` on-disk directory automatically
+from the GitHub runner name `connector-2`; notebooks do not need to contain a runner
+directory path.
 
 ## Runner location rule
 
