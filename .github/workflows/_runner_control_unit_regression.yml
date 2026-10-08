@@ -68,6 +68,11 @@ jobs:
 
           assert rc.listener_pids(runner) == []
 
+          alias_runner = root / "gpu" / "connector_2" / "actions-runner"
+          alias_runner.mkdir(parents=True)
+          assert rc.runner_dir_from_name("connector-2") == alias_runner
+          shutil.rmtree(alias_runner)
+
           start = subprocess.run(
               ["python", "tools/runner_control.py", "start",
                "--runner-dir", str(runner), "--no-github-wait"],
@@ -122,6 +127,50 @@ jobs:
           env = os.environ.copy()
           env.pop("GITHUB_TOKEN", None)
           env.pop("GH_TOKEN", None)
+
+          # Registration/remove-token lifecycle: a repository-admin credential
+          # must mint a distinct removal token for config.sh.
+          admin_fake = root / "gpu" / "admin-remove" / "actions-runner"
+          admin_fake.mkdir(parents=True)
+          (admin_fake / ".runner").write_text(json.dumps({
+              "name": "admin-remove",
+              "serverUrl": "https://github.com/Killer4K-N/Connector_1",
+          }))
+          (admin_fake / "config.sh").write_text(
+              "#!/usr/bin/env bash\n"
+              "set -euo pipefail\n"
+              "test \"$1\" = remove\n"
+              "test \"$3\" = --token\n"
+              "test \"$4\" = fresh-remove-token\n"
+              "rm -f .runner\n"
+          )
+          os.chmod(admin_fake / "config.sh", stat.S_IRWXU)
+
+          old_auth = rc._github_auth_token
+          old_request = rc._github_request
+          rc._github_auth_token = lambda: "admin-credential"
+          rc._github_request = lambda method, endpoint, token, timeout=20.0: (
+              {"token": "fresh-remove-token"}
+              if method == "POST" and endpoint.endswith("/actions/runners/remove-token")
+              else {}
+          )
+          auto_args = type("Args", (), {
+              "runner_dir": str(admin_fake),
+              "name": "admin-remove",
+              "no_github_wait": True,
+              "github_timeout": 1,
+              "auth_token": "",
+              "auth_token_env": "GITHUB_ADMIN_TOKEN",
+              "token": "",
+              "token_env": "ACTION_TOKEN",
+              "token_file": "",
+              "token_stdin": False,
+              "non_interactive": True,
+          })()
+          rc.remove_runner(auto_args)
+          assert not admin_fake.exists(), admin_fake
+          rc._github_auth_token = old_auth
+          rc._github_request = old_request
 
           remove = subprocess.run(
               ["python", "tools/runner_control.py", "remove",
