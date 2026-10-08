@@ -176,7 +176,16 @@ def wait_for_github_state(
     deadline = time.time() + timeout
     last = None
     while time.time() < deadline:
-        record = _github_runner_record(runner, token=token)
+        try:
+            record = _github_runner_record(runner, token=token)
+        except RuntimeError as exc:
+            raise SystemExit(
+                "GitHub runner-state verification failed: "
+                f"{exc}\n"
+                "The local runner may still be running. Supply a GitHub credential "
+                "with repository self-hosted-runner administration access, or use "
+                "--no-github-wait to manage only the local listener."
+            ) from exc
         last = record
         if desired == "offline":
             if record is not None and record.get("status") == "offline":
