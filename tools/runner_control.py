@@ -34,7 +34,18 @@ def gpu_root() -> Path:
 
 
 def runner_dir_from_name(name: str) -> Path:
-    return gpu_root() / name / "actions-runner"
+    """Resolve a runner name without requiring a directory path.
+
+    Existing installations may use either the runner name verbatim or the
+    historical hyphen-to-underscore on-disk form.
+    """
+    exact = gpu_root() / name / "actions-runner"
+    underscore = gpu_root() / name.replace("-", "_") / "actions-runner"
+    if exact.exists():
+        return exact
+    if underscore.exists():
+        return underscore
+    return underscore if "-" in name else exact
 
 
 def require_runner_dir(path: Path) -> Path:
@@ -207,8 +218,8 @@ def wait_for_github_state(
     )
 
 
-def delete_github_runner(runner: Path) -> bool:
-    token = _github_auth_token()
+def delete_github_runner(runner: Path, *, auth_token: str | None = None) -> bool:
+    token = auth_token or _github_auth_token()
     if not token:
         return False
 
@@ -217,7 +228,12 @@ def delete_github_runner(runner: Path) -> bool:
     if not name or not repo:
         return False
 
-    record = _github_runner_record(runner, token=token)
+    try:
+        record = _github_runner_record(runner, token=token)
+    except RuntimeError as exc:
+        print(f"GitHub runner lookup failed during removal: {exc}")
+        return False
+
     if record is None:
         print("GitHub runner already absent.")
         return True
@@ -227,25 +243,43 @@ def delete_github_runner(runner: Path) -> bool:
         return False
 
     try:
-        _github_request(
-            "DELETE",
-            f"repos/{repo}/actions/runners/{runner_id}",
-            token,
-        )
+        _github_request("DELETE", f"repos/{repo}/actions/runners/{runner_id}", token)
     except RuntimeError as exc:
         print(f"GitHub API removal failed: {exc}")
         return False
 
     deadline = time.time() + 30
     while time.time() < deadline:
-        if _github_runner_record(runner, token=token) is None:
-            print(f"GitHub runner removed: {name}")
-            return True
+        try:
+            if _github_runner_record(runner, token=token) is None:
+                print(f"GitHub runner removed: {name}")
+                return True
+        except RuntimeError:
+            pass
         time.sleep(2)
 
     print(f"GitHub runner deletion requested but registry still contains: {name}")
     return False
 
+
+def create_github_remove_token(runner: Path, auth_token: str) -> str:
+    _, server_url = _runner_identity(runner)
+    repo = _github_repo_from_server_url(server_url)
+    if not repo:
+        return ""
+
+    payload = _github_request(
+        "POST",
+        f"repos/{repo}/actions/runners/remove-token",
+        auth_token,
+    )
+    token_value = str(payload.get("token") or "").strip()
+    if not token_value:
+        raise RuntimeError(
+            "GitHub did not return a removal token. "
+            "The supplied credential needs repository Administration permission."
+        )
+    return token_value
 
 def _delete_local_runner_directory(runner: Path) -> None:
     if runner.exists():
@@ -734,8 +768,6 @@ def remove_runner(args: argparse.Namespace) -> None:
     remote_removed = False
     try:
         if (runner / ".runner").is_file():
-            # Stop first so the GitHub registry can transition to offline before
-            # removal. Do not let an external supervisor silently hide failure.
             stop_args = argparse.Namespace(
                 runner_dir=str(runner),
                 name=args.name,
@@ -747,16 +779,29 @@ def remove_runner(args: argparse.Namespace) -> None:
             except SystemExit as exc:
                 print(f"Warning: stop before remove reported: {exc}")
 
-            remote_removed = delete_github_runner(runner)
+            auth = str(getattr(args, "auth_token", "") or "").strip()
+            if not auth:
+                env_name = str(getattr(args, "auth_token_env", "") or "").strip()
+                if env_name:
+                    auth = os.environ.get(env_name, "").strip()
+            if not auth:
+                auth = _github_auth_token()
 
-            if not remote_removed:
-                # Fall back to the official runner removal token path when API
-                # deletion is unavailable or insufficiently authorized.
+            removal_token = ""
+            if auth:
+                try:
+                    removal_token = create_github_remove_token(runner, auth)
+                except RuntimeError as exc:
+                    print(f"Could not mint GitHub removal token: {exc}")
+
+            if not removal_token:
                 try:
                     removal_token = token(args)
                 except SystemExit:
                     removal_token = ""
-                if removal_token:
+
+            if removal_token:
+                try:
                     subprocess.run(
                         ["./config.sh", "remove", "--unattended", "--token", removal_token],
                         cwd=runner,
@@ -765,18 +810,24 @@ def remove_runner(args: argparse.Namespace) -> None:
                     )
                     remote_removed = True
                     print("GitHub runner removed via config.sh.")
-                else:
+                except subprocess.CalledProcessError as exc:
                     print(
-                        "Warning: GitHub runner could not be removed because no "
-                        "authorized API token or removal token was available."
+                        "config.sh remove failed. The supplied value must be a GitHub "
+                        "runner removal token; a registration token is not valid here."
                     )
+                    print(f"config.sh exit code: {exc.returncode}")
+
+            if not remote_removed and auth:
+                remote_removed = delete_github_runner(runner, auth_token=auth)
     finally:
         _delete_local_runner_directory(runner)
 
-    if not remote_removed and (runner / ".runner").exists():
-        raise SystemExit("Local runner directory deleted, but GitHub removal was not confirmed.")
     if not remote_removed:
-        raise SystemExit("Local runner directory deleted; GitHub removal was not confirmed.")
+        raise SystemExit(
+            "Local runner directory deleted, but GitHub removal was not confirmed. "
+            "Use a repository-admin credential to mint a removal token, or supply "
+            "an already-issued runner removal token with --token."
+        )
     print("Runner removal complete.")
 
 def status_runner(args: argparse.Namespace) -> None:
@@ -885,8 +936,9 @@ Security:
     common.add_argument(
         "--name",
         help=(
-            "GitHub runner name. With the default layout the runner is stored at "
-            "~/OEC/gpu/<name>/actions-runner."
+            "GitHub runner name; no path is required. Existing installations are "
+            "resolved automatically using either <name> or its hyphen-to-underscore "
+            "directory under ~/OEC/gpu."
         ),
     )
     common.add_argument(
@@ -1051,16 +1103,27 @@ Stopping leaves the runner registered with GitHub but offline.""",
             "Use config.sh remove to unregister the selected runner. "
             "This does not delete the local runner directory."
         ),
-        epilog="""Example:
+        epilog="""Examples:
   export ACTION_TOKEN='CURRENT_REMOVE_TOKEN'
   python ~/OEC/tools/runner_control.py remove --name connector-3
 
-Use the runner removal token issued for the same repository/organization.""",
+  export GITHUB_ADMIN_TOKEN='REPOSITORY_ADMIN_CREDENTIAL'
+  python ~/OEC/tools/runner_control.py remove --name connector-3
+
+The setup/registration token is not a removal token.""",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     remove.add_argument(
         "--token", metavar="TOKEN",
         help="Runner removal token. Prefer --token-env/--token-file/--token-stdin.",
+    )
+    remove.add_argument(
+        "--auth-token", metavar="TOKEN",
+        help="Optional repository-admin credential used to mint a fresh removal token.",
+    )
+    remove.add_argument(
+        "--auth-token-env", default="GITHUB_ADMIN_TOKEN", metavar="NAME",
+        help='Environment variable containing a repository-admin credential (default: "GITHUB_ADMIN_TOKEN").',
     )
     remove.add_argument(
         "--token-env", default="ACTION_TOKEN", metavar="NAME",
