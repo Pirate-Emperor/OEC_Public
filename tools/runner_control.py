@@ -11,6 +11,7 @@ import getpass
 import os
 import signal
 import subprocess
+import shutil
 import sys
 import tarfile
 import time
@@ -53,6 +54,58 @@ def load_core_config() -> None:
         __import__("core_config")
 
 
+def _read_proc_link(path: Path) -> str:
+    try:
+        return os.readlink(path)
+    except OSError:
+        return ""
+
+
+def _read_proc_cmdline(path: Path) -> str:
+    try:
+        return path.read_bytes().replace(b"\0", b" ").decode(errors="ignore")
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def _process_matches_runner(pid: int, runner_dir: Path, target: str) -> bool:
+    proc_dir = Path("/proc") / str(pid)
+    if not proc_dir.is_dir():
+        return False
+
+    exe = _read_proc_link(proc_dir / "exe")
+    cwd = _read_proc_link(proc_dir / "cwd")
+    cmdline = _read_proc_cmdline(proc_dir / "cmdline")
+
+    runner_path = runner_dir.resolve()
+    target_path = Path(target).resolve()
+
+    # Normal runner installation: Runner.Listener is the actual executable.
+    if exe:
+        try:
+            if Path(exe).resolve() == target_path:
+                return True
+        except OSError:
+            pass
+
+    # Fallback for dotnet-hosted/relative launches. Scope the match to this
+    # runner's directory so one runner never reports another runner as running.
+    if str(target_path) in cmdline:
+        return True
+
+    if "Runner.Listener" in cmdline:
+        if str(runner_path) in cmdline:
+            return True
+        if cwd:
+            try:
+                if Path(cwd).resolve() == runner_path:
+                    return True
+            except OSError:
+                pass
+
+    return False
+
+
 def listener_pids(runner_dir: Path) -> list[int]:
     target = str((runner_dir / "bin" / "Runner.Listener").resolve())
     proc_root = Path("/proc")
@@ -64,15 +117,14 @@ def listener_pids(runner_dir: Path) -> list[int]:
     for entry in proc_root.iterdir():
         if not entry.name.isdigit():
             continue
-        cmdline = entry / "cmdline"
         try:
-            raw = cmdline.read_bytes().replace(b"\0", b" ").decode(errors="ignore")
-        except (OSError, UnicodeDecodeError):
+            pid = int(entry.name)
+        except ValueError:
             continue
-        if target in raw:
-            found.append(int(entry.name))
+        if _process_matches_runner(pid, runner_dir, target):
+            found.append(pid)
 
-    return sorted(found)
+    return sorted(set(found))
 
 
 def token(args: argparse.Namespace) -> str:
@@ -186,24 +238,155 @@ def write_runner_env(runner: Path) -> None:
     env_file.write_text("\n".join(lines) + "\n")
 
 
+def _runner_archive_name(version: str) -> str:
+    return f"actions-runner-linux-x64-{version}.tar.gz"
+
+
+def _find_cached_runner_archive(runner: Path, version: str) -> Path | None:
+    name = _runner_archive_name(version)
+
+    explicit = os.environ.get("ACTIONS_RUNNER_ARCHIVE", "").strip()
+    if explicit:
+        path = Path(explicit).expanduser().resolve()
+        if path.is_file():
+            return path
+
+    cache_root = Path(
+        os.environ.get(
+            "ACTIONS_RUNNER_CACHE_DIR",
+            os.path.expanduser("~/.cache/oec/actions-runner"),
+        )
+    ).expanduser().resolve()
+    cached = cache_root / name
+    if cached.is_file():
+        return cached
+
+    try:
+        for candidate in gpu_root().rglob(name):
+            if candidate.resolve() != (runner / name).resolve() and candidate.is_file():
+                return candidate
+    except OSError:
+        pass
+
+    return None
+
+
+def _find_local_runner_source(runner: Path) -> Path | None:
+    try:
+        candidates = sorted(gpu_root().rglob("bin/Runner.Listener"))
+    except OSError:
+        return None
+
+    for listener in candidates:
+        source = listener.parent.parent
+        try:
+            if source.resolve() != runner.resolve() and (source / "config.sh").is_file():
+                return source
+        except OSError:
+            continue
+
+    return None
+
+
+def _bootstrap_from_local_runner(runner: Path) -> bool:
+    source = _find_local_runner_source(runner)
+    if source is None:
+        return False
+
+    for name in ("config.sh", "run.sh", "run-helper.sh.template", "svc.sh", "env.sh"):
+        src = source / name
+        dst = runner / name
+        if src.is_file():
+            shutil.copy2(src, dst)
+
+    for dirname in ("bin", "externals"):
+        src = source / dirname
+        dst = runner / dirname
+        if src.is_dir():
+            if dst.exists():
+                shutil.rmtree(dst)
+            shutil.copytree(src, dst)
+
+    if (runner / "config.sh").is_file() and (runner / "bin" / "Runner.Listener").is_file():
+        print(f"Bootstrapped runner binaries from existing install: {source}")
+        return True
+
+    return False
+
+
+def _download_runner_archive(url: str, archive: Path) -> None:
+    proxy = (
+        os.environ.get("https_proxy")
+        or os.environ.get("HTTPS_PROXY")
+        or os.environ.get("http_proxy")
+        or os.environ.get("HTTP_PROXY")
+        or ""
+    )
+    env = os.environ.copy()
+
+    curl = shutil.which("curl")
+    if curl:
+        cmd = [
+            curl, "--fail", "--location", "--retry", "2",
+            "--connect-timeout", "20", "--max-time", "900",
+            "--output", str(archive), url,
+        ]
+        print("Downloading runner archive with curl (proxy-aware)...")
+        result = subprocess.run(cmd, env=env, text=True, capture_output=True)
+        if result.returncode == 0:
+            return
+        detail = (result.stderr or result.stdout).strip()
+        raise SystemExit(
+            "Runner archive download failed. "
+            f"curl exit={result.returncode}; "
+            f"proxy={'configured' if proxy else 'not configured'}; "
+            f"url={url}; details={detail[-500:]}"
+        )
+
+    print("Downloading runner archive with Python urllib (proxy-aware)...")
+    try:
+        urllib.request.urlretrieve(url, archive)
+    except Exception as exc:
+        raise SystemExit(
+            "Runner archive download failed. "
+            f"proxy={'configured' if proxy else 'not configured'}; "
+            f"url={url}; error={exc}"
+        ) from exc
+
+
 def download_runner(runner: Path, version: str) -> None:
+    load_core_config()
+
     runner = require_runner_dir(runner)
     runner.mkdir(parents=True, exist_ok=True)
+    write_runner_env(runner)
 
     if (runner / "config.sh").is_file():
         return
 
-    archive = runner / f"actions-runner-linux-x64-{version}.tar.gz"
-    url = (
-        "https://github.com/actions/runner/releases/download/"
-        f"v{version}/actions-runner-linux-x64-{version}.tar.gz"
-    )
+    archive_name = _runner_archive_name(version)
+    archive = runner / archive_name
 
-    print(f"Downloading runner {version}...")
-    urllib.request.urlretrieve(url, archive)
+    cached = _find_cached_runner_archive(runner, version)
+    if cached and cached.resolve() != archive.resolve():
+        print(f"Reusing cached runner archive: {cached}")
+        shutil.copy2(cached, archive)
+
+    if not archive.is_file():
+        if _bootstrap_from_local_runner(runner):
+            return
+
+        url = os.environ.get("ACTIONS_RUNNER_DOWNLOAD_URL", "").strip()
+        if not url:
+            url = (
+                "https://github.com/actions/runner/releases/download/"
+                f"v{version}/{archive_name}"
+            )
+        print(f"Downloading runner {version}...")
+        _download_runner_archive(url, archive)
 
     if archive.stat().st_size < 1_000_000:
-        raise SystemExit("Downloaded runner archive is unexpectedly small.")
+        raise SystemExit("Runner archive is unexpectedly small (<1 MB).")
 
     with tarfile.open(archive, "r:gz") as tf:
         tf.extractall(runner)
@@ -243,9 +426,38 @@ def start_runner(args: argparse.Namespace) -> None:
         start_new_session=True,
         close_fds=True,
     )
+    log.close()
 
-    print(f"Runner started: PID {proc.pid}")
+    print(f"Runner start requested: PID {proc.pid}")
     print(f"Runner log: {log_path}")
+
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        pids = listener_pids(runner)
+        if pids:
+            print(f"Runner is running: Listener PID {pids[0]}")
+            return
+        if proc.poll() is not None:
+            break
+        time.sleep(0.25)
+
+    pids = listener_pids(runner)
+    if pids:
+        print(f"Runner is running: Listener PID {pids[0]}")
+        return
+
+    rc = proc.poll()
+    tail = ""
+    try:
+        lines = log_path.read_text(errors="replace").splitlines()
+        tail = "\n".join(lines[-30:])
+    except OSError:
+        pass
+
+    raise SystemExit(
+        "Runner failed to reach a running Runner.Listener state within 15 seconds "
+        f"(run.sh rc={rc}).\nLog: {log_path}\nLast log lines:\n{tail}"
+    )
 
 
 def stop_runner(args: argparse.Namespace) -> None:
