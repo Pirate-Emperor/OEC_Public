@@ -67,9 +67,41 @@ def load_core_config() -> None:
         __import__("core_config")
 
 
+def _dotenv_github_tokens() -> dict[str, str]:
+    """Read only recognized GitHub API credentials from ~/.env without importing core_config."""
+    env_path = Path.home() / ".env"
+    names = {
+        "GITHUB_RUNNER_ADMIN_TOKEN",
+        "GITHUB_ADMIN_TOKEN",
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+    }
+    values: dict[str, str] = {}
+    try:
+        for raw in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if key in names:
+                values[key] = value.strip().strip("'").strip('"')
+    except OSError:
+        pass
+    return values
+
+
 def _github_auth_token() -> str:
-    for name in ("GH_TOKEN", "GITHUB_TOKEN"):
-        value = os.environ.get(name, "").strip()
+    """Find a runner-admin API token from the process environment, ~/.env, or gh."""
+    file_values = _dotenv_github_tokens()
+    # Prefer specifically designated runner/repository administration credentials.
+    for name in (
+        "GITHUB_RUNNER_ADMIN_TOKEN",
+        "GITHUB_ADMIN_TOKEN",
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+    ):
+        value = os.environ.get(name, "").strip() or file_values.get(name, "").strip()
         if value:
             return value
 
@@ -150,7 +182,9 @@ def _github_runner_record(runner: Path, *, token: str | None = None) -> dict | N
     name, server_url = _runner_identity(runner)
     repo = _github_repo_from_server_url(server_url)
     if not name or not repo:
-        return None
+        raise RuntimeError(
+            f"Cannot verify GitHub runner state: missing/invalid .runner identity in {runner}"
+        )
 
     payload = _github_request(
         "GET",
@@ -165,7 +199,7 @@ def _github_runner_record(runner: Path, *, token: str | None = None) -> dict | N
 
 def _github_state_text(record: dict | None) -> str:
     if record is None:
-        return "unavailable/not-registered"
+        return "not registered (registry query returned no matching runner)"
     status = str(record.get("status") or "unknown")
     busy = bool(record.get("busy"))
     activity = "busy" if busy else "idle"
@@ -181,7 +215,10 @@ def wait_for_github_state(
 ) -> dict | None:
     token = _github_auth_token()
     if not token:
-        print("GitHub state not verified: no GH_TOKEN/GITHUB_TOKEN/gh auth available.")
+        print(
+            "GitHub state not verified: no GH_TOKEN, GITHUB_TOKEN, "
+            "GITHUB_ADMIN_TOKEN, GITHUB_RUNNER_ADMIN_TOKEN, or gh auth available."
+        )
         return None
 
     deadline = time.time() + timeout
@@ -296,6 +333,17 @@ def _read_proc_link(path: Path) -> str:
         return ""
 
 
+def _process_state(pid: int) -> str:
+    """Return Linux /proc process state; Z/X processes are not live listeners."""
+    try:
+        raw = (Path("/proc") / str(pid) / "stat").read_text(encoding="utf-8")
+        # The comm field may contain spaces and parentheses, so split after its last ')'.
+        tail = raw[raw.rfind(")") + 2:].split()
+        return tail[0] if tail else ""
+    except (OSError, IndexError):
+        return ""
+
+
 def _read_proc_cmdline(path: Path) -> str:
     try:
         return path.read_bytes().replace(b"\0", b" ").decode(errors="ignore")
@@ -355,6 +403,8 @@ def listener_pids(runner_dir: Path) -> list[int]:
         try:
             pid = int(entry.name)
         except ValueError:
+            continue
+        if _process_state(pid) in {"Z", "X"}:
             continue
         if _process_matches_runner(pid, runner_dir, target):
             found.append(pid)
@@ -712,6 +762,30 @@ def start_runner(args: argparse.Namespace) -> None:
         f"(run.sh rc={rc}).\nLog: {log_path}\nLast log lines:\n{tail}"
     )
 
+def _signal_runner_listeners(runner: Path, pids: list[int], sig: int) -> None:
+    """Signal only processes that still match this runner's exact Listener binary."""
+    target = str((runner / "bin" / "Runner.Listener").resolve())
+    for pid in pids:
+        if not _process_matches_runner(pid, runner, target):
+            continue
+        try:
+            os.kill(pid, sig)
+        except ProcessLookupError:
+            pass
+        except PermissionError:
+            print(f"Cannot signal Runner.Listener PID {pid}: permission denied.")
+
+
+def _wait_for_runner_exit(runner: Path, timeout: float) -> list[int]:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        remaining = listener_pids(runner)
+        if not remaining:
+            return []
+        time.sleep(0.25)
+    return listener_pids(runner)
+
+
 def stop_runner(args: argparse.Namespace) -> None:
     runner = require_runner_dir(
         Path(args.runner_dir).expanduser()
@@ -721,7 +795,7 @@ def stop_runner(args: argparse.Namespace) -> None:
 
     pids = listener_pids(runner)
     if not pids:
-        print("Runner is not running.")
+        print("Local runner process is stopped.")
         if not args.no_github_wait:
             wait_for_github_state(
                 runner,
@@ -730,25 +804,32 @@ def stop_runner(args: argparse.Namespace) -> None:
             )
         return
 
-    for pid in pids:
-        try:
-            os.kill(pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
+    print(f"Stopping Runner.Listener PID(s): {pids}")
+    # SIGINT matches the normal Ctrl+C shutdown path used by the runner.
+    _signal_runner_listeners(runner, pids, signal.SIGINT)
+    remaining = _wait_for_runner_exit(runner, 5)
 
-    deadline = time.time() + 15
-    while time.time() < deadline:
-        remaining = listener_pids(runner)
-        if not remaining:
-            print("Local runner process stopped.")
-            break
-        time.sleep(0.25)
-    else:
-        remaining = listener_pids(runner)
+    if remaining:
+        print(f"Runner still present after SIGINT; sending SIGTERM to PID(s): {remaining}")
+        _signal_runner_listeners(runner, remaining, signal.SIGTERM)
+        remaining = _wait_for_runner_exit(runner, 5)
+
+    if remaining:
+        print(
+            "WARNING: graceful shutdown failed. Force-stopping only verified "
+            f"Runner.Listener process(es): {remaining}. This can interrupt an active job."
+        )
+        _signal_runner_listeners(runner, remaining, signal.SIGKILL)
+        remaining = _wait_for_runner_exit(runner, 5)
+
+    if remaining:
+        states = {pid: _process_state(pid) or "unknown" for pid in remaining}
         raise SystemExit(
-            f"Runner did not stop cleanly; Runner.Listener PIDs still present: {remaining}"
+            "Runner processes remain after SIGINT/SIGTERM/SIGKILL attempts; "
+            f"PIDs={remaining}, states={states}. Check process ownership or host supervision."
         )
 
+    print("Local runner process stopped.")
     if not args.no_github_wait:
         wait_for_github_state(
             runner,
@@ -855,11 +936,18 @@ def status_runner(args: argparse.Namespace) -> None:
             pass
 
         if not args.no_github:
-            try:
-                record = _github_runner_record(runner)
-                print(f"GitHub    : {_github_state_text(record)}")
-            except RuntimeError as exc:
-                print(f"GitHub    : unavailable ({exc})")
+            auth = _github_auth_token()
+            if not auth:
+                print(
+                    "GitHub    : unknown (no token in GH_TOKEN, GITHUB_TOKEN, "
+                    "GITHUB_ADMIN_TOKEN, GITHUB_RUNNER_ADMIN_TOKEN, or gh auth)"
+                )
+            else:
+                try:
+                    record = _github_runner_record(runner, token=auth)
+                    print(f"GitHub    : {_github_state_text(record)}")
+                except RuntimeError as exc:
+                    print(f"GitHub    : unavailable ({exc})")
 
 
 
@@ -869,7 +957,7 @@ def list_runners(_: argparse.Namespace) -> None:
         print(f"No GPU runner directory: {root}")
         return
 
-    auth_available = bool(_github_auth_token())
+    auth = _github_auth_token()
     found = []
     for runner_file in root.rglob(".runner"):
         if runner_file.is_file() and runner_file.parent.name == "actions-runner":
@@ -882,15 +970,15 @@ def list_runners(_: argparse.Namespace) -> None:
     for runner in sorted(found):
         pids = listener_pids(runner)
         local_state = "RUNNING" if pids else "STOPPED"
-        if auth_available:
-            try:
-                github = _github_runner_record(runner)
-                github_state = _github_state_text(github)
-                print(f"{runner} | LOCAL={local_state} | GITHUB={github_state}")
-            except RuntimeError as exc:
-                print(f"{runner} | LOCAL={local_state} | GITHUB=unavailable ({exc})")
-        else:
-            print(f"{runner} | {local_state}")
+        if not auth:
+            print(f"{runner} | LOCAL={local_state} | GITHUB=unknown (no GitHub API credential)")
+            continue
+        try:
+            github = _github_runner_record(runner, token=auth)
+            github_state = _github_state_text(github)
+            print(f"{runner} | LOCAL={local_state} | GITHUB={github_state}")
+        except RuntimeError as exc:
+            print(f"{runner} | LOCAL={local_state} | GITHUB=unavailable ({exc})")
 
 def parser() -> argparse.ArgumentParser:
     examples = """
