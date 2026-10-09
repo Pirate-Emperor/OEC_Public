@@ -101,8 +101,9 @@ class RunnerControlFixTests(unittest.TestCase):
                     no_github_wait=True, github_timeout=0.1,
                 )
                 output = io.StringIO()
-                with contextlib.redirect_stdout(output):
-                    rc.stop_runner(args)
+                with mock.patch.dict(os.environ, {"OEC_ROOT": td}):
+                    with contextlib.redirect_stdout(output):
+                        rc.stop_runner(args)
                 self.assertIn("Local runner process stopped.", output.getvalue())
                 proc.wait(timeout=3)
                 self.assertEqual(rc.listener_pids(runner), [])
