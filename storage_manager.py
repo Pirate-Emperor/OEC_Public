@@ -636,16 +636,18 @@ def manage_allocations(once=False):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="OEC quota-aware multi-directory storage manager",
+        description="OEC persistent storage-reserve manager (reserve changes are explicit)",
     )
     action = parser.add_mutually_exclusive_group()
     action.add_argument("--status", action="store_true", help="Print storage/quota status and exit.")
-    action.add_argument("--clean", action="store_true", help="Remove all reserve and pause-control files.")
-    action.add_argument("--release", metavar="DIR", help="Release one directory reserve and pause automatic rebuilding.")
+    action.add_argument("--clean", action="store_true", help="Inspect reserves and remove stale pause locks; never deletes reserves.")
+    action.add_argument("--release", metavar="DIR", help="Deprecated: reserve deletion is disabled; use --set-reserve-gb.")
     action.add_argument("--resume", metavar="DIR", help="Resume one directory reserve after an intentional large operation.")
+    action.add_argument("--set-reserve-gb", metavar="DIR", help="Explicitly create/resize the persistent reserve.")
     action.add_argument("--preflight-dir", metavar="DIR", help="Run storage admission control for a directory.")
 
     parser.add_argument("--required-gb", type=float, help="Expected size of a large operation.")
+    parser.add_argument("--reserve-gb", type=float, help="Positive reserve size used with --set-reserve-gb; no quota query.")
     parser.add_argument(
         "--minimum-free-gb",
         type=float,
@@ -691,6 +693,16 @@ def main():
     if args.resume:
         raise SystemExit(0 if resume_reserve(args.resume) else 1)
 
+    if args.set_reserve_gb:
+        if args.reserve_gb is None:
+            raise SystemExit("--reserve-gb is required with --set-reserve-gb")
+        raise SystemExit(
+            0 if set_reserve_size(args.set_reserve_gb, args.reserve_gb) else 1
+        )
+
+    if args.reserve_gb is not None:
+        raise SystemExit("--reserve-gb may only be used with --set-reserve-gb")
+
     if args.preflight_dir:
         if args.required_gb is None:
             raise SystemExit("--required-gb is required with --preflight-dir")
@@ -706,7 +718,7 @@ def main():
     try:
         manage_allocations(once=args.once)
     except KeyboardInterrupt:
-        print("\n[STORAGE] Shutdown requested. Cleaning up reserve/control files...")
+        print("\n[STORAGE] Shutdown requested. Preserving reserve files and checking stale locks...")
         clean_all_reserves(config)
         print("[STORAGE] Exited safely.")
 
