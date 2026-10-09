@@ -8,6 +8,8 @@ download model weights, purge caches, or alter an existing checkout.
 from __future__ import annotations
 
 import argparse
+import ctypes
+import errno
 import importlib
 import os
 from pathlib import Path
@@ -70,6 +72,53 @@ def _configure_hpc_environment() -> None:
     # Importing core_config invokes its documented module initialization, including
     # mapping shared storage paths and setting the HPC proxy variables.
     _import_core_config()
+
+
+def _publish_without_overwrite(staging_dir: Path, target: Path) -> None:
+    """Atomically move a prepared directory only if the destination is absent.
+
+    Linux renameat2(RENAME_NOREPLACE) prevents a race from replacing an empty
+    destination directory created after the initial preflight. Fail closed if the
+    filesystem/kernel does not support this operation rather than risk overwriting.
+    """
+    libc = ctypes.CDLL(None, use_errno=True)
+    renameat2 = getattr(libc, "renameat2", None)
+    if renameat2 is None:
+        raise RuntimeError(
+            "Atomic no-overwrite publication requires Linux renameat2; "
+            "refusing to publish the LTX checkout unsafely."
+        )
+
+    renameat2.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    renameat2.restype = ctypes.c_int
+    at_fdcwd = -100
+    rename_noreplace = 1
+    result = renameat2(
+        at_fdcwd,
+        os.fsencode(staging_dir),
+        at_fdcwd,
+        os.fsencode(target),
+        rename_noreplace,
+    )
+    if result != 0:
+        error_number = ctypes.get_errno()
+        if error_number == errno.EEXIST:
+            raise FileExistsError(
+                error_number,
+                "Target appeared during setup; refusing to overwrite it.",
+                str(target),
+            )
+        raise OSError(
+            error_number,
+            f"Atomic no-overwrite rename failed: {os.strerror(error_number)}",
+            str(target),
+        )
 
 
 def prepare_runtime(
@@ -135,9 +184,7 @@ def prepare_runtime(
                 "The staged LTX checkout is unexpectedly dirty; refusing to publish it."
             )
 
-        # Path.rename will fail if another process has created the target meanwhile;
-        # unlike replacement APIs, it does not intentionally overwrite the target.
-        staging_dir.rename(target)
+        _publish_without_overwrite(staging_dir, target)
         staging_dir = None
         return target
     finally:
