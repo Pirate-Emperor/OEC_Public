@@ -17,7 +17,7 @@ The helper resolves the target using this order:
 2. `AIEROS_LTX_REPO_DIR`, if set.
 3. `core_config.SYSTEM_DIRS["cache"]/third_party/LTX-2`.
 
-It clones `https://github.com/Lightricks/LTX-2.git`, checks out the SHA pinned in the worker, validates the required `ltx-core` and `ltx-pipelines` package directories, and only then renames the staging checkout into place.
+It clones `https://github.com/Lightricks/LTX-2.git`, checks out the SHA pinned in the worker, validates the required `ltx-core` and `ltx-pipelines` package directories, and only then publishes the staging checkout with an atomic no-overwrite rename. Git LFS smudging is disabled for the clone/checkout so demo and media assets are not downloaded into the shared cache.
 
 **Safety behavior:** it refuses to overwrite any existing target path, including a symlink. If clone, checkout, or validation fails, it removes only the temporary staging directory created by that invocation. It does not remove or resize `.storage_reserve.bin`, purge caches, install Python packages, or download model weights.
 
