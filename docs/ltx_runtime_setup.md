@@ -17,7 +17,7 @@ The helper resolves the target using this order:
 2. `AIEROS_LTX_REPO_DIR`, if set.
 3. `core_config.SYSTEM_DIRS["cache"]/third_party/LTX-2`.
 
-It fetches only the SHA pinned in the worker from `https://github.com/Lightricks/LTX-2.git` into a fresh temporary Git repository, validates the expected commit and required `ltx-core` / `ltx-pipelines` package directories, then publishes the staging checkout with an atomic no-overwrite rename. Git LFS smudging is disabled during fetch/checkout so demo and media assets are not downloaded into the shared cache.
+It fetches only the SHA pinned in the worker from `https://github.com/Lightricks/LTX-2.git` into a fresh temporary Git repository, validates the expected commit and required `ltx-core` / `ltx-pipelines` package directories, then publishes the staging checkout with an atomic no-overwrite rename where supported. If the shared filesystem rejects `renameat2(RENAME_NOREPLACE)` (as some NFS configurations do), the helper locks the parent directory, rechecks that the target is absent, and uses an atomic same-filesystem rename. If parent-directory locking is unsupported, the helper fails closed. Git LFS smudging is disabled during fetch/checkout so demo and media assets are not downloaded into the shared cache.
 
 **Safety behavior:** it refuses to overwrite any existing target path, including a symlink. If clone, checkout, or validation fails, it removes only the temporary staging directory created by that invocation. It does not remove or resize `.storage_reserve.bin`, purge caches, install Python packages, or download model weights.
 
