@@ -198,7 +198,7 @@ Investigated the three user-requested notebooks in the OEC repository: `pipeline
 
 The first full image-to-3D reproduction reached the sparse-structure attention layer and failed at `xformers.ops.memory_efficient_attention`. The traceback identified that the installed xFormers extension had **no CUDA support** for the A100; its BF16 attention call offered no working operator. The notebook had installed `xformers==0.0.29.post1` with `--no-deps` while the selected PyTorch build was `2.6.0+cu124`.
 
-Official xFormers release history identifies `0.0.29.post2` as the matched PyTorch 2.6.0/CUDA 12.4 wheel. Installed that wheel **only in a throwaway venv under runner temp**, validated `python -m xformers.info`, and kept the shared `phase2_3d` environment unchanged. The info report showed PyTorch `2.6.0+cu124`, CUDA `12.4`, A100 compute capability `8.0`, and `memory_efficient_attention.cutlassF-pt: available`.
+Official [xFormers release history](https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md) identifies `0.0.29.post2` as the matched PyTorch 2.6.0/CUDA 12.4 wheel. Installed that wheel **only in a throwaway venv under runner temp**, validated `python -m xformers.info`, and kept the shared `phase2_3d` environment unchanged. The info report showed PyTorch `2.6.0+cu124`, CUDA `12.4`, A100 compute capability `8.0`, and `memory_efficient_attention.cutlassF-pt: available`.
 
 A subsequent full smoke test loaded the cached official TRELLIS.2 model offline, preprocessed TRELLIS's local example image, ran actual image-to-3D inference, simplified the mesh, and exported a real GLB. Results:
 
@@ -228,9 +228,9 @@ Both TRELLIS setup cells now include a one-time, per-Python-environment install 
 
 The saved FLUX notebook output showed Diffusers failing to import because its runtime check found `huggingface-hub==1.27.0` despite requiring a pre-1.0 version. The prior setup installed Diffusers from unpinned GitHub `main`, which has since advanced to `diffusers==0.41.0.dev0` and requires Hub `>=1.32.0`; that directly conflicts with `transformers==4.56.1`'s Hub `<1.0` constraint. Reproduced the resolver failure in a separate connector-1 scratch venv: [failed test using moving Diffusers main](https://github.com/Killer4K-N/Connector_1/actions/runs/37944139555).
 
-The official Diffusers **v0.37.0** release contains `Flux2KleinPipeline` and its package metadata accepts Hub `>=0.34.0,<2.0` and Transformers `>=4.41.2`; that is compatible with the pinned `huggingface-hub==0.36.0` and `transformers==4.56.1`. Both the combined and FLUX-only notebooks have been changed to pin the released `diffusers==0.37.0`, validate imports including `Flux2KleinPipeline` during setup, and stop with a clear restart instruction if pip has changed Hub on disk while the currently running Jupyter kernel still holds an incompatible Hub version in memory. In the combined notebook, dependency setup is moved before loading either model.
+The official [Diffusers v0.37.0 release](https://github.com/huggingface/diffusers/releases/tag/v0.37.0) contains `Flux2KleinPipeline` and its package metadata accepts Hub `>=0.34.0,<2.0` and Transformers `>=4.41.2`; that is compatible with the pinned `huggingface-hub==0.36.0` and `transformers==4.56.1`. Both the combined and FLUX-only notebooks have been changed to pin the released `diffusers==0.37.0`, validate imports including `Flux2KleinPipeline` during setup, and stop with a clear restart instruction if pip has changed Hub on disk while the currently running Jupyter kernel still holds an incompatible Hub version in memory. In the combined notebook, dependency setup is moved before loading either model.
 
-The scratch import test against the corrected release is queued/running at the time of this changelog update; its final result will be appended after completion. No packages were changed in the shared environment by the failed scratch test.
+The corrected-release scratch test completed successfully in a temporary environment: `diffusers==0.37.0`, `huggingface-hub==0.36.0`, and `transformers==4.56.1`; `DiffusionPipeline` and `Flux2KleinPipeline` both imported successfully, and the version assertions passed. Run: [FLUX dependency compatibility test](https://github.com/Killer4K-N/Connector_1/actions/runs/37944504866) · [test artifact](https://github.com/Killer4K-N/Connector_1/actions/runs/37944504866/artifacts/11623173549). No packages in the shared environment were changed by either scratch dependency test. Official references: [Diffusers 0.37.0 release](https://github.com/huggingface/diffusers/releases/tag/v0.37.0) and [v0.37.0 dependency metadata](https://github.com/huggingface/diffusers/blob/v0.37.0/setup.py).
 
 ### Candidate notebook changes
 
@@ -249,13 +249,13 @@ Fetched all three candidate notebooks back from GitHub and verified the JSON par
 - Run [37941708088](https://github.com/Killer4K-N/Connector_1/actions/runs/37941708088): the corrected CUDA wheel installed correctly, but the diagnostic's own assertion looked for the pre-suffix name `cutlassF` instead of the wheel's reported `cutlassF-pt`. This was a test-harness assertion mismatch, not a wheel-build failure; the assertion was corrected before the successful full test.
 - Run [37942265623](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623): full offline image-to-3D and GLB export passed.
 - Run [37944139555](https://github.com/Killer4K-N/Connector_1/actions/runs/37944139555): rejected unpinned Diffusers main + Hub 0.36.0 as dependency-incompatible, leading to the v0.37.0 release pin.
-- The latest fixed-release compatibility test is being tracked separately; result to append when complete.
+- The fixed-release compatibility test passed in run [37944504866](https://github.com/Killer4K-N/Connector_1/actions/runs/37944504866). The failed current-main resolver experiment was kept in the log because it is the evidence for pinning the release.
 
 ### Safety and deployment status
 
 Live OEC checkout remained at HEAD `081aaf34f6379873bdc925d1dcf6b9c3d50349d3` before and after the full TRELLIS smoke test. Existing live modifications remained unchanged: `core_config.py`, `oec_aireos/MOE`, `oec_deploy`, `storage_config.json`, and untracked `__tests__Untitled.ipynb`.
 
-No model weights were downloaded, no production queue or QA DB was written, no production worker was launched, no shared model cache was purged, and `.storage_reserve.bin` was not read for contents or touched. The pinned CuMesh build remains gated by a fresh storage/quota snapshot; missing telemetry must not be fabricated or bypassed. The fix branch has **not** been merged or deployed.
+No model weights were downloaded, no production queue or QA DB was written, no production worker was launched, no shared model cache was purged, and `.storage_reserve.bin` was not read for contents or touched. The temporary TRELLIS and FLUX diagnostic workflows were deleted from their isolated Connector_1 branches after the runs; their run logs/artifacts remain available through the links above. The pinned CuMesh build remains gated by a fresh storage/quota snapshot; missing telemetry must not be fabricated or bypassed. The fix branch has **not** been merged or deployed.
 
 ## Changelog maintenance rule
 
