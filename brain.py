@@ -89,7 +89,7 @@ class TheBrain:
                 try:
                     snapshot_download(
                         repo_id=model_id,
-                        cache_dir=SYSTEM_DIRS["models"],
+                        cache_dir=os.path.join(SYSTEM_DIRS["models"], "hub"),
                         local_files_only=True,
                     )
                     print("[THE BRAIN] Reasoning model verified in local HF cache.")
