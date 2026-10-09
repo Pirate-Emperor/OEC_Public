@@ -188,6 +188,75 @@ Evidence: [candidate fix unit-test run — 9/9](https://github.com/Killer4K-N/Co
 5. Run the production worker in a controlled single-GPU mode with a known prompt, output-path verification and no purge, then verify the resulting MP4.
 6. Only after a single-node run is stable, validate multi-node participant counts and purge/synchronization semantics for the actual cluster.
 
+## TRELLIS.2 / FLUX.2 notebook investigation
+
+### Scope
+
+Investigated the three user-requested notebooks in the OEC repository: `pipeline_trellis_3d.ipynb`, `pipeline_trellis_3d_only.ipynb`, and `pipeline_flux_only.ipynb`. Compared their setup and inference calls with the official Microsoft TRELLIS.2 and Hugging Face Diffusers sources, then reproduced image-to-3D generation through the connector-1 self-hosted runner on `scn17-mn`.
+
+### Confirmed TRELLIS.2 inference failure
+
+The first full image-to-3D reproduction reached the sparse-structure attention layer and failed at `xformers.ops.memory_efficient_attention`. The traceback identified that the installed xFormers extension had **no CUDA support** for the A100; its BF16 attention call offered no working operator. The notebook had installed `xformers==0.0.29.post1` with `--no-deps` while the selected PyTorch build was `2.6.0+cu124`.
+
+Official xFormers release history identifies `0.0.29.post2` as the matched PyTorch 2.6.0/CUDA 12.4 wheel. Installed that wheel **only in a throwaway venv under runner temp**, validated `python -m xformers.info`, and kept the shared `phase2_3d` environment unchanged. The info report showed PyTorch `2.6.0+cu124`, CUDA `12.4`, A100 compute capability `8.0`, and `memory_efficient_attention.cutlassF-pt: available`.
+
+A subsequent full smoke test loaded the cached official TRELLIS.2 model offline, preprocessed TRELLIS's local example image, ran actual image-to-3D inference, simplified the mesh, and exported a real GLB. Results:
+
+- Pipeline load: pass, 142.6 s.
+- Image-to-3D inference: pass, 222.0 s.
+- Mesh reported 6,348,077 vertices and 13,194,108 faces before export processing.
+- GLB export: pass, 108.6 s, output 8,950,028 bytes; decimation target 100,000.
+- Final markers: `TRELLIS_IMAGE_TO_3D_SMOKE=PASS`, `LIVE_OEC_CHECKOUT_PRESERVED=PASS`.
+- Run: [connector-1 image-to-3D + GLB smoke test](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623).
+- Artifact (diagnostic log and generated GLB): [open artifact](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194).
+
+The test ran with Hugging Face offline flags; it did not download model weights, start any production queue/worker, or write to the OEC production output directory. The GLB and logs were written to runner temp and uploaded as an artifact.
+
+### Other TRELLIS loader defects fixed
+
+The two TRELLIS notebooks passed `local_files_only=True` to `Trellis2ImageTo3DPipeline.from_pretrained()`, which does not accept that keyword. A broad `except Exception` then incorrectly reported this API error as an incomplete model cache and entered the download/storage-admission branch. The correct sequence now uses Hugging Face's `snapshot_download(..., local_files_only=True)`, resolves the real hub cache at `SYSTEM_DIRS["models"]/hub`, passes the returned **local snapshot directory** to the TRELLIS loader, and catches only `LocalEntryNotFoundError` for a genuine missing-cache fallback. Model/config/CUDA/import errors are no longer disguised as cache misses. Downloads still use the existing managed storage-admission guard and require fresh quota telemetry.
+
+### CuMesh/export hardening
+
+The official [TRELLIS.2 issue #84](https://github.com/microsoft/TRELLIS.2/issues/84) describes CuMesh CUDA illegal-memory-access failures during GLB atlas/export processing for low polygon targets after repeated generations; the discussion recommends updating CuMesh. The current notebook setup checked only whether CuMesh imported, so an older build could remain indefinitely.
+
+Both TRELLIS setup cells now include a one-time, per-Python-environment install marker for official CuMesh revision `12289e1062f0603f2f0d0771b02e1395d247f26f`. It uses a versioned source-directory name instead of deleting/replacing an existing checkout, performs storage preflight with fresh quota required before compilation, and writes the marker only after a successful install. Removed the old setup path that deleted the existing `CuMesh` directory. The polygon slider is aligned to the official TRELLIS.2 range (100,000–1,000,000; default 500,000).
+
+**Verification caveat:** the end-to-end GLB smoke run above used the already-installed CuMesh package and passed once at target 100,000. The newly pinned CuMesh source build and repeated-generation stability have not yet been end-to-end tested; the update is grounded in the upstream report but should not be presented as hardware-verified. The new build remains behind storage admission.
+
+### FLUX.2 dependency conflict and correction
+
+The saved FLUX notebook output showed Diffusers failing to import because its runtime check found `huggingface-hub==1.27.0` despite requiring a pre-1.0 version. The prior setup installed Diffusers from unpinned GitHub `main`, which has since advanced to `diffusers==0.41.0.dev0` and requires Hub `>=1.32.0`; that directly conflicts with `transformers==4.56.1`'s Hub `<1.0` constraint. Reproduced the resolver failure in a separate connector-1 scratch venv: [failed test using moving Diffusers main](https://github.com/Killer4K-N/Connector_1/actions/runs/37944139555).
+
+The official Diffusers **v0.37.0** release contains `Flux2KleinPipeline` and its package metadata accepts Hub `>=0.34.0,<2.0` and Transformers `>=4.41.2`; that is compatible with the pinned `huggingface-hub==0.36.0` and `transformers==4.56.1`. Both the combined and FLUX-only notebooks have been changed to pin the released `diffusers==0.37.0`, validate imports including `Flux2KleinPipeline` during setup, and stop with a clear restart instruction if pip has changed Hub on disk while the currently running Jupyter kernel still holds an incompatible Hub version in memory. In the combined notebook, dependency setup is moved before loading either model.
+
+The scratch import test against the corrected release is queued/running at the time of this changelog update; its final result will be appended after completion. No packages were changed in the shared environment by the failed scratch test.
+
+### Candidate notebook changes
+
+All notebook changes are on the unmerged branch `fix/brain-hf-cache-and-ltx-worker-dispatch-20261009` only:
+
+- [Combined TRELLIS + FLUX notebook](https://github.com/Killer4K-N/OEC/blob/fix/brain-hf-cache-and-ltx-worker-dispatch-20261009/pipeline_trellis_3d.ipynb) — CUDA-enabled xFormers validation, true offline local-snapshot resolution, pinned CuMesh install behind storage admission, released Diffusers/Hub dependency set, stale-kernel guard, and setup reordered before model loading.
+- [TRELLIS-only notebook](https://github.com/Killer4K-N/OEC/blob/fix/brain-hf-cache-and-ltx-worker-dispatch-20261009/pipeline_trellis_3d_only.ipynb) — same TRELLIS loader, CUDA attention, and CuMesh/export protections.
+- [FLUX-only notebook](https://github.com/Killer4K-N/OEC/blob/fix/brain-hf-cache-and-ltx-worker-dispatch-20261009/pipeline_flux_only.ipynb) — released Diffusers pin, Hub/Transformers import check, stale-kernel guard and corrected local HF cache root.
+
+Fetched all three candidate notebooks back from GitHub and verified the JSON parses, the model loaders use `models/hub` plus local snapshot paths, the invalid TRELLIS keyword is absent, broad cache fallback is absent, the expected dependency and CuMesh pins are present, and the GLB output still uses managed output storage.
+
+### Attempts and diagnostic history
+
+- Run [37940235685](https://github.com/Killer4K-N/Connector_1/actions/runs/37940235685): reproduced the invalid `local_files_only` keyword.
+- Run [37940853808](https://github.com/Killer4K-N/Connector_1/actions/runs/37940853808): with that keyword removed in the diagnostic, reproduced the CUDA-less xFormers attention failure.
+- Run [37941708088](https://github.com/Killer4K-N/Connector_1/actions/runs/37941708088): the corrected CUDA wheel installed correctly, but the diagnostic's own assertion looked for the pre-suffix name `cutlassF` instead of the wheel's reported `cutlassF-pt`. This was a test-harness assertion mismatch, not a wheel-build failure; the assertion was corrected before the successful full test.
+- Run [37942265623](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623): full offline image-to-3D and GLB export passed.
+- Run [37944139555](https://github.com/Killer4K-N/Connector_1/actions/runs/37944139555): rejected unpinned Diffusers main + Hub 0.36.0 as dependency-incompatible, leading to the v0.37.0 release pin.
+- The latest fixed-release compatibility test is being tracked separately; result to append when complete.
+
+### Safety and deployment status
+
+Live OEC checkout remained at HEAD `081aaf34f6379873bdc925d1dcf6b9c3d50349d3` before and after the full TRELLIS smoke test. Existing live modifications remained unchanged: `core_config.py`, `oec_aireos/MOE`, `oec_deploy`, `storage_config.json`, and untracked `__tests__Untitled.ipynb`.
+
+No model weights were downloaded, no production queue or QA DB was written, no production worker was launched, no shared model cache was purged, and `.storage_reserve.bin` was not read for contents or touched. The pinned CuMesh build remains gated by a fresh storage/quota snapshot; missing telemetry must not be fabricated or bypassed. The fix branch has **not** been merged or deployed.
+
 ## Changelog maintenance rule
 
 After each work prompt, update this date's changelog while the local date remains 9 October 2026 (Asia/Kolkata). On a new local date, create a new `CHANGELOG-YYYY-MM-DD.md` and update `changelog/README.md` with a brief summary and link. Do not overwrite prior daily history.
