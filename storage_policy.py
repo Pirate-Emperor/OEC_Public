@@ -161,12 +161,11 @@ def ensure_reserve_file(
     reserve_path = Path(path)
     required_bytes = max(0, int(required_bytes))
 
-    if required_bytes == 0:
-        try:
-            reserve_path.unlink()
-        except FileNotFoundError:
-            pass
-        return True
+    if required_bytes <= 0:
+        raise ValueError(
+            "Storage reserve must remain non-zero. Use an explicit positive "
+            "reserve size; automatic reserve deletion is disabled."
+        )
 
     reserve_path.parent.mkdir(parents=True, exist_ok=True)
 
