@@ -37,7 +37,12 @@ def _import_core_config():
     return importlib.import_module("core_config")
 
 
-def _run_git(\n    args: Sequence[str], *, cwd: Path | None = None, env: dict[str, str] | None = None\n) -> str:
+def _run_git(
+    args: Sequence[str],
+    *,
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> str:
     """Run Git without a shell and include bounded diagnostics on failure."""
     result = subprocess.run(
         ["git", *args],
@@ -45,6 +50,7 @@ def _run_git(\n    args: Sequence[str], *, cwd: Path | None = None, env: dict[st
         text=True,
         capture_output=True,
         check=False,
+        env=env,
     )
     if result.returncode:
         detail = (result.stderr or result.stdout or "no diagnostic output").strip()
@@ -131,7 +137,7 @@ def prepare_runtime(
     """Clone and verify into a staging directory, then publish only if valid.
 
     Existing target paths (including symlinks) are never overwritten. The staged
-    clone is created beside the target so the final rename stays on one filesystem.
+    clone is created beside the target so publication stays on one filesystem.
     """
     target = Path(os.path.abspath(os.path.expanduser(str(repo_dir))))
 
@@ -152,8 +158,20 @@ def prepare_runtime(
         staging_dir = Path(
             tempfile.mkdtemp(prefix=f".{target.name}.setup-", dir=str(target.parent))
         )
-        _run_git(["clone", "--no-checkout", repo_url, str(staging_dir)])
-        _run_git(["checkout", "--detach", commit_sha], cwd=staging_dir)
+
+        # The upstream repository tracks demo/media files with Git LFS. Keep the
+        # pointer files but do not download LFS assets into the shared cache.
+        git_env = os.environ.copy()
+        git_env["GIT_LFS_SKIP_SMUDGE"] = "1"
+        _run_git(
+            ["clone", "--no-checkout", repo_url, str(staging_dir)],
+            env=git_env,
+        )
+        _run_git(
+            ["checkout", "--detach", commit_sha],
+            cwd=staging_dir,
+            env=git_env,
+        )
 
         actual_origin = _run_git(["remote", "get-url", "origin"], cwd=staging_dir)
         if actual_origin != repo_url:
