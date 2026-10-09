@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 import tempfile
 import types
 import unittest
@@ -55,7 +54,7 @@ class LTXRuntimeSetupTests(unittest.TestCase):
         fake_config = types.SimpleNamespace(
             SYSTEM_DIRS={"cache": str(self.root / "configured-cache")}
         )
-        with patch.dict(sys.modules, {"core_config": fake_config}):
+        with patch.dict("sys.modules", {"core_config": fake_config}):
             with patch.dict(os.environ, {"AIEROS_LTX_REPO_DIR": ""}):
                 resolved = setup.resolve_runtime_dir()
 
@@ -64,7 +63,7 @@ class LTXRuntimeSetupTests(unittest.TestCase):
             self.root / "configured-cache" / "third_party" / "LTX-2",
         )
 
-    def test_explicit_path_takes_precedence_without_importing_config(self):
+    def test_explicit_path_takes_precedence(self):
         explicit = self.root / "explicit" / "LTX-2"
         with patch.dict(os.environ, {"AIEROS_LTX_REPO_DIR": str(self.root / "env-path")}):
             self.assertEqual(setup.resolve_runtime_dir(str(explicit)), explicit)
@@ -134,6 +133,20 @@ class LTXRuntimeSetupTests(unittest.TestCase):
 
         self.assertTrue(target.is_symlink())
         self.assertEqual(sentinel.read_text(encoding="utf-8"), "preserve symlink target")
+
+    def test_atomic_publish_does_not_replace_racing_empty_target(self):
+        staging = self.root / "prepared-staging"
+        staging.mkdir()
+        (staging / "keep.txt").write_text("prepared", encoding="utf-8")
+        target = self.root / "target"
+        target.mkdir()
+
+        with self.assertRaises(FileExistsError):
+            setup._publish_without_overwrite(staging, target)
+
+        self.assertTrue(staging.is_dir())
+        self.assertEqual((staging / "keep.txt").read_text(encoding="utf-8"), "prepared")
+        self.assertEqual(list(target.iterdir()), [])
 
     def test_failed_pinned_checkout_cleans_only_its_staging_directory(self):
         target = self.root / "cache" / "third_party" / "LTX-2"
