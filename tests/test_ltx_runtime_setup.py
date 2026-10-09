@@ -80,16 +80,19 @@ class LTXRuntimeSetupTests(unittest.TestCase):
                 configure_environment=False,
             )
 
-        git_calls = [
+        network_git_calls = [
             call for call in git_runner.call_args_list
-            if call.args and call.args[0] and call.args[0][0] == "git"
+            if call.args
+            and call.args[0]
+            and call.args[0][0] == "git"
+            and call.args[0][1] in {"fetch", "checkout"}
         ]
-        self.assertGreaterEqual(len(git_calls), 2)
-        for call in git_calls[:2]:
+        self.assertEqual(len(network_git_calls), 2)
+        for call in network_git_calls:
             self.assertEqual(
                 call.kwargs["env"]["GIT_LFS_SKIP_SMUDGE"],
                 "1",
-                "Clone and checkout must not download Git LFS media assets.",
+                "Fetch/checkout must not download Git LFS media assets.",
             )
 
         self.assertEqual(result, target)
