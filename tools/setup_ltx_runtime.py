@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 import errno
+import fcntl
 import importlib
 import os
 from pathlib import Path
@@ -80,20 +81,12 @@ def _configure_hpc_environment() -> None:
     _import_core_config()
 
 
-def _publish_without_overwrite(staging_dir: Path, target: Path) -> None:
-    """Atomically move a prepared directory only if the destination is absent.
-
-    Linux renameat2(RENAME_NOREPLACE) prevents a race from replacing an empty
-    destination directory created after the initial preflight. Fail closed if the
-    filesystem/kernel does not support this operation rather than risk overwriting.
-    """
+def _renameat2_noreplace(staging_dir: Path, target: Path) -> tuple[int, int]:
+    """Try Linux RENAME_NOREPLACE and return (result, errno)."""
     libc = ctypes.CDLL(None, use_errno=True)
     renameat2 = getattr(libc, "renameat2", None)
     if renameat2 is None:
-        raise RuntimeError(
-            "Atomic no-overwrite publication requires Linux renameat2; "
-            "refusing to publish the LTX checkout unsafely."
-        )
+        return -1, errno.ENOSYS
 
     renameat2.argtypes = (
         ctypes.c_int,
@@ -103,28 +96,75 @@ def _publish_without_overwrite(staging_dir: Path, target: Path) -> None:
         ctypes.c_uint,
     )
     renameat2.restype = ctypes.c_int
-    at_fdcwd = -100
-    rename_noreplace = 1
     result = renameat2(
-        at_fdcwd,
+        -100,  # AT_FDCWD
         os.fsencode(staging_dir),
-        at_fdcwd,
+        -100,  # AT_FDCWD
         os.fsencode(target),
-        rename_noreplace,
+        1,  # RENAME_NOREPLACE
     )
-    if result != 0:
-        error_number = ctypes.get_errno()
-        if error_number == errno.EEXIST:
-            raise FileExistsError(
-                error_number,
-                "Target appeared during setup; refusing to overwrite it.",
-                str(target),
-            )
+    return (0, 0) if result == 0 else (-1, ctypes.get_errno())
+
+
+def _publish_without_overwrite(staging_dir: Path, target: Path) -> None:
+    """Publish a validated checkout without replacing an existing target.
+
+    Prefer Linux renameat2(RENAME_NOREPLACE), which is race-safe. Some shared
+    filesystems (including some NFS configurations) return EINVAL/ENOSYS or
+    EOPNOTSUPP for that operation. In that case, serialize cooperating setup
+    processes by locking the parent directory, recheck the destination while
+    holding the lock, and use the filesystem's normal atomic same-filesystem
+    rename. Never use this fallback if the destination already exists.
+    """
+    if target.exists() or target.is_symlink():
+        raise FileExistsError(
+            f"Refusing to overwrite existing LTX runtime path: {target}"
+        )
+
+    result, error_number = _renameat2_noreplace(staging_dir, target)
+    if result == 0:
+        return
+    if error_number == errno.EEXIST:
+        raise FileExistsError(
+            error_number,
+            "Target appeared during setup; refusing to overwrite it.",
+            str(target),
+        )
+
+    unsupported_errors = {errno.EINVAL, errno.ENOSYS}
+    for name in ("EOPNOTSUPP", "ENOTSUP"):
+        value = getattr(errno, name, None)
+        if value is not None:
+            unsupported_errors.add(value)
+    if error_number not in unsupported_errors:
         raise OSError(
             error_number,
             f"Atomic no-overwrite rename failed: {os.strerror(error_number)}",
             str(target),
         )
+
+    parent = target.parent
+    parent_fd = os.open(parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        try:
+            fcntl.flock(parent_fd, fcntl.LOCK_EX)
+        except OSError as exc:
+            raise RuntimeError(
+                f"Filesystem does not support setup serialization for {parent}; "
+                "refusing to publish the LTX checkout."
+            ) from exc
+        try:
+            # Recheck after acquiring the parent lock; this prevents a second
+            # invocation of this helper from replacing a directory or symlink.
+            if target.exists() or target.is_symlink():
+                raise FileExistsError(
+                    f"Target appeared during setup; refusing to overwrite it: {target}"
+                )
+            os.rename(staging_dir, target)
+        finally:
+            fcntl.flock(parent_fd, fcntl.LOCK_UN)
+    finally:
+        os.close(parent_fd)
 
 
 def prepare_runtime(
