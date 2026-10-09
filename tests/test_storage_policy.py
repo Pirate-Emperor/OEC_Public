@@ -125,6 +125,16 @@ class StoragePolicyTests(unittest.TestCase):
             self.assertFalse(ok)
             self.assertIn("directory target", reason)
 
+    def test_zero_reserve_size_is_rejected_and_existing_reserve_stays(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / ".storage_reserve.bin"
+            path.write_bytes(b"reserved")
+            original = path.read_bytes()
+            with self.assertRaises(ValueError):
+                from storage_policy import ensure_reserve_file
+                ensure_reserve_file(path, 0)
+            self.assertEqual(path.read_bytes(), original)
+
     def test_preflight_can_fallback_to_filesystem(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
