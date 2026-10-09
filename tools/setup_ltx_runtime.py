@@ -37,7 +37,7 @@ def _import_core_config():
     return importlib.import_module("core_config")
 
 
-def _run_git(args: Sequence[str], *, cwd: Path | None = None) -> str:
+def _run_git(\n    args: Sequence[str], *, cwd: Path | None = None, env: dict[str, str] | None = None\n) -> str:
     """Run Git without a shell and include bounded diagnostics on failure."""
     result = subprocess.run(
         ["git", *args],
