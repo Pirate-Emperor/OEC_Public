@@ -134,10 +134,10 @@ def prepare_runtime(
     commit_sha: str = LTX_COMMIT_SHA,
     configure_environment: bool = True,
 ) -> Path:
-    """Clone and verify into a staging directory, then publish only if valid.
+    """Fetch and verify only the pinned commit into staging, then publish it.
 
     Existing target paths (including symlinks) are never overwritten. The staged
-    clone is created beside the target so publication stays on one filesystem.
+    checkout is created beside the target so publication stays on one filesystem.
     """
     target = Path(os.path.abspath(os.path.expanduser(str(repo_dir))))
 
@@ -163,12 +163,16 @@ def prepare_runtime(
         # pointer files but do not download LFS assets into the shared cache.
         git_env = os.environ.copy()
         git_env["GIT_LFS_SKIP_SMUDGE"] = "1"
+
+        _run_git(["init", "--quiet"], cwd=staging_dir)
+        _run_git(["remote", "add", "origin", repo_url], cwd=staging_dir)
         _run_git(
-            ["clone", "--no-checkout", repo_url, str(staging_dir)],
+            ["fetch", "--no-tags", "--depth", "1", "origin", commit_sha],
+            cwd=staging_dir,
             env=git_env,
         )
         _run_git(
-            ["checkout", "--detach", commit_sha],
+            ["checkout", "--detach", "FETCH_HEAD"],
             cwd=staging_dir,
             env=git_env,
         )
@@ -176,7 +180,7 @@ def prepare_runtime(
         actual_origin = _run_git(["remote", "get-url", "origin"], cwd=staging_dir)
         if actual_origin != repo_url:
             raise RuntimeError(
-                f"Cloned remote does not match the pinned repository URL: {actual_origin}"
+                f"Fetched remote does not match the pinned repository URL: {actual_origin}"
             )
 
         actual_commit = _run_git(["rev-parse", "HEAD"], cwd=staging_dir)
