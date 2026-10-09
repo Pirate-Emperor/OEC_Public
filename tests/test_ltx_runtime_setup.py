@@ -1,3 +1,4 @@
+import errno
 import os
 from pathlib import Path
 import shutil
@@ -163,6 +164,43 @@ class LTXRuntimeSetupTests(unittest.TestCase):
         self.assertTrue(staging.is_dir())
         self.assertEqual((staging / "keep.txt").read_text(encoding="utf-8"), "prepared")
         self.assertEqual(list(target.iterdir()), [])
+
+    def test_fallback_publish_when_filesystem_rejects_renameat2(self):
+        staging = self.root / "prepared-staging"
+        staging.mkdir()
+        (staging / "keep.txt").write_text("prepared", encoding="utf-8")
+        target = self.root / "target"
+
+        with patch.object(
+            setup, "_renameat2_noreplace", return_value=(-1, errno.EINVAL)
+        ):
+            setup._publish_without_overwrite(staging, target)
+
+        self.assertFalse(staging.exists())
+        self.assertEqual((target / "keep.txt").read_text(encoding="utf-8"), "prepared")
+
+    def test_fallback_rechecks_target_before_normal_rename(self):
+        staging = self.root / "prepared-staging"
+        staging.mkdir()
+        (staging / "keep.txt").write_text("prepared", encoding="utf-8")
+        target = self.root / "target"
+
+        def target_appears_during_renameat2(_staging, _target):
+            target.mkdir()
+            (target / "existing.txt").write_text("preserve", encoding="utf-8")
+            return -1, errno.EINVAL
+
+        with patch.object(
+            setup,
+            "_renameat2_noreplace",
+            side_effect=target_appears_during_renameat2,
+        ):
+            with self.assertRaises(FileExistsError):
+                setup._publish_without_overwrite(staging, target)
+
+        self.assertTrue(staging.is_dir())
+        self.assertEqual((staging / "keep.txt").read_text(encoding="utf-8"), "prepared")
+        self.assertEqual((target / "existing.txt").read_text(encoding="utf-8"), "preserve")
 
     def test_failed_pinned_checkout_cleans_only_its_staging_directory(self):
         target = self.root / "cache" / "third_party" / "LTX-2"
