@@ -11,4 +11,4 @@ Daily engineering records live in this directory. Each date gets its own file na
   - Live OEC checkout and pre-existing local changes were preserved; quota telemetry still needs a legitimate fresh snapshot for any real download.
   - Investigated three TRELLIS.2/FLUX.2 notebooks; reproduced and fixed the CUDA-less xFormers inference failure using a matched PyTorch 2.6/CUDA 12.4 wheel in a scratch venv, then generated and validated an actual GLB on connector-1.
   - Corrected TRELLIS and FLUX local Hugging Face cache resolution, stopped API/import errors being treated as cache misses, added an upstream CuMesh revision update behind fresh storage admission, and pinned FLUX to official Diffusers 0.37.0 rather than moving `main`.
-  - Full TRELLIS image-to-3D + export smoke passed; final FLUX release-pin import test was pending at changelog update. Candidate notebooks are on the unmerged fix branch, with live OEC changes preserved.
+  - Full TRELLIS image-to-3D + export smoke passed; the official Diffusers 0.37.0 + Hub 0.36.0 + Transformers 4.56.1 import test then passed. Candidate notebooks are on the unmerged fix branch, with live OEC changes preserved.
