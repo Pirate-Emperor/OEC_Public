@@ -219,51 +219,91 @@ def _pause_lock_active(folder_path, lock_ttl_seconds):
 
 
 def clean_all_reserves(config):
-    """Delete all reserve and pause-control files."""
-    print("\n[CLEANUP] Initiating manual wipe of storage reserve/control files...")
+    """Inspect reserve files and remove stale pause locks only."""
+    print("\n[CLEANUP] Checking storage controls; reserve files are protected...")
 
+    ttl_seconds = float(config.get("lock_ttl_seconds", DEFAULT_LOCK_TTL_SECONDS))
     for dir_cfg in config.get("directories", []):
         dir_name = dir_cfg["name"]
         folder_path = SYSTEM_DIRS.get(dir_name, dir_name)
-
+        os.makedirs(folder_path, exist_ok=True)
         try:
-            with _directory_lock(folder_path):
-                for name in (RESERVE_FILENAME, LOCK_FILENAME):
-                    path = os.path.join(folder_path, name)
-                    if os.path.exists(path):
-                        os.remove(path)
-                        print(f" ✅ Deleted {name} in: {folder_path}")
+            _pause_lock_active(folder_path, ttl_seconds)
+            reserve_path = os.path.join(folder_path, RESERVE_FILENAME)
+            if os.path.isfile(reserve_path) and not os.path.islink(reserve_path):
+                logging.info(
+                    "[%s] Preserving allocated reserve: %.3f GB.",
+                    dir_name,
+                    os.path.getsize(reserve_path) / BYTES_PER_GB,
+                )
+            else:
+                logging.critical(
+                    "[%s] RESERVE MISSING/UNSAFE. It will not be recreated automatically; "
+                    "use --set-reserve-gb after deciding the intended size.",
+                    dir_name,
+                )
         except OSError as exc:
-            print(f" ❌ Failed to clean {folder_path}: {type(exc).__name__}")
+            logging.error("[%s] Could not inspect controls: %s", dir_name, type(exc).__name__)
 
-    print("[CLEANUP] Disk reserve/control space reclaimed.\n")
+    print("[CLEANUP] No reserve file was deleted or resized.\n")
 
 
 def release_reserve(dir_name):
-    """Pause automatic reserve rebuilding and release the reserve file."""
+    """Deprecated safe no-op: never delete the allocated reserve implicitly."""
+    logging.error(
+        "Refusing to release/delete '%s' reserve. Resize explicitly with "
+        "--set-reserve-gb %s --reserve-gb N.",
+        dir_name,
+        dir_name,
+    )
+    return False
+
+
+def set_reserve_size(dir_name, reserve_gb):
+    """Explicitly create/resize a persistent reserve; does not query quota."""
     try:
-        config = load_config() or {}
+        config = load_config()
+        if not config:
+            raise RuntimeError("storage configuration is unavailable")
         _directory_config(config, dir_name)
+
+        reserve_gb = float(reserve_gb)
+        if not (reserve_gb > 0):
+            raise ValueError("reserve size must be positive; zero is forbidden")
+
         folder_path = SYSTEM_DIRS.get(dir_name, dir_name)
+        os.makedirs(folder_path, exist_ok=True)
+        reserve_path = os.path.join(folder_path, RESERVE_FILENAME)
+        tolerance_bytes = int(
+            float(config.get("reserve_resize_tolerance_mb", 64)) * BYTES_PER_MB
+        )
+        ttl_seconds = float(config.get("lock_ttl_seconds", DEFAULT_LOCK_TTL_SECONDS))
 
         with _directory_lock(folder_path):
-            lock_file = os.path.join(folder_path, LOCK_FILENAME)
-            reserve_file = os.path.join(folder_path, RESERVE_FILENAME)
+            if _pause_lock_active(folder_path, ttl_seconds):
+                raise RuntimeError("Cannot resize reserve during an active managed operation")
+            changed = ensure_reserve_file(
+                reserve_path,
+                int(reserve_gb * BYTES_PER_GB),
+                tolerance_bytes=tolerance_bytes,
+            )
 
-            with open(lock_file, "w", encoding="utf-8") as handle:
-                handle.write(f"pid={os.getpid()}\ntime={time.time():.6f}\n")
-                handle.flush()
-                os.fsync(handle.fileno())
-
-            if os.path.exists(reserve_file):
-                os.remove(reserve_file)
-
-        logging.info("Storage reserve RELEASED on '%s'.", dir_name)
+        actual_gb = os.path.getsize(reserve_path) / BYTES_PER_GB
+        logging.warning(
+            "[%s] Explicit reserve update: %.3f GB (%s).",
+            dir_name,
+            actual_gb,
+            "resized" if changed else "already within tolerance",
+        )
         return True
-    except (OSError, KeyError) as exc:
-        logging.error("Failed to release reserve for %s: %s", dir_name, type(exc).__name__)
+    except (OSError, KeyError, RuntimeError, ValueError) as exc:
+        logging.error(
+            "Could not update '%s' reserve: %s: %s",
+            dir_name,
+            type(exc).__name__,
+            exc,
+        )
         return False
-
 
 def resume_reserve(dir_name):
     """Remove the pause lock; the next manager cycle will rebuild the reserve."""
