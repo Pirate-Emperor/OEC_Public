@@ -25,7 +25,7 @@ class RunnerControlFixTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             home = Path(td)
             (home / ".env").write_text(
-                "GITHUB_ADMIN_TOKEN=admin-read-token\\nGH_TOKEN=less-specific-token\\n"
+                "GITHUB_ADMIN_TOKEN=admin-read-token\nGH_TOKEN=less-specific-token\n"
             )
             with mock.patch.dict(os.environ, {"HOME": td, "PATH": ""}, clear=True):
                 with mock.patch.object(rc.shutil, "which", return_value=None):
@@ -34,7 +34,7 @@ class RunnerControlFixTests(unittest.TestCase):
     def test_runner_admin_token_has_priority_over_generic_github_token(self):
         with tempfile.TemporaryDirectory() as td:
             home = Path(td)
-            (home / ".env").write_text("GITHUB_RUNNER_ADMIN_TOKEN=runner-admin-token\\n")
+            (home / ".env").write_text("GITHUB_RUNNER_ADMIN_TOKEN=runner-admin-token\n")
             with mock.patch.dict(
                 os.environ,
                 {"HOME": td, "PATH": "", "GITHUB_TOKEN": "short-lived-job-token"},
@@ -75,15 +75,15 @@ class RunnerControlFixTests(unittest.TestCase):
             (runner / "bin").mkdir(parents=True)
             listener = runner / "bin" / "Runner.Listener"
             listener.write_text(
-                "#!/usr/bin/env python3\\n"
-                "import signal, time, sys\\n"
-                "signal.signal(signal.SIGINT, lambda *_: sys.exit(0))\\n"
-                "signal.signal(signal.SIGTERM, signal.SIG_IGN)\\n"
-                "while True: time.sleep(0.1)\\n"
+                "#!/usr/bin/env python3\n"
+                "import signal, time, sys\n"
+                "signal.signal(signal.SIGINT, lambda *_: sys.exit(0))\n"
+                "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+                "while True: time.sleep(0.1)\n"
             )
             listener.chmod(0o755)
             run_sh = runner / "run.sh"
-            run_sh.write_text("#!/usr/bin/env bash\\nexec ./bin/Runner.Listener\\n")
+            run_sh.write_text("#!/usr/bin/env bash\nexec ./bin/Runner.Listener\n")
             run_sh.chmod(0o755)
 
             proc = subprocess.Popen(
