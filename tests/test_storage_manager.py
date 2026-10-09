@@ -38,21 +38,15 @@ class StorageManagerTests(unittest.TestCase):
                     require_fresh_quota=True,
                 )
                 self.assertTrue(ok, reason)
-    def test_managed_storage_operation_restores_reserve(self):
+    def test_managed_storage_operation_preserves_reserve(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             config_path = root / "storage_config.json"
             config_path.write_text(
                 json.dumps(
                     {
-                        "polling_interval_seconds": 300,
-                        "reserve_resize_tolerance_mb": 1,
                         "lock_ttl_seconds": 3600,
-                        "quota_snapshot_path": str(root / "missing-quota.json"),
-                        "quota_snapshot_max_age_seconds": 60,
-                        "directories": [
-                            {"name": "models", "target_allocation_gb": 0.001}
-                        ],
+                        "directories": [{"name": "models", "target_allocation_gb": 2}],
                     }
                 ),
                 encoding="utf-8",
@@ -62,33 +56,55 @@ class StorageManagerTests(unittest.TestCase):
                  mock.patch.object(storage_manager, "SYSTEM_DIRS", {"models": str(root / "models")}):
                 model_dir = root / "models"
                 model_dir.mkdir()
+                reserve = model_dir / storage_manager.RESERVE_FILENAME
+                storage_manager.ensure_reserve_file(reserve, 8 * 1024 * 1024, 0)
+                original_size = reserve.stat().st_size
 
                 with storage_manager.managed_storage_operation(
                     "models",
                     required_gb=0.0001,
-                    require_fresh_quota=False,
+                    require_fresh_quota=True,
                 ):
                     self.assertTrue((model_dir / storage_manager.LOCK_FILENAME).exists())
-                    self.assertFalse((model_dir / storage_manager.RESERVE_FILENAME).exists())
-
+                    self.assertTrue(reserve.exists())
+                    self.assertEqual(reserve.stat().st_size, original_size)
                     (model_dir / "payload.bin").write_bytes(b"x" * 100)
 
                 self.assertFalse((model_dir / storage_manager.LOCK_FILENAME).exists())
-                reserve = model_dir / storage_manager.RESERVE_FILENAME
                 self.assertTrue(reserve.exists())
-                self.assertGreater(reserve.stat().st_size, 0)
+                self.assertEqual(reserve.stat().st_size, original_size)
 
-    def test_managed_storage_operation_denies_over_target(self):
+    def test_managed_storage_operation_refuses_missing_reserve(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config_path = root / "storage_config.json"
+            config_path.write_text(
+                json.dumps({"directories": [{"name": "models", "target_allocation_gb": 2}]}),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(storage_manager, "CONFIG_FILE", str(config_path)), \
+                 mock.patch.object(storage_manager, "SYSTEM_DIRS", {"models": str(root / "models")}):
+                (root / "models").mkdir()
+                with self.assertRaisesRegex(RuntimeError, "reserve"):
+                    with storage_manager.managed_storage_operation(
+                        "models",
+                        required_gb=1.0,
+                        require_fresh_quota=False,
+                    ):
+                        pass
+
+    def test_explicit_reserve_resize_does_not_require_quota_snapshot(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             config_path = root / "storage_config.json"
             config_path.write_text(
                 json.dumps(
                     {
-                        "directories": [
-                            {"name": "models", "target_allocation_gb": 0.000001}
-                        ],
-                        "quota_snapshot_path": str(root / "missing-quota.json"),
+                        "reserve_resize_tolerance_mb": 0,
+                        "lock_ttl_seconds": 3600,
+                        "quota_snapshot_path": str(root / "no-quota.json"),
+                        "directories": [{"name": "models", "target_allocation_gb": 2}],
                     }
                 ),
                 encoding="utf-8",
@@ -96,13 +112,11 @@ class StorageManagerTests(unittest.TestCase):
 
             with mock.patch.object(storage_manager, "CONFIG_FILE", str(config_path)), \
                  mock.patch.object(storage_manager, "SYSTEM_DIRS", {"models": str(root / "models")}):
-                with self.assertRaises(RuntimeError):
-                    with storage_manager.managed_storage_operation(
-                        "models",
-                        required_gb=1.0,
-                        require_fresh_quota=False,
-                    ):
-                        pass
+                self.assertTrue(storage_manager.set_reserve_size("models", 0.01))
+                reserve = root / "models" / storage_manager.RESERVE_FILENAME
+                self.assertTrue(reserve.exists())
+                self.assertGreater(reserve.stat().st_size, 0)
+                self.assertAlmostEqual(reserve.stat().st_size / (1024**3), 0.01, delta=0.001)
 
 
 if __name__ == "__main__":
