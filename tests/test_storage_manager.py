@@ -119,5 +119,46 @@ class StorageManagerTests(unittest.TestCase):
                 self.assertAlmostEqual(reserve.stat().st_size / (1024**3), 0.01, delta=0.001)
 
 
+    def test_critical_monitor_preserves_existing_reserve(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            model_dir = root / "models"
+            model_dir.mkdir()
+            reserve = model_dir / storage_manager.RESERVE_FILENAME
+            reserve.write_bytes(b"reserve-stays-allocated")
+            before = reserve.read_bytes()
+            (model_dir / "payload.bin").write_bytes(b"x" * 4096)
+            config = {
+                "lock_ttl_seconds": 3600,
+                "warning_threshold_fraction": 0.85,
+                "critical_threshold_fraction": 0.95,
+                "warning_free_gb": 0,
+                "critical_free_gb": 0,
+                "quota_snapshot_path": str(root / "missing.json"),
+                "directories": [{"name": "models", "target_allocation_gb": 0.0000001}],
+            }
+
+            with mock.patch.object(storage_manager, "SYSTEM_DIRS", {"models": str(model_dir)}):
+                storage_manager.perform_allocation_cycle(config, {"models": False})
+                self.assertTrue(reserve.exists())
+                self.assertEqual(reserve.read_bytes(), before)
+
+    def test_clean_never_deletes_reserve(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            model_dir = root / "models"
+            model_dir.mkdir()
+            reserve = model_dir / storage_manager.RESERVE_FILENAME
+            reserve.write_bytes(b"keep-me-reserved")
+            config = {
+                "lock_ttl_seconds": 3600,
+                "directories": [{"name": "models", "target_allocation_gb": 2}],
+            }
+
+            with mock.patch.object(storage_manager, "SYSTEM_DIRS", {"models": str(model_dir)}):
+                storage_manager.clean_all_reserves(config)
+                self.assertTrue(reserve.exists())
+                self.assertEqual(reserve.read_bytes(), b"keep-me-reserved")
+
 if __name__ == "__main__":
     unittest.main()
