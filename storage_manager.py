@@ -400,11 +400,12 @@ def managed_storage_operation(
     require_fresh_quota=True,
     minimum_free_gb=0,
 ):
-    """Run one large storage-producing operation with exclusive reserve control.
+    """Serialize an operation while keeping the allocated reserve unchanged.
 
-    The directory lock is held for the entire operation. This prevents the
-    background manager or a second managed operation from rebuilding/releasing
-    the reserve concurrently.
+    Quota arguments remain accepted for API compatibility but are not used here.
+    This function does not probe quota, resize the reserve, or release it.
+    Operators must explicitly resize the reserve before an operation that needs
+    more space.
     """
     config = load_config()
     if not config:
@@ -413,43 +414,26 @@ def managed_storage_operation(
     _directory_config(config, dir_name)
     folder_path = SYSTEM_DIRS.get(dir_name, dir_name)
     os.makedirs(folder_path, exist_ok=True)
-
-    policy = StoragePolicy(config)
-    target_gb = float(_directory_config(config, dir_name).get("target_allocation_gb", 0))
-    ok, reason = policy.preflight(
-        folder_path,
-        required_bytes=max(0.0, float(required_gb)) * BYTES_PER_GB,
-        minimum_free_bytes=max(0.0, float(minimum_free_gb)) * BYTES_PER_GB,
-        require_fresh_quota=require_fresh_quota,
-        target_bytes=int(target_gb * BYTES_PER_GB),
-    )
-    if not ok:
-        raise RuntimeError(f"Storage admission denied for '{dir_name}': {reason}")
-
     lock_ttl_seconds = float(config.get("lock_ttl_seconds", DEFAULT_LOCK_TTL_SECONDS))
-    tolerance_bytes = int(
-        float(config.get("reserve_resize_tolerance_mb", 64)) * BYTES_PER_MB
-    )
     lock_file = os.path.join(folder_path, LOCK_FILENAME)
     reserve_file = os.path.join(folder_path, RESERVE_FILENAME)
 
     with _directory_lock(folder_path):
         if _pause_lock_active(folder_path, lock_ttl_seconds):
             raise RuntimeError(
-                f"Storage directory '{dir_name}' already has an active operation"
+                f"Storage directory '{dir_name}' already has an active managed operation"
             )
-
-        # Re-check after obtaining the exclusive lock so two callers cannot
-        # both pass a stale preflight and then consume the same headroom.
-        ok, reason = policy.preflight(
-            folder_path,
-            required_bytes=max(0.0, float(required_gb)) * BYTES_PER_GB,
-            minimum_free_bytes=max(0.0, float(minimum_free_gb)) * BYTES_PER_GB,
-            require_fresh_quota=require_fresh_quota,
-            target_bytes=int(target_gb * BYTES_PER_GB),
-        )
-        if not ok:
-            raise RuntimeError(f"Storage admission denied for '{dir_name}': {reason}")
+        if os.path.islink(reserve_file) or not os.path.isfile(reserve_file):
+            raise RuntimeError(
+                f"Allocated reserve {reserve_file} is missing or unsafe. "
+                "Refusing to proceed without it."
+            )
+        reserve_bytes_before = os.path.getsize(reserve_file)
+        if reserve_bytes_before <= 0:
+            raise RuntimeError(
+                f"Allocated reserve {reserve_file} is empty. "
+                "Set an explicit positive size before running the operation."
+            )
 
         with open(lock_file, "w", encoding="utf-8") as handle:
             handle.write(f"pid={os.getpid()}\ntime={time.time():.6f}\n")
@@ -458,52 +442,42 @@ def managed_storage_operation(
 
         operation_error = None
         try:
-            if os.path.exists(reserve_file):
-                os.remove(reserve_file)
             logging.info(
-                "Managed storage operation STARTED for '%s' (required %.2f GB).",
+                "Managed operation STARTED for '%s' (planned %.3f GB); reserve "
+                "remains %.3f GB. No quota probe or reserve mutation is performed.",
                 dir_name,
-                float(required_gb),
+                max(0.0, float(required_gb)),
+                reserve_bytes_before / BYTES_PER_GB,
             )
             yield
         except BaseException as exc:
             operation_error = exc
             raise
         finally:
-            restore_error = None
             try:
                 if os.path.exists(lock_file):
                     os.remove(lock_file)
-                decision = policy.evaluate(
-                    folder_path,
-                    int(target_gb * BYTES_PER_GB),
-                    RESERVE_FILENAME,
-                    LOCK_FILENAME,
-                )
-                reserve_needed = max(
-                    0,
-                    int(target_gb * BYTES_PER_GB) - decision.actual_bytes,
-                )
-                ensure_reserve_file(
-                    reserve_file,
-                    reserve_needed,
-                    tolerance_bytes=tolerance_bytes,
-                )
-                logging.info(
-                    "Managed storage operation FINISHED for '%s'; reserve restored to %.2f GB.",
-                    dir_name,
-                    reserve_needed / BYTES_PER_GB,
-                )
-            except Exception as exc:
-                restore_error = exc
+            except OSError as cleanup_error:
                 logging.error(
-                    "Failed to restore storage reserve for '%s': %s",
+                    "Could not remove operation lock for '%s': %s",
                     dir_name,
-                    type(exc).__name__,
+                    type(cleanup_error).__name__,
                 )
+                if operation_error is None:
+                    raise
 
-            if restore_error is not None and operation_error is None:
-                raise restore_error
+            try:
+                reserve_bytes_after = os.path.getsize(reserve_file)
+            except OSError:
+                reserve_bytes_after = -1
+            if reserve_bytes_after != reserve_bytes_before:
+                message = (
+                    f"Storage reserve changed during operation for '{dir_name}': "
+                    f"{reserve_bytes_before} -> {reserve_bytes_after} bytes"
+                )
+                logging.critical(message)
+                if operation_error is None:
+                    raise RuntimeError(message)
 
 
 def print_status(config):
