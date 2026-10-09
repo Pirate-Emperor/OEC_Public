@@ -8,6 +8,7 @@ download model weights, purge caches, or alter an existing checkout.
 from __future__ import annotations
 
 import argparse
+import importlib
 import os
 from pathlib import Path
 import shutil
@@ -24,6 +25,14 @@ REQUIRED_RELATIVE_DIRS = (
     Path("packages/ltx-pipelines"),
     Path("packages/ltx-pipelines/src"),
 )
+
+
+def _import_core_config():
+    """Import OEC's config regardless of whether this file is run as a script."""
+    oec_root = str(Path(__file__).resolve().parents[1])
+    if oec_root not in sys.path:
+        sys.path.insert(0, oec_root)
+    return importlib.import_module("core_config")
 
 
 def _run_git(args: Sequence[str], *, cwd: Path | None = None) -> str:
@@ -52,8 +61,7 @@ def resolve_runtime_dir(cli_path: str | None = None) -> Path:
 
     # Import only when needed. core_config initializes its configured paths and
     # proxy environment at import time; the setup command is an explicit action.
-    import core_config
-
+    core_config = _import_core_config()
     return Path(core_config.SYSTEM_DIRS["cache"]) / "third_party" / "LTX-2"
 
 
@@ -61,7 +69,7 @@ def _configure_hpc_environment() -> None:
     """Apply OEC's existing proxy/storage environment setup before Git access."""
     # Importing core_config invokes its documented module initialization, including
     # mapping shared storage paths and setting the HPC proxy variables.
-    import core_config  # noqa: F401
+    _import_core_config()
 
 
 def prepare_runtime(
