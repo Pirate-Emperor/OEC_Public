@@ -138,8 +138,14 @@ class StorageManagerTests(unittest.TestCase):
                 "directories": [{"name": "models", "target_allocation_gb": 0.0000001}],
             }
 
-            with mock.patch.object(storage_manager, "SYSTEM_DIRS", {"models": str(model_dir)}):
+            with (
+                mock.patch.object(storage_manager, "SYSTEM_DIRS", {"models": str(model_dir)}),
+                mock.patch.object(storage_manager, "send_discord_alert") as send_alert,
+            ):
                 storage_manager.perform_allocation_cycle(config, {"models": False})
+                # This test exercises the CRITICAL branch but must never send
+                # a real notification through the runner's configured webhook.
+                send_alert.assert_called_once()
                 self.assertTrue(reserve.exists())
                 self.assertEqual(reserve.read_bytes(), before)
 
