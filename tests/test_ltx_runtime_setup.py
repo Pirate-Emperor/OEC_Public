@@ -2,8 +2,11 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
+import types
 import unittest
+from unittest.mock import patch
 
 from tools import setup_ltx_runtime as setup
 
@@ -47,6 +50,24 @@ class LTXRuntimeSetupTests(unittest.TestCase):
         if result.returncode:
             raise AssertionError(result.stderr or result.stdout)
         return result.stdout.strip()
+
+    def test_default_path_uses_core_config_cache_root(self):
+        fake_config = types.SimpleNamespace(
+            SYSTEM_DIRS={"cache": str(self.root / "configured-cache")}
+        )
+        with patch.dict(sys.modules, {"core_config": fake_config}):
+            with patch.dict(os.environ, {"AIEROS_LTX_REPO_DIR": ""}):
+                resolved = setup.resolve_runtime_dir()
+
+        self.assertEqual(
+            resolved,
+            self.root / "configured-cache" / "third_party" / "LTX-2",
+        )
+
+    def test_explicit_path_takes_precedence_without_importing_config(self):
+        explicit = self.root / "explicit" / "LTX-2"
+        with patch.dict(os.environ, {"AIEROS_LTX_REPO_DIR": str(self.root / "env-path")}):
+            self.assertEqual(setup.resolve_runtime_dir(str(explicit)), explicit)
 
     def test_clones_and_validates_pinned_checkout_before_publishing(self):
         target = self.root / "cache" / "third_party" / "LTX-2"
