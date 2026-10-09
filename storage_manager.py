@@ -530,12 +530,9 @@ def print_status(config):
 
 
 def perform_allocation_cycle(config, alert_triggered):
-    """Perform one monitoring/reserve-allocation cycle."""
+    """Report storage state without creating, deleting, or resizing reserves."""
     policy = StoragePolicy(config)
     lock_ttl_seconds = float(config.get("lock_ttl_seconds", DEFAULT_LOCK_TTL_SECONDS))
-    tolerance_bytes = int(
-        float(config.get("reserve_resize_tolerance_mb", 64)) * BYTES_PER_MB
-    )
     webhook_url = _webhook_url(config)
 
     for dir_cfg in config.get("directories", []):
@@ -546,78 +543,66 @@ def perform_allocation_cycle(config, alert_triggered):
         os.makedirs(folder_path, exist_ok=True)
 
         if _pause_lock_active(folder_path, lock_ttl_seconds):
-            logging.info("[%s] Active operation pause lock; reserve allocation suspended.", dir_name)
+            logging.info("[%s] Active operation; reserve remains untouched.", dir_name)
             continue
 
         try:
-            with _directory_lock(folder_path):
-                decision = policy.evaluate(
-                    folder_path,
-                    target_bytes,
-                    RESERVE_FILENAME,
-                    LOCK_FILENAME,
+            decision = policy.evaluate(
+                folder_path,
+                target_bytes,
+                RESERVE_FILENAME,
+                LOCK_FILENAME,
+            )
+            reserve_file = os.path.join(folder_path, RESERVE_FILENAME)
+            reserve_ok = (
+                os.path.isfile(reserve_file)
+                and not os.path.islink(reserve_file)
+                and os.path.getsize(reserve_file) > 0
+            )
+            reserve_gb = (
+                os.path.getsize(reserve_file) / BYTES_PER_GB
+                if reserve_ok
+                else 0.0
+            )
+            actual_gb = decision.actual_bytes / BYTES_PER_GB
+
+            if not reserve_ok:
+                logging.critical(
+                    "[%s] STORAGE RESERVE MISSING/EMPTY. Monitor will not recreate, "
+                    "delete, or resize reserves automatically.",
+                    dir_name,
+                )
+            else:
+                logging.info(
+                    "[%s] State=%s | Actual=%.2f GB | Reserve=%.3f GB | Target=%.2f GB | %s",
+                    dir_name,
+                    decision.state,
+                    actual_gb,
+                    reserve_gb,
+                    target_gb,
+                    decision.reason,
                 )
 
-                actual_gb = decision.actual_bytes / BYTES_PER_GB
-                reserve_file = os.path.join(folder_path, RESERVE_FILENAME)
-
-                if decision.state == "CRITICAL":
-                    if os.path.exists(reserve_file):
-                        try:
-                            os.remove(reserve_file)
-                            logging.warning(
-                                "[%s] CRITICAL state; emergency reserve released (actual %.2f GB).",
-                                dir_name,
-                                actual_gb,
-                            )
-                        except OSError as exc:
-                            logging.error(
-                                "[%s] Failed to release emergency reserve: %s",
-                                dir_name,
-                                type(exc).__name__,
-                            )
-
-                    if not alert_triggered.get(dir_name, False):
-                        send_discord_alert(
-                            webhook_url,
-                            dir_name,
-                            actual_gb,
-                            target_gb,
-                        )
-                        alert_triggered[dir_name] = True
-                    continue
-
-                reserve_needed_bytes = max(0, target_bytes - decision.actual_bytes)
-                changed = ensure_reserve_file(
-                    reserve_file,
-                    reserve_needed_bytes,
-                    tolerance_bytes=tolerance_bytes,
+            if decision.state == "CRITICAL" or not reserve_ok:
+                logging.critical(
+                    "[%s] Storage alert condition; preserving reserve unchanged (%.3f GB).",
+                    dir_name,
+                    reserve_gb,
                 )
-                reserve_gb = reserve_needed_bytes / BYTES_PER_GB
-
-                if changed:
-                    logging.info(
-                        "[%s] State=%s | Actual=%.2f GB | Reserve=%.2f GB | Target=%.2f GB",
-                        dir_name,
-                        decision.state,
-                        actual_gb,
-                        reserve_gb,
-                        target_gb,
-                    )
-                elif decision.state == "WARNING":
-                    logging.info(
-                        "[%s] WARNING | Actual=%.2f GB / %.2f GB",
+                if not alert_triggered.get(dir_name, False):
+                    send_discord_alert(
+                        webhook_url,
                         dir_name,
                         actual_gb,
                         target_gb,
                     )
-
-                if decision.state == "NORMAL":
-                    alert_triggered[dir_name] = False
+                    alert_triggered[dir_name] = True
+            elif decision.state == "NORMAL":
+                alert_triggered[dir_name] = False
 
         except (OSError, RuntimeError) as exc:
             logging.error(
-                "[%s] Storage cycle failed: %s",
+                "[%s] Storage monitoring failed: %s",
                 dir_name,
                 type(exc).__name__,
             )
