@@ -9,7 +9,7 @@ on:
       - fix/disable-implicit-trash-cleanup-20261010
 
 concurrency:
-  group: oec-temporary-storage-reservation
+  group: oec-temporary-storage-reservation-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
