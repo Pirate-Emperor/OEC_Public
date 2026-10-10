@@ -8,9 +8,11 @@ fails closed rather than silently resizing the reserve.
 from __future__ import annotations
 
 import contextlib
+import grp
 import json
 import os
 import shutil
+import subprocess
 import time
 import uuid
 from pathlib import Path
@@ -19,6 +21,49 @@ import storage_manager
 from storage_policy import BYTES_PER_GB, StoragePolicy, directory_size_bytes
 
 STAGING_DIRECTORY = ".oec_temp_downloads"
+
+
+def _live_lustre_quota(folder: Path, config: dict):
+    """Read the current quota for the directory's owning group without writing a snapshot."""
+    if shutil.which("lfs") is None:
+        return None
+    group = os.environ.get("AIEROS_QUOTA_GROUP") or config.get("quota_group")
+    if not group:
+        try:
+            group = grp.getgrgid(folder.stat().st_gid).gr_name
+        except (OSError, KeyError):
+            return None
+    try:
+        result = subprocess.run(
+            ["lfs", "quota", "-g", str(group), str(folder)],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+
+    for line in result.stdout.splitlines():
+        fields = line.split()
+        if fields and fields[0].startswith("/"):
+            fields = fields[1:]
+        if len(fields) < 3 or not all(value.isdigit() for value in fields[:3]):
+            continue
+        used_kib, soft_kib, hard_kib = map(int, fields[:3])
+        limit_kib = soft_kib if soft_kib > 0 else hard_kib
+        if limit_kib <= 0:
+            continue
+        from storage_policy import QuotaSnapshot
+        return QuotaSnapshot(
+            used_bytes=used_kib * 1024,
+            limit_bytes=limit_kib * 1024,
+            timestamp=time.time(),
+            source=f"live lfs quota for group {group}",
+        )
+    return None
 
 
 def _write_json_exclusive(path: Path, payload: dict) -> None:
@@ -115,7 +160,14 @@ def temporary_download_reservation(
 
         quota = StoragePolicy(config).get_quota_snapshot()
         if quota is None:
-            raise RuntimeError("fresh authoritative quota snapshot is required for a temporary reserve lease")
+            # The cluster may not have a login-node snapshot producer installed.
+            # A bounded live Lustre group-quota query is the fallback; no snapshot
+            # file is fabricated or written by this code.
+            quota = _live_lustre_quota(folder, config)
+        if quota is None:
+            raise RuntimeError(
+                "no fresh quota snapshot and live lfs group-quota query is unavailable"
+            )
         if quota.used_bytes > quota.limit_bytes:
             raise RuntimeError(
                 "quota usage is already above the snapshot write-admission limit; "
