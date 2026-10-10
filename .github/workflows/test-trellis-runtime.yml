@@ -22,13 +22,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Verify local scratch, model cache, and phase2_3d environment
+        id: preflight
         shell: bash
         timeout-minutes: 3
         run: |
           set -euo pipefail
+          echo "run_smoke=false" >> "$GITHUB_OUTPUT"
           ENVROOT="$HOME/Conda/envs/phase2_3d"
-          test -x "$ENVROOT/bin/python"
-          test -d "$HOME/aireos_models/TRELLIS.2"
+          if [ ! -x "$ENVROOT/bin/python" ] || [ ! -d "$HOME/aireos_models/TRELLIS.2" ]; then
+            echo "TRELLIS_RUNTIME_SMOKE=SKIPPED_ENV_OR_REPO_MISSING"
+            exit 0
+          fi
           if [ ! -d "$HOME/aireos_models/hub/models--microsoft--TRELLIS.2-4B" ]; then
             echo "TRELLIS_RUNTIME_SMOKE=SKIPPED_NO_LOCAL_MODEL_CACHE"
             exit 0
@@ -62,8 +66,10 @@ jobs:
           print(f"GPU_COUNT={torch.cuda.device_count()}")
           print("PHASE2_3D_RUNTIME_PREFLIGHT=PASS")
           PY
+          echo "run_smoke=true" >> "$GITHUB_OUTPUT"
 
       - name: Run offline synthetic-image TRELLIS generation
+        if: steps.preflight.outputs.run_smoke == 'true'
         shell: bash
         timeout-minutes: 40
         env:
