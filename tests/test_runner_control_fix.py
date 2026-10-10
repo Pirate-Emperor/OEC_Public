@@ -151,7 +151,7 @@ class RunnerControlFixTests(unittest.TestCase):
             diag = runner / "_diag"
             diag.mkdir(parents=True)
             (diag / "Runner_20261011-003000-utc.log").write_text(
-                "Runner name: connector-4\\nMachine name: scn17-mn\\n"
+                "Runner name: connector-4\nMachine name: scn17-mn\n"
             )
             info = rc._runner_host_info(runner)
             self.assertEqual(info["hostname"], "scn17-mn")
