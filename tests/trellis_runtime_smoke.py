@@ -26,7 +26,7 @@ def main() -> int:
     os.environ["HUGGINGFACE_HUB_CACHE"] = str(model_root / "hub")
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
-    os.environ["ATTN_BACKEND"] = "xformers"
+    os.environ["ATTN_BACKEND"] = os.environ.get("AIEROS_TRELLIS_ATTN_BACKEND", "sdpa")
     os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     sys.path.insert(0, str(trellis_repo))
@@ -42,6 +42,7 @@ def main() -> int:
     print(f"TRELLIS_SMOKE_REPO={trellis_repo}")
     print(f"TRELLIS_SMOKE_HF_CACHE={model_root / 'hub'}")
     print(f"TRELLIS_SMOKE_OUTPUT_DIR={scratch}")
+    print(f"TRELLIS_SMOKE_ATTN_BACKEND={os.environ['ATTN_BACKEND']}")
 
     # The TRELLIS custom pipeline rejects local_files_only; the environment is offline instead.
     pipe = Trellis2ImageTo3DPipeline.from_pretrained("microsoft/TRELLIS.2-4B")
