@@ -11,6 +11,7 @@ import contextlib
 import json
 import os
 import shutil
+import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -148,7 +149,7 @@ def temporary_download_reservation(
                 )
 
         staging_root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        scratch = Path(shutil.mkdtemp(prefix=f"lease-{lease_id}-", dir=str(staging_root)))
+        scratch = Path(tempfile.mkdtemp(prefix=f"lease-{lease_id}-", dir=str(staging_root)))
         manifest = {
             "lease_id": lease_id,
             "pid": os.getpid(),
