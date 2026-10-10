@@ -134,23 +134,37 @@ def initialize_environment(interactive=False):
     clear_system_trash()
     print("[CORE] Storage, Proxies, and Auth initialized successfully.")
 
-def clear_system_trash():
-    """Wipes hidden system and Jupyter trash bins to free up disk space."""
+def clear_system_trash(confirm=False):
+    """Optionally empty the user's desktop trash; never delete Jupyter workspaces.
+
+    Cleanup is disabled by default because trash may contain recoverable user
+    data. Call with confirm=True only from an explicitly authorized cleanup path.
+    """
     trash_paths = [
         os.path.expanduser("~/.local/share/Trash/files"),
         os.path.expanduser("~/.local/share/Trash/info"),
-        os.path.expanduser("~/.jupyter/lab/workspaces") # Jupyter temp workspace junk
     ]
+    if not confirm:
+        print("[CORE] Trash cleanup skipped; explicit confirm=True is required.")
+        return False
+
+    cleaned_any = False
     for path in trash_paths:
-        if os.path.exists(path):
-            try:
-                for item in os.listdir(path):
-                    item_path = os.path.join(path, item)
-                    if os.path.isdir(item_path): shutil.rmtree(item_path)
-                    else: os.remove(item_path)
-                print(f"[CORE] Cleaned trash at {path}")
-            except Exception as e:
-                print(f"[CORE] Could not clean {path}: {e}")
+        if not os.path.isdir(path):
+            continue
+        try:
+            for item in os.listdir(path):
+                item_path = os.path.join(path, item)
+                # Do not follow symlinks while clearing the trash.
+                if os.path.islink(item_path) or not os.path.isdir(item_path):
+                    os.remove(item_path)
+                else:
+                    shutil.rmtree(item_path)
+            print(f"[CORE] Cleaned desktop trash at {path}")
+            cleaned_any = True
+        except OSError as exc:
+            print(f"[CORE] Could not clean desktop trash at {path}: {type(exc).__name__}")
+    return cleaned_any
                 
 # Auto-configure storage and proxy environment when imported by workers.
 # Destructive cleanup remains explicit via initialize_environment() so imports
