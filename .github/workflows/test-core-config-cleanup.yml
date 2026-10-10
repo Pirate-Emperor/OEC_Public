@@ -57,4 +57,5 @@ jobs:
         run: |
           set -euo pipefail
           "$CONDA_EXE" run --no-capture-output -n oec_freeze python tests/test_quota_snapshot.py -v
-          "$CONDA_EXE" run --no-capture-output -n oec_freeze python -m unittest tests.test_storage_policy tests.test_storage_manager -v
+          "$CONDA_EXE" run --no-capture-output -n oec_freeze python -m unittest discover -s tests -p "test_storage_policy.py" -v
+          "$CONDA_EXE" run --no-capture-output -n oec_freeze python -m unittest discover -s tests -p "test_storage_manager.py" -v
