@@ -150,7 +150,12 @@ def _runner_identity(runner: Path) -> tuple[str, str]:
 _RUNNER_HOST_METADATA = ".oec_runner_host.json"
 
 
-def _write_runner_host_metadata(runner: Path, listener_pid: int | None = None) -> dict:
+def _write_runner_host_metadata(
+    runner: Path,
+    listener_pid: int | None = None,
+    *,
+    preserve_started_at: bool = False,
+) -> dict:
     """Record which compute node started/owns this listener in the shared runner directory."""
     metadata_path = runner / _RUNNER_HOST_METADATA
     hostname = socket.gethostname()
@@ -163,7 +168,11 @@ def _write_runner_host_metadata(runner: Path, listener_pid: int | None = None) -
         pass
 
     started_epoch = prior.get("started_at_epoch")
-    if prior.get("hostname") != hostname or not isinstance(started_epoch, (int, float)):
+    if (
+        not preserve_started_at
+        or prior.get("hostname") != hostname
+        or not isinstance(started_epoch, (int, float))
+    ):
         started_epoch = time.time()
     record = {
         "hostname": hostname,
@@ -180,16 +189,18 @@ def _write_runner_host_metadata(runner: Path, listener_pid: int | None = None) -
 
 
 def _runner_host_info(runner: Path) -> dict:
-    """Read recorded host data, falling back to the runner's own diagnostic logs."""
+    """Read controller metadata, using a newer diagnostic log if the runner moved hosts."""
+    metadata_record: dict = {}
     metadata_path = runner / _RUNNER_HOST_METADATA
     try:
-        record = json.loads(metadata_path.read_text(encoding="utf-8"))
-        if isinstance(record, dict) and str(record.get("hostname") or "").strip():
-            record.setdefault("source", "controller metadata")
-            return record
+        loaded = json.loads(metadata_path.read_text(encoding="utf-8"))
+        if isinstance(loaded, dict) and str(loaded.get("hostname") or "").strip():
+            metadata_record = loaded
+            metadata_record.setdefault("source", "controller metadata")
     except (OSError, json.JSONDecodeError):
         pass
 
+    diagnostic_record: dict = {}
     diag_dir = runner / "_diag"
     try:
         logs = sorted(
@@ -207,15 +218,32 @@ def _runner_host_info(runner: Path) -> dict:
             hostname = machine_line.split("Machine name:", 1)[1].strip() if machine_line else ""
             if hostname:
                 modified = log_path.stat().st_mtime
-                return {
+                diagnostic_record = {
                     "hostname": hostname,
-                    "started_at": time.strftime("%Y-%m-%d %H:%M:%S %z", time.localtime(modified)),
+                    "log_updated_at": time.strftime(
+                        "%Y-%m-%d %H:%M:%S %z", time.localtime(modified)
+                    ),
                     "started_at_epoch": modified,
                     "source": "runner diagnostic log",
                 }
+                break
         except OSError:
             continue
-    return {}
+
+    if metadata_record:
+        try:
+            metadata_epoch = float(metadata_record.get("started_at_epoch", 0))
+            diagnostic_epoch = float(diagnostic_record.get("started_at_epoch", 0))
+        except (TypeError, ValueError):
+            metadata_epoch, diagnostic_epoch = 0, 0
+        if (
+            diagnostic_record
+            and diagnostic_record["hostname"] != metadata_record["hostname"]
+            and diagnostic_epoch > metadata_epoch
+        ):
+            return diagnostic_record
+        return metadata_record
+    return diagnostic_record
 
 
 def _host_location_text(
@@ -246,8 +274,12 @@ def _host_location_text(
         parts.append("last recorded host; not proof of current activity")
     if record.get("started_at"):
         parts.append(f"started={record['started_at']}")
+    elif record.get("log_updated_at"):
+        parts.append(f"log_updated={record['log_updated_at']}")
     if record.get("username"):
         parts.append(f"user={record['username']}")
+    if record.get("listener_pid"):
+        parts.append(f"pid_on_host={record['listener_pid']}")
     if record.get("source"):
         parts.append(f"source={record['source']}")
     return " (" + "; ".join(parts) + ")"
@@ -800,7 +832,7 @@ def start_runner(args: argparse.Namespace) -> None:
 
     pids = listener_pids(runner)
     if pids:
-        _write_runner_host_metadata(runner, pids[0])
+        _write_runner_host_metadata(runner, pids[0], preserve_started_at=True)
         print(f"Runner already running on {socket.gethostname()}: Listener PID {pids[0]}")
         if not args.no_github_wait:
             wait_for_github_state(
