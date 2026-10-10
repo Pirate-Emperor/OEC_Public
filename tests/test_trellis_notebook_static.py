@@ -82,6 +82,11 @@ class TrellisNotebookStaticTests(unittest.TestCase):
             self.assertNotIn("local_files_only=True", source)
             self.assertIn('os.environ["HF_HUB_OFFLINE"] = "1"', source)
             self.assertIn("Automatic re-download is disabled", source)
+            self.assertLess(
+                source.index('os.environ["HF_HUB_OFFLINE"] = "1"'),
+                source.index("from trellis2.pipelines import"),
+                "offline mode must be set before importing the TRELLIS pipeline",
+            )
         self.assertNotIn("local_files_only=True", runtime)
         self.assertIn("HF_HUB_OFFLINE", runtime)
 
