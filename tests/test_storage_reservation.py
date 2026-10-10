@@ -7,8 +7,8 @@ from pathlib import Path
 from unittest import mock
 
 import storage_manager
-from storage_policy import BYTES_PER_GB
-from storage_reservation import _live_lustre_quota, temporary_download_reservation
+from storage_policy import BYTES_PER_GB, _live_lustre_quota
+from storage_reservation import temporary_download_reservation
 
 
 class TemporaryReservationTests(unittest.TestCase):
@@ -113,7 +113,7 @@ class TemporaryReservationTests(unittest.TestCase):
             config["quota_snapshot_path"] = str(root / "missing.json")
             config_path.write_text(json.dumps(config))
             patch_a, patch_b = self._patch_config(models, config_path)
-            with patch_a, patch_b, mock.patch("storage_reservation._live_lustre_quota", return_value=None):
+            with patch_a, patch_b, mock.patch("storage_reservation.StoragePolicy.get_quota_snapshot", return_value=None):
                 with self.assertRaisesRegex(RuntimeError, "no fresh quota snapshot"):
                     with temporary_download_reservation(
                         "models",
@@ -132,7 +132,7 @@ class TemporaryReservationTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temp:
             folder = Path(temp)
-            with mock.patch("storage_reservation.shutil.which", return_value="/usr/bin/lfs"), mock.patch("storage_reservation.subprocess.run", return_value=Result()):
+            with mock.patch("storage_policy.shutil.which", return_value="/usr/bin/lfs"), mock.patch("storage_policy.subprocess.run", return_value=Result()):
                 quota = _live_lustre_quota(folder, {})
             self.assertIsNotNone(quota)
             self.assertEqual(quota.used_bytes, 2109592848 * 1024)
