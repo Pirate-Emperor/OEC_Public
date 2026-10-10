@@ -192,6 +192,7 @@ def temporary_download_reservation(
             raise
 
     body_error = None
+    size_error = None
     cleanup_error = None
     restore_error = None
     try:
@@ -203,6 +204,12 @@ def temporary_download_reservation(
             if scratch is not None:
                 if scratch.is_symlink() or not scratch.is_dir():
                     raise RuntimeError("temporary scratch path was replaced or is no longer a directory")
+                actual_download_bytes = directory_size_bytes(scratch, ())
+                if actual_download_bytes > download_bytes:
+                    size_error = RuntimeError(
+                        f"scratch exceeded declared max download: actual={actual_download_bytes} "
+                        f"max={download_bytes}; scratch will be removed before reserve restoration"
+                    )
                 shutil.rmtree(scratch)
                 try:
                     staging_root.rmdir()
@@ -234,5 +241,7 @@ def temporary_download_reservation(
         raise RuntimeError(
             f"reserve restoration failed; recovery manifest and pause lock were preserved: {restore_error}"
         ) from restore_error
+    if size_error is not None:
+        raise size_error
     if body_error is not None:
         raise body_error
