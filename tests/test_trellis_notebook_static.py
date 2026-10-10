@@ -74,6 +74,17 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertNotIn("!kill 9 2386856", self.source_only(7))
         self.assertNotIn("pip install --upgrade jupyter", self.source_only(9))
 
+    def test_cache_load_uses_hub_offline_mode_not_unsupported_argument(self):
+        combined = self.source(8)
+        only = self.source_only(11)
+        runtime = (self.ROOT / "tests" / "trellis_runtime_smoke.py").read_text(encoding="utf-8")
+        for source in (combined, only):
+            self.assertNotIn("local_files_only=True", source)
+            self.assertIn('os.environ["HF_HUB_OFFLINE"] = "1"', source)
+            self.assertIn("Automatic re-download is disabled", source)
+        self.assertNotIn("local_files_only=True", runtime)
+        self.assertIn("HF_HUB_OFFLINE", runtime)
+
 
 if __name__ == "__main__":
     unittest.main()
