@@ -24,7 +24,6 @@ def main() -> int:
     os.environ["TRELLIS_CACHE_DIR"] = str(scratch / "cache")
     os.environ["HF_HOME"] = str(model_root)
     os.environ["HUGGINGFACE_HUB_CACHE"] = str(model_root / "hub")
-    os.environ["TRANSFORMERS_CACHE"] = str(model_root)
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
     os.environ["ATTN_BACKEND"] = "xformers"
@@ -44,10 +43,8 @@ def main() -> int:
     print(f"TRELLIS_SMOKE_HF_CACHE={model_root / 'hub'}")
     print(f"TRELLIS_SMOKE_OUTPUT_DIR={scratch}")
 
-    pipe = Trellis2ImageTo3DPipeline.from_pretrained(
-        "microsoft/TRELLIS.2-4B",
-        local_files_only=True,
-    )
+    # The TRELLIS custom pipeline rejects local_files_only; the environment is offline instead.
+    pipe = Trellis2ImageTo3DPipeline.from_pretrained("microsoft/TRELLIS.2-4B")
     pipe.cuda()
 
     # Deterministic synthetic input; no private/user image is required.
