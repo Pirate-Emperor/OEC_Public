@@ -44,6 +44,37 @@ class StoragePolicyTests(unittest.TestCase):
             )
             self.assertIsNone(load_quota_snapshot(path, 60))
 
+    def test_quota_snapshot_accepts_usage_above_admission_limit_and_blocks_writes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            quota_path = root / "quota.json"
+            quota_path.write_text(
+                json.dumps({
+                    "used_bytes": 101 * BYTES_PER_GB,
+                    "limit_bytes": 100 * BYTES_PER_GB,
+                    "timestamp": time.time(),
+                    "source": "test soft quota exceeded",
+                }),
+                encoding="utf-8",
+            )
+            snapshot = load_quota_snapshot(quota_path, 60)
+            self.assertIsNotNone(snapshot)
+            self.assertEqual(snapshot.available_bytes, 0)
+            self.assertEqual(snapshot.usage_fraction, 1.0)
+
+            policy = StoragePolicy({
+                "quota_snapshot_path": str(quota_path),
+                "quota_snapshot_max_age_seconds": 60,
+            })
+            ok, reason = policy.preflight(
+                root,
+                required_bytes=1,
+                require_fresh_quota=True,
+            )
+            self.assertFalse(ok)
+            self.assertIn("insufficient storage", reason)
+            self.assertIn("available=0", reason)
+
     def test_directory_size_ignores_control_files(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
