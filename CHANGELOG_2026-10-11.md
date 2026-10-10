@@ -9,6 +9,17 @@
 - Added a duplicate-start guard: when the registry reports the configured runner online but no listener is visible on the current node, `start` refuses to launch a second listener and reports the recorded host.
 - Scope: changes are isolated to branch `fix/runner-control-stop-status-20261009`; no change to `main` or to the A100 `~/OEC` filesystem.
 
+## Live A100 inventory verification
+
+- Read-only matrix workflow successfully assigned and completed one no-GPU diagnostic job on every existing label `connector-1` through `connector-5`.
+- Observed host mapping: `connector-1` → `scn17-mn`; `connector-2` → `scn20-mn`; `connector-3` → `scn20-mn`; `connector-4` → `scn17-mn`; `connector-5` → `scn21-mn`.
+- GitHub Actions job IDs: connector-1 `3`, connector-2 `23`, connector-3 `24`, connector-4 `25`, connector-5 `26`; all five verification jobs completed successfully.
+- On all five nodes, `~/OEC/tools/runner_control.py` had Git blob SHA `458b6d4d47cec6516af67d193d3da8fd6a165f17`. The tested candidate controller has blob SHA `c70142fc8873596d1efad04e3b09c19125fc9121`, confirming local code had not yet been synced.
+- Each runner's expected `OEC/gpu/connector_N/actions-runner` path reported `.runner` and `bin/Runner.Listener` present in the final inventory; no nested `actions-runner/actions-runner` install was found.
+- `connector-5` is already accepting jobs on `scn21-mn`; the earlier attempt to create it on `scn37-mn` failed due to that node's proxy policy, so this verification did not treat that failed setup as a new registration.
+- Live inventory run: https://github.com/Killer4K-N/Connector_1/actions/runs/38081689687
+- Detailed workspace/path verification run: https://github.com/Killer4K-N/Connector_1/actions/runs/38081809409
+
 ## Validation
 
 - New regression tests cover remote-idle list output, diagnostic-log host fallback, host metadata written on start, remote-safe stop behavior, and duplicate-start prevention.
