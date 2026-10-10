@@ -58,3 +58,10 @@
 ## Approval boundary
 
 The next implementation step should be an isolated integration branch plus connector-1-only diagnostic workflows and focused tests. No change should be merged to `main`, and no shared A100 filesystem/code should be changed, until the proposed diffs and side effects have been reviewed and approved.
+
+
+## Official-source cross-check (completed during this audit)
+
+- The official [TRELLIS.2 README](https://github.com/microsoft/TRELLIS.2) uses `Trellis2ImageTo3DPipeline.from_pretrained("microsoft/TRELLIS.2-4B")`, followed by `.cuda()` and `.run(image)`; its example GLB decimation target is 1,000,000. The implementation signature accepts a model path and optional `config_file`, not `local_files_only`. Resolve cached snapshots with Hugging Face Hub first and pass the resolved local path to TRELLIS.
+- The official [xFormers changelog](https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md) identifies `0.0.29.post2` as the prebuilt PyTorch 2.6.0 wheel release for CUDA 11.8/12.4/12.6. The historical successful runner smoke used `0.0.29.post2`, whereas the latest TRELLIS candidate pins `0.0.29.post3`; this exact candidate pin is not verified by that result and must be tested on connector-1 before acceptance.
+- The official [TRELLIS.2 issue #84](https://github.com/microsoft/TRELLIS.2/issues/84) is a separate export-stage CuMesh CUDA illegal-memory-access report during chart/atlas processing at low decimation targets after repeated generations. Treat attention-backend/inference failure and mesh-to-GLB export stability as two independent acceptance checks.
