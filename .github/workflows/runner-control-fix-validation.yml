@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - fix/runner-control-stop-status-20261009
+      - fix/runner-identity-bom-host-stamping-20261011
 
 permissions:
   contents: read
