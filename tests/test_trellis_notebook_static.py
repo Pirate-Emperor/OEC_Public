@@ -90,14 +90,18 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertNotIn("local_files_only=True", runtime)
         self.assertIn("HF_HUB_OFFLINE", runtime)
 
-    def test_attention_backend_falls_back_when_xformers_cuda_ops_are_unavailable(self):
+    def test_attention_backend_checks_dense_and_sparse_compatibility(self):
         combined = self.source(8)
         only = self.source_only(11)
         runtime = (self.ROOT / "tests" / "trellis_runtime_smoke.py").read_text(encoding="utf-8")
         for source in (combined, only):
             self.assertIn("xops.memory_efficient_attention(probe, probe, probe)", source)
-            self.assertIn('os.environ["ATTN_BACKEND"] = "sdpa"', source)
-        self.assertIn('os.environ.get("AIEROS_TRELLIS_ATTN_BACKEND", "sdpa")', runtime)
+            self.assertIn('os.environ["ATTN_BACKEND"] = ATTN_BACKEND_REQUESTED', source)
+            self.assertIn('os.environ["SPARSE_ATTN_BACKEND"] = ATTN_BACKEND_REQUESTED', source)
+            self.assertIn("SDPA is not supported by TRELLIS sparse attention", source)
+            self.assertIn("Run the TRELLIS setup cell in phase2_3d", source)
+        self.assertIn('os.environ["ATTN_BACKEND"] = "xformers"', runtime)
+        self.assertIn('os.environ["SPARSE_ATTN_BACKEND"] = "xformers"', runtime)
 
 
 if __name__ == "__main__":
