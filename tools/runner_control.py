@@ -133,21 +133,47 @@ def _github_repo_from_server_url(server_url: str) -> str:
 
 
 def _runner_identity(runner: Path) -> tuple[str, str]:
+    """Read GitHub's actual runner metadata format, including its UTF-8 BOM."""
     metadata = runner / ".runner"
     if not metadata.is_file():
         return "", ""
 
     try:
-        info = json.loads(metadata.read_text())
+        info = json.loads(metadata.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError):
         return "", ""
 
-    name = str(info.get("name") or info.get("runnerName") or "").strip()
-    server_url = str(info.get("serverUrl") or info.get("gitHubUrl") or "").strip()
+    name = str(
+        info.get("name") or info.get("runnerName") or info.get("agentName") or ""
+    ).strip()
+    # gitHubUrl is the repository/org URL. serverUrl may point at an
+    # actions.githubusercontent.com service endpoint instead.
+    server_url = str(info.get("gitHubUrl") or info.get("serverUrl") or "").strip()
     return name, server_url
 
 
 _RUNNER_HOST_METADATA = ".oec_runner_host.json"
+
+
+def _process_start_epoch(pid: int | None) -> float | None:
+    """Estimate a Linux process start epoch from /proc, without external tools."""
+    if pid is None:
+        return None
+    try:
+        raw = (Path("/proc") / str(pid) / "stat").read_text(encoding="utf-8")
+        fields = raw[raw.rfind(")") + 2:].split()
+        start_ticks = int(fields[19])  # proc stat field 22 (starttime)
+        boot_time = None
+        for line in Path("/proc/stat").read_text(encoding="utf-8").splitlines():
+            if line.startswith("btime "):
+                boot_time = float(line.split()[1])
+                break
+        ticks_per_second = float(os.sysconf("SC_CLK_TCK"))
+        if boot_time is None or ticks_per_second <= 0:
+            return None
+        return boot_time + start_ticks / ticks_per_second
+    except (OSError, ValueError, IndexError, TypeError):
+        return None
 
 
 def _write_runner_host_metadata(
@@ -156,28 +182,43 @@ def _write_runner_host_metadata(
     *,
     preserve_started_at: bool = False,
 ) -> dict:
-    """Record which compute node started/owns this listener in the shared runner directory."""
+    """Record the runner host without inventing a start time for pre-existing listeners."""
     metadata_path = runner / _RUNNER_HOST_METADATA
     hostname = socket.gethostname()
     prior: dict = {}
     try:
-        loaded = json.loads(metadata_path.read_text(encoding="utf-8"))
+        loaded = json.loads(metadata_path.read_text(encoding="utf-8-sig"))
         if isinstance(loaded, dict):
             prior = loaded
     except (OSError, json.JSONDecodeError):
         pass
 
-    started_epoch = prior.get("started_at_epoch")
+    now = time.time()
+    prior_started = prior.get("started_at_epoch")
     if (
-        not preserve_started_at
-        or prior.get("hostname") != hostname
-        or not isinstance(started_epoch, (int, float))
+        preserve_started_at
+        and prior.get("hostname") == hostname
+        and isinstance(prior_started, (int, float))
     ):
-        started_epoch = time.time()
+        started_epoch = float(prior_started)
+        started_source = str(prior.get("started_at_source") or "previous metadata")
+    elif preserve_started_at:
+        started_epoch = _process_start_epoch(listener_pid)
+        started_source = "proc" if started_epoch is not None else "unknown"
+    else:
+        started_epoch = now
+        started_source = "runner_control.py start"
+
     record = {
         "hostname": hostname,
-        "started_at": time.strftime("%Y-%m-%d %H:%M:%S %z", time.localtime(started_epoch)),
+        "started_at": (
+            time.strftime("%Y-%m-%d %H:%M:%S %z", time.localtime(started_epoch))
+            if started_epoch is not None else None
+        ),
         "started_at_epoch": started_epoch,
+        "started_at_source": started_source,
+        "observed_at": time.strftime("%Y-%m-%d %H:%M:%S %z", time.localtime(now)),
+        "observed_at_epoch": now,
         "username": getpass.getuser(),
         "listener_pid": listener_pid,
         "source": "runner_control.py",
@@ -232,7 +273,11 @@ def _runner_host_info(runner: Path) -> dict:
 
     if metadata_record:
         try:
-            metadata_epoch = float(metadata_record.get("started_at_epoch", 0))
+            metadata_epoch = float(
+                metadata_record.get("observed_at_epoch")
+                or metadata_record.get("started_at_epoch")
+                or 0
+            )
             diagnostic_epoch = float(diagnostic_record.get("started_at_epoch", 0))
         except (TypeError, ValueError):
             metadata_epoch, diagnostic_epoch = 0, 0
@@ -258,6 +303,8 @@ def _host_location_text(
         parts = [f"HOST={hostname}", "process detected on this node"]
         if record.get("hostname") == hostname and record.get("started_at"):
             parts.append(f"started={record['started_at']}")
+        elif record.get("hostname") == hostname and record.get("observed_at"):
+            parts.append(f"observed={record['observed_at']}")
         return " (" + "; ".join(parts) + ")"
 
     record = _runner_host_info(runner)
@@ -276,6 +323,8 @@ def _host_location_text(
         parts.append(f"started={record['started_at']}")
     elif record.get("log_updated_at"):
         parts.append(f"log_updated={record['log_updated_at']}")
+    elif record.get("observed_at"):
+        parts.append(f"observed={record['observed_at']}")
     if record.get("username"):
         parts.append(f"user={record['username']}")
     if record.get("listener_pid"):
@@ -1124,9 +1173,11 @@ def status_runner(args: argparse.Namespace) -> None:
     record = None
     if configured:
         try:
-            info = json.loads((runner / ".runner").read_text())
-            print(f"Runner    : {info.get('name', args.name)}")
-            print(f"Server    : {info.get('serverUrl', 'unknown')}")
+            info = json.loads((runner / ".runner").read_text(encoding="utf-8-sig"))
+            runner_name = info.get("name") or info.get("runnerName") or info.get("agentName") or args.name or "unknown"
+            server_url = info.get("gitHubUrl") or info.get("serverUrl") or "unknown"
+            print(f"Runner    : {runner_name}")
+            print(f"Server    : {server_url}")
         except Exception:
             pass
 
