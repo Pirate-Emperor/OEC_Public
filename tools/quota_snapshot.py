@@ -69,8 +69,8 @@ def main() -> int:
 
     if used is None or limit is None:
         parser.error("provide used/limit values in bytes or GB")
-    if used < 0 or limit <= 0 or used > limit:
-        parser.error("quota values must satisfy 0 <= used <= limit and limit > 0")
+    if used < 0 or limit <= 0:
+        parser.error("quota values must satisfy used >= 0 and limit > 0")
 
     payload = {
         "used_bytes": int(used),
@@ -82,8 +82,13 @@ def main() -> int:
 
     print(
         f"Quota snapshot written: used={used} bytes, "
-        f"limit={limit} bytes, output={Path(args.output).expanduser()}"
+        f"admission_limit={limit} bytes, output={Path(args.output).expanduser()}"
     )
+    if used > limit:
+        print(
+            "WARNING: usage is above the configured admission limit; "
+            "the snapshot will report zero available bytes and block new writes."
+        )
     return 0
 
 
