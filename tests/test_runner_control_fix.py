@@ -267,13 +267,14 @@ class RunnerControlFixTests(unittest.TestCase):
             with mock.patch.object(rc.socket, "gethostname", return_value="scn17-mn"):
                 with mock.patch.object(rc.getpass, "getuser", return_value="rahkus"):
                     with mock.patch.object(rc.time, "time", return_value=2000):
-                        new_start = rc._write_runner_host_metadata(runner, 200)
                         existing = rc._write_runner_host_metadata(
                             runner, 201, preserve_started_at=True
                         )
-            self.assertEqual(new_start["started_at_epoch"], 2000)
-            self.assertEqual(existing["started_at_epoch"], 2000)
+                        new_start = rc._write_runner_host_metadata(runner, 200)
+            self.assertEqual(existing["started_at_epoch"], 1000)
             self.assertEqual(existing["listener_pid"], 201)
+            self.assertEqual(new_start["started_at_epoch"], 2000)
+            self.assertEqual(new_start["listener_pid"], 200)
 
     def test_newer_diagnostic_log_overrides_stale_host_metadata(self):
         with tempfile.TemporaryDirectory() as td:
