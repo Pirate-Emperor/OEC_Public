@@ -19,3 +19,5 @@ jobs:
         run: python -m py_compile tools/runner_control.py
       - name: Run isolated lifecycle/auth regression tests
         run: python -m unittest discover -s tests -p 'test_runner_control_fix.py' -v
+      - name: Run complete repository test suite
+        run: python -m unittest discover -s tests -v
