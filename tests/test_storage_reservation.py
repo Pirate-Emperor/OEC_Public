@@ -128,7 +128,7 @@ class TemporaryReservationTests(unittest.TestCase):
     def test_live_lustre_quota_parser_uses_soft_limit(self):
         class Result:
             returncode = 0
-            stdout = "Disk quotas for grp lmedge (gid 55000):\\nFilesystem kbytes quota limit grace files quota limit grace\\n/nlsasfs 2109592848 2147483648 2254857830 - 4220723 0 0 -\\n"
+            stdout = "Disk quotas for grp lmedge (gid 55000):\nFilesystem kbytes quota limit grace files quota limit grace\n/nlsasfs 2109592848 2147483648 2254857830 - 4220723 0 0 -\n"
 
         with tempfile.TemporaryDirectory() as temp:
             folder = Path(temp)
