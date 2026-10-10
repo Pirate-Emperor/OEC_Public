@@ -12,4 +12,9 @@
 ## Validation
 
 - New regression tests cover remote-idle list output, diagnostic-log host fallback, host metadata written on start, remote-safe stop behavior, and duplicate-start prevention.
-- CI result will be added after the validation workflow completes.
+- `python -m py_compile tools/runner_control.py`: passed.
+- Focused runner-control regressions: **12/12 passed**.
+- Full repository suite: **36/36 passed** after the workflow installed `huggingface_hub`, which the pre-existing upload-daemon test imports. Before that CI adjustment, the full suite had 33 passes and one error caused only by this missing test-environment dependency.
+- Earlier first attempt on the diagnostic-log test exposed a fixture with escaped literal newlines; corrected the fixture. The final focused and full runs passed.
+- The full suite emits a non-failing `ResourceWarning` for an unclosed `upload_daemon.log` handler in `hf_upload_daemon.py:21`; this is outside the runner-control change.
+- Final full validation run: https://github.com/Killer4K-N/OEC/actions/runs/38081353311
