@@ -116,6 +116,11 @@ def temporary_download_reservation(
         quota = StoragePolicy(config).get_quota_snapshot()
         if quota is None:
             raise RuntimeError("fresh authoritative quota snapshot is required for a temporary reserve lease")
+        if quota.used_bytes > quota.limit_bytes:
+            raise RuntimeError(
+                "quota usage is already above the snapshot write-admission limit; "
+                "temporary reserve leases are blocked until usage returns below it"
+            )
         if quota.available_bytes + release_bytes < download_bytes + min_headroom_bytes:
             raise RuntimeError(
                 "insufficient quota headroom even after reserve release: "
