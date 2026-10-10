@@ -62,7 +62,8 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         setup = self.source_only(10)
         self.assertNotIn("pip", self.source_only(1).lower())
         self.assertNotIn("pip", self.source_only(2).lower())
-        self.assertNotIn('pip", "uninstall"', setup)
+        self.assertNotIn("cuda-toolkit", setup)
+        self.assertNotIn("nvidia-cudnn-cu13", setup)
         self.assertNotIn("--force-reinstall", setup)
         self.assertIn('xformers==0.0.29.post3', setup)
 
