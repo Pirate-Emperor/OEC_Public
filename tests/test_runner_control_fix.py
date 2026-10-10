@@ -308,7 +308,7 @@ class RunnerControlFixTests(unittest.TestCase):
                 "workFolder": "_work",
             }
             (runner / ".runner").write_bytes(
-                ("\\ufeff" + json.dumps(metadata)).encode("utf-8")
+                ("\ufeff" + json.dumps(metadata)).encode("utf-8")
             )
             self.assertEqual(
                 rc._runner_identity(runner),
@@ -339,7 +339,7 @@ class RunnerControlFixTests(unittest.TestCase):
                 "gitHubUrl": "https://github.com/Killer4K-N/Connector_1",
             }
             (runner / ".runner").write_bytes(
-                ("\\ufeff" + json.dumps(metadata)).encode("utf-8")
+                ("\ufeff" + json.dumps(metadata)).encode("utf-8")
             )
             with mock.patch.dict(os.environ, {"OEC_ROOT": td, "HOME": td}, clear=True):
                 with mock.patch.object(rc, "listener_pids", return_value=[]):
