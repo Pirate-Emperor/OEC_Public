@@ -133,7 +133,7 @@ class TemporaryReservationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             folder = Path(temp)
             with mock.patch("storage_policy.shutil.which", return_value="/usr/bin/lfs"), mock.patch("storage_policy.subprocess.run", return_value=Result()):
-                quota = _live_lustre_quota(folder, {})
+                quota = _live_lustre_quota(folder)
             self.assertIsNotNone(quota)
             self.assertEqual(quota.used_bytes, 2109592848 * 1024)
             self.assertEqual(quota.limit_bytes, 2147483648 * 1024)
