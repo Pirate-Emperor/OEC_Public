@@ -1,0 +1,47 @@
+name: OEC Temporary Storage Reservation Regression
+
+on:
+  push:
+    branches:
+      - feat/temporary-storage-leases-20261010
+  pull_request:
+    branches:
+      - fix/disable-implicit-trash-cleanup-20261010
+
+concurrency:
+  group: oec-temporary-storage-reservation-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Test reserve lease in oec_freeze
+    runs-on: [self-hosted, connector-3]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout tested branch
+        uses: actions/checkout@v4
+      - name: Verify dedicated environment
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          CONDA_EXE="$(command -v conda || true)"
+          if [ -z "$CONDA_EXE" ]; then
+            for candidate in "$HOME/Conda/condabin/conda" "$HOME/miniconda3/bin/conda" "$HOME/anaconda3/bin/conda" "$HOME/.conda/condabin/conda"; do
+              if [ -x "$candidate" ]; then CONDA_EXE="$candidate"; break; fi
+            done
+          fi
+          test -n "$CONDA_EXE"
+          "$CONDA_EXE" run --no-capture-output -n oec_freeze python -c 'import sys; assert sys.version_info[:2] == (3, 11); print(sys.executable); print("OEC_FREEZE_ENVIRONMENT=PASS")'
+          echo "CONDA_EXE=$CONDA_EXE" >> "$GITHUB_ENV"
+      - name: Compile and test isolated reservation lease
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          "$CONDA_EXE" run --no-capture-output -n oec_freeze python -m py_compile storage_manager.py storage_reservation.py tests/test_storage_reservation.py
+          "$CONDA_EXE" run --no-capture-output -n oec_freeze python -m unittest discover -s tests -p "test_storage_reservation.py" -v
+          "$CONDA_EXE" run --no-capture-output -n oec_freeze python -m unittest discover -s tests -p "test_storage_manager.py" -v

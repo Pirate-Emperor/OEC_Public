@@ -37,6 +37,7 @@ CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "storage_
 RESERVE_FILENAME = ".storage_reserve.bin"
 LOCK_FILENAME = ".storage_pause.lock"
 MANAGER_LOCK_FILENAME = ".storage_manager.lock"
+LEASE_MANIFEST_FILENAME = ".storage_lease.json"
 DEFAULT_LOCK_TTL_SECONDS = 6 * 60 * 60
 
 log_path = os.path.join(
@@ -189,6 +190,15 @@ def get_actual_folder_size(folder_path):
 
 
 def _pause_lock_active(folder_path, lock_ttl_seconds):
+    # Never auto-expire a lease marker: the reserve may still be partially released.
+    lease_manifest = os.path.join(folder_path, LEASE_MANIFEST_FILENAME)
+    if os.path.exists(lease_manifest) or os.path.islink(lease_manifest):
+        logging.critical(
+            "Unrecovered temporary reserve lease in %s; manual inspection is required.",
+            folder_path,
+        )
+        return True
+
     lock_file = os.path.join(folder_path, LOCK_FILENAME)
     if not os.path.exists(lock_file):
         return False
@@ -313,13 +323,18 @@ def resume_reserve(dir_name):
         folder_path = SYSTEM_DIRS.get(dir_name, dir_name)
 
         with _directory_lock(folder_path):
+            manifest_path = os.path.join(folder_path, LEASE_MANIFEST_FILENAME)
+            if os.path.exists(manifest_path) or os.path.islink(manifest_path):
+                raise RuntimeError(
+                    "temporary reserve lease/recovery manifest exists; inspect it before resuming"
+                )
             lock_file = os.path.join(folder_path, LOCK_FILENAME)
             if os.path.exists(lock_file):
                 os.remove(lock_file)
 
         logging.info("Storage reserve RESUMED on '%s'.", dir_name)
         return True
-    except (OSError, KeyError) as exc:
+    except (OSError, KeyError, RuntimeError) as exc:
         logging.error("Failed to resume reserve for %s: %s", dir_name, type(exc).__name__)
         return False
 
@@ -483,7 +498,8 @@ def managed_storage_operation(
 def print_status(config):
     """Print quota and per-directory status without modifying storage."""
     policy = StoragePolicy(config)
-    quota = policy.get_quota_snapshot()
+    models_path = SYSTEM_DIRS.get("models", os.path.expanduser("~/aireos_models"))
+    quota = policy.get_quota_snapshot(models_path)
 
     print("==================================================")
     print("OEC STORAGE STATUS")
