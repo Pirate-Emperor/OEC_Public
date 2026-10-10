@@ -8,9 +8,11 @@ filesystem-level telemetry explicitly.
 
 from __future__ import annotations
 
+import grp
 import json
 import os
 import shutil
+import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -108,6 +110,44 @@ def load_quota_snapshot(
     if snapshot.age_seconds > max_age_seconds:
         return None
     return snapshot
+
+
+def _live_lustre_quota(folder_path: str | os.PathLike[str]):
+    """Query the owning group's live Lustre quota without writing a snapshot."""
+    if shutil.which("lfs") is None:
+        return None
+    folder = Path(folder_path)
+    try:
+        group = os.environ.get("AIEROS_QUOTA_GROUP") or grp.getgrgid(folder.stat().st_gid).gr_name
+        result = subprocess.run(
+            ["lfs", "quota", "-g", str(group), str(folder)],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, KeyError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+
+    for line in result.stdout.splitlines():
+        fields = line.split()
+        if fields and fields[0].startswith("/"):
+            fields = fields[1:]
+        if len(fields) < 3 or not all(value.isdigit() for value in fields[:3]):
+            continue
+        used_kib, soft_kib, hard_kib = map(int, fields[:3])
+        limit_kib = soft_kib if soft_kib > 0 else hard_kib
+        if limit_kib <= 0:
+            continue
+        return QuotaSnapshot(
+            used_bytes=used_kib * 1024,
+            limit_bytes=limit_kib * 1024,
+            timestamp=time.time(),
+            source=f"live lfs quota for group {group}",
+        )
+    return None
 
 
 def directory_size_bytes(
@@ -240,11 +280,19 @@ class StoragePolicy:
             config.get("quota_snapshot_max_age_seconds", 900)
         )
 
-    def get_quota_snapshot(self) -> Optional[QuotaSnapshot]:
-        return load_quota_snapshot(
+    def get_quota_snapshot(
+        self,
+        folder_path: str | os.PathLike[str] | None = None,
+    ) -> Optional[QuotaSnapshot]:
+        snapshot = load_quota_snapshot(
             self.quota_snapshot_path,
             self.quota_snapshot_max_age_seconds,
         )
+        if snapshot is not None:
+            return snapshot
+        if folder_path is not None:
+            return _live_lustre_quota(folder_path)
+        return None
 
     def evaluate(
         self,
@@ -255,7 +303,7 @@ class StoragePolicy:
     ) -> StorageDecision:
         actual = directory_size_bytes(folder_path, (reserve_filename, lock_filename))
         free_bytes = filesystem_free_bytes(folder_path)
-        quota = self.get_quota_snapshot()
+        quota = self.get_quota_snapshot(folder_path)
 
         fraction = (actual / target_bytes) if target_bytes > 0 else 1.0
         state = "NORMAL"
@@ -319,7 +367,7 @@ class StoragePolicy:
         """
         required_bytes = max(0, int(required_bytes))
         minimum_free_bytes = max(0, int(minimum_free_bytes))
-        quota = self.get_quota_snapshot()
+        quota = self.get_quota_snapshot(folder_path)
 
         if target_bytes is not None:
             target_bytes = max(0, int(target_bytes))
