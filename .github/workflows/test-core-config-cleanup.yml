@@ -1,0 +1,62 @@
+name: OEC Core Config Safety Regression
+
+on:
+  push:
+    branches:
+      - fix/disable-implicit-trash-cleanup-20261010
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "core_config.py"
+      - "tests/test_core_config_cleanup.py"
+      - ".github/workflows/test-core-config-cleanup.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Validate safe cleanup and storage policy
+    runs-on: [self-hosted, connector-3]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v4
+
+      - name: Verify dedicated oec_freeze environment
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          CONDA_EXE="$(command -v conda || true)"
+          if [ -z "$CONDA_EXE" ]; then
+            for candidate in "$HOME/Conda/condabin/conda" "$HOME/miniconda3/bin/conda" "$HOME/anaconda3/bin/conda" "$HOME/.conda/condabin/conda"; do
+              if [ -x "$candidate" ]; then CONDA_EXE="$candidate"; break; fi
+            done
+          fi
+          test -n "$CONDA_EXE"
+          "$CONDA_EXE" run --no-capture-output -n oec_freeze python - <<'PY'
+          import sys
+          from pathlib import Path
+          assert sys.version_info[:2] == (3, 11), sys.version
+          assert Path(sys.prefix).name == "oec_freeze", sys.prefix
+          print(f"PYTHON={sys.executable}")
+          print(f"PREFIX={sys.prefix}")
+          print("OEC_FREEZE_ENVIRONMENT=PASS")
+          PY
+          echo "CONDA_EXE=$CONDA_EXE" >> "$GITHUB_ENV"
+
+      - name: Test safe core_config cleanup
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          "$CONDA_EXE" run --no-capture-output -n oec_freeze python tests/test_core_config_cleanup.py -v
+
+      - name: Run storage policy and manager regression tests
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          "$CONDA_EXE" run --no-capture-output -n oec_freeze python -m unittest tests.test_storage_policy tests.test_storage_manager -v
