@@ -14,7 +14,7 @@
 - Read-only matrix workflow successfully assigned and completed one no-GPU diagnostic job on every existing label `connector-1` through `connector-5`.
 - Observed host mapping: `connector-1` → `scn17-mn`; `connector-2` → `scn20-mn`; `connector-3` → `scn20-mn`; `connector-4` → `scn17-mn`; `connector-5` → `scn21-mn`.
 - GitHub Actions job IDs: connector-1 `3`, connector-2 `23`, connector-3 `24`, connector-4 `25`, connector-5 `26`; all five verification jobs completed successfully.
-- On all five nodes, `~/OEC/tools/runner_control.py` had Git blob SHA `458b6d4d47cec6516af67d193d3da8fd6a165f17`. The tested candidate controller has blob SHA `c70142fc8873596d1efad04e3b09c19125fc9121`, confirming local code had not yet been synced.
+- On all five nodes, the preliminary inventory reported a digest of `458b6d4d47cec6516af67d193d3da8fd6a165f17`, but its hash routine used an escaped separator and that value was not a valid Git blob SHA. The guarded deployment preflight computed the actual local controller blob as `88050dbfa12072ab6d53e8dbd3be13ae73421627`; the merged source blob is `7ccb4a95819c8feddaa4e3093d999d92cd8685b9`.
 - Each runner's expected `OEC/gpu/connector_N/actions-runner` path reported `.runner` and `bin/Runner.Listener` present in the final inventory; no nested `actions-runner/actions-runner` install was found.
 - `connector-5` is already accepting jobs on `scn21-mn`; the earlier attempt to create it on `scn37-mn` failed due to that node's proxy policy, so this verification did not treat that failed setup as a new registration.
 - Live inventory run: https://github.com/Killer4K-N/Connector_1/actions/runs/38081689687
@@ -27,7 +27,7 @@
 - Updated host metadata seeding for an already-running listener to obtain its start time from Linux `/proc` when available, instead of incorrectly treating the time of the first observation as its start time. Added a separate observation timestamp.
 - Added regression tests for BOM-prefixed runner metadata, the real `agentName` / `gitHubUrl` field combination, correct GitHub API endpoint derivation, safe status output, and accurate start-time stamping.
 - Follow-up validation: focused runner-control suite **15/15 passed**; full repository test suite **39/39 passed**. Run: https://github.com/Killer4K-N/OEC/actions/runs/38082197015
-- The local controller content hash is still `458b6d4d47cec6516af67d193d3da8fd6a165f17` on the five verified runners; deployment remains pending final sync and post-sync validation.
+- A guarded local sync attempt on `scn17-mn` correctly refused to write because the expected-old hash inherited from the faulty inventory digest did not match the actual file hash. No local file was changed and no backup was created. The deployment workflow still needs its old-hash guard corrected before retrying; source sync and post-sync validation remain pending.
 
 ## Validation
 
