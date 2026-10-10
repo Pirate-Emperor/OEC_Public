@@ -251,5 +251,48 @@ class RunnerControlFixTests(unittest.TestCase):
             popen.assert_not_called()
 
 
+
+    def test_new_start_refreshes_timestamp_but_existing_listener_preserves_it(self):
+        with tempfile.TemporaryDirectory() as td:
+            runner = Path(td) / "actions-runner"
+            runner.mkdir()
+            (runner / rc._RUNNER_HOST_METADATA).write_text(json.dumps({
+                "hostname": "scn17-mn",
+                "started_at": "1970-01-01 00:16:40 +0000",
+                "started_at_epoch": 1000,
+                "username": "rahkus",
+                "listener_pid": 100,
+                "source": "runner_control.py",
+            }))
+            with mock.patch.object(rc.socket, "gethostname", return_value="scn17-mn"):
+                with mock.patch.object(rc.getpass, "getuser", return_value="rahkus"):
+                    with mock.patch.object(rc.time, "time", return_value=2000):
+                        new_start = rc._write_runner_host_metadata(runner, 200)
+                        existing = rc._write_runner_host_metadata(
+                            runner, 201, preserve_started_at=True
+                        )
+            self.assertEqual(new_start["started_at_epoch"], 2000)
+            self.assertEqual(existing["started_at_epoch"], 2000)
+            self.assertEqual(existing["listener_pid"], 201)
+
+    def test_newer_diagnostic_log_overrides_stale_host_metadata(self):
+        with tempfile.TemporaryDirectory() as td:
+            runner = Path(td) / "actions-runner"
+            diag = runner / "_diag"
+            diag.mkdir(parents=True)
+            (runner / rc._RUNNER_HOST_METADATA).write_text(json.dumps({
+                "hostname": "scn17-mn",
+                "started_at": "1970-01-01 00:16:40 +0000",
+                "started_at_epoch": 1000,
+                "source": "runner_control.py",
+            }))
+            log = diag / "Runner_20261011-003000-utc.log"
+            log.write_text("Runner name: connector-4\nMachine name: scn37-mn\n")
+            os.utime(log, (2000, 2000))
+            info = rc._runner_host_info(runner)
+            self.assertEqual(info["hostname"], "scn37-mn")
+            self.assertEqual(info["source"], "runner diagnostic log")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
