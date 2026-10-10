@@ -483,7 +483,8 @@ def managed_storage_operation(
 def print_status(config):
     """Print quota and per-directory status without modifying storage."""
     policy = StoragePolicy(config)
-    quota = policy.get_quota_snapshot()
+    models_path = SYSTEM_DIRS.get("models", os.path.expanduser("~/aireos_models"))
+    quota = policy.get_quota_snapshot(models_path)
 
     print("==================================================")
     print("OEC STORAGE STATUS")
