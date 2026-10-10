@@ -87,6 +87,24 @@ class TemporaryReservationTests(unittest.TestCase):
                 staging = models / ".oec_temp_downloads"
                 self.assertFalse(staging.exists() and any(staging.iterdir()))
 
+    def test_oversized_scratch_is_deleted_and_reserve_restored(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            models, reserve, original_size, config_path = self._setup(root)
+            patch_a, patch_b = self._patch_config(models, config_path)
+            with patch_a, patch_b:
+                with self.assertRaisesRegex(RuntimeError, "exceeded declared max download"):
+                    with temporary_download_reservation(
+                        "models",
+                        reserve_release_gb=(8 * 1024**2) / BYTES_PER_GB,
+                        max_download_gb=(4 * 1024**2) / BYTES_PER_GB,
+                        minimum_reserve_gb=(8 * 1024**2) / BYTES_PER_GB,
+                        minimum_quota_headroom_gb=(1 * 1024**2) / BYTES_PER_GB,
+                    ) as scratch:
+                        (scratch / "too-large.bin").write_bytes(b"x" * (5 * 1024**2))
+                self.assertEqual(reserve.stat().st_size, original_size)
+                self.assertFalse((models / storage_manager.LEASE_MANIFEST_FILENAME).exists())
+
     def test_missing_quota_snapshot_blocks_without_mutating_reserve(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
