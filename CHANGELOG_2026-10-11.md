@@ -7,7 +7,7 @@
 - Added host location reporting. New starts write hostname, start time, username, and listener PID to `.oec_runner_host.json` inside the runner directory. Existing installs can fall back to the runner's `_diag/Runner_*.log` `Machine name:` entry.
 - Updated `status` to show location and updated `stop` to refuse to claim a remote runner stopped when no listener is visible locally but GitHub still reports it online.
 - Added a duplicate-start guard: when the registry reports the configured runner online but no listener is visible on the current node, `start` refuses to launch a second listener and reports the recorded host.
-- Scope: changes are isolated to branch `fix/runner-control-stop-status-20261009`; no change to `main` or to the A100 `~/OEC` filesystem.
+- The initial state/location implementation was merged in PR #3 (`ec4ebcfa14d709f199a81bbeb0751a1fc708be8b`). Live runner metadata inspection then exposed a real-format compatibility bug; this follow-up fixes the BOM/field mapping before any local deployment. The local A100 `~/OEC/tools/runner_control.py` has not yet been modified.
 
 ## Live A100 inventory verification
 
@@ -19,6 +19,15 @@
 - `connector-5` is already accepting jobs on `scn21-mn`; the earlier attempt to create it on `scn37-mn` failed due to that node's proxy policy, so this verification did not treat that failed setup as a new registration.
 - Live inventory run: https://github.com/Killer4K-N/Connector_1/actions/runs/38081689687
 - Detailed workspace/path verification run: https://github.com/Killer4K-N/Connector_1/actions/runs/38081809409
+
+## Real runner metadata compatibility follow-up
+
+- The actual `.runner` files inspected on the live runners have a UTF-8 BOM, use `agentName`, and contain `gitHubUrl` for the repository URL. The `serverUrl` field is an Actions service endpoint and must not be used to derive the GitHub repository. No service-endpoint URL is recorded in this changelog.
+- Updated `_runner_identity` and `status` to parse `utf-8-sig`, accept `agentName`, and prefer `gitHubUrl`.
+- Updated host metadata seeding for an already-running listener to obtain its start time from Linux `/proc` when available, instead of incorrectly treating the time of the first observation as its start time. Added a separate observation timestamp.
+- Added regression tests for BOM-prefixed runner metadata, the real `agentName` / `gitHubUrl` field combination, correct GitHub API endpoint derivation, safe status output, and accurate start-time stamping.
+- Follow-up validation: focused runner-control suite **15/15 passed**; full repository test suite **39/39 passed**. Run: https://github.com/Killer4K-N/OEC/actions/runs/38082197015
+- The local controller content hash is still `458b6d4d47cec6516af67d193d3da8fd6a165f17` on the five verified runners; deployment remains pending final sync and post-sync validation.
 
 ## Validation
 
