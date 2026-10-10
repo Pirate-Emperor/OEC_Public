@@ -13,6 +13,7 @@ import os
 import signal
 import subprocess
 import shutil
+import socket
 import sys
 import tarfile
 import time
@@ -144,6 +145,112 @@ def _runner_identity(runner: Path) -> tuple[str, str]:
     name = str(info.get("name") or info.get("runnerName") or "").strip()
     server_url = str(info.get("serverUrl") or info.get("gitHubUrl") or "").strip()
     return name, server_url
+
+
+_RUNNER_HOST_METADATA = ".oec_runner_host.json"
+
+
+def _write_runner_host_metadata(runner: Path, listener_pid: int | None = None) -> dict:
+    """Record which compute node started/owns this listener in the shared runner directory."""
+    metadata_path = runner / _RUNNER_HOST_METADATA
+    hostname = socket.gethostname()
+    prior: dict = {}
+    try:
+        loaded = json.loads(metadata_path.read_text(encoding="utf-8"))
+        if isinstance(loaded, dict):
+            prior = loaded
+    except (OSError, json.JSONDecodeError):
+        pass
+
+    started_epoch = prior.get("started_at_epoch")
+    if prior.get("hostname") != hostname or not isinstance(started_epoch, (int, float)):
+        started_epoch = time.time()
+    record = {
+        "hostname": hostname,
+        "started_at": time.strftime("%Y-%m-%d %H:%M:%S %z", time.localtime(started_epoch)),
+        "started_at_epoch": started_epoch,
+        "username": getpass.getuser(),
+        "listener_pid": listener_pid,
+        "source": "runner_control.py",
+    }
+    temporary = metadata_path.with_name(f"{metadata_path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(metadata_path)
+    return record
+
+
+def _runner_host_info(runner: Path) -> dict:
+    """Read recorded host data, falling back to the runner's own diagnostic logs."""
+    metadata_path = runner / _RUNNER_HOST_METADATA
+    try:
+        record = json.loads(metadata_path.read_text(encoding="utf-8"))
+        if isinstance(record, dict) and str(record.get("hostname") or "").strip():
+            record.setdefault("source", "controller metadata")
+            return record
+    except (OSError, json.JSONDecodeError):
+        pass
+
+    diag_dir = runner / "_diag"
+    try:
+        logs = sorted(
+            diag_dir.glob("Runner_*.log"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+    except OSError:
+        logs = []
+
+    for log_path in logs:
+        try:
+            lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+            machine_line = next((line for line in lines if "Machine name:" in line), "")
+            hostname = machine_line.split("Machine name:", 1)[1].strip() if machine_line else ""
+            if hostname:
+                modified = log_path.stat().st_mtime
+                return {
+                    "hostname": hostname,
+                    "started_at": time.strftime("%Y-%m-%d %H:%M:%S %z", time.localtime(modified)),
+                    "started_at_epoch": modified,
+                    "source": "runner diagnostic log",
+                }
+        except OSError:
+            continue
+    return {}
+
+
+def _host_location_text(
+    runner: Path,
+    local_pids: list[int],
+    github_record: dict | None = None,
+) -> str:
+    """Describe the current host for a local listener, otherwise its recorded host."""
+    if local_pids:
+        hostname = socket.gethostname()
+        record = _runner_host_info(runner)
+        parts = [f"HOST={hostname}", "process detected on this node"]
+        if record.get("hostname") == hostname and record.get("started_at"):
+            parts.append(f"started={record['started_at']}")
+        return " (" + "; ".join(parts) + ")"
+
+    record = _runner_host_info(runner)
+    hostname = str(record.get("hostname") or "").strip()
+    if not hostname:
+        return " (HOST=unknown; no controller metadata or runner diagnostic log found)"
+
+    is_online = bool(github_record and github_record.get("status") == "online")
+    label = "HOST" if is_online else "LAST_HOST"
+    parts = [f"{label}={hostname}"]
+    if is_online:
+        parts.append("GitHub reports online")
+    else:
+        parts.append("last recorded host; not proof of current activity")
+    if record.get("started_at"):
+        parts.append(f"started={record['started_at']}")
+    if record.get("username"):
+        parts.append(f"user={record['username']}")
+    if record.get("source"):
+        parts.append(f"source={record['source']}")
+    return " (" + "; ".join(parts) + ")"
 
 
 def _github_request(
@@ -693,7 +800,8 @@ def start_runner(args: argparse.Namespace) -> None:
 
     pids = listener_pids(runner)
     if pids:
-        print(f"Runner already running: PID {pids[0]}")
+        _write_runner_host_metadata(runner, pids[0])
+        print(f"Runner already running on {socket.gethostname()}: Listener PID {pids[0]}")
         if not args.no_github_wait:
             wait_for_github_state(
                 runner,
@@ -701,6 +809,21 @@ def start_runner(args: argparse.Namespace) -> None:
                 timeout=args.github_timeout,
             )
         return
+
+    auth = _github_auth_token()
+    if auth:
+        try:
+            existing_record = _github_runner_record(runner, token=auth)
+        except RuntimeError as exc:
+            print(f"Warning: could not check remote runner state before start: {exc}")
+        else:
+            if existing_record and existing_record.get("status") == "online":
+                host_text = _host_location_text(runner, [], existing_record)
+                raise SystemExit(
+                    f"GitHub already reports this runner online ({_github_state_text(existing_record)}). "
+                    f"No listener was found on {socket.gethostname()}; refusing to start a duplicate. "
+                    f"{host_text} Stop or inspect the runner on its reported host first."
+                )
 
     write_runner_env(runner)
 
@@ -726,7 +849,8 @@ def start_runner(args: argparse.Namespace) -> None:
     while time.time() < deadline:
         pids = listener_pids(runner)
         if pids:
-            print(f"Runner is running: Listener PID {pids[0]}")
+            _write_runner_host_metadata(runner, pids[0])
+            print(f"Runner is running on {socket.gethostname()}: Listener PID {pids[0]}")
             if not args.no_github_wait:
                 wait_for_github_state(
                     runner,
@@ -740,7 +864,8 @@ def start_runner(args: argparse.Namespace) -> None:
 
     pids = listener_pids(runner)
     if pids:
-        print(f"Runner is running: Listener PID {pids[0]}")
+        _write_runner_host_metadata(runner, pids[0])
+        print(f"Runner is running on {socket.gethostname()}: Listener PID {pids[0]}")
         if not args.no_github_wait:
             wait_for_github_state(
                 runner,
@@ -795,12 +920,49 @@ def stop_runner(args: argparse.Namespace) -> None:
 
     pids = listener_pids(runner)
     if not pids:
-        print("Local runner process is stopped.")
-        if not args.no_github_wait:
-            wait_for_github_state(
-                runner,
-                "offline",
-                timeout=args.github_timeout,
+        current_host = socket.gethostname()
+        if args.no_github_wait:
+            print(
+                f"No Runner.Listener process detected on {current_host}; "
+                "GitHub state was not checked and no remote process was signalled."
+            )
+            return
+
+        auth = _github_auth_token()
+        if not auth:
+            print(
+                f"No Runner.Listener process detected on {current_host}; "
+                "GitHub state is unknown because no API credential is available. "
+                "No remote process was signalled."
+            )
+            return
+
+        try:
+            record = _github_runner_record(runner, token=auth)
+        except RuntimeError as exc:
+            print(
+                f"No Runner.Listener process detected on {current_host}; "
+                f"GitHub state is unavailable ({exc}). No remote process was signalled."
+            )
+            return
+
+        host_text = _host_location_text(runner, [], record)
+        if record and record.get("status") == "online":
+            raise SystemExit(
+                f"No Runner.Listener process detected on {current_host}, but GitHub still "
+                f"reports {_github_state_text(record)}. No stop signal was sent. "
+                f"{host_text} Run stop on the reported host."
+            )
+        if record is None:
+            print(
+                "No local Runner.Listener process detected; GitHub registry has no matching runner. "
+                "No remote process was signalled."
+            )
+        else:
+            print(
+                f"No local Runner.Listener process detected on {current_host}; "
+                f"GitHub reports {_github_state_text(record)}. No remote process was signalled."
+                f"{host_text}"
             )
         return
 
@@ -927,6 +1089,7 @@ def status_runner(args: argparse.Namespace) -> None:
     if pids:
         print(f"PIDs      : {','.join(map(str, pids))}")
 
+    record = None
     if configured:
         try:
             info = json.loads((runner / ".runner").read_text())
@@ -948,6 +1111,7 @@ def status_runner(args: argparse.Namespace) -> None:
                     print(f"GitHub    : {_github_state_text(record)}")
                 except RuntimeError as exc:
                     print(f"GitHub    : unavailable ({exc})")
+    print(f"Location  : {_host_location_text(runner, pids, record).strip().strip('()')}")
 
 
 
@@ -969,16 +1133,30 @@ def list_runners(_: argparse.Namespace) -> None:
 
     for runner in sorted(found):
         pids = listener_pids(runner)
-        local_state = "RUNNING" if pids else "STOPPED"
+        process_state = (
+            f"RUNNING_HERE pid={','.join(map(str, pids))}"
+            if pids
+            else "NOT_RUNNING_HERE"
+        )
         if not auth:
-            print(f"{runner} | LOCAL={local_state} | GITHUB=unknown (no GitHub API credential)")
+            host_text = _host_location_text(runner, pids)
+            print(
+                f"{runner} | PROCESS={process_state} | GITHUB=unknown "
+                f"(no GitHub API credential){host_text}"
+            )
             continue
         try:
             github = _github_runner_record(runner, token=auth)
             github_state = _github_state_text(github)
-            print(f"{runner} | LOCAL={local_state} | GITHUB={github_state}")
+            host_text = _host_location_text(runner, pids, github)
+            print(
+                f"{runner} | PROCESS={process_state} | GITHUB={github_state}{host_text}"
+            )
         except RuntimeError as exc:
-            print(f"{runner} | LOCAL={local_state} | GITHUB=unavailable ({exc})")
+            host_text = _host_location_text(runner, pids)
+            print(
+                f"{runner} | PROCESS={process_state} | GITHUB=unavailable ({exc}){host_text}"
+            )
 
 def parser() -> argparse.ArgumentParser:
     examples = """
