@@ -23,7 +23,7 @@ BYTES_PER_MB = 1024 ** 2
 
 @dataclass(frozen=True)
 class QuotaSnapshot:
-    """A point-in-time project/user quota snapshot."""
+    """A point-in-time quota snapshot; limit_bytes is the write-admission limit (usually the soft quota)."""
 
     used_bytes: int
     limit_bytes: int
@@ -82,8 +82,8 @@ class QuotaSnapshot:
 
         if limit <= 0:
             raise ValueError("quota limit must be positive")
-        if used < 0 or used > limit:
-            raise ValueError("quota used bytes must be between 0 and limit")
+        if used < 0:
+            raise ValueError("quota used bytes must be non-negative")
 
         return cls(
             used_bytes=int(used),
