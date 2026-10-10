@@ -295,5 +295,81 @@ class RunnerControlFixTests(unittest.TestCase):
             self.assertEqual(info["source"], "runner diagnostic log")
 
 
+
+    def test_actual_runner_metadata_bom_agent_name_and_github_url(self):
+        with tempfile.TemporaryDirectory() as td:
+            runner = Path(td) / "actions-runner"
+            runner.mkdir()
+            metadata = {
+                "agentId": 25,
+                "agentName": "connector-4",
+                "serverUrl": "https://actions.example.invalid/service-path",
+                "gitHubUrl": "https://github.com/Killer4K-N/Connector_1",
+                "workFolder": "_work",
+            }
+            (runner / ".runner").write_bytes(
+                ("\ufeff" + json.dumps(metadata)).encode("utf-8")
+            )
+            self.assertEqual(
+                rc._runner_identity(runner),
+                ("connector-4", "https://github.com/Killer4K-N/Connector_1"),
+            )
+
+            with mock.patch.object(rc, "_github_request", return_value={
+                "runners": [{
+                    "id": 25, "name": "connector-4",
+                    "status": "online", "busy": False,
+                }]
+            }) as api:
+                record = rc._github_runner_record(runner, token="test-token")
+            self.assertEqual(record["name"], "connector-4")
+            self.assertEqual(
+                api.call_args.args[1],
+                "repos/Killer4K-N/Connector_1/actions/runners?per_page=100",
+            )
+
+    def test_status_reads_actual_runner_metadata_with_utf8_bom(self):
+        with tempfile.TemporaryDirectory() as td:
+            runner = Path(td) / "gpu" / "connector_4" / "actions-runner"
+            runner.mkdir(parents=True)
+            metadata = {
+                "agentId": 25,
+                "agentName": "connector-4",
+                "serverUrl": "https://actions.example.invalid/service-path",
+                "gitHubUrl": "https://github.com/Killer4K-N/Connector_1",
+            }
+            (runner / ".runner").write_bytes(
+                ("\ufeff" + json.dumps(metadata)).encode("utf-8")
+            )
+            with mock.patch.dict(os.environ, {"OEC_ROOT": td, "HOME": td}, clear=True):
+                with mock.patch.object(rc, "listener_pids", return_value=[]):
+                    output = io.StringIO()
+                    with contextlib.redirect_stdout(output):
+                        rc.status_runner(argparse.Namespace(
+                            runner_dir=str(runner), name="connector-4", no_github=True
+                        ))
+            text = output.getvalue()
+            self.assertIn("Runner    : connector-4", text)
+            self.assertIn("Server    : https://github.com/Killer4K-N/Connector_1", text)
+            self.assertNotIn("actions.example.invalid", text)
+
+    def test_existing_listener_host_stamp_uses_proc_start_time(self):
+        with tempfile.TemporaryDirectory() as td:
+            runner = Path(td) / "actions-runner"
+            runner.mkdir()
+            with mock.patch.object(rc.socket, "gethostname", return_value="scn17-mn"):
+                with mock.patch.object(rc.getpass, "getuser", return_value="rahkus"):
+                    with mock.patch.object(rc.time, "time", return_value=2000):
+                        with mock.patch.object(rc, "_process_start_epoch", return_value=1234):
+                            record = rc._write_runner_host_metadata(
+                                runner, 4567, preserve_started_at=True
+                            )
+            self.assertEqual(record["hostname"], "scn17-mn")
+            self.assertEqual(record["started_at_epoch"], 1234)
+            self.assertEqual(record["observed_at_epoch"], 2000)
+            self.assertEqual(record["started_at_source"], "proc")
+            self.assertEqual(record["listener_pid"], 4567)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
