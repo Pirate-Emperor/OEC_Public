@@ -24,7 +24,7 @@ The numbers are illustrative, not approval to download a specific model. Set the
 
 ## Safety model
 
-- A fresh quota snapshot is mandatory. Admission compares current quota headroom plus released reserve bytes against the declared maximum download and an explicit quota margin.
+- A fresh quota snapshot is preferred. If it is absent or stale, the storage policy queries the live Lustre quota for the models directory's owning group without writing a snapshot. Admission blocks if both sources are unavailable or current usage is already above the write-admission (soft) limit; released reserve bytes must cover the declared maximum download plus an explicit quota margin.
 - The configured logical directory target is checked before reserve blocks are released.
 - A process lock serializes reserve mutations. A pause lock and `.storage_lease.json` manifest mark the lease so `storage_manager.py` refuses competing managed operations.
 - The uniquely created scratch directory is removed before reserve restoration.
