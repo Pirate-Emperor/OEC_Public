@@ -8,7 +8,7 @@ from unittest import mock
 
 import storage_manager
 from storage_policy import BYTES_PER_GB
-from storage_reservation import temporary_download_reservation
+from storage_reservation import _live_lustre_quota, temporary_download_reservation
 
 
 class TemporaryReservationTests(unittest.TestCase):
@@ -114,7 +114,8 @@ class TemporaryReservationTests(unittest.TestCase):
             config_path.write_text(json.dumps(config))
             patch_a, patch_b = self._patch_config(models, config_path)
             with patch_a, patch_b:
-                with self.assertRaisesRegex(RuntimeError, "fresh authoritative quota"):
+                with mock.patch("storage_reservation._live_lustre_quota", return_value=None):
+                    with self.assertRaisesRegex(RuntimeError, "no fresh quota snapshot"):
                     with temporary_download_reservation(
                         "models",
                         reserve_release_gb=(8 * 1024**2) / BYTES_PER_GB,
@@ -124,6 +125,24 @@ class TemporaryReservationTests(unittest.TestCase):
                     ):
                         pass
                 self.assertEqual(reserve.stat().st_size, original_size)
+
+    def test_live_lustre_quota_parser_uses_soft_limit(self):
+        class Result:
+            returncode = 0
+            stdout = (
+                "Disk quotas for grp lmedge (gid 55000):\\n"
+                "Filesystem kbytes quota limit grace files quota limit grace\\n"
+                "/nlsasfs 2109592848 2147483648 2254857830 - 4220723 0 0 -\\n"
+            )
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            with mock.patch("storage_reservation.shutil.which", return_value="/usr/bin/lfs"), \\
+                 mock.patch("storage_reservation.subprocess.run", return_value=Result()):
+                quota = _live_lustre_quota(folder, {})
+            self.assertIsNotNone(quota)
+            self.assertEqual(quota.used_bytes, 2109592848 * 1024)
+            self.assertEqual(quota.limit_bytes, 2147483648 * 1024)
+            self.assertIn("lfs quota", quota.source)
 
     def test_release_must_cover_download_and_quota_margin(self):
         with tempfile.TemporaryDirectory() as temp:
