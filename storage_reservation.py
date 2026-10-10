@@ -69,8 +69,9 @@ def temporary_download_reservation(
 ):
     """Lend a bounded part of the reserve to one download, then restore it.
 
-    A fresh quota snapshot is mandatory. The caller must write all temporary
-    artifacts under the yielded path; that exact path is deleted before restore.
+    A fresh quota snapshot or live Lustre group-quota result is mandatory. The
+    caller must write temporary artifacts under the yielded path; that path is
+    deleted before reserve restoration.
     """
     config = storage_manager.load_config()
     if not config:
