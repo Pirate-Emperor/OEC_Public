@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-11T23:30:00+05:30",
+  "last_updated": "2026-10-12T02:20:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
   "latest_summary": {
@@ -68,7 +68,56 @@
       "note": "This confirms the marker quote was fixed and bash -n preflight ran before the guarded sync. The tracking files and all static suites passed; workflow remains incomplete because fresh-quota admission is unavailable."
     },
     "tested_feature_source_sha": "624e26d84d997e72b4b890ce7e5c654598d0c2b8",
-    "documentation_state_before_tracking_files": "82296851860bff2ba977d6c020418713e0d56d43"
+    "documentation_state_before_tracking_files": "82296851860bff2ba977d6c020418713e0d56d43",
+    "latest_verified_live_audit": {
+      "run_id": 38161901000,
+      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38161901000",
+      "result": "SOURCE_SYNC_AND_STATIC_PASS_RUNTIME_INCOMPLETE",
+      "observed": {
+        "bash_syntax_preflight": "PASS",
+        "tracking_validation": "PASS",
+        "static_tests": "PASS 17 TRELLIS/entrypoint + 5 AudioCraft notebook + 10 QA queue/worker + 6 path aliases",
+        "fresh_quota_snapshot": "UNAVAILABLE_OR_STALE",
+        "storage_admission": "BLOCKED",
+        "xformers_attention": "UNVERIFIED because package writes were blocked",
+        "trellis_model_download": "NOT_ATTEMPTED",
+        "flux_image_generation": "NOT_ATTEMPTED",
+        "audiocraft_repair": "NOT_ATTEMPTED",
+        "qa_worker_recovery": "NOT_RUN_AFTER_GLOBAL_STORAGE_ADMISSION_BLOCK",
+        "queue_mutation": "NOT_PERFORMED",
+        "queue_statuses": {
+          "FAILED_MISSING_FILE": 78,
+          "PENDING": 144,
+          "PENDING_QA": 2,
+          "PROCESSING_QA": 1
+        }
+      },
+      "note": "The script source/static sync passed; the overall action failed intentionally at its fail-closed fresh-quota gate. Do not label model/runtime blockers fixed."
+    },
+    "runtime_remediation_2026_10_12": {
+      "connector_repository": "Killer4K-N/Connector_1",
+      "connector_branch": "ops/runtime-remediation-20261012",
+      "latest_helper_commit": "67e5f28d9fc5f496a866a7b9c3988b5b2221ad1c",
+      "helper_changes": [
+        "All package/model-write preflights in sync helper now require fresh quota.",
+        "xformers==0.0.29.post2 is restricted to prebuilt wheels.",
+        "AudioCraft repair explicitly pins thinc==8.2.5 with numpy==1.26.4 and spacy==3.7.6; binary wheels only.",
+        "QA recovery explicitly passes --gpu and defers retiring a stopped process until replacement Slurm job is RUNNING, with identity/session revalidation.",
+        "October 12 daily changelog added to explicit sync snapshot/staging allowlists."
+      ],
+      "official_references": [
+        "https://github.com/microsoft/TRELLIS.2",
+        "https://github.com/microsoft/TRELLIS.2/blob/main/setup.sh",
+        "https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md",
+        "https://huggingface.co/docs/diffusers/v0.37.0/en/api/pipelines/flux2",
+        "https://github.com/facebookresearch/audiocraft/blob/main/requirements.txt",
+        "https://github.com/microsoft/TRELLIS.2/issues/111"
+      ],
+      "verification_status": "SOURCE_CHANGES_COMMITTED; WAITING_FOR_NEW_WORKFLOW_RUN",
+      "actual_install_or_inference": "NOT_RUN",
+      "queue_mutation": "NOT_PERFORMED",
+      "caveat": "This is a source guard correction, not evidence of successful runtime repair. Fresh, authoritative quota telemetry is still required."
+    }
   },
   "experiments": [
     {
@@ -615,6 +664,56 @@
         "trellis_inference": "NOT_RUN"
       },
       "limitation": "The sync is successful at source/tracking/static validation; runtime acceptance remains blocked until fresh authoritative quota telemetry is supplied."
+    },
+    {
+      "id": "EXP-2026-10-12-RUNTIME-BLOCKER-GUARDRAILS",
+      "date": "2026-10-12",
+      "category": "runtime remediation guardrail changes and official upstream compatibility review",
+      "approach": "Inspect the last live workflow log and official TRELLIS.2, xFormers, Diffusers and AudioCraft repositories. In an isolated Connector_1 branch, require fresh quota for every package/model write preflight; constrain CUDA-compatible xFormers and AudioCraft dependency repair to wheels; correct the QA Slurm GPU argument and ownership-sensitive retirement sequence; include the new daily changelog in explicit staging. Prepare this cumulative experiment record before running the remediation workflow.",
+      "reason": "The prior action failed closed because no fresh quota snapshot existed, and code review found optional-quota calls in install/download helpers, an incomplete AudioCraft Thinc repair, and unsafe QA replacement timing/GPU selection. Fix the helper logic before retrying runtime setup.",
+      "parameters": {
+        "connector_repository": "Killer4K-N/Connector_1",
+        "branch": "ops/runtime-remediation-20261012",
+        "latest_helper_commit": "67e5f28d9fc5f496a866a7b9c3988b5b2221ad1c",
+        "previous_audit_run_id": 38161901000,
+        "previous_quota_gate": "require_fresh_quota=True required but snapshot unavailable/stale",
+        "xformers_candidate": "0.0.29.post2",
+        "torch_cuda": "2.6.0+cu124",
+        "flux_release_set": {
+          "diffusers": "0.37.0",
+          "huggingface-hub": "0.36.0",
+          "transformers": "4.56.1"
+        },
+        "audiocraft_repair": {
+          "numpy": "1.26.4",
+          "spacy": "3.7.6",
+          "thinc": "8.2.5",
+          "pip_binary_only": true
+        },
+        "queue_before": {
+          "total": 225,
+          "FAILED_MISSING_FILE": 78,
+          "PENDING": 144,
+          "PENDING_QA": 2,
+          "PROCESSING_QA": 1
+        },
+        "official_sources_reviewed": 6
+      },
+      "results": {
+        "helper_source_changes": "COMMITTED_ON_ISOLATED_BRANCH",
+        "official_upstream_review": "DONE",
+        "fresh_quota_snapshot": "UNAVAILABLE",
+        "workflow_validation": "PENDING_NEW_RUN",
+        "package_installs": "NOT_RUN",
+        "model_download": "NOT_RUN",
+        "trellis_attention_probe": "NOT_RUN",
+        "trellis_inference": "NOT_RUN",
+        "flux_import_and_image": "NOT_RUN",
+        "audiocraft_pip_check_and_generation": "NOT_RUN",
+        "qa_worker_replacement": "NOT_RUN",
+        "queue_mutation": "NOT_PERFORMED"
+      },
+      "limitation": "The current work corrects guard logic but cannot claim runtime acceptance until the remediated action passes syntax/static tests and fresh quota telemetry authorizes actual package/model writes. Do not estimate quota, bypass admission, purge shared caches, or merge to main."
     }
   ]
 }
