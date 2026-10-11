@@ -17,6 +17,7 @@
 - [x] Snapshot the prior `Wan2.1/requirements.txt` and phase2_3d package freeze before targeted edits in `.oec_snapshots/trellis-sync-20261011-38141547014`.
 - [x] Run offline source tests on connector-1, connector-2 and connector-5. The matrix at run [38157725815](https://github.com/Killer4K-N/Connector_1/actions/runs/38157725815) passed 17 TRELLIS/entry-point tests, 5 AudioCraft notebook tests, 10 QA recovery tests, and 6 alias tests per runner (38 per runner, 114 total).
 - [x] Provision this single TODO, `test.json`, and cumulative `result.md` so future prompts can update persistent project tracking.
+- [x] Copy and validate the tracking files in the live shared OEC tree with [connector-1 sync run 38160777602](https://github.com/Killer4K-N/Connector_1/actions/runs/38160777602); the staged JSON parse and all four offline test suites passed.
 
 ## P0 — unblock runtime safely
 
@@ -41,3 +42,8 @@
 - [ ] At the end of every new task, append a dated experiment to `test.json`, update this TODO list, append to the current day's changelog (create a new daily file when local date changes), and update `result.md` when a material result changes.
 - [ ] Never merge these changes into `main` without explicit approval. Preserve dirty/untracked files in the live OEC checkout; do not force checkout/reset/clean.
 - [ ] Continue using only the authorized runner labels `connector-1`, `connector-2`, and `connector-5` for parallel audit/test jobs.
+
+
+## Latest sync note — 2026-10-11
+
+The latest source sync copied the current tracker set from feature revision `337390e938d8b1c0bfa7f446fb7ed05e53edde67`. `TRACKING_FILES_VALIDATION=PASS`; source/static results were 17 TRELLIS, 5 AudioCraft notebook, 10 QA, and 6 path-alias tests passing. `STORAGE_ADMISSION=BLOCKED`, therefore package installation and live TRELLIS inference were not run. See the daily changelog and `test.json` for the details.
