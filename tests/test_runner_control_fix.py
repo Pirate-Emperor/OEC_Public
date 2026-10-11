@@ -439,6 +439,34 @@ class RunnerControlFixTests(unittest.TestCase):
             self.assertIn("Server    : https://github.com/Killer4K-N/Connector_1", text)
             self.assertNotIn("actions.example.invalid", text)
 
+    def test_status_seeds_shared_host_metadata_for_existing_listener(self):
+        with tempfile.TemporaryDirectory() as td:
+            runner = Path(td) / "gpu" / "a3_test" / "actions-runner"
+            runner.mkdir(parents=True)
+            (runner / ".runner").write_text(json.dumps({
+                "agentName": "a3-test",
+                "gitHubUrl": "https://github.com/SpryzenHell/A3",
+            }))
+            with mock.patch.dict(os.environ, {"OEC_ROOT": td, "HOME": td}, clear=True):
+                with mock.patch.object(rc, "listener_pids", return_value=[2952507]):
+                    with mock.patch.object(rc.socket, "gethostname", return_value="scn24-mn"):
+                        with mock.patch.object(rc.getpass, "getuser", return_value="rahkus"):
+                            with mock.patch.object(rc, "_process_start_epoch", return_value=1791594715.0):
+                                output = io.StringIO()
+                                with contextlib.redirect_stdout(output):
+                                    rc.status_runner(argparse.Namespace(
+                                        runner_dir=str(runner), name="a3-test", no_github=True
+                                    ))
+            metadata_path = runner / rc._RUNNER_HOST_METADATA
+            self.assertTrue(metadata_path.is_file())
+            metadata = json.loads(metadata_path.read_text())
+            self.assertEqual(metadata["hostname"], "scn24-mn")
+            self.assertEqual(metadata["listener_pid"], 2952507)
+            self.assertEqual(metadata["username"], "rahkus")
+            self.assertEqual(metadata["started_at_source"], "proc")
+            self.assertIn("Host info  : recorded", output.getvalue())
+            self.assertIn("HOST=scn24-mn", output.getvalue())
+
     def test_existing_listener_host_stamp_uses_proc_start_time(self):
         with tempfile.TemporaryDirectory() as td:
             runner = Path(td) / "actions-runner"
