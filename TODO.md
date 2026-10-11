@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-11 (Asia/Kolkata)  
+**Last updated:** 2026-10-12 (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 
 ## Completed in this workstream
@@ -65,3 +65,27 @@ The official Diffusers release notes list Flux2 Klein support in v0.37.0; the cu
 - [x] `TRACKING_FILES_VALIDATION=PASS` and `STAGED_NOTEBOOK_AND_CLI_VALIDATION=PASS`; the run copied the latest `TODO.md`, `test.json`, `result.md`, daily changelog and index.
 - [x] Four suites passed again: 17 TRELLIS/entry-point, 5 AudioCraft notebook, 10 QA, and 6 path-alias tests. Queue handling stayed report-only.
 - [ ] Live TRELLIS/FLUX runtime remains gated by missing fresh quota data; no package installation or model download was performed.
+
+
+## 2026-10-12 — Runtime remediation in progress
+
+### Guarded fixes prepared (awaiting new action validation)
+
+- [x] Created an isolated Connector_1 branch `ops/runtime-remediation-20261012` and corrected all 12 package/model admission calls in the sync helper plus all 6 write-related QA-helper admission calls to require fresh quota data. StorageManager must still check the existing allocated reserve, allocation target, and actual filesystem headroom; reserve resizing/deletion and cache purging remain forbidden.
+- [x] Constrain the `xformers==0.0.29.post2` candidate to a prebuilt wheel (`--only-binary=:all:`) for the official Torch 2.6/CUDA 12.4 combination. It still needs a real CUDA fp16 attention probe after admission; do not mark fixed based only on the wheel version.
+- [x] Correct the AudioCraft repair plan to pin `numpy==1.26.4`, `spacy==3.7.6`, and the spaCy-compatible `thinc==8.2.5` with binary wheels only. Runtime package consistency and imports must pass after the guarded action.
+- [x] Harden QA recovery: pass the scheduled GPU via `--gpu`, capture PID/parent/session/TTY/job identifiers, revalidate them before retirement, and never retire the old stopped process until the replacement Slurm job has reached RUNNING. The model/dependency preflight still fails closed if a required download/install lacks a fresh snapshot.
+- [x] Include `changelog/CHANGELOG-2026-10-12.md` in the explicit snapshot and staging allowlists so the guarded sync preserves the required daily tracking records.
+
+### Runtime acceptance still pending
+
+- [ ] **Quota:** obtain real values by running `quota_check` in the approved login shell and create `~/.cache/aieros/quota_snapshot.json` with `tools/quota_snapshot.py`. Never estimate, forge a timestamp, or turn off `require_fresh_quota`. Latest verified audit reported no fresh snapshot; all package/model writes remain blocked until this is resolved.
+- [ ] **TRELLIS attention:** run the actual CUDA attention probe after wheel admission. If xFormers still fails, assess a separately quota-gated, upstream `flash-attn==2.7.3` path from [Microsoft TRELLIS.2 setup](https://github.com/microsoft/TRELLIS.2/blob/main/setup.sh).
+- [ ] **TRELLIS.2 inference:** cache-first check/download `microsoft/TRELLIS.2-4B`, generate one sample, export GLB, re-open with trimesh, and verify nonempty geometry.
+- [ ] **FLUX.2 inference:** install/verify the released Diffusers 0.37.0 / Hub 0.36.0 / Transformers 4.56.1 set only after admission; import the Flux2 pipeline and generate/re-open a PNG from cached FLUX.2 Klein weights.
+- [ ] **QA worker:** execute syntax/preflight on the remediation branch, inspect exact process/session ownership, and replace at most one stopped worker only after the guarded model/dependency checks and confirmation that the new job is RUNNING. Inspect worker logs afterward.
+- [ ] **QA backlog:** retain the 225-row status snapshot as report-only. Do not requeue any of the 78 `FAILED_MISSING_FILE` records or mutate any row without file-by-file and process-ownership evidence.
+- [ ] **AudioCraft:** after quota admission, require `pip check`, `AudioGen` and `audio_write` imports to pass; perform small generation/write validation only when model-cache and runtime prerequisites are satisfied.
+- [ ] **Action verification:** the remediation helpers have source commits, but no new run has yet validated the combined helper flow. Record the exact run ID and result in `test.json`, this daily changelog, `result.md`, and this TODO once the new branch action finishes.
+
+**Upstream references reviewed:** [TRELLIS.2](https://github.com/microsoft/TRELLIS.2), [xFormers changelog](https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md), [Diffusers FLUX.2 v0.37.0 docs](https://huggingface.co/docs/diffusers/v0.37.0/en/api/pipelines/flux2), and [AudioCraft requirements](https://github.com/facebookresearch/audiocraft/blob/main/requirements.txt). Source reference review is not runtime acceptance.
