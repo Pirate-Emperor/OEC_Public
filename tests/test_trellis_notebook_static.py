@@ -102,6 +102,27 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         trellis_studio = self.find(self.combined, "def load_trellis_pipeline()")
         self.assertLess(self.combined.index(setup), self.combined.index(trellis_studio))
 
+    def test_combined_flux_dependency_install_is_quota_gated(self):
+        setup = self.find(self.combined, "FLUX_IMPORT_CHECK=PASS")
+        self.assertIn("REQUIRED_FLUX_PACKAGES", setup)
+        self.assertIn("metadata.version(package)", setup)
+        self.assertIn("storage_preflight(", setup)
+        self.assertIn("require_fresh_quota=True", setup)
+        self.assertIn("if not ok:", setup)
+        self.assertIn("managed_storage_operation(", setup)
+        self.assertIn("FLUX_SETUP_STORAGE_ADMISSION=", setup)
+        self.assertIn("FLUX_DEPENDENCY_INSTALL=SKIPPED", setup)
+
+    def test_setup_markdown_is_not_duplicate_or_misjoined(self):
+        setup_markdown = "\\n".join(
+            source for source in self.combined if source.startswith("# Step 1: TRELLIS.2 (Setup)")
+            or source.startswith("# Step 2: FLUX.2 (Setup)")
+        )
+        self.assertIn("Prepare TRELLIS.2 Python and native dependencies.", setup_markdown)
+        self.assertIn("restart the kernel before continuing", setup_markdown.lower())
+        self.assertNotIn("environment.This installs", setup_markdown)
+        self.assertNotIn("Compilation & DependenciesThis cell", setup_markdown)
+
     def test_runtime_smoke_probes_xformers_and_reopens_export(self):
         self.assertIn("XFORMERS_CUDA_ATTENTION=PASS", self.runtime)
         self.assertIn("snapshot_download(", self.runtime)
