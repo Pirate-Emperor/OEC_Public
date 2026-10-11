@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-11T23:24:00+05:30",
+  "last_updated": "2026-10-11T23:25:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
   "latest_summary": {
@@ -38,11 +38,12 @@
       "note": "Offline/static/unit validation only; it does not establish successful live model inference."
     },
     "latest_live_targeted_sync": {
-      "run_id": 38160976083,
-      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38160976083",
-      "source_sha": "70411afa152a862e4356cb09ccdc83cb1278b2fc",
-      "result": "TRACKING_AND_SOURCE_SYNC_PASS_RUNTIME_INCOMPLETE",
+      "run_id": 38161408008,
+      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38161408008",
+      "source_sha": "e7a470a0c0c0791e03daa6db369fc5bcaa5f5480",
+      "result": "SCRIPT_PREFLIGHT_PASS_TRACKING_SYNC_AND_STATIC_PASS_RUNTIME_INCOMPLETE",
       "details": {
+        "bash_syntax_preflight": "PASS",
         "tracking_files_validation": "PASS",
         "todo_copied": "PASS",
         "test_json_parsed_and_copied": "PASS",
@@ -53,14 +54,17 @@
         "audiocraft_notebook_tests": "5/5 PASS",
         "qa_recovery_tests": "10/10 PASS",
         "path_alias_tests": "6/6 PASS",
-        "plural_aliases": "ALIAS_OK",
+        "aliases": "ALIAS_OK",
         "storage_admission": "BLOCKED",
         "package_install": "NOT_RUN",
         "model_download": "NOT_RUN",
         "trellis_inference": "NOT_RUN",
         "queue_mutation": "NOT_PERFORMED"
       },
-      "note": "The latest targeted sync copied tracking files and passed all static suites; workflow conclusion is incomplete solely because fresh-quota admission blocked runtime writes/inference."
+      "artifacts": [
+        "https://api.github.com/repos/Killer4K-N/Connector_1/actions/runs/38161408008/artifacts"
+      ],
+      "note": "The prior shell-quote failure was fixed. The workflow now runs bash -n before the guarded sync, and the current run confirms syntax, tracking, target-copy and static validations. Workflow remains incomplete only because quota admission blocks runtime writes/inference."
     },
     "tested_feature_source_sha": "624e26d84d997e72b4b890ce7e5c654598d0c2b8",
     "documentation_state_before_tracking_files": "82296851860bff2ba977d6c020418713e0d56d43"
@@ -531,6 +535,45 @@
         "new_sync_run": "PENDING at time of this record"
       },
       "limitation": "Do not claim the final documentation revision is live until a later run reports tracking validation and SYNCED_TARGET for all three files."
+    },
+    {
+      "id": "EXP-2026-10-11-SYNC-SHELL-QUOTE-FIX-VERIFIED",
+      "date": "2026-10-11",
+      "category": "orchestration syntax fix and guarded resync",
+      "approach": "Run bash syntax validation first in the workflow, then snapshot, stage and validate the targeted files, copy them to the live checkout, and run all offline test suites.",
+      "reason": "Prevent the previous missing quote in the trigger marker from stopping the sync before staging or copy.",
+      "parameters": {
+        "run_id": 38161408008,
+        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38161408008",
+        "source_sha": "e7a470a0c0c0791e03daa6db369fc5bcaa5f5480",
+        "script_fix_commit": "49a720b8f2429f0698759bbfc3bdf113a1717a4f",
+        "bash_n_preflight_commit": "69cd5b02b317b82f6ecf4ea3a2f41e5a22c9ff21",
+        "runner": "connector-1"
+      },
+      "results": {
+        "bash_syntax": "PASS",
+        "tracking_file_validation": "PASS",
+        "copied": [
+          "TODO.md",
+          "test.json",
+          "result.md",
+          "changelog/CHANGELOG-2026-10-11.md",
+          "changelog/README.md"
+        ],
+        "static_suites": {
+          "trellis_entrypoint": "17/17 PASS",
+          "audiocraft_notebook": "5/5 PASS",
+          "qa_queue": "10/10 PASS",
+          "path_alias": "6/6 PASS"
+        },
+        "queue_mutation": "NOT_PERFORMED",
+        "storage_admission": "BLOCKED",
+        "install": "NOT_RUN",
+        "inference": "NOT_RUN"
+      },
+      "limitations": [
+        "This only verifies source/static sync and does not establish successful TRELLIS or FLUX inference."
+      ]
     }
   ]
 }
