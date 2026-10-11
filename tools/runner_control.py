@@ -1338,9 +1338,12 @@ def list_runners(args: argparse.Namespace) -> None:
     columns = _list_columns(getattr(args, "columns", None))
     no_github = bool(getattr(args, "no_github", False))
     show_details = bool(getattr(args, "details", False))
+    name_filters = getattr(args, "name", None) or []
+    if isinstance(name_filters, str):
+        name_filters = [name_filters]
     requested_names = {
         part.strip().lower().replace("-", "_")
-        for value in (getattr(args, "name", None) or [])
+        for value in name_filters
         for part in str(value).split(",")
         if part.strip()
     }
@@ -1404,7 +1407,11 @@ def list_runners(args: argparse.Namespace) -> None:
             process = "running here"
             pid = ",".join(map(str, pids))
         else:
-            host = f"{recorded_hostname} (last)" if recorded_hostname else "unknown"
+            host_is_online = bool(github_record and github_record.get("status") == "online")
+            if recorded_hostname:
+                host = recorded_hostname if host_is_online else f"{recorded_hostname} (last)"
+            else:
+                host = "unknown"
             process = "not here"
             remote_pid = host_info.get("listener_pid")
             pid = f"{remote_pid}*" if remote_pid else "—"
@@ -1769,13 +1776,52 @@ The setup/registration token is not a removal token.""",
 
     list_parser = sub.add_parser(
         "list",
-        help="List configured runners found recursively under OEC/gpu.",
+        help="Show a readable table of configured runners.",
         description=(
-            "Search OEC_ROOT/gpu/**/actions-runner/.runner and show each configured "
-            "runner with its local running/stopped state."
+            "List configured runners under OEC/gpu in a compact table. The default "
+            "columns are name, host, process, and GitHub state. A remote runner that "
+            "is not visible on this node is shown as 'not here', not as stopped."
         ),
-        epilog="Example:\n  python ~/OEC/tools/runner_control.py list",
+        epilog="""Examples:
+  # Compact default table
+  python ~/OEC/tools/runner_control.py list
+
+  # Choose exactly the columns you want
+  python ~/OEC/tools/runner_control.py list --columns name,host,github
+  python ~/OEC/tools/runner_control.py list --columns name,process,pid
+  python ~/OEC/tools/runner_control.py list --columns all
+
+  # Filter runners and/or avoid GitHub API requests
+  python ~/OEC/tools/runner_control.py list --name connector-1,connector-2
+  python ~/OEC/tools/runner_control.py list --no-github
+  python ~/OEC/tools/runner_control.py list --details
+""",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    list_parser.add_argument(
+        "--columns",
+        default="name,host,process,github",
+        metavar="COLS",
+        help=(
+            "Comma-separated columns: name,host,process,pid,github,started,repo,path,source,error; "
+            "use 'all' to show every column. Aliases: runner,node,state,status,directory,api_detail."
+        ),
+    )
+    list_parser.add_argument(
+        "--name",
+        action="append",
+        metavar="NAME[,NAME...]",
+        help="Show only the named runner(s); may be repeated or comma-separated.",
+    )
+    list_parser.add_argument(
+        "--no-github",
+        action="store_true",
+        help="Do not query GitHub; show local process and last-recorded host details only.",
+    )
+    list_parser.add_argument(
+        "--details",
+        action="store_true",
+        help="Print full paths and underlying GitHub/API diagnostics below the table.",
     )
     list_parser.set_defaults(func=list_runners)
 
