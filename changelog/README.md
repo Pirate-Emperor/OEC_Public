@@ -17,4 +17,4 @@ Daily engineering records live here. Use the local Asia/Kolkata date in each fil
 
 - **Final October 11 follow-up:** [sync audit run 38151680642](https://github.com/Killer4K-N/Connector_1/actions/runs/38151680642) passed all targeted static suites (30 tests across TRELLIS, AudioCraft, QA, and alias checks) and created the three backward-compatible plural symlinks. QA rows were not altered because connector-2 has an active QA worker; regular sync is now report-only for queue maintenance, and destructive/mutating repair needs explicit `OEC_QA_QUEUE_REPAIR_APPROVED=1`. Fresh quota telemetry is still unavailable, so installs/inference remain blocked.
 
-- **October 11, 2026:** TRELLIS CLI/Gradio and notebook usability, QA queue safety, shared path aliases, AudioCraft diagnostics, and idempotent path-alias validation. See [daily changelog](CHANGELOG-2026-10-11.md).
+- **October 11, 2026:** TRELLIS and FLUX CLI/Gradio and notebook usability, quota-gated dependency/model downloads, QA queue safety, shared path aliases, AudioCraft diagnostics, and idempotent path-alias validation. See [daily changelog](CHANGELOG-2026-10-11.md).
