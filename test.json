@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-11T23:05:00+05:30",
+  "last_updated": "2026-10-11T23:16:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
   "latest_summary": {
@@ -204,7 +204,21 @@
         "huggingface_hub": "0.36.2",
         "transformers": "4.56.1",
         "accelerate": "1.14.0",
-        "audit_run_id": 38157759730
+        "audit_run_id": 38157759730,
+        "official_references": [
+          {
+            "url": "https://github.com/huggingface/diffusers/releases",
+            "claim": "Official Diffusers release notes list Flux2 Klein under v0.37.0."
+          },
+          {
+            "url": "https://github.com/huggingface/huggingface_hub/actions/runs/29011952200",
+            "claim": "Official Hugging Face Hub CI page for the get_cached_repo_tree utility PR series; the function is a later cache-tree API than the installed 0.36.2 surface."
+          },
+          {
+            "url": "https://github.com/huggingface/huggingface_hub/blob/main/docs/source/en/package_reference/file_download.md",
+            "claim": "Current Hub documentation exposes get_cached_repo_tree."
+          }
+        ]
       },
       "results": {
         "model_snapshot": "CACHE_HIT",
@@ -216,7 +230,8 @@
           "huggingface_hub": "0.36.0",
           "transformers": "4.56.1"
         },
-        "released_stack_installed_or_runtime_verified": false
+        "released_stack_installed_or_runtime_verified": false,
+        "pin_basis": "Official Diffusers v0.37.0 release notes include Flux2 Klein; the missing get_cached_repo_tree symbol is documented in current Hub sources and the installed hub 0.36.2 fails the import probe. The proposed 0.37.0/0.36.0/4.56.1 stack is a conservative released-version candidate, not runtime verified in this environment."
       },
       "reason_for_not_installing": "Dependency reconciliation is written behind fresh-quota admission in the notebooks; no shared-env install was attempted."
     },
@@ -438,6 +453,34 @@
         "trellis_inference": "NOT_RUN"
       },
       "limitation": "The workflow reports incomplete because policy correctly stops storage writes/model inference when the fresh quota snapshot is absent. This does not negate the successful tracking validation, targeted copy, or static tests."
+    },
+    {
+      "id": "EXP-2026-10-11-FLUX2-DIFFUSERS-HUB-COMPATIBILITY-REFERENCE-CHECK",
+      "date": "2026-10-11",
+      "category": "official compatibility-reference review",
+      "approach": "Review the official Diffusers release history for Flux2 Klein support and the Hugging Face Hub references for get_cached_repo_tree, then compare those references with the concrete import failure from the three live runners.",
+      "reason": "Ensure the candidate released package pins can reasonably avoid the import-time symbol mismatch without inventing a compatibility workaround.",
+      "parameters": {
+        "proposed_diffusers": "0.37.0",
+        "proposed_huggingface_hub": "0.36.0",
+        "transformers": "4.56.1",
+        "current_diffusers": "0.40.0.dev0",
+        "current_huggingface_hub": "0.36.2",
+        "references": [
+          "https://github.com/huggingface/diffusers/releases",
+          "https://github.com/huggingface/huggingface_hub/actions/runs/29011952200",
+          "https://github.com/huggingface/huggingface_hub/blob/main/docs/source/en/package_reference/file_download.md"
+        ]
+      },
+      "results": {
+        "diffusers_v0370_release_notes": "Flux2 Klein is listed among supported/new pipelines",
+        "get_cached_repo_tree": "Present in current Hub documentation; incompatible with the concrete installed 0.36.2 import surface observed in runtime logs",
+        "source_level_candidate": "Consistent with using a stable Diffusers release from before this Hub cache-tree API and a matching Hub version",
+        "package_install": "NOT_RUN",
+        "flux_import_after_pin": "NOT_VERIFIED",
+        "image_generation": "NOT_RUN"
+      },
+      "limitation": "Official notes establish that the release supports Flux2 Klein, but do not replace an install/import and image-generation smoke in the real phase2_3d environment. Fresh quota admission remains mandatory."
     }
   ]
 }
