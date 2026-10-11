@@ -111,3 +111,74 @@ No model download was attempted; all HF access for the live smoke was offline-on
 6. Separately confirm the user's actual Jupyter UI and SSH tunnel after the kernel smoke passes.
 
 No source/runtime fix is merged or deployed as a result of this test.
+
+
+## Follow-up — authorized targeted TRELLIS sync and whole-system diagnostics
+
+**Workflow:** [Connector-1 run 38141547014](https://github.com/Killer4K-N/Connector_1/actions/runs/38141547014)  
+**Report artifact:** [oec-trellis-sync-audit-38141547014](https://github.com/Killer4K-N/Connector_1/actions/runs/38141547014/artifacts/11702353014)  
+**Current validation state:** source files synchronized and 9/9 static tests passed; package installation and GPU inference remain blocked by missing/stale fresh quota telemetry.
+
+### Pre-sync snapshot and synchronization
+
+The third run took and verified a Python-created snapshot before touching the targeted files:
+
+/nlsasfs/home/lmedge/rahkus/OEC/.oec_snapshots/trellis-sync-20261011-38141547014
+
+- It found one live requirements.txt: Wan2.1/requirements.txt (227 bytes, SHA-256 70b8bd1018b0465ddcb2525da541302fd713b4d39c26e3a833fb549262d99251). The backup is preserved under requirements/Wan2.1/requirements.txt below the snapshot root.
+- It also saved phase2_3d-pip-freeze-before.txt and a manifest.json with hashes/paths for requirements and both pre-sync TRELLIS notebooks. This is the environment rollback reference; the root OEC does not have its own requirements.txt.
+- Current source revision copied from fix/trellis-runtime-flux-20261011: 13d145966545ffce001d96f624ae3edb65d980a3.
+- Only these four target files were copied to the live OEC working directory: pipeline_trellis_3d.ipynb, pipeline_trellis_3d_only.ipynb, tests/test_trellis_notebook_static.py, and tests/trellis_runtime_smoke.py. No checkout/reset/stash/clean was used, and pre-existing unrelated changes were preserved.
+- The previous sync attempt caught a malformed notebook source-serialization issue before package installation; the corrected branch preserves cell source line breaks. The final validation run reports all nine tests OK, including both notebooks' Python-cell parse check and the FLUX-before-TRELLIS model-studio ordering.
+- Live source sync is complete for those four files. This does not mean the whole OEC checkout is synchronized to remote main; its pre-existing divergence and dirty files remain untouched.
+
+### Dependency-install and inference gate
+
+The policy check reported:
+
+- FRESH_QUOTA_SNAPSHOT=UNAVAILABLE_OR_STALE
+- STORAGE_ADMISSION_ALLOWED=False
+- STORAGE_ADMISSION_REASON=fresh quota telemetry is required but no fresh snapshot is available
+- TRELLIS_INSTALL=BLOCKED
+- TRELLIS_INFERENCE=BLOCKED
+
+No packages were installed in phase2_3d and no model weights were downloaded by this sync. The last observed installed attention backend therefore remains xformers 0.0.29.post1, which failed the earlier CUDA-attention probe against Torch 2.6.0+cu124. The notebook's proposed 0.0.29.post2 installation has not yet been executed or validated in the shared environment.
+
+A separate read-only attempt to obtain authoritative telemetry from the login node also failed before reaching the quota command: the Connector-1 host scn17-mn could not resolve login.npsf.cdac.in (Name or service not known). Evidence: [read-only quota probe run 38141665093](https://github.com/Killer4K-N/Connector_1/actions/runs/38141665093), [probe artifact](https://github.com/Killer4K-N/Connector_1/actions/runs/38141665093/artifacts/11702738669). Do not fabricate quota values or bypass admission. A fresh snapshot must be produced from the login node using the site's actual quota output before retrying dependency installation.
+
+### OEC path-consistency question — confirmed current state
+
+The live path audit reproduced the .env/fallback path behavior:
+
+| Logical directory | Actual resolved path | Exists? | Plural alias exists? |
+|---|---|---:|---:|
+| Models | ~/aireos_models | Yes | Not applicable |
+| Datasets | ~/aireos_dataset | Yes | ~/aireos_datasets: No |
+| Cache | ~/aireos_cache | Yes | Not applicable |
+| Inputs | ~/aireos_input | Yes | ~/aireos_inputs: No |
+| Outputs | ~/aireos_output | Yes | ~/aireos_outputs: No |
+| Logs | ~/aireos_logs | Yes | Not applicable |
+
+The model/datasets/cache/inputs/outputs paths are explicitly set by .env; AIEROS_LOGS_DIR is absent, so logs use the fallback. The existing singular directories are the active resolved locations. The naming-convention inconsistency is still present, but this audit did not justify renaming any directory; no rename or directory creation was performed.
+
+### AudioCraft (phase1) read-only diagnosis
+
+- Python 3.9.25, AudioCraft 1.3.0, PyTorch/torchvision/torchaudio all from the 2.1.0+cu118 line; CUDA was available and Torch/Torchaudio versions matched.
+- Imports of AudioGen and audio_write passed. This proves the installed package imports; it does not reproduce the separately reported wheel-build failure.
+- pip check fails with a concrete dependency conflict: thinc 8.3.6 requires numpy >=2.0.0 and <3.0.0, while the shared phase1 environment has numpy 1.26.4.
+- No installation, uninstall, wheel build, or model inference was attempted in phase1. Keep AudioCraft repair separate from the approved TRELLIS changes.
+
+### QA routing and low GPU utilization
+
+- Static source inspection confirms the video worker and QA worker use the same queue configuration; video jobs are inserted as PENDING_QA, and the QA worker polls that status. The brain code writes input job JSON.
+- The live queue database exists at ~/aireos_output/upload_queue.db with 225 rows: PENDING=144, FAILED_MISSING_FILE=78, PENDING_QA=2, PROCESSING_QA=1.
+- The sampled brain.log, qa_worker.log, and four GPU worker logs were about 49 hours old at audit time. The log tail shows the DeepSeek startup failing on missing/stale fresh quota telemetry, and historical video jobs successfully submitted items to QA. hf_upload_daemon.log was absent.
+- Three current nvidia-smi samples on scn17-mn showed both exposed A100s at 0% utilization and 1 MiB used; no compute application processes were reported. This establishes the GPUs were idle during the sample, not that an active inference was running inefficiently. Do not use the old saved log tails as proof that current workers are active.
+- No test queue item was inserted and no process was stopped or restarted.
+
+### Remaining gates
+
+1. Refresh fresh quota telemetry using the real login-node quota output; compute-node DNS currently prevented the runner from invoking quota_check remotely.
+2. With admission passing, install only the pinned TRELLIS/FLUX dependencies in phase2_3d, then verify xFormers CUDA attention, run offline cached-model image-to-3D, export/reopen GLB geometry, and test a repeat export for CuMesh stability.
+3. Repair AudioCraft's wheel-build issue in phase1 separately after gathering the exact pip/build traceback. Preserve the existing environment and avoid upgrading NumPy globally just to satisfy thinc without a dependency plan.
+4. Diagnose QA backlog/missing assets and worker liveness separately; do not purge old queue entries or launch production workers as part of the TRELLIS validation.
