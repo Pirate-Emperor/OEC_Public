@@ -240,3 +240,35 @@ The model/datasets/cache/inputs/outputs paths are explicitly set by .env; AIEROS
 - The source sync ran after a Python-based pre-sync snapshot; it backed up the pre-existing `Wan2.1/requirements.txt` and package freeze before copying targets. The dirty OEC checkout was not reset/cleaned and unrelated modified/untracked files were preserved.
 - All three authorized runner labels (`connector-1`, `connector-2`, `connector-5`) agree: GPU samples are idle, the quota snapshot is absent, and `login.npsf.cdac.in` does not resolve from the compute nodes. Therefore phase2_3d installs and real TRELLIS inference remain blocked by the fresh-quota policy. No package changes or model downloads were made.
 - Do not mark overall runtime validation complete until the corrected static suite passes, alias/QA maintenance steps have a verified result, fresh quota data is available, xFormers CUDA attention passes in phase2_3d, and TRELLIS inference produces and reopens a non-empty GLB.
+
+
+## Follow-up — multi-runner liveness check and final guarded sync
+
+**Sync validation:** [Connector-1 run 38151680642](https://github.com/Killer4K-N/Connector_1/actions/runs/38151680642), [diagnostic artifact](https://github.com/Killer4K-N/Connector_1/actions/runs/38151680642/artifacts/11706174664). The script's validation phase finished with `NOTEBOOK_SYNC=PASS`, `STATIC_TEST=PASS`, `PATH_AUDIT=PASS`, and `PATH_ALIAS_REPAIR=PASS`. Static suites passed: TRELLIS 14/14, AudioCraft notebook 5/5, QA queue 6/6 (the prior run's source snapshot), path alias 5/5. The aggregate script returns incomplete because fresh quota admission blocks the TRELLIS install/inference gate. Artifact reporting is present; GitHub still reports the runner in the artifact-upload/cleanup part even though the artifact is available.
+
+### Shared path aliases now applied
+
+The three missing plural aliases have been created as symbolic links on the shared home filesystem and verified from connector-2 and connector-5:
+
+- `aireos_datasets -> aireos_dataset`
+- `aireos_inputs -> aireos_input`
+- `aireos_outputs -> aireos_output`
+
+The canonical singular directories and data were not renamed, copied, removed, or overwritten. The alias utility is idempotent and refuses to replace a pre-existing real path or incorrect link.
+
+### QA worker ownership and queue repair boundary
+
+- A read-only process audit on connector-2 found one `qa_compliance_worker.py`, one `worker_ltx_video.py`, and one `hf_upload_daemon.py` process. Connector-5 had none of these. The connector-1 process audit is queued behind the long-running artifact-report step.
+- At the post-sync checks on connector-2 and connector-5, the database counts remained `FAILED_MISSING_FILE=78`, `PENDING=144`, `PENDING_QA=2`, `PROCESSING_QA=1`. No queue rows were changed by the completed sync validation. The initial queue doctor report failed its cross-node worker check because its direct CLI did not have the OEC root on `PYTHONPATH`; this was fixed in source. It never altered row statuses.
+- Because a QA worker is running on a different host, automatic requeue is now explicitly disabled in the normal sync path. `tools/qa_queue_doctor.py` additionally requires `OEC_QA_QUEUE_REPAIR_APPROVED=1` together with `--apply`; report-only inspection remains the default. Do not set that approval flag until the active worker's queue ownership and health have been checked across all three hosts.
+- The default stale-claim timeout is now four hours rather than 30 minutes to avoid reclaiming legitimate long-running model inference. The newer timeout and approval guard are on the source branch and will be copied by the next queued sync; the older live sync validated the previously copied implementation.
+
+### AudioCraft notebook corrections
+
+- The notebook now preserves the registered `conda-env-phase1-py` kernel ID instead of renaming it to generic `python3`, and its cache probe uses the configured `AUDIOCRAFT_CACHE_DIR` root.
+- It verifies existing AudioCraft/Torch/CUDA/NumPy/Transformers/Gradio versions, reports the known thinc/NumPy `pip check` conflict without changing packages, checks local model cache before quota-gated download, writes output under the managed audio directory, and launches Gradio on port 7861 with public sharing disabled. It no longer force-uninstalls/reinstalls packages, upgrades AudioCraft, or closes Gradio immediately.
+- The exact original wheel-build traceback is still unavailable and the failure has not been reproduced; phase1 remains untouched. The notebook was statically validated, but its full AudioGen model load/generation was not run because the current shared node's fresh-quota path is unavailable.
+
+### Still blocked
+
+The shared checkout now has the target model/notebook/QA/path utilities and the verified path aliases, but live TRELLIS acceptance remains incomplete: all three compute hosts lack a fresh quota snapshot and cannot resolve `login.npsf.cdac.in`. No packages were installed and no new inference was attempted. Actual xFormers CUDA attention and TRELLIS GLB generation must be rerun after the authoritative login-node quota snapshot becomes available.
