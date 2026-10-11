@@ -59,6 +59,7 @@ class TrellisNotebookStaticTests(unittest.TestCase):
             self.assertIn("Trellis2ImageTo3DPipeline.from_pretrained(local_model_dir)", studio)
             self.assertNotRegex(studio, r"from_pretrained\([^)]*local_files_only")
             self.assertIn('os.path.join(SYSTEM_DIRS["models"], "hub")', studio)
+            self.assertIn("storage_preflight(", studio)
             self.assertNotIn('os.environ["HF_HUB_OFFLINE"] = "1"', studio)
 
     def test_attention_probe_precedes_trellis_import(self):
@@ -69,16 +70,21 @@ class TrellisNotebookStaticTests(unittest.TestCase):
             self.assertIn('os.environ["SPARSE_ATTN_BACKEND"] = ATTN_BACKEND_REQUESTED', studio)
             self.assertLess(studio.index("xops.memory_efficient_attention"), studio.index("from trellis2.pipelines import"))
 
-    def test_notebooks_do_not_kill_fixed_pid_or_upgrade_jupyter(self):
+    def test_shared_cuda_packages_and_existing_source_checkouts_are_not_deleted(self):
+        for cells in (self.combined, self.only):
+            all_source = "\n".join(cells)
+            self.assertNotIn('"pip", "uninstall"', all_source)
+            self.assertNotIn("shutil.rmtree(nd_dir)", all_source)
+            self.assertNotIn("shutil.rmtree(nr_dir)", all_source)
+            self.assertNotIn("shutil.rmtree(cm_dir)", all_source)
+            self.assertNotIn("shutil.rmtree(fg_dir)", all_source)
+            self.assertNotIn("shutil.rmtree(t2_dir)", all_source)
+            self.assertNotIn("pip install --upgrade jupyter", all_source)
+
+    def test_no_fixed_pid_kill_and_shared_cache_purge_is_guarded(self):
         for cells in (self.combined, self.only):
             all_source = "\n".join(cells)
             self.assertNotIn("!kill 9 2386856", all_source)
-            self.assertNotIn("pip install --upgrade jupyter", all_source)
-            self.assertIn("!ps -u", all_source)
-
-    def test_shared_cache_purge_is_disabled_by_default_and_guarded(self):
-        for cells in (self.combined, self.only):
-            all_source = "\n".join(cells)
             self.assertIn("ENABLE_DISK_PURGE = False", all_source)
             self.assertIn('os.environ.get("AIEROS_ALLOW_SHARED_MODEL_PURGE") == "1"', all_source)
             self.assertIn("Shared model/cache files retained", all_source)
