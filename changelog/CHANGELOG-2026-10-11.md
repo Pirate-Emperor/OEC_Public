@@ -363,3 +363,11 @@ For each future OEC prompt on the same local date, append findings here, add or 
 - Added a preventive preflight to `.github/workflows/sync-trellis-and-audit-oec.yml` in commit `69cd5b02b317b82f6ecf4ea3a2f41e5a22c9ff21`: it executes `bash -n tools/sync_trellis_and_audit_oec.sh` and emits `SYNC_SCRIPT_SYNTAX=PASS` before running the guarded sync.
 - The error run made no new live-tree changes. The last verified live sync remains run [38160976083](https://github.com/Killer4K-N/Connector_1/actions/runs/38160976083), which copied the earlier revision and passed the tracking/static checks but predates the latest compatibility-reference and incident records. A retry with the repaired script is required before claiming these latest documents are in the live checkout.
 - Added `EXP-2026-10-11-SYNC-SHELL-QUOTE-REGRESSION` to `test.json` so both the failed approach and preventive fix are retained. This failure is a synchronization-script issue, not a TRELLIS/FLUX model or notebook test failure.
+
+
+## Confirmed retry after orchestration syntax correction
+
+- The retry [Connector-1 run 38161408008](https://github.com/Killer4K-N/Connector_1/actions/runs/38161408008) emitted `SYNC_SCRIPT_SYNTAX=PASS` before executing `tools/sync_trellis_and_audit_oec.sh`, confirming the shell quote fix and preventive check are active.
+- Staging reported `TRACKING_FILES_VALIDATION=PASS` and `STAGED_NOTEBOOK_AND_CLI_VALIDATION=PASS`. It copied `TODO.md`, `test.json`, `result.md`, `changelog/CHANGELOG-2026-10-11.md`, and `changelog/README.md` along with the other explicitly scoped files. Test counts passed again: 17 TRELLIS/entrypoint, 5 AudioCraft notebook, 10 QA, 6 path-alias.
+- `STORAGE_ADMISSION=BLOCKED`, `TRELLIS_INSTALL=BLOCKED`, `TRELLIS_INFERENCE=BLOCKED`, and `VERIFICATION_RESULT=FAIL_OR_INCOMPLETE` remain accurate. No package installation, model download, inference, queue mutation, or worker signal was performed.
+- `test.json` now records 16 experiments and the latest sync ID. TODO and result reports were updated with the same final run; index and daily record are synchronized as part of this retry.
