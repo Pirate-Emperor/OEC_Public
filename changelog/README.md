@@ -4,17 +4,22 @@ Daily engineering records live here. Use the local Asia/Kolkata date in each fil
 
 ## Daily records
 
-- [2026-10-11 — TRELLIS, Jupyter, and source-sync verification](CHANGELOG-2026-10-11.md)
-  - Historical isolated A100 test generated a real TRELLIS mesh and GLB, but the current shared `phase2_3d` run fails before inference because its installed xFormers build has no usable CUDA extension for Torch 2.6.0+cu124.
-  - Temporary Jupyter Server and actual `phase2_3d` notebook-kernel smoke checks passed; a user's existing server/browser tunnel was not confirmed active.
-  - The live OEC checkout is not synchronized with remote `main` and has pre-existing dirty/untracked work; it was not reset or edited.
-  - Follow-up targeted sync (Connector-1 run 38141547014) copied the two TRELLIS notebooks and two TRELLIS Python tests; all nine earlier static regressions passed. A later sync (run 38150226432) added the standalone TRELLIS CLI, Gradio support, notebook run instructions, setup idempotency, the model-entrypoint convention, and additional tests; its 14 targeted tests passed. Dependency install and live inference still require fresh quota telemetry.
-  - The initial audit found singular .env-resolved canonical directories; guarded follow-up sync created plural compatibility symlinks, now verified as ALIAS_OK without renaming canonical directories.
-  - New three-runner audit on connector-1, connector-2, and connector-5 is in progress under [run 38150422509](https://github.com/Killer4K-N/Connector_1/actions/runs/38150422509); results must be checked before considering the current runtime fixed.
-  - AudioCraft imports in phase1, but pip check finds the thinc 8.3.6 / NumPy 1.26.4 conflict. QA queue contains stale/missing-file records, and current A100 sampling showed idle GPUs. Details and the login-node DNS blocker are in the daily log.
+- [2026-10-11 — TRELLIS, Jupyter, QA, paths, and runtime diagnosis](CHANGELOG-2026-10-11.md)
+  - The standalone TRELLIS.2 CLI/Gradio entry point and safer TRELLIS/FLUX notebook flows were added on the feature branch. Future interactive-model requirements are in `docs/model_entrypoint_convention.md`.
+  - The final 3-runner offline/static matrix at [run 38157725815](https://github.com/Killer4K-N/Connector_1/actions/runs/38157725815) passed 38 tests per runner across connector-1, connector-2, and connector-5: 17 TRELLIS/entry-point tests, 5 AudioCraft notebook tests, 10 QA queue/worker guard tests, and 6 path-alias tests (114 passes total).
+  - The targeted live sync [run 38157960859](https://github.com/Killer4K-N/Connector_1/actions/runs/38157960859) passed staging, all four test suites, and alias checks. Its overall result remains incomplete because quota admission blocked package installation and TRELLIS inference; no packages/models were installed/downloaded by that run.
+  - Plural aliases are created and verified: `aireos_datasets -> aireos_dataset`, `aireos_inputs -> aireos_input`, and `aireos_outputs -> aireos_output`. Canonical singular paths were preserved.
+  - The currently installed `xformers==0.0.29.post1` fails CUDA attention with `torch==2.6.0+cu124`; `flash-attn` is absent. The TRELLIS.2 model cache probe misses `microsoft/TRELLIS.2-4B`. Fresh quota admission is still unavailable on all three compute runners, so no bypass is allowed.
+  - FLUX.2 Klein weights are cached, but the installed `diffusers==0.40.0.dev0` fails to import with `huggingface-hub==0.36.2` because `get_cached_repo_tree` is unavailable. The notebook's proposed released version set remains quota-gated and must still be runtime-verified.
+  - QA worker source now selects GPU before importing PyTorch and guards model download/cache purge. The existing connector-2 QA process was observed stopped (state `T`) under an interactive session; it was not resumed or duplicated. Queue rows were not changed.
+  - AudioCraft imports work in phase1, but `pip check` reports the `thinc==8.3.6` / `numpy==1.26.4` conflict. The original reported wheel-build traceback was not found; phase1 was not changed.
+  - No changes were merged into `main`; the dirty live working tree was not reset or cleaned.
 
-- **QA queue safety + AudioCraft follow-up (2026-10-11):** added atomic QA job claims, safer stale recovery, failure-row preservation, dry-run-first queue doctor, no-overwrite plural path symlinks, and a safer AudioCraft notebook. Latest sync run [38151438339](https://github.com/Killer4K-N/Connector_1/actions/runs/38151438339) copied the code but skipped shared filesystem / database repairs because one AudioCraft static assertion failed; corrected assertion is queued for the next validation. Installs and inference remain blocked by unavailable fresh quota telemetry.
+## Persistent project tracking
 
-- **Final October 11 follow-up:** [sync audit run 38151680642](https://github.com/Killer4K-N/Connector_1/actions/runs/38151680642) passed all targeted static suites (30 tests across TRELLIS, AudioCraft, QA, and alias checks) and created the three backward-compatible plural symlinks. QA rows were not altered. Latest process audit finds the connector-2 QA worker visible but stopped (state T), so the old process was not resumed; source guards were hardened for fresh-quota model download admission and cache-preserving defaults. Queue mutation still requires explicit `OEC_QA_QUEUE_REPAIR_APPROVED=1`. Fresh quota telemetry is still unavailable, so installs/inference remain blocked.
+- **One active TODO list:** [`TODO.md`](../TODO.md)
+- **Structured experiment/test log:** [`test.json`](../test.json)
+- **Cumulative significant results:** [`result.md`](../result.md)
+- **Reusable interactive-model implementation convention:** [`model_entrypoint_convention.md`](../docs/model_entrypoint_convention.md)
 
-- **October 11, 2026:** TRELLIS CLI/Gradio entry point and easier TRELLIS/FLUX Jupyter startup; quota-gated downloads; QA worker GPU/cache/download guard fixes; 38 offline regression tests pass on each of connector-1, connector-2, connector-5; shared path aliases verified; AudioCraft dependency diagnostics. FLUX import is blocked by the installed dev Diffusers/Hub mismatch; live TRELLIS inference remains quota- and xFormers-blocked. See [daily changelog](CHANGELOG-2026-10-11.md).
+Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end of each OEC task. Do not create additional parallel TODO/test/result files.
