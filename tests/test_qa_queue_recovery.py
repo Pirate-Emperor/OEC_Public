@@ -7,6 +7,7 @@ import time
 import unittest
 from pathlib import Path
 
+from tools.qa_queue_doctor import main as qa_queue_doctor_main
 from tools.qa_queue import (
     claim_next_pending_job,
     ensure_qa_tracking_columns,
@@ -63,6 +64,14 @@ class QAQueueRecoveryTests(unittest.TestCase):
             states = dict(conn.execute("SELECT id, status FROM assets WHERE id IN (2, 3)"))
         self.assertEqual(states, {2: "PENDING_QA", 3: "PROCESSING_QA"})
 
+    def test_queue_doctor_requires_explicit_mutation_approval(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temp:
+            db = Path(temp) / "not-created-unapproved.db"
+            with patch.dict("os.environ", {"OEC_QA_QUEUE_REPAIR_APPROVED": "0"}):
+                result = qa_queue_doctor_main(["--db", str(db), "--apply"])
+            self.assertEqual(result, 4)
+            self.assertFalse(db.exists())
     def test_default_stale_timeout_is_four_hours(self):
         # A heavy model can legitimately take longer than 30 minutes; the default
         # sweeper should not race a live inference job.
