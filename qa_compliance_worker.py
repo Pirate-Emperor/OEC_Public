@@ -134,7 +134,7 @@ class QANode:
         ok, reason = storage_preflight(
             "models",
             required_gb=required_gb,
-            require_fresh_quota=False,
+            require_fresh_quota=True,
             minimum_free_gb=minimum_free_gb,
         )
         print(
@@ -151,7 +151,7 @@ class QANode:
         with managed_storage_operation(
             "models",
             required_gb=required_gb,
-            require_fresh_quota=False,
+            require_fresh_quota=True,
             minimum_free_gb=minimum_free_gb,
         ):
             os.environ["HF_HUB_OFFLINE"] = "0"
@@ -282,7 +282,7 @@ class QANode:
             with managed_storage_operation(
                 "outputs",
                 required_gb=max(0.05, raw_size_gb * 1.25),
-                require_fresh_quota=False,
+                require_fresh_quota=True,
                 minimum_free_gb=float(
                     os.environ.get("AIEROS_OUTPUT_MIN_FREE_GB", "0.05")
                 ),
