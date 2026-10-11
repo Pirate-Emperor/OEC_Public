@@ -282,3 +282,8 @@ The path-alias repair utility now checks symlinks before comparing canonical pat
 ## Follow-up — FLUX notebook dependency admission
 
 The combined TRELLIS.2 + FLUX.2 notebook's FLUX dependency cell no longer unconditionally upgrades Diffusers/Hub/Transformers. It first checks exact installed versions; if any are missing or mismatched, it requires fresh-quota storage admission and enters OEC's managed-operation lock before installing the pinned versions. Failure now stops the cell with an actionable quota message, before mutating the environment. Static regressions cover the gate, skip-on-matching-versions path, and cleaned setup instructions. Runtime package installation and FLUX/TRELLIS inference remain dependent on fresh quota admission.
+
+
+## Follow-up — standalone FLUX.2 notebook safety and usability
+
+The standalone FLUX notebook now uses the verified `phase2_3d` kernel, respects scheduler/GPU selection instead of hard-coding GPU 2, removes a fixed-PID kill command, and replaces Jupyter upgrades and GitHub-main Diffusers installs with pinned released packages. Dependency changes are skipped when versions already match; otherwise fresh-quota admission and OEC's managed-operation lock are required. Model loading uses a local Hugging Face snapshot first and only downloads after fresh-quota admission. Removed the unconditional shared-cache purge, prevented duplicate in-memory pipeline loads on cell re-execution, fixed integer seed handling, exposes an image/file output, and defaults Gradio to port 7864 with public sharing off.
