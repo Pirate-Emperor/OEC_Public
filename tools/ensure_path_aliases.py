@@ -25,8 +25,8 @@ def ensure_alias(alias: Path, target: Path, *, apply: bool = False) -> str:
     target = target.expanduser().resolve()
     if not target.is_dir():
         return f"REFUSED target_not_directory target={target} alias={alias}"
-    if alias.resolve(strict=False) == target:
-        return f"REFUSED alias_equals_target alias={alias}"
+    # Check symlinks before path equivalence: a valid alias naturally resolves
+    # to its canonical target and must be reported as ALIAS_OK, not as a conflict.
     if alias.is_symlink():
         try:
             current = alias.resolve(strict=True)
@@ -35,6 +35,8 @@ def ensure_alias(alias: Path, target: Path, *, apply: bool = False) -> str:
         if current == target:
             return f"ALIAS_OK alias={alias} target={target}"
         return f"REFUSED wrong_symlink alias={alias} current={current} target={target}"
+    if alias.resolve(strict=False) == target:
+        return f"REFUSED alias_equals_target alias={alias}"
     if alias.exists():
         return f"REFUSED existing_non_symlink alias={alias} type={'directory' if alias.is_dir() else 'file'}"
     if not apply:
