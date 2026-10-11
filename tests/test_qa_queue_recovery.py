@@ -107,6 +107,35 @@ class QAQueueRecoveryTests(unittest.TestCase):
         self.assertNotIn("DELETE FROM assets WHERE id = ?", source)
         self.assertNotIn("UPDATE assets SET status = 'PENDING_QA' WHERE status = 'PROCESSING_QA'", source)
 
+    def test_qa_gpu_visibility_is_set_before_torch_import(self):
+        source = (
+            Path(__file__).resolve().parents[1] / "qa_compliance_worker.py"
+        ).read_text(encoding="utf-8")
+        self.assertLess(
+            source.index('os.environ["CUDA_VISIBLE_DEVICES"] = _qa_gpu_value'),
+            source.index("import torch"),
+        )
+        self.assertNotIn('os.environ["CUDA_VISIBLE_DEVICES"] = self.gpu_id', source)
+        self.assertIn('parser.add_argument(\n        "--gpu"', source)
+        self.assertIn("torch.cuda.set_device(0)", source)
+
+    def test_qa_model_download_requires_fresh_quota_and_cache_is_preserved(self):
+        source = (
+            Path(__file__).resolve().parents[1] / "qa_compliance_worker.py"
+        ).read_text(encoding="utf-8")
+        start = source.index("    def _ensure_downloaded_robustly(self):")
+        end = source.index("\n    def load_vlm(self):", start)
+        download = source[start:end]
+        self.assertIn("local_files_only=True", download)
+        self.assertIn("storage_preflight(", download)
+        self.assertIn("require_fresh_quota=True", download)
+        self.assertIn("if not ok:", download)
+        self.assertLess(download.index("storage_preflight("), download.index("with managed_storage_operation("))
+        self.assertLess(download.index("storage_preflight("), download.index('os.environ["HF_HUB_OFFLINE"] = "0"'))
+        self.assertIn('parser.set_defaults(purge=False)', source)
+        self.assertIn('parser.add_argument(\n        "--purge"', source)
+        self.assertNotIn('parser.set_defaults(purge=True)', source)
+
     def test_runtime_errors_retry_then_become_visible_failure(self):
         claim_next_pending_job(self.db)
         status = handle_qa_runtime_error(self.db, 1, "first error", max_attempts=3)
