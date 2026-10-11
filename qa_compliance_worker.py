@@ -313,11 +313,17 @@ def process_qa_queue(purge_after_load=True):
             print(f"\n[QA-NODE] Evaluating Asset ID: {record_id} | {os.path.basename(raw_vid_path)}")
             
             if not os.path.exists(raw_vid_path) or not os.path.exists(json_path):
-                print(f"[QA-NODE] Files missing from disk. Deleting record.")
-                with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                    conn.execute("DELETE FROM assets WHERE id = ?", (record_id,))
+                missing = []
+                if not os.path.exists(raw_vid_path):
+                    missing.append(f"video={raw_vid_path}")
+                if not os.path.exists(json_path):
+                    missing.append(f"metadata={json_path}")
+                message = "Missing QA input file(s): " + ", ".join(missing)
+                print(f"[QA-NODE] {message}. Preserving row as FAILED_MISSING_FILE.")
+                finish_qa_job(
+                    QUEUE_DB_PATH, record_id, "FAILED_MISSING_FILE", error=message
+                )
                 continue
-            
             with open(json_path, 'r') as f:
                 metadata = json.load(f)
                 
