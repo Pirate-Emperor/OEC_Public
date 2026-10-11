@@ -81,3 +81,20 @@ Official Diffusers release notes list Flux2 Klein support in the v0.37.0 release
 ## Final verified shared-tree sync — 38161747478
 
 The latest syntax-checked sync [38161747478](https://github.com/Killer4K-N/Connector_1/actions/runs/38161747478) emitted `SYNC_SCRIPT_SYNTAX=PASS`, `TRACKING_FILES_VALIDATION=PASS`, and `STAGED_NOTEBOOK_AND_CLI_VALIDATION=PASS`; it copied the current tracking files and reran all four suites successfully (17/17, 5/5, 10/10, 6/6). The workflow remains incomplete solely at storage admission; no install/model download/inference or queue mutation occurred. `test.json` now holds 17 experiments covering the source fixes, diagnostics, syntax regression and final sync.
+
+
+
+## 2026-10-12 — Runtime blocker remediation (guard changes, not runtime acceptance)
+
+The last shared-tree action, [38161901000](https://github.com/Killer4K-N/Connector_1/actions/runs/38161901000), passed source/static validation but failed at the mandatory quota admission because the 15-minute quota snapshot was missing or stale. Actual CUDA attention, TRELLIS model download, TRELLIS inference, FLUX image generation, AudioCraft repair, and QA-worker replacement therefore remain unverified. Its read-only queue report still had 225 rows (78 `FAILED_MISSING_FILE`, 144 `PENDING`, 2 `PENDING_QA`, 1 `PROCESSING_QA`); no queue mutation occurred.
+
+An isolated Connector_1 branch, [`ops/runtime-remediation-20261012`](https://github.com/Killer4K-N/Connector_1/tree/ops/runtime-remediation-20261012), now carries source-level corrections prepared for action validation:
+- Enforced `require_fresh_quota=True` in all 12 package/model write-admission calls in the main sync helper and six QA write-related admission calls.
+- Restricted the candidate `xformers==0.0.29.post2` install to a prebuilt wheel for the existing Torch 2.6.0+cu124 runtime.
+- Corrected AudioCraft's dependency target to `numpy==1.26.4`, `spacy==3.7.6`, and `thinc==8.2.5`, using binary wheels only so the existing Thinc 8.3.6/NumPy 1.26.4 mismatch cannot remain silently installed and cannot trigger an avoidable source build.
+- Hardened QA recovery with an explicit Slurm `--gpu` argument, parent/session/TTY/job identity revalidation, and a rule to keep the previously stopped worker untouched until the replacement job is RUNNING.
+- Added the October 12 changelog to the explicit snapshot and staging allowlists.
+
+Official upstream references reviewed: Microsoft [TRELLIS.2 README](https://github.com/microsoft/TRELLIS.2) and [setup.sh](https://github.com/microsoft/TRELLIS.2/blob/main/setup.sh), [xFormers release changelog](https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md), [Diffusers v0.37.0 FLUX.2 API](https://huggingface.co/docs/diffusers/v0.37.0/en/api/pipelines/flux2), [AudioCraft requirements](https://github.com/facebookresearch/audiocraft/blob/main/requirements.txt), and the upstream [TRELLIS.2 setup issue #111](https://github.com/microsoft/TRELLIS.2/issues/111). These sources support scoped compatibility candidates; they do not substitute for testing the actual installed environment.
+
+**Acceptance status:** source edits are committed but the combined remediation workflow has not yet reported. Actual package/model writes are still prohibited until authoritative quota telemetry is available. No package was installed, no model was downloaded, no shared cache or reserve file was purged/resized, no QA row changed, and no worker was signaled by the source-editing step. No merge to `main`.
