@@ -265,7 +265,7 @@ class QANode:
             print(f"[QA-NODE] Quality Improver failed: {e}")
             return False
 
-def sweep_stuck_jobs(db_path, *, stale_after_seconds=1800):
+def sweep_stuck_jobs(db_path, *, stale_after_seconds=4 * 60 * 60):
     """Recover only timed-out jobs; never reset a live PROCESSING_QA claim."""
     try:
         recovered = recover_qa_stuck_jobs(
