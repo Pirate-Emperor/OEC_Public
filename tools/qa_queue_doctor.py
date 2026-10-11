@@ -26,7 +26,7 @@ except ModuleNotFoundError:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", type=Path, help="Queue SQLite path; defaults to core_config.QUEUE_DB_PATH.")
-    parser.add_argument("--apply", action="store_true", help="Apply selected migrations/repairs. Default is report-only.")
+    parser.add_argument("--apply", action="store_true", help="Apply selected migrations/repairs; also requires OEC_QA_QUEUE_REPAIR_APPROVED=1. Default is report-only.")
     parser.add_argument("--stale-after-minutes", type=int, default=240, help="Age required to requeue a timestamped claim (default: 240; four hours).")
     parser.add_argument("--recover-untracked-processing", action="store_true", help="Also recover legacy PROCESSING_QA rows with no claim timestamp; requires --apply and no active QA worker.")
     parser.add_argument("--mark-missing-files", action="store_true", help="Mark missing-file PENDING_QA rows FAILED_MISSING_FILE; requires --apply.")
@@ -162,6 +162,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.stale_after_minutes < 1:
         print("ERROR: --stale-after-minutes must be >= 1.", file=sys.stderr)
         return 2
+    if args.apply and os.environ.get("OEC_QA_QUEUE_REPAIR_APPROVED") != "1":
+        print(
+            "ERROR: database mutation is locked. Set OEC_QA_QUEUE_REPAIR_APPROVED=1 only after "
+            "checking QA worker ownership across all shared-storage nodes.",
+            file=sys.stderr,
+        )
+        print("QA_QUEUE_DOCTOR=APPLY_REQUIRES_OPERATOR_APPROVAL")
+        return 4
 
     try:
         db_path = _queue_path(args)
