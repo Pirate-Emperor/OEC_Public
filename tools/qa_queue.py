@@ -132,7 +132,7 @@ def handle_qa_runtime_error(
 def recover_stuck_jobs(
     db_path: str | Path,
     *,
-    stale_after_seconds: int = 1800,
+    stale_after_seconds: int = 4 * 60 * 60,
     recover_untracked: bool = False,
     now: float | None = None,
 ) -> int:
