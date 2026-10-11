@@ -1,0 +1,350 @@
+{
+  "schema_version": 1,
+  "project": "OEC",
+  "last_updated": "2026-10-11T23:10:00+05:30",
+  "timezone": "Asia/Kolkata",
+  "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
+  "latest_summary": {
+    "source_branch": "fix/trellis-gradio-notebooks-20261011",
+    "latest_documentation_commit": "82296851860bff2ba977d6c020418713e0d56d43",
+    "latest_three_runner_static_matrix": {
+      "run_id": 38157725815,
+      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38157725815",
+      "tested_source_sha": "624e26d84d997e72b4b890ce7e5c654598d0c2b8",
+      "runners": [
+        {
+          "label": "connector-1",
+          "host": "scn17-mn",
+          "result": "PASS"
+        },
+        {
+          "label": "connector-2",
+          "host": "scn20-mn",
+          "result": "PASS"
+        },
+        {
+          "label": "connector-5",
+          "host": "scn21-mn",
+          "result": "PASS"
+        }
+      ],
+      "tests_per_runner": {
+        "trellis_and_entrypoint_static": 17,
+        "audiocraft_notebook_static": 5,
+        "qa_queue_recovery": 10,
+        "path_aliases": 6,
+        "total": 38
+      },
+      "total_passed_across_three_runners": 114,
+      "note": "Offline/static/unit validation only; it does not establish successful live model inference."
+    },
+    "latest_live_targeted_sync": {
+      "run_id": 38157960859,
+      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38157960859",
+      "source_sha": "82296851860bff2ba977d6c020418713e0d56d43",
+      "result": "SYNC_AND_STATIC_PASS_RUNTIME_INCOMPLETE",
+      "details": {
+        "staged_files_validation": "PASS",
+        "trellis_entrypoint_tests": "17/17 PASS",
+        "audiocraft_notebook_tests": "5/5 PASS",
+        "qa_recovery_tests": "10/10 PASS",
+        "path_alias_tests": "6/6 PASS",
+        "plural_aliases": "ALIAS_OK on connector-1, connector-2, connector-5",
+        "storage_admission": "BLOCKED",
+        "package_install": "NOT_RUN",
+        "trellis_inference": "NOT_RUN"
+      },
+      "artifacts": [
+        "https://github.com/Killer4K-N/Connector_1/actions/runs/38157960859/artifacts/11709142578"
+      ],
+      "note": "Workflow conclusion is failure/incomplete because guarded runtime installation/inference admission failed; source sync and all static suites passed."
+    }
+  },
+  "experiments": [
+    {
+      "id": "EXP-2026-10-11-TRELLIS-STATIC-MATRIX",
+      "date": "2026-10-11",
+      "category": "static/unit validation",
+      "approach": "Fetch isolated OEC feature branch into runner-local temporary workspace, validate JSON and Python/IPython notebook cells, execute targeted unittest suites without writing shared source files.",
+      "reason": "Check cross-runner reproducibility and avoid collisions in the dirty live checkout.",
+      "parameters": {
+        "runner_labels": [
+          "connector-1",
+          "connector-2",
+          "connector-5"
+        ],
+        "tested_sha": "624e26d84d997e72b4b890ce7e5c654598d0c2b8",
+        "suites": {
+          "test_trellis_*.py": 17,
+          "test_audiocraft_notebook_static.py": 5,
+          "test_qa_queue_recovery.py": 10,
+          "test_path_aliases.py": 6
+        },
+        "fail_fast": false
+      },
+      "results": {
+        "connector_1": "PASS",
+        "connector_2": "PASS",
+        "connector_5": "PASS",
+        "total_tests_passed": 114,
+        "total_tests_failed": 0
+      },
+      "artifacts_and_logs": "https://github.com/Killer4K-N/Connector_1/actions/runs/38157725815",
+      "limitations": [
+        "Static/CPU-side tests only; no model inference or package installation."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-11-LIVE-SYNC-AUDIT",
+      "date": "2026-10-11",
+      "category": "targeted live sync and regression tests",
+      "approach": "Python snapshot of the prior requirements file and environment freeze, stage only explicit notebook/Python/test/doc/tracking targets from the feature branch, validate the stage, copy each file atomically, run static tests and report-only QA diagnostics.",
+      "reason": "Apply targeted fixes without force-checking out or wiping unrelated work in the live OEC checkout.",
+      "parameters": {
+        "runner_label": "connector-1",
+        "runner_host": "scn17-mn",
+        "run_id": 38157960859,
+        "source_sha": "82296851860bff2ba977d6c020418713e0d56d43",
+        "target_components": [
+          "TRELLIS notebooks",
+          "FLUX-only notebook",
+          "AudioCraft notebook",
+          "TRELLIS Python CLI/Gradio",
+          "QA worker/queue helpers",
+          "path alias utility",
+          "tests",
+          "model entrypoint docs",
+          "daily changelog"
+        ],
+        "requirements_snapshot": {
+          "root": "/nlsasfs/home/lmedge/rahkus/OEC/.oec_snapshots/trellis-sync-20261011-38141547014",
+          "file": "Wan2.1/requirements.txt",
+          "bytes": 227,
+          "sha256": "70b8bd1018b0465ddcb2525da541302fd713b4d39c26e3a833fb549262d99251"
+        }
+      },
+      "results": {
+        "staged_validation": "PASS",
+        "targeted_static_tests": "PASS",
+        "aliases": "PASS",
+        "queue_mutation": "NOT_PERFORMED",
+        "storage_admission": "BLOCKED",
+        "dependency_install": "NOT_RUN",
+        "model_download": "NOT_RUN",
+        "trellis_inference": "NOT_RUN"
+      },
+      "limitations": [
+        "The aggregate workflow is incomplete because the required fresh quota snapshot is absent. This must not be presented as a completed runtime repair."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-11-XFORMERS-CUDA-ATTENTION",
+      "date": "2026-10-11",
+      "category": "live CUDA compatibility probe",
+      "approach": "On each authorized connector, import torch/xformers and run memory_efficient_attention on a tiny CUDA fp16 tensor; no model loading or writes.",
+      "reason": "Establish whether the currently installed attention kernel can run with the active PyTorch/CUDA build.",
+      "parameters": {
+        "hosts": [
+          "scn17-mn",
+          "scn20-mn",
+          "scn21-mn"
+        ],
+        "torch": "2.6.0+cu124",
+        "torchvision": "0.21.0+cu124",
+        "cuda_build": "12.4",
+        "xformers": "0.0.29.post1",
+        "query_tensor_shape": [
+          1,
+          2,
+          1,
+          64
+        ],
+        "key_tensor_shape": [
+          1,
+          2,
+          1,
+          64
+        ],
+        "value_tensor_shape": [
+          1,
+          2,
+          1,
+          64
+        ],
+        "dtype": "float16",
+        "device": "cuda"
+      },
+      "results": {
+        "connector_1": "FAIL: NotImplementedError, no memory_efficient_attention_forward operator",
+        "connector_2": "FAIL: NotImplementedError, no memory_efficient_attention_forward operator",
+        "connector_5": "FAIL: NotImplementedError, no memory_efficient_attention_forward operator",
+        "flash_attn_fallback": "FAIL: ModuleNotFoundError; flash_attn is not installed",
+        "fix_candidate": "xformers==0.0.29.post2 from the PyTorch cu124 wheel index",
+        "candidate_installed_in_shared_environment": false
+      },
+      "reason_for_not_installing": "OEC fresh-quota admission is unavailable; no policy bypass."
+    },
+    {
+      "id": "EXP-2026-10-11-FLUX2-IMPORT",
+      "date": "2026-10-11",
+      "category": "read-only import diagnosis",
+      "approach": "Inspect installed package metadata and eagerly import DiffusionPipeline and Flux2KleinPipeline on all three connectors without loading model weights.",
+      "reason": "Distinguish a cached model from a usable Python package stack.",
+      "parameters": {
+        "model_id": "black-forest-labs/FLUX.2-klein-4B",
+        "diffusers": "0.40.0.dev0",
+        "huggingface_hub": "0.36.2",
+        "transformers": "4.56.1",
+        "accelerate": "1.14.0"
+      },
+      "results": {
+        "model_snapshot": "CACHE_HIT",
+        "import": "FAIL",
+        "exact_import_error": "cannot import name 'get_cached_repo_tree' from 'huggingface_hub'",
+        "cause": "Installed development Diffusers build expects a Hugging Face Hub symbol not present in installed hub version.",
+        "proposed_released_stack": {
+          "diffusers": "0.37.0",
+          "huggingface_hub": "0.36.0",
+          "transformers": "4.56.1"
+        },
+        "released_stack_installed_or_runtime_verified": false
+      },
+      "reason_for_not_installing": "Dependency reconciliation is written behind fresh-quota admission in the notebooks; no shared-env install was attempted."
+    },
+    {
+      "id": "EXP-2026-10-11-TRELLIS-MODEL-CACHE",
+      "date": "2026-10-11",
+      "category": "offline cache inspection",
+      "approach": "Use huggingface_hub.snapshot_download with local_files_only=True for each model; no network download.",
+      "reason": "Find out whether inference would require a missing model download and whether it is blocked by storage admission.",
+      "parameters": {
+        "model_ids": [
+          "microsoft/TRELLIS.2-4B",
+          "black-forest-labs/FLUX.2-klein-4B"
+        ],
+        "cache_root": "/nlsasfs/home/lmedge/rahkus/aireos_models",
+        "local_files_only": true
+      },
+      "results": {
+        "trellis": "CACHE_MISS: LocalEntryNotFoundError",
+        "flux2_klein": "CACHE_HIT: snapshot e7b7dc27f91deacad38e78976d1f2b499d76a294",
+        "downloaded_anything": false
+      }
+    },
+    {
+      "id": "EXP-2026-10-11-QUOTA-ADMISSION",
+      "date": "2026-10-11",
+      "category": "storage readiness",
+      "approach": "Check for a fresh OEC quota snapshot, check whether quota_check is installed locally, and attempt the authorized login-node route where available.",
+      "reason": "Prevent package/model writes without accurate quota headroom.",
+      "parameters": {
+        "max_allowed_snapshot_age_seconds": 900,
+        "runner_labels": [
+          "connector-1",
+          "connector-2",
+          "connector-5"
+        ],
+        "expected_snapshot_path": "~/.cache/aieros/quota_snapshot.json",
+        "local_quota_check": "command -v quota_check",
+        "remote_command": "ssh <login-node> quota_check"
+      },
+      "results": {
+        "all_runners": "QUOTA_SNAPSHOT_ABSENT",
+        "local_quota_check": "NOT_INSTALLED on all three",
+        "login_node_route": "UNAVAILABLE; connector-1 earlier reported login hostname DNS resolution failure and connector-2/5 lack SSH",
+        "admission": "BLOCKED"
+      },
+      "follow_up_command": "quota_check (on approved login node), then python ~/OEC/tools/quota_snapshot.py --used-gb <ACTUAL_USED_GB> --limit-gb <ACTUAL_LIMIT_GB> --source quota_check"
+    },
+    {
+      "id": "EXP-2026-10-11-QA-WORKER-STATE",
+      "date": "2026-10-11",
+      "category": "read-only queue/process inspection",
+      "approach": "Read SQLite aggregate counts, inspect process states/parents/wait channels/cgroups and compare worker log modification times; do not mutate queue or signal processes.",
+      "reason": "Diagnose stuck QA and low GPU utilization without risking a duplicate worker or invalid claim recovery.",
+      "parameters": {
+        "database": "/nlsasfs/home/lmedge/rahkus/aireos_output/upload_queue.db",
+        "total_rows": 225,
+        "observed_status_counts": {
+          "FAILED_MISSING_FILE": 78,
+          "PENDING": 144,
+          "PENDING_QA": 2,
+          "PROCESSING_QA": 1
+        },
+        "qa_worker_pid": 2529002,
+        "connector_host": "scn20-mn"
+      },
+      "results": {
+        "qa_worker_state": "T (stopped)",
+        "qa_worker_started": "2026-10-09 16:48:13 local node time as shown by ps",
+        "parent": "interactive bash process in session pts/8",
+        "video_worker_state": "sleeping in hrtimer_nanosleep",
+        "upload_daemon_state": "sleeping in hrtimer_nanosleep",
+        "observed_gpu_utilization_percent": 0,
+        "queue_records_changed": false,
+        "process_signals_sent": false
+      },
+      "action": "Do not SIGCONT stale code. Replace with latest guarded worker after checking session ownership and prerequisites; run exactly one worker."
+    },
+    {
+      "id": "EXP-2026-10-11-AUDIOCRAFT-PHASE1",
+      "date": "2026-10-11",
+      "category": "read-only package diagnosis",
+      "approach": "Inspect package metadata, run AudioGen/audio_write imports and pip check; search recent bounded logs for the reported wheel-build traceback.",
+      "reason": "Avoid a speculative package upgrade without reproducing the exact build failure.",
+      "parameters": {
+        "python": "3.9.25",
+        "audiocraft": "1.3.0",
+        "torch": "2.1.0+cu118",
+        "torchvision": "0.16.0+cu118",
+        "torchaudio": "2.1.0+cu118",
+        "numpy": "1.26.4",
+        "thinc": "8.3.6"
+      },
+      "results": {
+        "audiogen_audio_write_imports": "PASS",
+        "pip_check": "FAIL",
+        "dependency_conflict": "thinc==8.3.6 requires numpy>=2.0.0,<3.0.0; phase1 has numpy==1.26.4",
+        "original_wheel_build_traceback": "NOT_FOUND in bounded recent logs",
+        "packages_modified": false
+      },
+      "action": "Reproduce and capture exact pip/wheel build error before resolving this conflict in an isolated environment."
+    },
+    {
+      "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
+      "date": "2026-10-09",
+      "category": "prior isolated end-to-end inference",
+      "approach": "Run TRELLIS image-to-3D in a separate compatible virtual environment, export GLB and reopen geometry.",
+      "reason": "Show that TRELLIS can work with a compatible package stack while the shared environment remains broken.",
+      "parameters": {
+        "run_id": 37942265623,
+        "environment": "isolated scratch virtualenv; not shared phase2_3d",
+        "artifact": "https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194"
+      },
+      "results": {
+        "marker": "TRELLIS_IMAGE_TO_3D_SMOKE=PASS",
+        "glb_bytes": 8950028,
+        "mesh_geometry_reopened": true
+      },
+      "limitation": "Does not validate current shared phase2_3d."
+    },
+    {
+      "id": "EXP-2026-10-11-JUPYTER-SMOKE-HISTORICAL",
+      "date": "2026-10-11",
+      "category": "Jupyter mechanics",
+      "approach": "Temporary Jupyter server API status check and execution of a temporary notebook using the phase2_3d interpreter.",
+      "reason": "Confirm the base server and kernel can start independently of model inference.",
+      "parameters": {
+        "kernel_python": "/nlsasfs/home/lmedge/rahkus/Conda/envs/phase2_3d/bin/python",
+        "torch": "2.6.0+cu124",
+        "server": "temporary local Jupyter Server"
+      },
+      "results": {
+        "api_status": "PASS",
+        "kernel_execution": "PASS",
+        "user_existing_server_and_ssh_tunnel": "NOT_VERIFIED",
+        "full_notebook_inference": "NOT_RUN"
+      }
+    }
+  ]
+}
