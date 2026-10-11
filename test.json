@@ -38,25 +38,32 @@
       "note": "Offline/static/unit validation only; it does not establish successful live model inference."
     },
     "latest_live_targeted_sync": {
-      "run_id": 38157960859,
-      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38157960859",
-      "source_sha": "82296851860bff2ba977d6c020418713e0d56d43",
-      "result": "SYNC_AND_STATIC_PASS_RUNTIME_INCOMPLETE",
+      "run_id": 38160777602,
+      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38160777602",
+      "source_sha": "337390e938d8b1c0bfa7f446fb7ed05e53edde67",
+      "result": "TRACKING_AND_SOURCE_SYNC_PASS_RUNTIME_INCOMPLETE",
       "details": {
-        "staged_files_validation": "PASS",
+        "tracking_files_validation": "PASS",
+        "todo_copied": "PASS",
+        "test_json_parsed_and_copied": "PASS",
+        "result_report_copied": "PASS",
+        "daily_changelog_and_index_copied": "PASS",
+        "staged_notebook_and_python_validation": "PASS",
         "trellis_entrypoint_tests": "17/17 PASS",
         "audiocraft_notebook_tests": "5/5 PASS",
         "qa_recovery_tests": "10/10 PASS",
         "path_alias_tests": "6/6 PASS",
-        "plural_aliases": "ALIAS_OK on connector-1, connector-2, connector-5",
+        "plural_aliases": "ALIAS_OK",
         "storage_admission": "BLOCKED",
         "package_install": "NOT_RUN",
-        "trellis_inference": "NOT_RUN"
+        "model_download": "NOT_RUN",
+        "trellis_inference": "NOT_RUN",
+        "queue_mutation": "NOT_PERFORMED"
       },
       "artifacts": [
-        "https://github.com/Killer4K-N/Connector_1/actions/runs/38157960859/artifacts/11709142578"
+        "https://github.com/Killer4K-N/Connector_1/actions/runs/38160777602"
       ],
-      "note": "Workflow conclusion is failure/incomplete because guarded runtime installation/inference admission failed; source sync and all static suites passed."
+      "note": "Workflow conclusion remains failure/incomplete by design because quota admission denies runtime writes; the targeted files and tracking files passed validation and were copied."
     },
     "tested_feature_source_sha": "624e26d84d997e72b4b890ce7e5c654598d0c2b8",
     "documentation_state_before_tracking_files": "82296851860bff2ba977d6c020418713e0d56d43"
@@ -380,6 +387,57 @@
         "total_passes": 114
       },
       "limitation": "This was an assertion fix; the notebook parsing itself passed and it did not perform model inference."
+    },
+    {
+      "id": "EXP-2026-10-11-TRACKING-ARTIFACTS-SYNC",
+      "date": "2026-10-11",
+      "category": "documentation integrity and targeted shared-tree synchronization",
+      "approach": "Extend the guarded Connector-1 sync target list with TODO.md, test.json and result.md; validate the staged daily changelog/index, check TODO/result markers, parse test.json as JSON with a non-empty experiment list, atomically copy only the explicit target files, then run the full four offline static suites and the read-only quota/runtime audit.",
+      "reason": "Honor the requested persistent tracking policy and ensure the live OEC tree includes the single TODO list, structured experiment log, cumulative results, and daily change record without force checkout/reset or unrelated writes.",
+      "parameters": {
+        "orchestration_script_commit": "ffd1e57cdf2659bc2baa957ff279e0a3cd32345e",
+        "final_sync_trigger_commit": "702dfa89899e70baef5a1ee3b2b7650fd20d0059",
+        "runs": [
+          {
+            "id": 38160673020,
+            "source_sha": "a1c341bc5b9fbc397f98d7e754aa1cde68ae1493",
+            "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38160673020"
+          },
+          {
+            "id": 38160777602,
+            "source_sha": "337390e938d8b1c0bfa7f446fb7ed05e53edde67",
+            "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38160777602"
+          }
+        ],
+        "target_files": [
+          "TODO.md",
+          "test.json",
+          "result.md",
+          "changelog/CHANGELOG-2026-10-11.md",
+          "changelog/README.md"
+        ],
+        "validation": {
+          "TODO_has_P0_section": true,
+          "result_has_current_status": true,
+          "test_json_schema_version": 1,
+          "test_json_experiments_before_sync": 11
+        }
+      },
+      "results": {
+        "tracking_files_validation": "PASS",
+        "atomic_target_copy": "PASS",
+        "trellis_entrypoint_tests": "17/17 PASS",
+        "audiocraft_notebook_tests": "5/5 PASS",
+        "qa_recovery_tests": "10/10 PASS",
+        "path_alias_tests": "6/6 PASS",
+        "aliases": "PASS",
+        "queue_mutation": "NOT_PERFORMED",
+        "storage_admission": "BLOCKED",
+        "package_install": "NOT_RUN",
+        "trellis_model_download": "NOT_RUN",
+        "trellis_inference": "NOT_RUN"
+      },
+      "limitation": "The workflow reports incomplete because policy correctly stops storage writes/model inference when the fresh quota snapshot is absent. This does not negate the successful tracking validation, targeted copy, or static tests."
     }
   ]
 }
