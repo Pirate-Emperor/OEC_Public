@@ -371,3 +371,10 @@ For each future OEC prompt on the same local date, append findings here, add or 
 - Staging reported `TRACKING_FILES_VALIDATION=PASS` and `STAGED_NOTEBOOK_AND_CLI_VALIDATION=PASS`. It copied `TODO.md`, `test.json`, `result.md`, `changelog/CHANGELOG-2026-10-11.md`, and `changelog/README.md` along with the other explicitly scoped files. Test counts passed again: 17 TRELLIS/entrypoint, 5 AudioCraft notebook, 10 QA, 6 path-alias.
 - `STORAGE_ADMISSION=BLOCKED`, `TRELLIS_INSTALL=BLOCKED`, `TRELLIS_INFERENCE=BLOCKED`, and `VERIFICATION_RESULT=FAIL_OR_INCOMPLETE` remain accurate. No package installation, model download, inference, queue mutation, or worker signal was performed.
 - `test.json` now records 16 experiments and the latest sync ID. TODO and result reports were updated with the same final run; index and daily record are synchronized as part of this retry.
+
+
+## Final verified live sync and record count
+
+- The syntax-checked retry [38161747478](https://github.com/Killer4K-N/Connector_1/actions/runs/38161747478) fetched feature revision `141567d4a322261dd41c977f80b6b2f8314535b0`, passed `bash -n`, validated tracking/docs/notebook targets, and copied the TODO, experiment log, result report, daily changelog and index. The live stage logs record `TRACKING_FILES_VALIDATION=PASS` and `STAGED_NOTEBOOK_AND_CLI_VALIDATION=PASS`.
+- All targeted test counts passed again: TRELLIS/entrypoint 17, AudioCraft notebook 5, QA 10, aliases 6. Quota admission blocked only dependency/model writes and inference. No queue changes or process signals were made.
+- Root `test.json` now contains 17 experiments. Root `TODO.md` is the single maintained list and `result.md` the cumulative material results report.
