@@ -34,12 +34,13 @@ class AudioCraftNotebookTests(unittest.TestCase):
                 compile(transformed, f"pipeline_audiocraft.ipynb:cell-{index}", "exec")
 
     def test_no_destructive_or_unpinned_install_commands(self):
-        all_text = "\n".join(self.sources)
-        self.assertNotIn("pip uninstall", all_text.lower())
-        self.assertNotIn("pip install -U audiocraft", all_text.lower())
-        self.assertNotIn("!pip install", all_text)
-        self.assertNotIn("demo.close()", all_text)
-
+        code_text = "\\n".join(
+            source for cell, source in zip(self.nb["cells"], self.sources)
+            if cell.get("cell_type") == "code"
+        )
+        self.assertNotIn("pip uninstall", code_text.lower())
+        self.assertNotIn("pip install", code_text.lower())
+        self.assertNotIn("demo.close()", code_text)
     def test_dependency_cell_is_read_only_and_checks_expected_stack(self):
         check = self.sources[2]
         for package in ("audiocraft", "torch", "torchvision", "torchaudio", "numpy", "transformers"):
