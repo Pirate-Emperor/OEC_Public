@@ -45,7 +45,7 @@ class AudioCraftNotebookTests(unittest.TestCase):
         check = self.sources[2]
         for package in ("audiocraft", "torch", "torchvision", "torchaudio", "numpy", "transformers"):
             self.assertIn(f'"{package}"', check)
-        self.assertIn("pip check", check)
+        self.assertIn('"check"', check)
         self.assertIn("AUDIOCRAFT_IMPORT_CHECK=PASS", check)
         self.assertIn("sys.executable", check)
         self.assertNotIn("pip install", check)
