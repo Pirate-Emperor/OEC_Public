@@ -58,3 +58,10 @@
 - The real connector-node list smoke test passed and showed the five connector hosts in a compact table. The legacy `a3-test` row remains `unknown` until the newly deployed `status` command is run again on `scn24-mn`; the pre-deployment run had detected that hostname but did not persist it.
 - Successful final A100 sync and table smoke test: https://github.com/Killer4K-N/Connector_1/actions/runs/38132553565
 
+
+## Final live-table verification
+
+- Normal GitHub-enabled `list` ran on `scn17-mn` and displayed a sorted, aligned `NAME | HOST | PROCESS | GITHUB` table. GitHub API failures were shortened to labels such as `API 404 (repo/access…)`; the full exception was not leaked into each table row.
+- End-to-end checks passed for all five Connector_1 host rows: connector-1 → `scn17-mn`, connector-2 → `scn20-mn`, connector-3 → `scn20-mn`, connector-4 → `scn17-mn`, connector-5 → `scn21-mn`. `--columns name,host,process --no-github` and `--name connector-1,connector-2 --columns name,host --no-github` both passed.
+- One live-verification workflow run initially failed because the verification script contained escaped Bash variables, so it searched for the literal `${name}`/`${host}` instead of expanding them. This was a test-script bug, not a controller-output failure. The test was corrected and the rerun passed: https://github.com/Killer4K-N/Connector_1/actions/runs/38132847486
+- On the A100 live list, `a3-test` still showed `unknown` because its earlier `status` was executed before the new status-time metadata write was deployed. The corrected code is installed. Rerun `python ~/OEC/tools/runner_control.py status --name a3-test --no-github` once on `scn24-mn`; subsequent nodes should then show `scn24-mn (last)` until a successful GitHub lookup can confirm current activity.
