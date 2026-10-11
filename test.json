@@ -1,12 +1,11 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-11T23:10:00+05:30",
+  "last_updated": "2026-10-11T23:05:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
   "latest_summary": {
     "source_branch": "fix/trellis-gradio-notebooks-20261011",
-    "latest_documentation_commit": "82296851860bff2ba977d6c020418713e0d56d43",
     "latest_three_runner_static_matrix": {
       "run_id": 38157725815,
       "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38157725815",
@@ -58,7 +57,9 @@
         "https://github.com/Killer4K-N/Connector_1/actions/runs/38157960859/artifacts/11709142578"
       ],
       "note": "Workflow conclusion is failure/incomplete because guarded runtime installation/inference admission failed; source sync and all static suites passed."
-    }
+    },
+    "tested_feature_source_sha": "624e26d84d997e72b4b890ce7e5c654598d0c2b8",
+    "documentation_state_before_tracking_files": "82296851860bff2ba977d6c020418713e0d56d43"
   },
   "experiments": [
     {
@@ -195,7 +196,8 @@
         "diffusers": "0.40.0.dev0",
         "huggingface_hub": "0.36.2",
         "transformers": "4.56.1",
-        "accelerate": "1.14.0"
+        "accelerate": "1.14.0",
+        "audit_run_id": 38157759730
       },
       "results": {
         "model_snapshot": "CACHE_HIT",
@@ -345,6 +347,39 @@
         "user_existing_server_and_ssh_tunnel": "NOT_VERIFIED",
         "full_notebook_inference": "NOT_RUN"
       }
+    },
+    {
+      "id": "EXP-2026-10-11-NOTEBOOK-MARKDOWN-REGRESSION-ASSERTION",
+      "date": "2026-10-11",
+      "category": "test assertion debug and cross-runner rerun",
+      "approach": "Run the offline static suite on connector-1/2/5, inspect the failing assertion, correct it to join every source line in the Markdown cell, and repeat the full matrix.",
+      "reason": "Verify the standalone FLUX notebook has real host/port tunnel instructions while avoiding false failures caused by reading only the first source-array element.",
+      "parameters": {
+        "initial_failed_run_id": 38157036151,
+        "fixed_matrix_run_id": 38157114724,
+        "final_expanded_matrix_run_id": 38157725815,
+        "original_assertion": "self.flux_only_nb['cells'][0]['source'][0]",
+        "corrected_assertion": "''.join(self.flux_only_nb['cells'][0]['source'])",
+        "matrix_runners": [
+          "connector-1",
+          "connector-2",
+          "connector-5"
+        ],
+        "final_code_test_sha": "624e26d84d997e72b4b890ce7e5c654598d0c2b8"
+      },
+      "results": {
+        "initial": "FAIL: COMPUTE_NODE not found because only first Markdown source element was inspected",
+        "correction": "PASS: entire source array is joined before checking host/tunnel instructions",
+        "final_matrix": "PASS on all three connectors",
+        "per_runner_suite_results": {
+          "trellis_entrypoint": 17,
+          "audiocraft_notebook": 5,
+          "qa_queue": 10,
+          "path_alias": 6
+        },
+        "total_passes": 114
+      },
+      "limitation": "This was an assertion fix; the notebook parsing itself passed and it did not perform model inference."
     }
   ]
 }
