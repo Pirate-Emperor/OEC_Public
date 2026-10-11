@@ -371,23 +371,43 @@ def process_qa_queue(purge_after_load=True):
                         json.dump(metadata, f, indent=4)
                         
                     new_size = os.path.getsize(raw_vid_path) + os.path.getsize(json_path)
-                    with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                        conn.execute(
-                            "UPDATE assets SET status = 'PENDING_UPLOAD', total_size_bytes = ? WHERE id = ?", 
-                            (new_size, record_id)
-                        )
-                    print(f"[QA-NODE] QA Complete. Asset handed over to HF Upload Daemon.")
+                    finish_qa_job(
+                        QUEUE_DB_PATH,
+                        record_id,
+                        "PENDING_UPLOAD",
+                        total_size_bytes=new_size,
+                    )
+                    print("[QA-NODE] QA Complete. Asset handed over to HF Upload Daemon.")
                 else:
                     print(f"[QA-NODE] Quality Improver failed. Rejecting asset.")
-                    with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                        conn.execute("UPDATE assets SET status = 'FAILED_IMPROVER' WHERE id = ?", (record_id,))
+                    finish_qa_job(
+                        QUEUE_DB_PATH,
+                        record_id,
+                        "FAILED_IMPROVER",
+                        error="Quality improver returned false",
+                    )
             else:
                  print(f"[QA-NODE] QA Extraction failed. Check if FFmpeg is installed/working.")
-                 with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                        conn.execute("UPDATE assets SET status = 'FAILED_QA_EXTRACTION' WHERE id = ?", (record_id,))
+                 finish_qa_job(
+                     QUEUE_DB_PATH,
+                     record_id,
+                     "FAILED_QA_EXTRACTION",
+                     error="QA extraction returned no frame; check FFmpeg/input format",
+                 )
                         
         except Exception as e:
-            print(f"[QA-NODE] Fatal error in QA loop: {e}")
+            print(f"[QA-NODE] Fatal error in QA loop: {type(e).__name__}: {e}")
+            if record_id is not None:
+                try:
+                    next_status = handle_qa_runtime_error(
+                        QUEUE_DB_PATH,
+                        record_id,
+                        f"{type(e).__name__}: {e}",
+                        max_attempts=3,
+                    )
+                    print(f"[QA-NODE] Job {record_id} transitioned to {next_status}.")
+                except Exception as recovery_error:
+                    print(f"[QA-NODE] Job recovery failed: {type(recovery_error).__name__}: {recovery_error}")
             time.sleep(10)
 
 if __name__ == "__main__":
