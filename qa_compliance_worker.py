@@ -18,6 +18,9 @@ import random
 from pathlib import Path
 from PIL import Image
 
+from tools.qa_queue import claim_next_pending_job, finish_qa_job, handle_qa_runtime_error
+from tools.qa_queue import recover_stuck_jobs as recover_qa_stuck_jobs
+
 # STRICT DISK MANAGER IMPORT
 from purge_manager import DiskPurgeManager
 from storage_manager import managed_storage_operation
@@ -262,20 +265,18 @@ class QANode:
             print(f"[QA-NODE] Quality Improver failed: {e}")
             return False
 
-def sweep_stuck_jobs(db_path):
-    """Recovers crashed jobs."""
+def sweep_stuck_jobs(db_path, *, stale_after_seconds=1800):
+    """Recover only timed-out jobs; never reset a live PROCESSING_QA claim."""
     try:
-        # FIX: Reverted the cross-queue extraction hack.
-        # Now strictly isolated to recovering its own processing crashes to maintain safe linear pipeline flow.
-        with sqlite3.connect(db_path, timeout=30) as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute("UPDATE assets SET status = 'PENDING_QA' WHERE status = 'PROCESSING_QA'")
-            if cursor.rowcount > 0:
-                print(f"[QA-NODE] 🧹 Recovered {cursor.rowcount} crashed jobs back to PENDING_QA.")
-            conn.commit()
+        recovered = recover_qa_stuck_jobs(
+            db_path,
+            stale_after_seconds=stale_after_seconds,
+            recover_untracked=False,
+        )
+        if recovered:
+            print(f"[QA-NODE] Recovered {recovered} stale QA jobs back to PENDING_QA.")
     except Exception as e:
-        print(f"[QA-NODE] Failed to sweep DB: {e}")
+        print(f"[QA-NODE] Failed to sweep DB: {type(e).__name__}: {e}")
 
 def process_qa_queue(purge_after_load=True):
     qa = QANode(gpu_id=0, purge_after_load=purge_after_load)
