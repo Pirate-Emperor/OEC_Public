@@ -16,12 +16,11 @@ import sqlite3
 import sys
 import time
 
-from tools.qa_queue import (
-    ensure_qa_tracking_columns,
-    recover_stuck_jobs,
-    finish_qa_job,
-    queue_snapshot,
-)
+try:
+    from tools.qa_queue import ensure_qa_tracking_columns, recover_stuck_jobs
+except ModuleNotFoundError:
+    # Direct execution from the tools/ folder puts that folder, not its parent, on sys.path.
+    from qa_queue import ensure_qa_tracking_columns, recover_stuck_jobs
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
