@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-11T23:17:00+05:30",
+  "last_updated": "2026-10-11T23:24:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
   "latest_summary": {
@@ -507,6 +507,30 @@
         "trellis_inference": "NOT_RUN"
       },
       "limitation": "This is source/tracking and static validation only. Runtime package/model changes remain blocked until the authoritative quota snapshot is fresh."
+    },
+    {
+      "id": "EXP-2026-10-11-SYNC-SHELL-QUOTE-REGRESSION",
+      "date": "2026-10-11",
+      "category": "orchestration shell syntax failure and fix",
+      "approach": "Inspect the small verification.log artifact from the final tracking sync attempt, identify the exact bash parse error, repair the marker line, and add a bash -n preflight to the GitHub Actions wrapper before executing the guarded sync script.",
+      "reason": "The previous marker edit accidentally omitted its closing double quote. Catch script syntax regressions before entering snapshot/stage/copy operations.",
+      "parameters": {
+        "failed_run_id": 38161193474,
+        "failed_run_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38161193474",
+        "failed_orchestration_commit": "3a714828f00f8b596b96a5ff2fc9a8f3ec0ceb7a",
+        "artifact_id": 11710901351,
+        "artifact_file": "verification.log",
+        "error": "tools/sync_trellis_and_audit_oec.sh: line 125: syntax error near unexpected token '('; line 125 begins the Python text No file named requirements.txt was found under OEC before sync",
+        "fix_commit": "49a720b8f2429f0698759bbfc3bdf113a1717a4f",
+        "preventive_validation_commit": "69cd5b02b317b82f6ecf4ea3a2f41e5a22c9ff21"
+      },
+      "results": {
+        "failed_run_stage_copy": "NOT_REACHED; syntax failure before staging/copy",
+        "marker_quote": "FIXED",
+        "workflow_syntax_preflight": "ADDED: bash -n tools/sync_trellis_and_audit_oec.sh",
+        "new_sync_run": "PENDING at time of this record"
+      },
+      "limitation": "Do not claim the final documentation revision is live until a later run reports tracking validation and SYNCED_TARGET for all three files."
     }
   ]
 }
