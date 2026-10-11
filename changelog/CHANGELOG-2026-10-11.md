@@ -208,3 +208,35 @@ The model/datasets/cache/inputs/outputs paths are explicitly set by .env; AIEROS
 - QA worker/video worker queue linkage exists in source. Latest read-only inspection reported 225 rows (`PENDING=144`, `FAILED_MISSING_FILE=78`, `PENDING_QA=2`, `PROCESSING_QA=1`) and worker logs about 52 hours old; this is a runtime liveness/backlog issue, not evidence that the QA handoff code is absent. No production worker was restarted and no queue rows were mutated.
 
 **Boundary:** the live source sync and static validations passed; full runtime acceptance is not complete until authoritative storage admission, compatible xFormers CUDA attention, TRELLIS inference/export, and a fresh inspection of multi-runner diagnostics all pass.
+
+
+## Follow-up — QA queue safety, path aliases, and AudioCraft notebook
+
+**Source branch:** [`fix/trellis-gradio-notebooks-20261011`](https://github.com/Killer4K-N/OEC/tree/fix/trellis-gradio-notebooks-20261011)  
+**Latest sync attempt:** [Connector-1 run 38151438339](https://github.com/Killer4K-N/Connector_1/actions/runs/38151438339)  
+**Run result:** TRELLIS/QA/path static tests passed; 1 AudioCraft test assertion failed because the test expected the literal phrase `pip check` while the notebook correctly invokes it as `[sys.executable, "-m", "pip", "check"]`. That assertion has now been corrected for the next run. Shared-directory alias creation and QA database repair were skipped because the aggregate test gate failed.
+
+### QA queue integrity improvements (source updated; next gated sync will validate)
+
+- Added transactional SQLite helpers in `tools/qa_queue.py`: atomic `PENDING_QA` claiming, claim timestamps and attempt counters, recorded error messages, bounded retry handling, and stale-claim recovery. Legacy processing rows without claim timestamps are only recoverable through explicit maintenance action.
+- Updated `qa_compliance_worker.py` to atomically claim jobs, recover only timed-out tracked claims, keep missing-file rows with `FAILED_MISSING_FILE`, preserve rejected video/metadata evidence and queue history as `FAILED_QA_REJECTED`, and record bounded runtime retries rather than leaving all exceptions stuck at `PROCESSING_QA`.
+- Added `tools/qa_queue_doctor.py`. Its default is report-only; mutations require `--apply`. Explicit legacy recovery is blocked when a QA worker process is visible locally or the shared `qa_worker.log` has recent activity. The repair code was copied to the live checkout during run 38151438339, but the apply step did not run because static tests did not all pass.
+- Regression coverage verifies atomic claiming, only recovering stale records, explicit opt-in for legacy untracked rows, preserving failure records, bounded retry states, and no broad queue deletion/requeue in the worker.
+
+### Path consistency
+
+- Added `tools/ensure_path_aliases.py` and regression tests. It creates only missing symbolic-link aliases for `aireos_datasets -> aireos_dataset`, `aireos_inputs -> aireos_input`, and `aireos_outputs -> aireos_output`; it refuses to overwrite real paths or repoint existing incorrect links.
+- All three runner hosts report that the singular configured target directories exist and the plural names are absent. The alias utility is source-synced, but aliases have **not yet been created**, because run 38151438339 stopped at the failed AudioCraft static test before any shared filesystem mutation.
+
+### AudioCraft notebook and dependency evidence
+
+- Reworked `pipeline_audiocraft.ipynb` to remove destructive uninstalls/upgrades, inspect the active `phase1` kernel and pinned package versions without installing anything, explain the NumPy/Thinc metadata conflict without pretending it proves the old wheel-build cause, probe the AudioGen model cache before a quota-gated download, export WAVs through OEC's managed output policy, and keep Gradio listening on port 7861 with public sharing off.
+- Removed the final `demo.close()` action that could shut down the UI. The notebook now documents the expected `phase1` kernel and tunnel command.
+- The previous read-only phase1 audit showed AudioCraft `1.3.0`, Torch/vision/audio `2.1.0+cu118`, NumPy `1.26.4`, and successful AudioGen/audio_write imports. `pip check` reports only the observed conflict: `thinc 8.3.6` wants NumPy >=2, while the AudioCraft pins need NumPy <2. No phase1 packages were changed; the original wheel-build failure is not yet reproduced from its exact traceback.
+- AudioGen's current model card lists approximately 3.91 GB for the medium model; its documented inference guidance requires at least 16 GB of GPU memory for medium variants. The notebook now requires fresh storage admission only when that model snapshot is missing from cache.
+
+### Current shared-runtime boundary
+
+- The source sync ran after a Python-based pre-sync snapshot; it backed up the pre-existing `Wan2.1/requirements.txt` and package freeze before copying targets. The dirty OEC checkout was not reset/cleaned and unrelated modified/untracked files were preserved.
+- All three authorized runner labels (`connector-1`, `connector-2`, `connector-5`) agree: GPU samples are idle, the quota snapshot is absent, and `login.npsf.cdac.in` does not resolve from the compute nodes. Therefore phase2_3d installs and real TRELLIS inference remain blocked by the fresh-quota policy. No package changes or model downloads were made.
+- Do not mark overall runtime validation complete until the corrected static suite passes, alias/QA maintenance steps have a verified result, fresh quota data is available, xFormers CUDA attention passes in phase2_3d, and TRELLIS inference produces and reopens a non-empty GLB.
