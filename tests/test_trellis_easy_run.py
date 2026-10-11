@@ -70,7 +70,7 @@ class TrellisEasyRunTests(unittest.TestCase):
                     transformed = shell.transform_cell(code)
                     compile(transformed, f"{filename}:cell-{index}", "exec")
 
-    def test_trellis_only_setup_has_fresh_quota_gate_before_installs(self):
+    def test_trellis_only_setup_has_storage_manager_gate_before_installs(self):
         cells = cell_sources(ROOT / "pipeline_trellis_3d_only.ipynb")
         setup = next((cell for cell in cells if "IRONCLAD PYTORCH" in cell), "")
         self.assertIn("storage_preflight_path", setup)
