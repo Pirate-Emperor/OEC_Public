@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-11T23:16:00+05:30",
+  "last_updated": "2026-10-11T23:17:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
   "latest_summary": {
@@ -38,9 +38,9 @@
       "note": "Offline/static/unit validation only; it does not establish successful live model inference."
     },
     "latest_live_targeted_sync": {
-      "run_id": 38160777602,
-      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38160777602",
-      "source_sha": "337390e938d8b1c0bfa7f446fb7ed05e53edde67",
+      "run_id": 38160976083,
+      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38160976083",
+      "source_sha": "70411afa152a862e4356cb09ccdc83cb1278b2fc",
       "result": "TRACKING_AND_SOURCE_SYNC_PASS_RUNTIME_INCOMPLETE",
       "details": {
         "tracking_files_validation": "PASS",
@@ -60,10 +60,7 @@
         "trellis_inference": "NOT_RUN",
         "queue_mutation": "NOT_PERFORMED"
       },
-      "artifacts": [
-        "https://github.com/Killer4K-N/Connector_1/actions/runs/38160777602"
-      ],
-      "note": "Workflow conclusion remains failure/incomplete by design because quota admission denies runtime writes; the targeted files and tracking files passed validation and were copied."
+      "note": "The latest targeted sync copied tracking files and passed all static suites; workflow conclusion is incomplete solely because fresh-quota admission blocked runtime writes/inference."
     },
     "tested_feature_source_sha": "624e26d84d997e72b4b890ce7e5c654598d0c2b8",
     "documentation_state_before_tracking_files": "82296851860bff2ba977d6c020418713e0d56d43"
@@ -481,6 +478,35 @@
         "image_generation": "NOT_RUN"
       },
       "limitation": "Official notes establish that the release supports Flux2 Klein, but do not replace an install/import and image-generation smoke in the real phase2_3d environment. Fresh quota admission remains mandatory."
+    },
+    {
+      "id": "EXP-2026-10-11-FINAL-TRACKING-DOCS-SYNC",
+      "date": "2026-10-11",
+      "category": "final daily record and tracking file synchronization",
+      "approach": "Run the guarded connector-1 sync after the TODO, test register, results report, daily changelog and index have been updated; inspect staged and copied-file checksums, JSON validation and all static suites.",
+      "reason": "Ensure the working tree has the project's current tracking contract and results, not only the model code, while maintaining the guarded sync boundary.",
+      "parameters": {
+        "run_id": 38160976083,
+        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38160976083",
+        "source_sha": "70411afa152a862e4356cb09ccdc83cb1278b2fc",
+        "runner_label": "connector-1",
+        "tracking_log_experiments_at_run": 12,
+        "suites": {
+          "trellis_entrypoint": 17,
+          "audiocraft_notebook": 5,
+          "qa_queue": 10,
+          "path_aliases": 6
+        }
+      },
+      "results": {
+        "tracking_files_validation": "PASS",
+        "targeted_copy": "PASS",
+        "static_suite_totals": "PASS 17/17, 5/5, 10/10, 6/6",
+        "storage_admission": "BLOCKED",
+        "install": "NOT_RUN",
+        "trellis_inference": "NOT_RUN"
+      },
+      "limitation": "This is source/tracking and static validation only. Runtime package/model changes remain blocked until the authoritative quota snapshot is fresh."
     }
   ]
 }
