@@ -25,7 +25,7 @@ Daily engineering records live here. Use the local Asia/Kolkata date in each fil
 ## Persistent project tracking
 
 - **One active TODO list:** [`TODO.md`](../TODO.md)
-- **Structured experiment/test log:** [`test.json`](../test.json) — currently 17 experiment records.
+- **Structured experiment/test log:** [`test.json`](../test.json) — currently 18 experiment records.
 - **Cumulative significant results:** [`result.md`](../result.md)
 - **Reusable interactive-model implementation convention:** [`model_entrypoint_convention.md`](../docs/model_entrypoint_convention.md)
 
