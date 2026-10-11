@@ -7,7 +7,7 @@
 - Added host location reporting. New starts write hostname, start time, username, and listener PID to `.oec_runner_host.json` inside the runner directory. Existing installs can fall back to the runner's `_diag/Runner_*.log` `Machine name:` entry.
 - Updated `status` to show location and updated `stop` to refuse to claim a remote runner stopped when no listener is visible locally but GitHub still reports it online.
 - Added a duplicate-start guard: when the registry reports the configured runner online but no listener is visible on the current node, `start` refuses to launch a second listener and reports the recorded host.
-- The initial state/location implementation was merged in PR #3 (`ec4ebcfa14d709f199a81bbeb0751a1fc708be8b`). Live runner metadata inspection then exposed a real-format compatibility bug; this follow-up fixes the BOM/field mapping before any local deployment. The local A100 `~/OEC/tools/runner_control.py` has not yet been modified.
+- The initial state/location implementation was merged in PR #3 (`ec4ebcfa14d709f199a81bbeb0751a1fc708be8b`), and real-format compatibility fixes were merged in PR #7 (`7ef49b7afaa613b8553a1b61f9a6067e8fd7d5a1`). The follow-up source sync to the A100 directory was subsequently completed and verified on `scn17-mn`; details are recorded below.
 
 ## Live A100 inventory verification
 
@@ -27,7 +27,7 @@
 - Updated host metadata seeding for an already-running listener to obtain its start time from Linux `/proc` when available, instead of incorrectly treating the time of the first observation as its start time. Added a separate observation timestamp.
 - Added regression tests for BOM-prefixed runner metadata, the real `agentName` / `gitHubUrl` field combination, correct GitHub API endpoint derivation, safe status output, and accurate start-time stamping.
 - Follow-up validation: focused runner-control suite **15/15 passed**; full repository test suite **39/39 passed**. Run: https://github.com/Killer4K-N/OEC/actions/runs/38082197015
-- A guarded local sync attempt on `scn17-mn` correctly refused to write because the expected-old hash inherited from the faulty inventory digest did not match the actual file hash. No local file was changed and no backup was created. The deployment workflow still needs its old-hash guard corrected before retrying; source sync and post-sync validation remain pending.
+- Two initial guarded sync attempts failed safely before any write: the first rejected a bad payload digest, and the second rejected an incorrect expected-old digest inherited from the faulty inventory. After correcting the guard to the actual local Git blob SHA, the later sync completed successfully. No failed attempt modified the local file.
 
 ## Validation
 
@@ -38,3 +38,15 @@
 - Earlier first attempt on the diagnostic-log test exposed a fixture with escaped literal newlines; corrected the fixture. The final focused and full runs passed.
 - The full suite emits a non-failing `ResourceWarning` for an unclosed `upload_daemon.log` handler in `hf_upload_daemon.py:21`; this is outside the runner-control change.
 - Final full validation run: https://github.com/Killer4K-N/OEC/actions/runs/38081353311
+
+
+## Guarded local source sync and host metadata bootstrap (completed)
+
+- Used the dedicated `Connector_1` self-hosted runner on `scn17-mn` to synchronize `~/OEC/tools/runner_control.py` from the verified OEC `main` source. The source/payload blob SHA was pinned to `7ccb4a95819c8feddaa4e3093d999d92cd8685b9`.
+- Pre-sync local blob SHA: `88050dbfa12072ab6d53e8dbd3be13ae73421627`. The final workflow used a correct Git blob header with a NUL separator, verified the payload and Python syntax before writing, created backup `tools/runner_control.py.pre-sync-20261011T100729Z.bak`, replaced the file atomically, and verified the installed blob SHA exactly matched the expected source.
+- Post-sync Python compilation passed. The first smoke run's check was overly broad: it failed on 404 responses from unrelated legacy runner configurations (for example A3/A4 and older deploy runners) even though the five Connector_1 runners were reporting online. The smoke check was scoped to the target Connector_1 registry; the subsequent sync smoke run passed. These unrelated legacy 404 entries remain visible in `list` but no longer invalidate the Connector_1 sync check.
+- Created controller host metadata only for runners whose `status --no-github` confirmed an existing local Listener process. The workflow then invoked `start --no-github-wait`, which detected each existing listener and recorded metadata without starting a duplicate process.
+- Final host mapping confirmed by reading the actual `runner_control.py list` output on `scn17-mn`: connector-1 → `scn17-mn`; connector-2 → `scn20-mn`; connector-3 → `scn20-mn`; connector-4 → `scn17-mn`; connector-5 → `scn21-mn`. All five entries reported `GITHUB=online` and the expected `HOST=` value. Remote connectors correctly display `PROCESS=NOT_RUNNING_HERE` on `scn17-mn` rather than being mislabeled stopped.
+- Successful sync and smoke check: https://github.com/Killer4K-N/Connector_1/actions/runs/38130903358
+- Successful host metadata bootstrap for all five connectors: https://github.com/Killer4K-N/Connector_1/actions/runs/38130924049
+- Final end-to-end `list` output verified all five expected hosts: https://github.com/Killer4K-N/Connector_1/actions/runs/38131004727
