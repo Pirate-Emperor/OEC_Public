@@ -354,3 +354,12 @@ For each future OEC prompt on the same local date, append findings here, add or 
 - Updated the experiment register after this run to 14 entries, including the final tracking-sync run and the official FLUX.2 compatibility-reference check. The source branch therefore needs one final guarded docs sync after this latest record update.
 - Persistent files are now explicit project policy: one root `TODO.md`, one root `test.json`, one cumulative root `result.md`, and one dated file per day in `changelog/`. The index links to these files; future prompts must update each relevant record before ending the task.
 - Runtime blockers remain unchanged: missing fresh quota telemetry; incompatible xFormers CUDA extension in the shared stack; TRELLIS.2 model cache miss; FLUX development Diffusers/Hub import mismatch until the guarded package set can be reconciled; stopped legacy QA worker that must be safely replaced rather than resumed; and unreproduced original AudioCraft wheel-build traceback.
+
+
+## Sync-script syntax incident and prevention
+
+- Run [38161193474](https://github.com/Killer4K-N/Connector_1/actions/runs/38161193474) failed **before staging or copying files**. Its 355-byte diagnostic artifact `oec-trellis-sync-audit-38161193474` contains `verification.log`, identifying a Bash syntax error at line 125. Root cause: the previous update to the orchestration marker `MODEL_NOTEBOOKS_VALIDATED` omitted its final double quote, so Bash continued parsing until it reached a parenthesis in the Python heredoc text.
+- Fixed the marker quote in orchestration commit `49a720b8f2429f0698759bbfc3bdf113a1717a4f`.
+- Added a preventive preflight to `.github/workflows/sync-trellis-and-audit-oec.yml` in commit `69cd5b02b317b82f6ecf4ea3a2f41e5a22c9ff21`: it executes `bash -n tools/sync_trellis_and_audit_oec.sh` and emits `SYNC_SCRIPT_SYNTAX=PASS` before running the guarded sync.
+- The error run made no new live-tree changes. The last verified live sync remains run [38160976083](https://github.com/Killer4K-N/Connector_1/actions/runs/38160976083), which copied the earlier revision and passed the tracking/static checks but predates the latest compatibility-reference and incident records. A retry with the repaired script is required before claiming these latest documents are in the live checkout.
+- Added `EXP-2026-10-11-SYNC-SHELL-QUOTE-REGRESSION` to `test.json` so both the failed approach and preventive fix are retained. This failure is a synchronization-script issue, not a TRELLIS/FLUX model or notebook test failure.
