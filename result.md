@@ -76,3 +76,8 @@ Official Diffusers release notes list Flux2 Klein support in the v0.37.0 release
 - All offline suites passed again: 17 TRELLIS/entrypoint, 5 AudioCraft notebook, 10 QA worker/queue, and 6 path-alias tests. The aliases remain verified; the QA database was report-only.
 - The run is marked incomplete because storage admission is blocked. This is a clean source/tracking sync and static-validation result, **not** a successful live TRELLIS/FLUX inference result.
 - The experiment register has 16 entries and records the original marker syntax failure, the `bash -n` prevention, the final successful sync-stage checks, and all remaining runtime blockers.
+
+
+## Final verified shared-tree sync — 38161747478
+
+The latest syntax-checked sync [38161747478](https://github.com/Killer4K-N/Connector_1/actions/runs/38161747478) emitted `SYNC_SCRIPT_SYNTAX=PASS`, `TRACKING_FILES_VALIDATION=PASS`, and `STAGED_NOTEBOOK_AND_CLI_VALIDATION=PASS`; it copied the current tracking files and reran all four suites successfully (17/17, 5/5, 10/10, 6/6). The workflow remains incomplete solely at storage admission; no install/model download/inference or queue mutation occurred. `test.json` now holds 17 experiments covering the source fixes, diagnostics, syntax regression and final sync.
