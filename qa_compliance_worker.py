@@ -337,15 +337,21 @@ def process_qa_queue(purge_after_load=True):
                 
                 if category == 1:
                     reason = analysis.get("rejection_reason", "Failed Adobe Stock Guidelines")
-                    print(f"[QA-NODE] ❌ REJECTED: {reason}. Moving to trash.")
-                    
-                    shutil.move(raw_vid_path, os.path.join(REJECTED_DIR, os.path.basename(raw_vid_path)))
-                    os.remove(json_path)
-                    
-                    with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                        conn.execute("DELETE FROM assets WHERE id = ?", (record_id,))
+                    print(f"[QA-NODE] REJECTED: {reason}. Moving assets to rejected archive.")
+                    # Keep both evidence files and the queue row for audit/debugging.
+                    rejected_video = os.path.join(REJECTED_DIR, f"{record_id}_{os.path.basename(raw_vid_path)}")
+                    shutil.move(raw_vid_path, rejected_video)
+                    rejected_metadata = None
+                    if os.path.exists(json_path):
+                        rejected_metadata = os.path.join(REJECTED_DIR, f"{record_id}_{os.path.basename(json_path)}")
+                        shutil.move(json_path, rejected_metadata)
+                    finish_qa_job(
+                        QUEUE_DB_PATH,
+                        record_id,
+                        "FAILED_QA_REJECTED",
+                        error=f"{reason}; rejected_video={rejected_video}; rejected_metadata={rejected_metadata}",
+                    )
                     continue
-                    
                 cat_string = "Photorealistic / Human-Created" if category == 3 else "AI-Generated Style"
                 print(f"[QA-NODE] ✅ PASSED. Category: {cat_string}")
                 
