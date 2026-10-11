@@ -272,3 +272,8 @@ The canonical singular directories and data were not renamed, copied, removed, o
 ### Still blocked
 
 The shared checkout now has the target model/notebook/QA/path utilities and the verified path aliases, but live TRELLIS acceptance remains incomplete: all three compute hosts lack a fresh quota snapshot and cannot resolve `login.npsf.cdac.in`. No packages were installed and no new inference was attempted. Actual xFormers CUDA attention and TRELLIS GLB generation must be rerun after the authoritative login-node quota snapshot becomes available.
+
+
+## Follow-up — existing path aliases are idempotent
+
+The path-alias repair utility now checks symlinks before comparing canonical paths. This fixes a false failure when a correctly configured plural alias already resolves to its singular target. Added a regression test proving a valid existing symlink is reported as `ALIAS_OK` and is not replaced. No paths or shared data are changed by this source-code fix; the live filesystem is re-checked separately.
