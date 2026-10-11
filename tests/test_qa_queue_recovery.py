@@ -85,6 +85,14 @@ class QAQueueRecoveryTests(unittest.TestCase):
         snapshot = queue_snapshot(self.db)
         self.assertEqual(snapshot["statuses"]["FAILED_MISSING_FILE"], 1)
 
+    def test_worker_uses_safe_claim_and_preserves_failed_rows(self):
+        source = (Path(__file__).resolve().parents[1] / "qa_compliance_worker.py").read_text(encoding="utf-8")
+        self.assertIn("claim_next_pending_job(QUEUE_DB_PATH)", source)
+        self.assertIn('"FAILED_MISSING_FILE"', source)
+        self.assertIn('"FAILED_QA_REJECTED"', source)
+        self.assertNotIn("DELETE FROM assets WHERE id = ?", source)
+        self.assertNotIn("UPDATE assets SET status = 'PENDING_QA' WHERE status = 'PROCESSING_QA'", source)
+
     def test_runtime_errors_retry_then_become_visible_failure(self):
         claim_next_pending_job(self.db)
         status = handle_qa_runtime_error(self.db, 1, "first error", max_attempts=3)
