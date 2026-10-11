@@ -140,10 +140,96 @@ class RunnerControlFixTests(unittest.TestCase):
                                 with contextlib.redirect_stdout(output):
                                     rc.list_runners(argparse.Namespace())
             text = output.getvalue()
-            self.assertIn("PROCESS=NOT_RUNNING_HERE", text)
-            self.assertIn("GITHUB=online/idle", text)
-            self.assertIn("HOST=scn17-mn", text)
+            self.assertIn("NAME", text)
+            self.assertIn("HOST", text)
+            self.assertIn("PROCESS", text)
+            self.assertIn("online/idle", text)
+            self.assertIn("scn17-mn", text)
+            self.assertIn("not here", text)
             self.assertNotIn("STOPPED", text)
+
+    def test_list_columns_can_select_subset_and_all(self):
+        with tempfile.TemporaryDirectory() as td:
+            runner = Path(td) / "gpu" / "connector_1" / "actions-runner"
+            runner.mkdir(parents=True)
+            (runner / ".runner").write_text(json.dumps({
+                "name": "connector-1",
+                "gitHubUrl": "https://github.com/Killer4K-N/Connector_1",
+            }))
+            with mock.patch.dict(os.environ, {"OEC_ROOT": td, "HOME": td}, clear=True):
+                with mock.patch.object(rc, "_github_auth_token", return_value="test-api-token"):
+                    with mock.patch.object(rc, "listener_pids", return_value=[]):
+                        with mock.patch.object(rc, "_github_runner_record", return_value={
+                            "name": "connector-1", "status": "online", "busy": False,
+                        }):
+                            with mock.patch.object(rc.socket, "gethostname", return_value="scn11-mn"):
+                                output = io.StringIO()
+                                with contextlib.redirect_stdout(output):
+                                    rc.list_runners(argparse.Namespace(
+                                        columns="name,host,status", name=["connector-1"],
+                                        no_github=False, details=False,
+                                    ))
+                                subset = output.getvalue()
+                                self.assertIn("NAME", subset)
+                                self.assertIn("HOST", subset)
+                                self.assertIn("GITHUB", subset)
+                                self.assertNotIn("PROCESS", subset.splitlines()[1])
+
+                                output = io.StringIO()
+                                with contextlib.redirect_stdout(output):
+                                    rc.list_runners(argparse.Namespace(
+                                        columns="all", name=None,
+                                        no_github=True, details=False,
+                                    ))
+                                all_columns = output.getvalue()
+            self.assertIn("PROCESS", all_columns.splitlines()[1])
+            self.assertIn("PID", all_columns.splitlines()[1])
+            self.assertIn("PATH", all_columns.splitlines()[1])
+            self.assertIn("API_ERR", all_columns.splitlines()[1])
+            self.assertIn("not checked", all_columns)
+
+    def test_list_compacts_dns_errors_and_details_expands_them(self):
+        with tempfile.TemporaryDirectory() as td:
+            runner = Path(td) / "gpu" / "connector_1" / "actions-runner"
+            runner.mkdir(parents=True)
+            (runner / ".runner").write_text(json.dumps({
+                "name": "connector-1",
+                "gitHubUrl": "https://github.com/Killer4K-N/Connector_1",
+            }))
+            error = RuntimeError(
+                "GitHub API GET repos/Killer4K-N/Connector_1/actions/runners failed: "
+                "<urlopen error [Errno -2] Name or service not known>"
+            )
+            with mock.patch.dict(os.environ, {"OEC_ROOT": td, "HOME": td}, clear=True):
+                with mock.patch.object(rc, "_github_auth_token", return_value="test-api-token"):
+                    with mock.patch.object(rc, "listener_pids", return_value=[]):
+                        with mock.patch.object(rc, "_github_runner_record", side_effect=error):
+                            with mock.patch.object(rc.socket, "gethostname", return_value="scn11-mn"):
+                                output = io.StringIO()
+                                with contextlib.redirect_stdout(output):
+                                    rc.list_runners(argparse.Namespace(
+                                        columns="name,host,github", name=None,
+                                        no_github=False, details=False,
+                                    ))
+                                compact = output.getvalue()
+                                self.assertIn("API down (DNS)", compact)
+                                self.assertNotIn("Name or service not known", compact)
+
+                                output = io.StringIO()
+                                with contextlib.redirect_stdout(output):
+                                    rc.list_runners(argparse.Namespace(
+                                        columns="name,github", name=None,
+                                        no_github=False, details=True,
+                                    ))
+                                detailed = output.getvalue()
+            self.assertIn("Name or service not known", detailed)
+            self.assertIn("API detail:", detailed)
+
+    def test_list_rejects_unknown_column_names_clearly(self):
+        with self.assertRaises(SystemExit) as raised:
+            rc._list_columns("name,host,magic")
+        self.assertIn("Unknown --columns", str(raised.exception))
+        self.assertIn("Valid columns", str(raised.exception))
 
     def test_runner_host_info_falls_back_to_diagnostic_log(self):
         with tempfile.TemporaryDirectory() as td:
