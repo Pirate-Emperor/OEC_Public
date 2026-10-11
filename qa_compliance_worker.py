@@ -12,9 +12,27 @@ import shutil
 import glob
 import signal
 import argparse
-import torch
 import traceback
 import random
+
+# Select GPU visibility before importing PyTorch/CUDA extensions.
+_qa_gpu_parser = argparse.ArgumentParser(add_help=False)
+_qa_gpu_parser.add_argument("--gpu", default=os.environ.get("AIEROS_QA_GPU"))
+_qa_gpu_early_args, _qa_gpu_unparsed = _qa_gpu_parser.parse_known_args()
+if _qa_gpu_early_args.gpu is not None:
+    _qa_gpu_value = str(_qa_gpu_early_args.gpu).strip()
+    if not _qa_gpu_value:
+        raise ValueError("--gpu / AIEROS_QA_GPU must not be empty")
+    os.environ["CUDA_VISIBLE_DEVICES"] = _qa_gpu_value
+elif not os.environ.get("CUDA_VISIBLE_DEVICES"):
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+DEFAULT_QA_GPU = (
+    str(_qa_gpu_early_args.gpu).strip()
+    if _qa_gpu_early_args.gpu is not None
+    else os.environ.get("AIEROS_QA_GPU", os.environ.get("CUDA_VISIBLE_DEVICES", "0")).split(",")[0].strip()
+)
+
+import torch
 from pathlib import Path
 from PIL import Image
 
@@ -23,7 +41,7 @@ from tools.qa_queue import recover_stuck_jobs as recover_qa_stuck_jobs
 
 # STRICT DISK MANAGER IMPORT
 from purge_manager import DiskPurgeManager
-from storage_manager import managed_storage_operation
+from storage_manager import managed_storage_operation, storage_preflight
 from storage_policy import BYTES_PER_GB, estimate_hf_repo_bytes
 
 # ==============================================================================
@@ -76,18 +94,21 @@ except ImportError:
     print("[QA-NODE] qwen-vl-utils is not installed; VLM QA cannot run until the dependency is installed.")
 
 class QANode:
-    def __init__(self, gpu_id=0, purge_after_load=True):
+    def __init__(self, gpu_id=DEFAULT_QA_GPU, purge_after_load=False):
         self.gpu_id = str(gpu_id)
         self.purge_after_load = purge_after_load
-        os.environ["CUDA_VISIBLE_DEVICES"] = self.gpu_id
+        # Visibility is finalized before torch import; selected GPU is cuda:0.
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        if self.device == "cuda":
+            torch.cuda.set_device(0)
         self.processor = None
         self.model = None
         self.repo_id = "Qwen/Qwen2-VL-7B-Instruct"
 
     def _ensure_downloaded_robustly(self):
         from huggingface_hub import snapshot_download
-        
+        from huggingface_hub.errors import LocalEntryNotFoundError
+
         try:
             snapshot_download(
                 repo_id=self.repo_id,
@@ -96,7 +117,7 @@ class QANode:
             )
             print(f"[QA-NODE-GPU{self.gpu_id}] Model verified in local HF cache.")
             return
-        except Exception:
+        except LocalEntryNotFoundError:
             pass
 
         print(f"[QA-NODE-GPU{self.gpu_id}] Model missing or incomplete. Estimating required download size...")
@@ -106,23 +127,35 @@ class QANode:
             float(os.environ.get("AIEROS_MODEL_DOWNLOAD_SAFETY_GB", "2.0")),
         )
         required_gb += safety_gb
-        print(
-            f"[QA-NODE-GPU{self.gpu_id}] Conservative model download budget: "
-            f"{required_gb:.2f} GB"
+        minimum_free_gb = float(os.environ.get("AIEROS_MODEL_MIN_FREE_GB", "2.0"))
+
+        # A managed-operation lock serializes writers but is not quota admission.
+        # Require an authoritative, fresh quota snapshot before any download.
+        ok, reason = storage_preflight(
+            "models",
+            required_gb=required_gb,
+            require_fresh_quota=True,
+            minimum_free_gb=minimum_free_gb,
         )
+        print(
+            f"[QA-NODE-GPU{self.gpu_id}] Model download storage admission: "
+            f"{ok}; {reason}"
+        )
+        if not ok:
+            raise RuntimeError(
+                f"QA model download refused by OEC storage policy: {reason}. "
+                "Refresh the authoritative login-node quota snapshot, then retry."
+            )
 
-        offline_status = os.environ.get("HF_HUB_OFFLINE", "0")
-        os.environ["HF_HUB_OFFLINE"] = "0"
-
-        try:
-            with managed_storage_operation(
-                "models",
-                required_gb=required_gb,
-                require_fresh_quota=True,
-                minimum_free_gb=float(
-                    os.environ.get("AIEROS_MODEL_MIN_FREE_GB", "2.0")
-                ),
-            ):
+        offline_status = os.environ.get("HF_HUB_OFFLINE")
+        with managed_storage_operation(
+            "models",
+            required_gb=required_gb,
+            require_fresh_quota=True,
+            minimum_free_gb=minimum_free_gb,
+        ):
+            os.environ["HF_HUB_OFFLINE"] = "0"
+            try:
                 for attempt in range(5):
                     try:
                         snapshot_download(
@@ -131,19 +164,22 @@ class QANode:
                         )
                         print(f"[QA-NODE-GPU{self.gpu_id}] Download successful.")
                         break
-                    except Exception as e:
+                    except Exception as exc:
                         sleep_time = 15 * (attempt + 1)
                         print(
                             f"[QA-NODE-GPU{self.gpu_id}] Download error: "
-                            f"{type(e).__name__}. Retrying in {sleep_time}s..."
+                            f"{type(exc).__name__}: {exc}. Retrying in {sleep_time}s..."
                         )
                         time.sleep(sleep_time)
                 else:
                     raise RuntimeError(
                         f"Failed to download {self.repo_id} after 5 attempts."
                     )
-        finally:
-            os.environ["HF_HUB_OFFLINE"] = offline_status
+            finally:
+                if offline_status is None:
+                    os.environ.pop("HF_HUB_OFFLINE", None)
+                else:
+                    os.environ["HF_HUB_OFFLINE"] = offline_status
 
     def load_vlm(self):
         print(f"[QA-NODE-GPU{self.gpu_id}] Initializing Qwen2-VL-7B-Instruct for Strict Compliance Checking...")
@@ -278,8 +314,8 @@ def sweep_stuck_jobs(db_path, *, stale_after_seconds=4 * 60 * 60):
     except Exception as e:
         print(f"[QA-NODE] Failed to sweep DB: {type(e).__name__}: {e}")
 
-def process_qa_queue(purge_after_load=True):
-    qa = QANode(gpu_id=0, purge_after_load=purge_after_load)
+def process_qa_queue(purge_after_load=False, gpu_id=DEFAULT_QA_GPU):
+    qa = QANode(gpu_id=gpu_id, purge_after_load=purge_after_load)
     
     sweep_stuck_jobs(QUEUE_DB_PATH)
     
@@ -412,10 +448,28 @@ def process_qa_queue(purge_after_load=True):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="QA & Compliance Worker Node")
-    parser.add_argument("--purge", action="store_true", help="Purge model from disk after loading into VRAM (Default)")
-    parser.add_argument("--no-purge", dest="purge", action="store_false", help="Keep model on disk after loading")
-    parser.set_defaults(purge=True)
+    parser.add_argument(
+        "--gpu",
+        default=DEFAULT_QA_GPU,
+        help="CUDA visibility selector parsed before torch import; defaults to scheduler visibility or GPU 0.",
+    )
+    parser.add_argument(
+        "--purge",
+        action="store_true",
+        help="Explicitly purge model weights from the shared cache after loading (not recommended on shared nodes).",
+    )
+    parser.add_argument(
+        "--no-purge",
+        dest="purge",
+        action="store_false",
+        help="Keep model weights in the shared cache (default).",
+    )
+    parser.set_defaults(purge=False)
     args = parser.parse_args()
-    
+
     print("[SYSTEM] Starting QA Compliance Worker...")
-    process_qa_queue(purge_after_load=args.purge)
+    print(
+        f"[SYSTEM] CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES', '')}; "
+        f"shared model cache purge={args.purge}"
+    )
+    process_qa_queue(purge_after_load=args.purge, gpu_id=args.gpu)
