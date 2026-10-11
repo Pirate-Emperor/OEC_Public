@@ -50,3 +50,10 @@ The latest source sync copied the current tracker set from feature revision `704
 
 
 The official Diffusers release notes list Flux2 Klein support in v0.37.0; the current Hugging Face Hub docs expose `get_cached_repo_tree`, explaining the observed import mismatch with the installed older Hub. This supports the proposed version pin but is not a substitute for the gated live import/generation smoke.
+
+
+### Latest confirmed sync — run 38161408008
+
+- [x] Fixed the missing quote in `MODEL_NOTEBOOKS_VALIDATED` after run 38161193474 failed before staging; the workflow now runs `bash -n tools/sync_trellis_and_audit_oec.sh` first and logs `SYNC_SCRIPT_SYNTAX=PASS`.
+- [x] The subsequent [run 38161408008](https://github.com/Killer4K-N/Connector_1/actions/runs/38161408008) passed shell syntax, tracking validation, staged notebook/CLI validation, tracker-file copy, and the static suites (17 TRELLIS, 5 AudioCraft notebook, 10 QA, 6 alias tests).
+- [ ] Runtime package/model installation and TRELLIS inference remain blocked on fresh quota telemetry. No packages were installed, no model was downloaded and no QA queue rows were changed.
