@@ -294,24 +294,22 @@ def process_qa_queue(purge_after_load=True):
     signal.signal(signal.SIGINT, handle_sig)
     signal.signal(signal.SIGTERM, handle_sig)
 
+    last_sweep = time.monotonic()
+
     while is_running:
+        record_id = None
         try:
-            with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT id, asset_path, json_path FROM assets WHERE status = 'PENDING_QA' LIMIT 1")
-                row = cursor.fetchone()
-                
+            # The claim helper atomically marks one pending row PROCESSING_QA.
+            row = claim_next_pending_job(QUEUE_DB_PATH)
+
             if not row:
                 time.sleep(5)
-                if random.random() < 0.1:
+                if time.monotonic() - last_sweep >= 60:
                     sweep_stuck_jobs(QUEUE_DB_PATH)
+                    last_sweep = time.monotonic()
                 continue
-                
+
             record_id, raw_vid_path, json_path = row
-            
-            with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                conn.execute("UPDATE assets SET status = 'PROCESSING_QA' WHERE id = ?", (record_id,))
-                
             print(f"\n[QA-NODE] Evaluating Asset ID: {record_id} | {os.path.basename(raw_vid_path)}")
             
             if not os.path.exists(raw_vid_path) or not os.path.exists(json_path):
