@@ -457,15 +457,56 @@ class RunnerControlFixTests(unittest.TestCase):
                                     rc.status_runner(argparse.Namespace(
                                         runner_dir=str(runner), name="a3-test", no_github=True
                                     ))
-            metadata_path = runner / rc._RUNNER_HOST_METADATA
-            self.assertTrue(metadata_path.is_file())
-            metadata = json.loads(metadata_path.read_text())
-            self.assertEqual(metadata["hostname"], "scn24-mn")
-            self.assertEqual(metadata["listener_pid"], 2952507)
-            self.assertEqual(metadata["username"], "rahkus")
-            self.assertEqual(metadata["started_at_source"], "proc")
-            self.assertIn("Host info  : recorded", output.getvalue())
-            self.assertIn("HOST=scn24-mn", output.getvalue())
+                metadata_path = runner / rc._RUNNER_HOST_METADATA
+                self.assertTrue(metadata_path.is_file())
+                metadata = json.loads(metadata_path.read_text())
+                self.assertEqual(metadata["hostname"], "scn24-mn")
+                self.assertEqual(metadata["listener_pid"], 2952507)
+                self.assertEqual(metadata["username"], "rahkus")
+                self.assertEqual(metadata["started_at_source"], "proc")
+                self.assertIn("Host info  : recorded", output.getvalue())
+                self.assertIn("HOST=scn24-mn", output.getvalue())
+
+                # A second node cannot see scn24's /proc, but the shared metadata
+                # should still let its list display the last known host explicitly.
+                with mock.patch.object(rc, "listener_pids", return_value=[]):
+                    with mock.patch.object(rc.socket, "gethostname", return_value="scn17-mn"):
+                        output = io.StringIO()
+                        with contextlib.redirect_stdout(output):
+                            rc.list_runners(argparse.Namespace(
+                                columns="name,host,process", name=["a3-test"],
+                                no_github=True, details=False,
+                            ))
+            listing = output.getvalue()
+            self.assertIn("a3-test", listing)
+            self.assertIn("scn24-mn (last)", listing)
+            self.assertIn("not here", listing)
+            self.assertNotIn("unknown", listing)
+
+    def test_list_sorts_by_displayed_runner_name_not_directory(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "gpu"
+            for directory, visible_name, repo in [
+                ("a_dir", "zebra-runner", "https://github.com/example/repo"),
+                ("z_dir", "alpha-runner", "https://github.com/example/repo"),
+            ]:
+                runner = root / directory / "actions-runner"
+                runner.mkdir(parents=True)
+                (runner / ".runner").write_text(json.dumps({
+                    "agentName": visible_name,
+                    "gitHubUrl": repo,
+                }))
+            with mock.patch.dict(os.environ, {"OEC_ROOT": td, "HOME": td}, clear=True):
+                with mock.patch.object(rc, "listener_pids", return_value=[]):
+                    with mock.patch.object(rc.socket, "gethostname", return_value="scn17-mn"):
+                        output = io.StringIO()
+                        with contextlib.redirect_stdout(output):
+                            rc.list_runners(argparse.Namespace(
+                                columns="name,path", name=None,
+                                no_github=True, details=False,
+                            ))
+            rendered = output.getvalue()
+            self.assertLess(rendered.index("alpha-runner"), rendered.index("zebra-runner"))
 
     def test_existing_listener_host_stamp_uses_proc_start_time(self):
         with tempfile.TemporaryDirectory() as td:
