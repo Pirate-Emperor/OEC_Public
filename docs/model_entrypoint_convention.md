@@ -25,3 +25,10 @@ conda run -n phase2_3d python pipeline_trellis_3d.py --mode generate --gpu 0 --i
 ```
 
 Use `--offline` to prevent a missing model snapshot from triggering a download. Without it, a missing snapshot can only be downloaded if OEC's fresh-quota admission succeeds. On shared compute, use an SSH tunnel and leave `--share` off unless a public Gradio URL is deliberately required.
+
+
+## Existing AudioCraft and QA workflows
+
+- Jupyter setup cells should inspect the active kernel and installed package metadata before making changes. Avoid blanket uninstalls/upgrades in shared conda environments; preserve the registered kernel metadata.
+- Model-cache checks should use the model library's configured cache root. If weights are missing, run OEC's fresh quota/storage admission checks before downloads.
+- Queue repair tools that change shared records must be dry-run-first and require an explicit operator-approval environment flag in addition to a CLI apply flag. A local process scan alone is insufficient on multi-node shared storage; also inspect shared logs and worker ownership on all active nodes.
