@@ -55,3 +55,11 @@ A prior isolated TRELLIS smoke on October 9 produced a nonempty **8,950,028-byte
 - No production QA rows were changed and no worker signals were sent.
 - The existing `.storage_reserve.bin` and shared cache/data are preserved.
 - Only the authorized connectors `connector-1`, `connector-2`, and `connector-5` were used.
+
+
+## Latest tracking-file sync
+
+- [Connector-1 sync run 38160777602](https://github.com/Killer4K-N/Connector_1/actions/runs/38160777602) fetched feature revision `337390e938d8b1c0bfa7f446fb7ed05e53edde67`, validated `TODO.md`, `test.json`, `result.md`, and the daily changelog/index, and copied them to the live shared OEC checkout.
+- Marker `TRACKING_FILES_VALIDATION=PASS`; the same live sync run passed 17 TRELLIS/entry-point tests, 5 AudioCraft notebook tests, 10 QA worker/queue tests, and 6 path-alias tests.
+- The workflow's final status remains **incomplete** because storage admission is blocked: no new packages installed, no model downloaded, and no TRELLIS inference attempted. Treat it as successful targeted source/tracking sync plus static validation, not as runtime model acceptance.
+- The canonical daily log is `changelog/CHANGELOG-2026-10-11.md`; `TODO.md` remains the only TODO list and `test.json` the single cumulative experiment register.
