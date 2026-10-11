@@ -68,3 +68,11 @@ A prior isolated TRELLIS smoke on October 9 produced a nonempty **8,950,028-byte
 ## Compatibility-reference review
 
 Official Diffusers release notes list Flux2 Klein support in the v0.37.0 release. The current official Hugging Face Hub download docs expose `get_cached_repo_tree`, which the shared `diffusers==0.40.0.dev0` build tries to import from installed `huggingface-hub==0.36.2` and fails. References: [Diffusers releases](https://github.com/huggingface/diffusers/releases), [Hub download API docs](https://github.com/huggingface/huggingface_hub/blob/main/docs/source/en/package_reference/file_download.md), [Hub utility PR workflow](https://github.com/huggingface/huggingface_hub/actions/runs/29011952200). This supports the proposed released dependency-set direction; it does not imply that the stack was installed or that an actual FLUX image was generated. The latest experiment file `test.json` contains 14 structured experiment entries.
+
+
+## Final synchronization verification — run 38161408008
+
+- The final corrected orchestration run [38161408008](https://github.com/Killer4K-N/Connector_1/actions/runs/38161408008) ran `bash -n` successfully, staged and copied `TODO.md`, `test.json`, `result.md`, the daily changelog and its index, and reported `TRACKING_FILES_VALIDATION=PASS`.
+- All offline suites passed again: 17 TRELLIS/entrypoint, 5 AudioCraft notebook, 10 QA worker/queue, and 6 path-alias tests. The aliases remain verified; the QA database was report-only.
+- The run is marked incomplete because storage admission is blocked. This is a clean source/tracking sync and static-validation result, **not** a successful live TRELLIS/FLUX inference result.
+- The experiment register has 16 entries and records the original marker syntax failure, the `bash -n` prevention, the final successful sync-stage checks, and all remaining runtime blockers.
