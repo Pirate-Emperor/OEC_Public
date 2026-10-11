@@ -27,7 +27,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", type=Path, help="Queue SQLite path; defaults to core_config.QUEUE_DB_PATH.")
     parser.add_argument("--apply", action="store_true", help="Apply selected migrations/repairs. Default is report-only.")
-    parser.add_argument("--stale-after-minutes", type=int, default=30, help="Age required to requeue a timestamped claim (default: 30).")
+    parser.add_argument("--stale-after-minutes", type=int, default=240, help="Age required to requeue a timestamped claim (default: 240; four hours).")
     parser.add_argument("--recover-untracked-processing", action="store_true", help="Also recover legacy PROCESSING_QA rows with no claim timestamp; requires --apply and no active QA worker.")
     parser.add_argument("--mark-missing-files", action="store_true", help="Mark missing-file PENDING_QA rows FAILED_MISSING_FILE; requires --apply.")
     return parser.parse_args(argv)
