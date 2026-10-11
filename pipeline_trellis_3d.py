@@ -158,7 +158,7 @@ def _resolve_snapshot(args: argparse.Namespace, runtime: dict[str, Any]) -> Path
     if args.offline:
         raise RuntimeError(
             f"Model {args.model_id!r} is not cached in {runtime['cache_dir']}. "
-            "Run without --offline only after confirming fresh quota telemetry and storage admission."
+            "Run without --offline only when OEC StorageManager confirms configured allocation and filesystem headroom."
         )
 
     from storage_manager import managed_storage_operation, storage_preflight
@@ -170,7 +170,7 @@ def _resolve_snapshot(args: argparse.Namespace, runtime: dict[str, Any]) -> Path
     ok, reason = storage_preflight(
         "models",
         required_gb=required_gb,
-        require_fresh_quota=True,
+        require_fresh_quota=False,
         minimum_free_gb=minimum_free_gb,
     )
     if not ok:
@@ -179,7 +179,7 @@ def _resolve_snapshot(args: argparse.Namespace, runtime: dict[str, Any]) -> Path
     with managed_storage_operation(
         "models",
         required_gb=required_gb,
-        require_fresh_quota=True,
+        require_fresh_quota=False,
         minimum_free_gb=minimum_free_gb,
     ):
         snapshot = runtime["snapshot_download"](

@@ -54,7 +54,7 @@ class AudioCraftNotebookTests(unittest.TestCase):
         model_cell = self.sources[4]
         self.assertIn("local_files_only=True", model_cell)
         self.assertIn("storage_preflight(", model_cell)
-        self.assertIn("require_fresh_quota=True", model_cell)
+        self.assertIn("require_fresh_quota=False", model_cell)
         self.assertIn("managed_storage_operation(", model_cell)
         self.assertIn('AudioGen.get_pretrained(AUDIOGEN_MODEL_ID, device="cuda")', model_cell)
         self.assertLess(model_cell.index("storage_preflight("), model_cell.index("AudioGen.get_pretrained("))
