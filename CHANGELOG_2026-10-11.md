@@ -46,7 +46,7 @@
 - Added `list --columns name,host,github`, `list --columns name,process,pid`, and `list --columns all`; recognized columns are name, host, process, pid, github, started, repo, path, source, and error. Friendly aliases include `runner`, `node`, `state`, `status`, `directory`, and `api_detail`.
 - Added `list --name connector-1,connector-2`, `list --no-github`, and `list --details`. The default view summarizes DNS/API errors such as `API down (DNS)` or `API 404 (repo/access)` instead of printing entire exceptions in every row. `--details` expands raw diagnostic details.
 - Clarified that `not here` means no `Runner.Listener` is visible in the current node's `/proc`; it does not mean stopped. A host marked `(last)` is persisted history, not proof the remote process is still active. The list uses a shorter per-request GitHub API timeout to keep the inventory responsive when network/DNS is degraded.
-- Validation: focused runner-control suite **18/18 passed**, full repo test suite **42/42 passed** on commit before the final host-persistence and sort/timeout tests; subsequent CI runs also passed the host-persistence and sorting changes. Latest validation run before the final commit: https://github.com/Killer4K-N/OEC/actions/runs/38132506639
+- Final CI validation after host-persistence, name-sorting, and bounded API-timeout changes: focused runner-control suite **20/20 passed** and full repository suite **44/44 passed**. Run: https://github.com/Killer4K-N/OEC/actions/runs/38132506639
 
 ## Cross-node host metadata for pre-existing runners
 
@@ -54,4 +54,7 @@
 - Changed `status` so, when a configured runner already has a local Listener PID, it writes host/start-time/username/PID metadata through the existing atomic metadata writer and prints a short confirmation. This does not start or restart the runner.
 - Added regression coverage that calls status on `scn24-mn`, then lists the same shared runner from `scn17-mn`, and checks the output identifies `scn24-mn (last)` rather than `unknown`. Added a sorting test where directory order differs from displayed runner-name order.
 - For legacy runners, run `status --name <runner> --no-github` once on the node where the Listener actually runs. Once metadata is recorded in the shared directory, other nodes can display that host. Since DNS/API is currently unreliable, remote activity must still be treated as unconfirmed unless GitHub status is available.
+- The final guarded deployment installed `tools/runner_control.py` from OEC blob `89b74fedcf4edf4d3ae65ea37278cfcbe4f45da8`; it backed up the previous blob `a83f4e7d8b8c09523bfeb388a5ce70cc638ec637` as `tools/runner_control.py.pre-sync-20261011T103647Z.bak`. Post-write hash verification and Python compilation passed.
+- The real connector-node list smoke test passed and showed the five connector hosts in a compact table. The legacy `a3-test` row remains `unknown` until the newly deployed `status` command is run again on `scn24-mn`; the pre-deployment run had detected that hostname but did not persist it.
+- Successful final A100 sync and table smoke test: https://github.com/Killer4K-N/Connector_1/actions/runs/38132553565
 
