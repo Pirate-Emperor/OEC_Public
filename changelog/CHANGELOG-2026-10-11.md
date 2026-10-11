@@ -335,3 +335,13 @@ The standalone FLUX notebook now uses the verified `phase2_3d` kernel, respects 
 ### End-of-prompt tracking rule
 
 For each future OEC prompt on the same local date, append findings here, add or update an experiment in `test.json`, update `TODO.md` to reflect completion/new blockers, and update `result.md` when a material outcome changes. After the local date changes, create a new daily changelog file and update the index; keep only one TODO file, one test log, and one cumulative result report.
+
+
+## Final synchronization — persistent tracking files copied to live OEC
+
+- Latest targeted sync: [Connector-1 run 38160777602](https://github.com/Killer4K-N/Connector_1/actions/runs/38160777602), which fetched feature revision `337390e938d8b1c0bfa7f446fb7ed05e53edde67`.
+- The sync tool now snapshots/stages/copies `TODO.md`, `test.json`, and `result.md` along with the daily changelog/index and scoped model/QA/path code. It parses `test.json`, checks required TODO/result sections, and verifies the index/daily log before copying. `TRACKING_FILES_VALIDATION=PASS`.
+- Target copy output explicitly reported `SYNCED_TARGET=TODO.md`, `SYNCED_TARGET=test.json`, and `SYNCED_TARGET=result.md`. The same run passed 17 TRELLIS/entrypoint tests, 5 AudioCraft notebook tests, 10 QA recovery/worker tests, and 6 path-alias tests. Its overall status remains `VERIFICATION_RESULT=FAIL_OR_INCOMPLETE` because storage admission is still denied; package install, TRELLIS model download, and TRELLIS inference were not run.
+- `test.json` now has 12 experiment records, including cross-runner test counts, the notebook test-assertion false failure and fix, CUDA attention and FLUX import diagnoses, model-cache probes, quota gate, QA worker state, AudioCraft dependency mismatch, prior isolated TRELLIS GLB success, and the latest tracking-file sync.
+- `TODO.md` was updated with the completed tracking-copy task and retains the remaining P0/P1 blockers. `result.md` records the sync and explicitly distinguishes static/source success from runtime acceptance.
+- The only remaining path to a live runtime fix is the authoritative fresh quota snapshot from the approved login node. Do not fabricate quota values, upgrade shared packages without admission, download model weights without admission, resume the stale QA process, or mutate queue statuses until ownership and prerequisites have been checked.
