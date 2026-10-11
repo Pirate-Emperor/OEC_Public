@@ -1457,7 +1457,9 @@ def list_runners(args: argparse.Namespace) -> None:
         if "(last)" in row["host"]
     ]
     if last_known_hosts:
-        print("* HOST is last recorded, not confirmed current; this node cannot inspect that remote process.")
+        print("HOST marked '(last)' is the last recorded host, not a confirmed current location.")
+    if any(str(row["pid"]).endswith("*") for row in rows):
+        print("PID marked '*' is the last recorded remote Listener PID, not a PID visible on this node.")
 
     if any(row["process"] == "not here" for row in rows):
         print("Note: 'not here' means no listener is visible on this node; it does not mean stopped.")
