@@ -362,7 +362,12 @@ def _github_request(
         raise RuntimeError(f"GitHub API {method} {endpoint} failed: {exc}") from exc
 
 
-def _github_runner_record(runner: Path, *, token: str | None = None) -> dict | None:
+def _github_runner_record(
+    runner: Path,
+    *,
+    token: str | None = None,
+    timeout: float = 20.0,
+) -> dict | None:
     auth = token or _github_auth_token()
     if not auth:
         return None
@@ -378,6 +383,7 @@ def _github_runner_record(runner: Path, *, token: str | None = None) -> dict | N
         "GET",
         f"repos/{repo}/actions/runners?per_page=100",
         auth,
+        timeout=timeout,
     )
     for item in payload.get("runners", []):
         if item.get("name") == name:
@@ -1395,7 +1401,8 @@ def list_runners(args: argparse.Namespace) -> None:
                 github_error = github_errors_by_repo[cache_key]
             else:
                 try:
-                    github_record = _github_runner_record(runner, token=auth)
+                    # Listing should stay responsive when API/DNS is degraded.
+                    github_record = _github_runner_record(runner, token=auth, timeout=5.0)
                 except RuntimeError as exc:
                     github_error = str(exc)
                     github_errors_by_repo[cache_key] = github_error
@@ -1441,7 +1448,7 @@ def list_runners(args: argparse.Namespace) -> None:
             "repo": repo or "—",
             "path": path_text,
             "source": source,
-            "error": github_state if github_error else ("no token" if not auth and not no_github else api_detail if no_github else "—"),
+            "error": github_state if github_error else ("no token" if not auth and not no_github else "—"),
             "_full_path": str(runner),
             "_repo_url": server_url or "",
             "_pids": pids,
@@ -1453,6 +1460,9 @@ def list_runners(args: argparse.Namespace) -> None:
     if not rows:
         print("No configured runners match --name.")
         return
+
+    # Sort by the displayed runner name rather than the physical directory path.
+    rows.sort(key=lambda row: str(row["name"]).casefold())
 
     print(
         f"OEC runner inventory — {len(rows)} runner(s) — local node: {socket.gethostname()}"
