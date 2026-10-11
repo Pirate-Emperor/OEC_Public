@@ -1170,6 +1170,13 @@ def status_runner(args: argparse.Namespace) -> None:
     if pids:
         print(f"PIDs      : {','.join(map(str, pids))}")
 
+    # A status command run on the node hosting an existing listener also seeds
+    # shared host metadata. Other login/compute nodes can then display this host
+    # without incorrectly inferring remote process state from their own /proc.
+    if configured and pids:
+        _write_runner_host_metadata(runner, pids[0], preserve_started_at=True)
+        print(f"Host info  : recorded for shared inventory ({socket.gethostname()})")
+
     record = None
     if configured:
         try:
