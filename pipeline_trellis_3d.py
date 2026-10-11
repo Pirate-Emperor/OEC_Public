@@ -336,9 +336,9 @@ def main(argv: list[str] | None = None) -> int:
         decimation_target: int,
         texture_size: int,
         max_image_size: int,
-    ) -> str:
+    ) -> tuple[str, str]:
         try:
-            return generate_glb(
+            result = generate_glb(
                 image=input_image,
                 pipeline=pipeline,
                 o_voxel=runtime["o_voxel"],
@@ -349,6 +349,7 @@ def main(argv: list[str] | None = None) -> int:
                 decimation_target=int(decimation_target),
                 texture_size=int(texture_size),
             )
+            return result, result
         except Exception as exc:
             raise gr.Error(f"TRELLIS generation failed: {type(exc).__name__}: {exc}") from exc
 
