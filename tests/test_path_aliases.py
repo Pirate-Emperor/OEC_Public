@@ -45,6 +45,18 @@ class EnsurePathAliasesTests(unittest.TestCase):
             self.assertTrue(marker.is_file())
             self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
 
+    def test_existing_correct_symlink_is_reported_ok(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = root / "aireos_dataset"
+            target.mkdir()
+            alias = root / "aireos_datasets"
+            alias.symlink_to(target, target_is_directory=True)
+            result = ensure_alias(alias, target, apply=True)
+            self.assertTrue(result.startswith("ALIAS_OK"), result)
+            self.assertTrue(alias.is_symlink())
+            self.assertEqual(alias.resolve(), target.resolve())
+
     def test_wrong_symlink_is_not_repointed(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
