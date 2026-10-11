@@ -63,6 +63,11 @@ class QAQueueRecoveryTests(unittest.TestCase):
             states = dict(conn.execute("SELECT id, status FROM assets WHERE id IN (2, 3)"))
         self.assertEqual(states, {2: "PENDING_QA", 3: "PROCESSING_QA"})
 
+    def test_default_stale_timeout_is_four_hours(self):
+        # A heavy model can legitimately take longer than 30 minutes; the default
+        # sweeper should not race a live inference job.
+        recovered = recover_stuck_jobs(self.db, now=self.now)
+        self.assertEqual(recovered, 0)
     def test_legacy_untracked_jobs_require_explicit_opt_in(self):
         with sqlite3.connect(self.db) as conn:
             conn.execute("UPDATE assets SET qa_claimed_at=NULL WHERE id=2")
