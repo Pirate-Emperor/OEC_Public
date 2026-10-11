@@ -40,10 +40,10 @@ def _queue_path(args: argparse.Namespace) -> Path:
     return Path(QUEUE_DB_PATH).expanduser().resolve()
 
 
-def _active_qa_worker_pids() -> list[int]:
-    """Best-effort local process check used only to gate legacy row recovery."""
+def _active_qa_worker_indicators() -> list[str]:
+    """Conservative process/log activity check before recovering legacy queue rows."""
     proc_root = Path("/proc")
-    active: list[int] = []
+    active: list[str] = []
     if not proc_root.is_dir():
         raise RuntimeError("Cannot verify active QA workers: /proc is unavailable; refusing legacy recovery.")
     for entry in proc_root.iterdir():
@@ -53,13 +53,23 @@ def _active_qa_worker_pids() -> list[int]:
         if pid == os.getpid():
             continue
         try:
-            cmdline = (entry / "cmdline").read_bytes().replace(b"\x00", b" ").decode("utf-8", "replace")
+            cmdline = (entry / "cmdline").read_bytes().replace(b"\\x00", b" ").decode("utf-8", "replace")
         except (FileNotFoundError, PermissionError, ProcessLookupError):
             continue
         if "qa_compliance_worker.py" in cmdline and "qa_queue_doctor.py" not in cmdline:
-            active.append(pid)
-    return sorted(active)
+            active.append(f"pid:{pid}")
 
+    # Shared-storage log activity can reveal a QA process on another node, outside local /proc.
+    try:
+        from core_config import SYSTEM_DIRS
+        log_path = Path(SYSTEM_DIRS.get("logs", SYSTEM_DIRS["outputs"])) / "qa_worker.log"
+        if log_path.is_file():
+            age_seconds = max(0, time.time() - log_path.stat().st_mtime)
+            if age_seconds < 1800:
+                active.append(f"qa_worker.log_recent:{int(age_seconds)}s")
+    except Exception as exc:
+        raise RuntimeError(f"Cannot verify shared QA worker log; refusing legacy recovery: {type(exc).__name__}: {exc}") from exc
+    return sorted(active)
 
 def _read_report(db_path: Path) -> dict[str, object]:
     if not db_path.is_file():
@@ -165,11 +175,11 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.recover_untracked_processing:
-            pids = _active_qa_worker_pids()
-            if pids:
+            indicators = _active_qa_worker_indicators()
+            if indicators:
                 print(
-                    "ERROR: active qa_compliance_worker.py process(es) visible on this host: "
-                    + ",".join(map(str, pids))
+                    "ERROR: active QA worker process or recent shared QA log activity detected: "
+                    + ",".join(indicators)
                     + "; refusing to requeue legacy PROCESSING_QA rows.",
                     file=sys.stderr,
                 )
