@@ -61,6 +61,11 @@ def _active_qa_worker_indicators() -> list[str]:
 
     # Shared-storage log activity can reveal a QA process on another node, outside local /proc.
     try:
+        # Running this file directly from tools/ does not automatically put the repo
+        # root on sys.path. Resolve the configured shared log path from the OEC root.
+        oec_root = Path(__file__).resolve().parents[1]
+        if str(oec_root) not in sys.path:
+            sys.path.insert(0, str(oec_root))
         from core_config import SYSTEM_DIRS
         log_path = Path(SYSTEM_DIRS.get("logs", SYSTEM_DIRS["outputs"])) / "qa_worker.log"
         if log_path.is_file():
