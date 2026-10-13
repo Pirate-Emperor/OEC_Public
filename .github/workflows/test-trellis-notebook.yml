@@ -1,0 +1,51 @@
+name: TRELLIS Notebook Static Regression
+
+on:
+  push:
+    branches:
+      - fix/trellis-extension-detection-and-safe-purge-20261010
+
+concurrency:
+  group: trellis-notebook-static-regression
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Validate TRELLIS notebook fixes
+    runs-on: [self-hosted, connector-3]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout TRELLIS fix branch
+        uses: actions/checkout@v4
+
+      - name: Verify dedicated oec_freeze environment
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          CONDA_EXE="$(command -v conda || true)"
+          if [ -z "$CONDA_EXE" ]; then
+            for candidate in "$HOME/Conda/condabin/conda" "$HOME/miniconda3/bin/conda" "$HOME/anaconda3/bin/conda"; do
+              if [ -x "$candidate" ]; then CONDA_EXE="$candidate"; break; fi
+            done
+          fi
+          test -n "$CONDA_EXE"
+          "$CONDA_EXE" run --no-capture-output -n oec_freeze python - <<'PY'
+          import sys
+          from pathlib import Path
+          assert sys.version_info[:2] == (3, 11), sys.version
+          assert Path(sys.prefix).name == "oec_freeze", sys.prefix
+          print(f"PYTHON={sys.executable}")
+          print("OEC_FREEZE_ENVIRONMENT=PASS")
+          PY
+          echo "CONDA_EXE=$CONDA_EXE" >> "$GITHUB_ENV"
+
+      - name: Run TRELLIS notebook static regressions
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          "$CONDA_EXE" run --no-capture-output -n oec_freeze python tests/test_trellis_notebook_static.py -v
