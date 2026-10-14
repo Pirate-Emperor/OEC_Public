@@ -1,0 +1,85 @@
+name: OEC FLUX.2 Klein cache-only image generation
+run-name: "oec-flux-cache-generation-${{ github.run_id }}"
+
+on:
+  push:
+    branches:
+      - fix/trellis-offline-pipeline-config-20261014
+    paths:
+      - ".github/workflows/oec-flux-image-smoke.yml"
+      - "pipeline_flux_image.py"
+      - "tools/flux_gpu_admission.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flux-image:
+    name: Generate and validate one FLUX PNG on ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        runner: [oec-1, oec-2, oec-3]
+    runs-on: [self-hosted, linux, x64, gpu, a100, "${{ matrix.runner }}"]
+    timeout-minutes: 25
+    steps:
+      - name: Checkout isolated OEC candidate
+        uses: actions/checkout@v4
+      - name: Generate one cache-only FLUX.2 Klein image on an admitted GPU
+        shell: bash
+        env:
+          OEC_EXPECTED_RUNNER: ${{ matrix.runner }}
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          HF_HUB_DISABLE_TELEMETRY: "1"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          PYTHON="${OEC_PYTHON:-$HOME/Conda/envs/phase2_3d/bin/python}"
+          if [ ! -x "$PYTHON" ]; then
+            echo "FLUX_GENERATION=BLOCKED_PHASE2_3D_PYTHON_MISSING path=$PYTHON"
+            exit 20
+          fi
+          RUNNER_NAME_ACTUAL="${RUNNER_NAME:-unknown}"
+          if [ "$RUNNER_NAME_ACTUAL" != "$OEC_EXPECTED_RUNNER" ]; then
+            echo "FLUX_GENERATION=FAIL_RUNNER_IDENTITY expected=$OEC_EXPECTED_RUNNER actual=$RUNNER_NAME_ACTUAL"
+            exit 21
+          fi
+          GPU="$("$PYTHON" tools/flux_gpu_admission.py --print-index-only)"
+          echo "FLUX_SELECTED_PHYSICAL_GPU=$GPU"
+          export CUDA_VISIBLE_DEVICES="$GPU"
+          export AIEROS_GPU="$GPU"
+          OUTPUT_DIR="/tmp/oec-flux-image-$GITHUB_RUN_ID-$RUNNER_NAME_ACTUAL"
+          if [ -e "$OUTPUT_DIR" ]; then
+            echo "FLUX_GENERATION=BLOCKED_REFUSING_EXISTING_TEMP_DIR path=$OUTPUT_DIR"
+            exit 22
+          fi
+          mkdir -m 700 -p "$OUTPUT_DIR"
+          "$PYTHON" pipeline_flux_image.py --mode check --offline --gpu "$GPU"
+          "$PYTHON" pipeline_flux_image.py --mode generate --offline --scratch-output --gpu "$GPU"             --output "$OUTPUT_DIR/flux2_klein.png"             --prompt "A polished red ceramic tea kettle on a quiet studio table, soft natural window light, realistic product photography"             --seed 2048 --width 512 --height 512 --steps 4 --guidance-scale 1.0
+          "$PYTHON" - "$OUTPUT_DIR/flux2_klein.png" "$OUTPUT_DIR/flux2_klein_info.json" <<'PY'
+          import json, sys
+          from pathlib import Path
+          from pipeline_flux_image import validate_png_file
+          image, metadata = Path(sys.argv[1]), Path(sys.argv[2])
+          info = validate_png_file(image)
+          payload = json.loads(metadata.read_text(encoding="utf-8"))
+          assert payload["image_path"] == str(image)
+          assert payload["image_bytes"] == info["bytes"]
+          assert payload["seed"] == 2048
+          print("FLUX_ARTIFACT_VALIDATION=PASS " + json.dumps({
+              "path": str(image), "bytes": info["bytes"], "metadata_path": str(metadata),
+              "width": payload["width"], "height": payload["height"], "seed": payload["seed"],
+              "generation_seconds": payload["generation_seconds"], "host": payload["host"],
+          }, sort_keys=True))
+          PY
+      - name: Upload exact-run PNG and generation metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-flux-image-${{ matrix.runner }}-${{ github.run_id }}
+          path: /tmp/oec-flux-image-${{ github.run_id }}-${{ matrix.runner }}/flux2_klein*
+          if-no-files-found: warn
+          retention-days: 30
