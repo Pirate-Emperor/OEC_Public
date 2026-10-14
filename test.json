@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-14T22:25:29+05:30",
+  "last_updated": "2026-10-14T22:30:28+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "TRELLIS offline loader fixed and runtime verified: fresh 8.87 MB GLB with structural checks and trimesh reopen PASS (96,532 vertices / 91,986 faces). OEC CLI/notebook source candidate passed 34 CI tests; PR #10 remains open. Connector test-assertion and stale-artifact-path issues are corrected; final reruns are active/queued. FLUX end-to-end generation and fresh authoritative quota telemetry remain separate outstanding items.",
+  "latest_summary": "TRELLIS offline loader fixed and end-to-end runtime verified twice: run 38598822415 produced an 8.87 MB validated GLB; corrected retry 38601626147 passed 10/10 tests and generated another validated GLB (98,250 vertices/93,243 faces). OEC CLI/notebook candidate passed 34 CI tests; PR #10 is open, not merged. Exact-run artifact upload validation is in progress; FLUX generation and quota telemetry remain separate.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -1494,12 +1494,21 @@
         "corrected_test_retry": {
           "id": 38601626147,
           "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38601626147",
-          "status": "TEST_STEP_PASS; GENERATION_IN_PROGRESS"
+          "status": "PASS_10_TESTS_AND_GENERATION",
+          "generated_glb": {
+            "bytes": 8952036,
+            "sha256": "2ddf74205d88dec2875dd3126e2c1a4f5600a29bfedad280b5e16452d7aae575",
+            "vertices": 98250,
+            "faces": 93243,
+            "trimesh_reopen": "PASS"
+          },
+          "artifact_id": 11913877767,
+          "artifact_limitation": "Artifact archive may contain multiple GLBs because that run used the old broad upload glob."
         },
         "run_scoped_artifact_retry": {
           "id": 38602330418,
           "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418",
-          "status": "QUEUED"
+          "status": "GENERATION_IN_PROGRESS"
         }
       },
       "interpretation": "This was a test expectation failure, not a TRELLIS inference failure. The assertion and artifact selection path were corrected.",
@@ -1565,7 +1574,7 @@
     {
       "id": "TEST-2026-10-14-TRELLIS-OFFLINE-PIPELINE-CONFIG-FIX",
       "date": "2026-10-14",
-      "datetime": "2026-10-14T22:25:29+05:30",
+      "datetime": "2026-10-14T22:30:28+05:30",
       "timezone": "Asia/Kolkata",
       "category": "TRELLIS cache-only image-to-3D runtime regression and fix",
       "objective": "Fix the live cached TRELLIS smoke after GPU admission so the local weight snapshot can load its pipeline config without a Hugging Face network request, then generate and validate a fresh GLB.",
@@ -1621,15 +1630,29 @@
         "regression_suite_retry": {
           "id": 38601626147,
           "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38601626147",
-          "status": "TESTS_PASS; GENERATION_IN_PROGRESS_AT_LOG_UPDATE",
-          "commit": "4dde5fdd9c815e7c1eee5e11e1e2c2f8840c2908"
+          "status": "PASS_10_TESTS_AND_GENERATION",
+          "commit": "4dde5fdd9c815e7c1eee5e11e1e2c2f8840c2908",
+          "job_id": 115982042418,
+          "artifact_id": 11913877767,
+          "artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38601626147/artifacts/11913877767",
+          "report_artifact_id": 11913962436,
+          "report_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38601626147/artifacts/11913962436",
+          "generated_glb": {
+            "bytes": 8952036,
+            "sha256": "2ddf74205d88dec2875dd3126e2c1a4f5600a29bfedad280b5e16452d7aae575",
+            "trimesh_reopen": "PASS",
+            "vertices": 98250,
+            "faces": 93243
+          },
+          "artifact_limitation": "Broad path produced a 14,552,312-byte archive that may contain older files as well as this run's GLB. Use the exact-run path hardening run 38602330418 for the isolated final artifact."
         },
         "artifact_path_guard": {
           "id": 38602330418,
           "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418",
-          "status": "QUEUED",
+          "status": "GENERATION_IN_PROGRESS_AT_LOG_UPDATE",
           "commit": "d543a062b5695a07fd2952396ab8dc88f81a85d6",
-          "reason": "Restrict GLB upload to the exact run ID so a failed run cannot publish an older file from another /tmp directory."
+          "reason": "Restrict GLB upload to the exact run ID so a failed run cannot publish an older file from another /tmp directory.",
+          "job_id": 115984412406
         },
         "oec_source_ci": {
           "id": 38601987037,
@@ -1696,17 +1719,40 @@
         "package_install": false,
         "shared_cache_mutated": false,
         "active_gpu_process_terminated": false,
-        "authoritative_quota_snapshot": "MISSING"
+        "authoritative_quota_snapshot": "MISSING",
+        "latest_successful_runtime_run": 38601626147,
+        "latest_successful_runtime_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38601626147",
+        "latest_generated_glb": {
+          "bytes": 8952036,
+          "sha256": "2ddf74205d88dec2875dd3126e2c1a4f5600a29bfedad280b5e16452d7aae575",
+          "artifact_id": 11913877767,
+          "report_artifact_id": 11913962436,
+          "format": "GLB 2.0",
+          "structural_validation": "PASS",
+          "trimesh_reopen": "PASS",
+          "mesh_count": 1,
+          "primitive_count": 1,
+          "texture_count": 2,
+          "vertices": 98250,
+          "faces": 93243
+        },
+        "retry_test_suite": {
+          "status": "PASS",
+          "total": 10,
+          "passed": 10,
+          "failed": 0,
+          "run_id": 38601626147
+        }
       },
-      "interpretation": "The offline loader defect is fixed and a fresh asset has passed structural GLB checks plus trimesh reopen on Connector_1. The same config-overlay helper is in the OEC CLI and both TRELLIS notebooks; OEC candidate CI passes 34 tests and PR #10 is open, not merged. Corrected connector retest and artifact-upload path verification are pending.",
+      "interpretation": "Two Connector_1 runs have now independently generated valid GLBs after the pinned local pipeline config fix. The corrected expanded test suite passed 10/10 and a further fresh GLB (98,250 vertices/93,243 faces) passed structural and trimesh validation. The last retry's broad artifact path can bundle older GLBs; the exact-run artifact upload hardening commit is being validated.",
       "limitations": [
         "Artifact 11913875417 from failed run 38598881722 is stale: generation was skipped and the workflow's broad /tmp wildcard matched an older GLB.",
         "OEC source changes remain on the candidate branch and PR #10; main code was not merged without approval.",
         "Run 38601626147 had passed tests and was still generating at log update; run 38602330418 (exact run-scoped artifact upload) was queued.",
         "Authoritative quota telemetry remains missing. No model/dependency download, install, shared-cache mutation, quota bypass, or GPU process termination occurred."
       ],
-      "status": "RUNTIME FIX VERIFIED; OEC SOURCE PR OPEN; CONNECTOR RETEST IN PROGRESS",
-      "follow_up": "Verify run 38601626147 finishes with a current-run GLB; verify 38602330418 uploads only its own output; review PR #10 and merge only with authorization. Update this record when final retry outcomes are known.",
+      "status": "RUNTIME FIX VERIFIED; OEC SOURCE PR OPEN; EXACT-RUN ARTIFACT VERIFICATION IN PROGRESS",
+      "follow_up": "Verify exact-run artifact upload in run 38602330418; then finish OEC main tracking. PR #10 remains open for source review and has not been merged.",
       "oec_candidate": {
         "branch": "fix/trellis-offline-pipeline-config-20261014",
         "commit": "9b97c7d316d861993463ded43e8488154f060728",
