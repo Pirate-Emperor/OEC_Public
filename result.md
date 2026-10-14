@@ -209,3 +209,22 @@ The correction is on the diagnostic branch of [Connector_1](https://github.com/K
 The config-vendor run [38598747382](https://github.com/Killer4K-N/Connector_1/actions/runs/38598747382) was still in progress when this note was written; the loader fix [38598822415](https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415) and expanded 10-test suite [38598881722](https://github.com/Killer4K-N/Connector_1/actions/runs/38598881722) were queued behind it. **Fresh asset generation remains pending** until a current run loads the model, performs inference, exports a GLB and validates actual geometry. Historical successful asset evidence remains [run 37942265623](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623), artifact [11622412194](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194).
 
 No package installation, model download, shared-cache mutation, quota bypass, or process termination was performed. The missing authoritative quota snapshot remains a separate blocker for any downloads.
+
+
+## 2026-10-14 22:25 IST — TRELLIS offline loader fixed; fresh asset generated and validated
+
+### Root cause and runtime fix
+
+The cache-only loader safely passed GPU admission but failed at model load because cached snapshot af44b45f2e35a493886929c6d786e563ec68364d lacked pipeline.json. Upstream from_pretrained(snapshot) then attempted a Hub lookup while offline. Connector_1 commit [dcc0eb9](https://github.com/Killer4K-N/Connector_1/commit/dcc0eb9f8be81e20437416679414b67def6da358) adds a pinned local config, isolated /tmp snapshot overlay and temporary Hugging Face metadata view. It does not write to shared model-cache files.
+
+### Current asset proof
+
+[Connector_1 run 38598822415](https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415) completed successfully and generated a fresh GLB; artifact [11912523421](https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415/artifacts/11912523421), 8,870,632 bytes, plus report artifact [11913208247](https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415/artifacts/11913208247). SHA-256 is 0ba06de0e028d975b7108f4dcb9856a81dcdd76037e94cc852883fc5b2ad6b1e. GLB 2.0/length/JSON checks and trimesh reopen passed: one mesh/primitive, two textures, 96,532 vertices and 91,986 faces. GPU 1 admission was 39,902 MiB free, 0% utilization, with 416 MiB attributed to one existing process; no process was terminated. No model or package downloads occurred.
+
+### Regression and source-entry follow-through
+
+Expanded Connector_1 test run [38598881722](https://github.com/Killer4K-N/Connector_1/actions/runs/38598881722) failed one test (9/10 passed), not inference: the synthetic fixture intentionally had weight shards but no config.json. Generation was skipped. Its broad artifact path picked up a previous GLB, so artifact [11913875417](https://github.com/Killer4K-N/Connector_1/actions/runs/38598881722/artifacts/11913875417) is stale and is not accepted as output from that failed run. Commit [4dde5fd](https://github.com/Killer4K-N/Connector_1/commit/4dde5fdd9c815e7c1eee5e11e1e2c2f8840c2908) corrected the assertion; retry [38601626147](https://github.com/Killer4K-N/Connector_1/actions/runs/38601626147) passed tests and was generating when this note was written. Commit [d543a06](https://github.com/Killer4K-N/Connector_1/commit/d543a062b5695a07fd2952396ab8dc88f81a85d6) restricts artifact upload to the current run ID; validation run [38602330418](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418) is queued.
+
+The same fix is in the OEC standalone CLI and both TRELLIS notebooks on branch [fix/trellis-offline-pipeline-config-20261014](https://github.com/Killer4K-N/OEC/tree/fix/trellis-offline-pipeline-config-20261014). CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 tests (12 notebook static, 5 CLI, 6 offline config, 5 AudioCraft, 6 storage admission), Python compilation and four notebook JSON checks. Review PR [#10](https://github.com/Killer4K-N/OEC/pull/10) is open and not merged.
+
+Authoritative quota telemetry remains missing. Any missing model/dependency download remains denied; the successful path uses cached files plus /tmp only.
