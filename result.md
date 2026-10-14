@@ -1,12 +1,12 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-11 (Asia/Kolkata)  
+**Last updated:** 2026-10-14 (Asia/Kolkata)  
 **Branch:** `fix/trellis-gradio-notebooks-20261011`  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
 ## Current status
 
-**Source and offline/static validations are passing; full shared-environment runtime is not yet fixed.** Required installs and TRELLIS inference remain blocked by missing fresh quota telemetry. The latest targeted sync preserves existing source/worktree changes and reports its aggregate result as incomplete, correctly reflecting the blocked runtime gate.
+**Static validation has historical PASS evidence; shared-environment runtime is still not accepted.** The October 14 read-only runner probe confirms that the configured quota snapshot is missing and `quota_check` is unavailable on connector-1/scn17-mn. The measured Lustre free space does not establish user/project quota headroom, so package/model writes remain gated. The current live OEC checkout is detached and has tracked dirty files; no sync/reset was attempted.
 
 ## Material fixes delivered in the feature branch
 
@@ -98,3 +98,24 @@ An isolated Connector_1 branch, [`ops/runtime-remediation-20261012`](https://git
 Official upstream references reviewed: Microsoft [TRELLIS.2 README](https://github.com/microsoft/TRELLIS.2) and [setup.sh](https://github.com/microsoft/TRELLIS.2/blob/main/setup.sh), [xFormers release changelog](https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md), [Diffusers v0.37.0 FLUX.2 API](https://huggingface.co/docs/diffusers/v0.37.0/en/api/pipelines/flux2), [AudioCraft requirements](https://github.com/facebookresearch/audiocraft/blob/main/requirements.txt), and the upstream [TRELLIS.2 setup issue #111](https://github.com/microsoft/TRELLIS.2/issues/111). These sources support scoped compatibility candidates; they do not substitute for testing the actual installed environment.
 
 **Acceptance status:** source edits are committed but the combined remediation workflow has not yet reported. Actual package/model writes are still prohibited until authoritative quota telemetry is available. No package was installed, no model was downloaded, no shared cache or reserve file was purged/resized, no QA row changed, and no worker was signaled by the source-editing step. No merge to `main`.
+
+
+## 2026-10-14 — Confirmed quota telemetry blocker and live checkout divergence
+
+The OEC feature branch `fix/trellis-gradio-notebooks-20261011` is at `2543b26d2888e667c6443c984259f84ac5b6c142`, 111 commits ahead and 0 behind OEC `main` (`82346c0753e139b92240f53734eb48d2113ed9ad`). No main-branch changes or merge were made.
+
+A focused read-only probe was committed on Connector_1 branch [`diagnose/oec-storage-telemetry-20261014`](https://github.com/Killer4K-N/Connector_1/tree/diagnose/oec-storage-telemetry-20261014), commit [`70d9000ba48cfdd6a6413276d7a4d4fe2888ad17`](https://github.com/Killer4K-N/Connector_1/commit/70d9000ba48cfdd6a6413276d7a4d4fe2888ad17). [Run 38555689884](https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884) completed successfully; job `115824133792` on `connector-1` / `scn17-mn` passed Python compile, read-only report generation, JSON validation, and artifact upload ([artifact 11888967874](https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884/artifacts/11888967874)).
+
+Confirmed report observations:
+- Configured quota snapshot `/nlsasfs/home/lmedge/rahkus/.cache/aieros/quota_snapshot.json`: **MISSING**; freshness threshold 900 seconds.
+- `quota_check`: **NOT_FOUND** on this compute runner.
+- Model path `/nlsasfs/home/lmedge/rahkus/aireos_models` resides on shared Lustre. Measured filesystem free space was 9,383,140,028,837,888 bytes (8,738,730.13 GiB). This is filesystem capacity only, **not** authoritative user/project quota.
+- Two A100-SXM4-40GB GPUs were visible. No CUDA attention operator or model inference was tested.
+- Live OEC checkout: HEAD `081aaf34f6379873bdc925d1dcf6b9c3d50349d3`, no branch name reported, and ten tracked dirty paths including config, three notebooks, QA worker, storage config and runner-control tooling. No sync/reset/clean occurred.
+- Reserve discrepancy: run [38175212786](https://github.com/Killer4K-N/Connector_1/actions/runs/38175212786) had logged `STORAGE_MANAGER_RESERVE_BYTES=37190724326`; October 14 read-only stat found `.storage_reserve.bin` size 33,580,119,505 bytes, allocated 33,580,130,304 bytes, non-sparse, mtime `2026-10-12T20:33:53Z`. Cause/path equivalence has not been established. No reserve operation is authorized or performed.
+
+Conclusion: **diagnostic PASS / storage admission BLOCKED**. Do not replace `require_fresh_quota=True` with filesystem-only admission for large writes on shared Lustre. Obtain genuine quota values through an approved login-node/site route and publish them using `tools/quota_snapshot.py` only from actual `quota_check` output; if the route remains unavailable, repair approved access/transport or arrange a site-approved producer before retrying package/model writes.
+
+The separate [run 38175212786](https://github.com/Killer4K-N/Connector_1/actions/runs/38175212786) connector-2 QA job also failed with `scontrol: stepd_available: Couldn't find nodename` and `sacct` connection refusal to `localhost:6819`. This is an independent Slurm/scheduler issue and must not be confused with the quota telemetry failure.
+
+No package was installed, no model was downloaded, no shared cache/reserve was changed, no queue row was mutated, and no process was signalled. TRELLIS shared-environment inference, FLUX generation, full notebook UI execution, AudioCraft repair/generation, and QA worker replacement remain unverified. The historical isolated TRELLIS GLB success remains isolated-environment evidence, not shared `phase2_3d` acceptance.

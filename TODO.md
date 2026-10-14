@@ -1,7 +1,20 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-12 (Asia/Kolkata)  
+**Last updated:** 2026-10-14 (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
+
+## 2026-10-14 — quota telemetry and live-checkout diagnosis
+
+- [x] Verified GitHub state: OEC `main` is `82346c0753e139b92240f53734eb48d2113ed9ad`; `fix/trellis-gradio-notebooks-20261011` is `2543b26d2888e667c6443c984259f84ac5b6c142` (111 ahead, 0 behind). No main-branch change or merge.
+- [x] Reviewed failed remediation [run 38175212786](https://github.com/Killer4K-N/Connector_1/actions/runs/38175212786). Main job blocked on missing fresh quota; separate connector-2 QA recovery failed with `scontrol: stepd_available: Couldn't find nodename` and `sacct` connection refusal to `localhost:6819`.
+- [x] Created the read-only Connector_1 diagnostic on [branch `diagnose/oec-storage-telemetry-20261014`](https://github.com/Killer4K-N/Connector_1/tree/diagnose/oec-storage-telemetry-20261014), commit `70d9000ba48cfdd6a6413276d7a4d4fe2888ad17`. [Run 38555689884](https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884) succeeded, job `115824133792`; JSON artifact [11888967874](https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884/artifacts/11888967874).
+- [x] The probe confirmed the configured quota snapshot is **MISSING**, `quota_check` is **NOT_FOUND** on `scn17-mn`, and the resolved model directory `/nlsasfs/home/lmedge/rahkus/aireos_models` is on shared Lustre. Free-space measurement was 9,383,140,028,837,888 bytes (8,738,730.13 GiB); this does not establish user/project quota. Keep fresh-quota admission fail-closed.
+- [x] GPU visibility showed two A100-SXM4-40GB devices. This was not an attention probe or inference test.
+- [x] The live OEC checkout was observed at `081aaf34f6379873bdc925d1dcf6b9c3d50349d3`, with no branch name (detached) and ten tracked dirty paths: `core_config.py`, `oec_aireos/MOE`, `oec_deploy`, three model notebooks, `qa_compliance_worker.py`, `storage_config.json`, and `tools/runner_control.py`. No live sync/reset/clean was attempted.
+- [ ] **Reconcile the reserve-size discrepancy before any storage write.** The 2026-10-11 run `38175212786` logged `STORAGE_MANAGER_RESERVE_BYTES=37190724326`; the 2026-10-14 read-only stat reports size `33580119505` bytes, allocated `33580130304`, non-sparse, mtime `2026-10-12T20:33:53Z`. Cause/path equivalence is unknown. Do not resize, recreate, overwrite, delete or relocate the reserve.
+- [ ] Obtain genuine quota values via the approved site/login-node route, publish with `tools/quota_snapshot.py` from actual `quota_check` values, verify shared visibility/freshness, and rerun admission. If the login route is still unavailable, resolve that transport or provide a site-approved telemetry producer; do not invent values.
+- [ ] Diagnose the connector-2 Slurm control/accounting failure before QA recovery. Preserve the stopped process and queue until ownership and the replacement job state can be verified.
+- [ ] After admission passes, complete actual xFormers/CUDA attention, TRELLIS model load/inference/GLB geometry, FLUX image-generation, intended-kernel notebook, and separate AudioCraft/QA checks. Runtime acceptance remains open.
 
 ## Completed in this workstream
 

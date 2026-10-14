@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-12T02:20:00+05:30",
+  "last_updated": "2026-10-14T16:50:16+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
   "latest_summary": {
@@ -117,6 +117,20 @@
       "actual_install_or_inference": "NOT_RUN",
       "queue_mutation": "NOT_PERFORMED",
       "caveat": "This is a source guard correction, not evidence of successful runtime repair. Fresh, authoritative quota telemetry is still required."
+    },
+    "latest_storage_quota_diagnostic": {
+      "run_id": 38555689884,
+      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884",
+      "artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884/artifacts/11888967874",
+      "connector_commit": "70d9000ba48cfdd6a6413276d7a4d4fe2888ad17",
+      "runner": "connector-1/scn17-mn",
+      "result": "PASS_READ_ONLY_REPORT",
+      "quota_snapshot": "MISSING",
+      "quota_check": "NOT_FOUND",
+      "admission": "BLOCKED; not bypassed",
+      "install_download_inference": "NOT_RUN",
+      "queue_and_process_mutation": "NOT_PERFORMED",
+      "note": "Lustre filesystem has very large free capacity but does not reveal authoritative user/project quota. Live OEC checkout is detached at 081aaf34... with tracked dirty files; reserve size differs from earlier logged measurement and needs safe reconciliation."
     }
   },
   "experiments": [
@@ -714,6 +728,133 @@
         "queue_mutation": "NOT_PERFORMED"
       },
       "limitation": "The current work corrects guard logic but cannot claim runtime acceptance until the remediated action passes syntax/static tests and fresh quota telemetry authorizes actual package/model writes. Do not estimate quota, bypass admission, purge shared caches, or merge to main."
+    },
+    {
+      "id": "EXP-2026-10-14-STORAGE-QUOTA-TELEMETRY-READONLY",
+      "date": "2026-10-14",
+      "datetime": "2026-10-14T16:49:45.592369+05:30",
+      "timezone": "Asia/Kolkata",
+      "category": "read-only live-runner storage telemetry diagnosis",
+      "objective": "Determine why OEC model/package write admission keeps failing; distinguish missing authoritative quota telemetry from filesystem capacity without weakening admission or changing shared state.",
+      "reason": "Latest live syncs fail closed because StorageManager has no fresh quota snapshot. Shared Lustre free space does not establish the user's/project's quota.",
+      "hypothesis": "The compute runner lacks both the configured quota snapshot and the quota_check utility even if the backing filesystem reports free blocks.",
+      "environment": {
+        "oec_main_sha": "82346c0753e139b92240f53734eb48d2113ed9ad",
+        "oec_feature_branch": "fix/trellis-gradio-notebooks-20261011",
+        "oec_feature_sha": "2543b26d2888e667c6443c984259f84ac5b6c142",
+        "live_oec_checkout_sha": "081aaf34f6379873bdc925d1dcf6b9c3d50349d3",
+        "live_oec_checkout_branch": "no branch name reported (detached checkout)",
+        "live_oec_tracked_dirty_paths": [
+          "core_config.py",
+          "oec_aireos/MOE",
+          "oec_deploy",
+          "pipeline_audiocraft.ipynb",
+          "pipeline_flux_only.ipynb",
+          "pipeline_trellis_3d.ipynb",
+          "pipeline_trellis_3d_only.ipynb",
+          "qa_compliance_worker.py",
+          "storage_config.json",
+          "tools/runner_control.py"
+        ],
+        "connector_repository": "Killer4K-N/Connector_1",
+        "connector_branch": "diagnose/oec-storage-telemetry-20261014",
+        "connector_commit": "70d9000ba48cfdd6a6413276d7a4d4fe2888ad17",
+        "runner": "connector-1 / scn17-mn",
+        "diagnostic_python": "3.14.6 system Python; not phase2_3d",
+        "mount": "Lustre /nlsasfs"
+      },
+      "workflow": {
+        "run_id": 38555689884,
+        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884",
+        "job_id": 115824133792,
+        "artifact_id": 11888967874,
+        "artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884/artifacts/11888967874",
+        "result": "SUCCESS",
+        "checks": [
+          "py_compile PASS",
+          "diagnostic report generation PASS",
+          "python -m json.tool PASS",
+          "artifact upload PASS"
+        ]
+      },
+      "parameters": {
+        "quota_snapshot_path": "~/.cache/aieros/quota_snapshot.json",
+        "quota_snapshot_max_age_seconds": 900,
+        "quota_check": "looked up and executed only if found, timeout 15 sec",
+        "model_path": "/nlsasfs/home/lmedge/rahkus/aireos_models",
+        "mutation_scope": "read only"
+      },
+      "expected": "Emit actual snapshot status, command availability, resolved paths, mount/capacity, reserve metadata, GPU visibility, and checkout revision/dirty status without changes.",
+      "results": {
+        "diagnostic": "PASS",
+        "snapshot": "MISSING at /nlsasfs/home/lmedge/rahkus/.cache/aieros/quota_snapshot.json; max age 900 seconds",
+        "quota_check": "NOT_FOUND on connector-1",
+        "live_config": "valid JSON; models target 240 GB; outputs target 1 GB",
+        "filesystem": {
+          "path": "/nlsasfs/home/lmedge/rahkus/aireos_models",
+          "mount": "/nlsasfs Lustre",
+          "total_bytes": 11322878034575360,
+          "used_bytes": 1939738005737472,
+          "free_bytes": 9383140028837888,
+          "free_gib": 8738730.13,
+          "interpretation": "Filesystem free capacity is not authoritative user/project quota."
+        },
+        "reserve": {
+          "path": "/nlsasfs/home/lmedge/rahkus/aireos_models/.storage_reserve.bin",
+          "exists": true,
+          "size_bytes": 33580119505,
+          "allocated_bytes": 33580130304,
+          "looks_sparse": false,
+          "mtime_utc": "2026-10-12T20:33:53+00:00",
+          "touched": false,
+          "discrepancy": "Prior run 38175212786 logged STORAGE_MANAGER_RESERVE_BYTES=37190724326; cause/path equivalence has not been established."
+        },
+        "gpu": "Two NVIDIA A100-SXM4-40GB devices visible; 31536 MiB free on GPU 0 and 39902 MiB free on GPU 1 at probe time. This is not an attention or inference test.",
+        "live_checkout": "HEAD 081aaf34f6379873bdc925d1dcf6b9c3d50349d3; detached/no branch name; 10 tracked dirty paths recorded; no sync/reset/cleanup performed.",
+        "package_install": "NOT_RUN",
+        "model_download": "NOT_RUN",
+        "TRELLIS_inference": "NOT_RUN",
+        "FLUX_generation": "NOT_RUN",
+        "queue_mutation": "NOT_PERFORMED",
+        "process_signals": "NOT_PERFORMED"
+      },
+      "interpretation": "Confirmed immediate blocker: no fresh authoritative snapshot and no local quota_check on this compute node. Keep require_fresh_quota=True for model/package writes. Shared filesystem free space cannot safely replace user/project quota.",
+      "limitations": [
+        "Probe ran on connector-1/scn17-mn only in this action.",
+        "System Python was used; phase2_3d dependencies were not tested.",
+        "No valid quota values/snapshot were produced.",
+        "No inference, package install, or model download was run.",
+        "Reserve, queue, running processes, caches and live checkout were not modified."
+      ],
+      "status": "PASS_READ_ONLY_DIAGNOSTIC; STORAGE_ADMISSION_STILL_BLOCKED",
+      "next_actions": [
+        "Run quota_check via the approved site/login-node route and preserve actual output; if unavailable, repair the approved access/transport or arrange a site-approved producer.",
+        "Create/propagate the quota snapshot using tools/quota_snapshot.py with only genuine measured values, then rerun admission.",
+        "Reconcile reserve-size discrepancy and dirty detached checkout from read-only history before any sync or storage operation.",
+        "After admission passes, run attention, TRELLIS inference/GLB, FLUX import/image, notebook, AudioCraft and QA validation separately."
+      ],
+      "external_sources": [
+        {
+          "title": "Microsoft TRELLIS.2 setup.sh",
+          "url": "https://github.com/microsoft/TRELLIS.2/blob/main/setup.sh",
+          "supports": "Official Torch/CUDA and attention backend setup guidance; no local install validated."
+        },
+        {
+          "title": "Microsoft TRELLIS.2 issue #111",
+          "url": "https://github.com/microsoft/TRELLIS.2/issues/111",
+          "supports": "Upstream installation pitfalls around environments, CUDA and attention extensions."
+        },
+        {
+          "title": "xFormers changelog",
+          "url": "https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md",
+          "supports": "Prebuilt xformers 0.0.29.post2 candidate for Torch 2.6/CUDA 12.4; not installed."
+        },
+        {
+          "title": "AudioCraft requirements.txt",
+          "url": "https://github.com/facebookresearch/audiocraft/blob/main/requirements.txt",
+          "supports": "Separate phase1 dependency investigation; phase1 was not modified."
+        }
+      ]
     }
   ]
 }
