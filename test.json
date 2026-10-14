@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-14T21:51:00+05:30",
+  "last_updated": "2026-10-14T22:25:29+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "TRELLIS offline config defect isolated and patched on Connector_1 diagnostic branch; updated self-hosted verification still pending. Historical validated GLB remains proof of prior real generation; do not mark current fix accepted until a fresh GLB is generated and reopened.",
+  "latest_summary": "TRELLIS offline loader fixed and runtime verified: fresh 8.87 MB GLB with structural checks and trimesh reopen PASS (96,532 vertices / 91,986 faces). OEC CLI/notebook source candidate passed 34 CI tests; PR #10 remains open. Connector test-assertion and stale-artifact-path issues are corrected; final reruns are active/queued. FLUX end-to-end generation and fresh authoritative quota telemetry remain separate outstanding items.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -1459,9 +1459,113 @@
       "follow_up": "Retry when an idle A100 is available, then verify PNG decoding, dimensions and SHA-256."
     },
     {
+      "id": "TEST-2026-10-14-TRELLIS-OFFLINE-OVERLAY-FIXTURE-ASSERTION",
+      "date": "2026-10-14",
+      "datetime": "2026-10-14T22:15:13+05:30",
+      "timezone": "Asia/Kolkata",
+      "category": "TRELLIS offline cache-overlay regression test follow-up",
+      "objective": "Run expanded 10-test suite after loader fix and run generation only if all tests pass.",
+      "reason": "The loader-fix runtime run succeeded, but the additional overlay test must prove pipeline.json is only added to the temporary view.",
+      "environment": {
+        "repository": "Killer4K-N/Connector_1",
+        "branch": "diagnose/trellis-asset-generation-20261014",
+        "run_id": 38598881722,
+        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598881722",
+        "commit": "293718c8743a8720296a77a94672b105e244eb46"
+      },
+      "approach": "Execute the 10 GPU-admission/config-overlay tests before any inference.",
+      "expected": "All 10 pass; generation runs; only the current run's GLB is uploaded.",
+      "results": {
+        "status": "FAIL_TEST_ASSERTION_ONLY",
+        "tests_total": 10,
+        "tests_passed": 9,
+        "tests_failed": 1,
+        "failing_test": "test_offline_overlay_copies_config_and_links_weights_without_shared_writes",
+        "cause": "The synthetic cache intentionally had weights but no config.json; the assertion incorrectly expected config.json in that cache snapshot.",
+        "generation_step": "SKIPPED",
+        "asset_claim_from_this_run": false,
+        "artifact_upload_issue": "Broad /tmp wildcard uploaded a prior run's GLB after generation was skipped; artifact 11913875417 is stale for this run."
+      },
+      "fix_commits": [
+        "https://github.com/Killer4K-N/Connector_1/commit/4dde5fdd9c815e7c1eee5e11e1e2c2f8840c2908",
+        "https://github.com/Killer4K-N/Connector_1/commit/d543a062b5695a07fd2952396ab8dc88f81a85d6"
+      ],
+      "follow_up_runs": {
+        "corrected_test_retry": {
+          "id": 38601626147,
+          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38601626147",
+          "status": "TEST_STEP_PASS; GENERATION_IN_PROGRESS"
+        },
+        "run_scoped_artifact_retry": {
+          "id": 38602330418,
+          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418",
+          "status": "QUEUED"
+        }
+      },
+      "interpretation": "This was a test expectation failure, not a TRELLIS inference failure. The assertion and artifact selection path were corrected.",
+      "limitations": [
+        "No inference ran in this failed job because the test suite exited nonzero.",
+        "The uploaded artifact was stale and is explicitly excluded as evidence."
+      ],
+      "status": "FAILURE LOGGED; FIX COMMITTED; RETEST PENDING"
+    },
+    {
+      "id": "TEST-2026-10-14-OEC-TRELLIS-OFFLINE-ENTRYPOINT-CI",
+      "date": "2026-10-14",
+      "datetime": "2026-10-14T22:24:12+05:30",
+      "timezone": "Asia/Kolkata",
+      "category": "OEC CLI/notebook offline pipeline-config fix CI",
+      "objective": "Validate shared cache-only pipeline-config helper used by standalone CLI and both TRELLIS notebooks.",
+      "reason": "Cached weight snapshots lacked pipeline.json. Early candidate CI attempts also exposed notebook source-array newline loss during editing; restore line endings and rerun full lightweight suite.",
+      "environment": {
+        "repository": "Killer4K-N/OEC",
+        "branch": "fix/trellis-offline-pipeline-config-20261014",
+        "candidate_commit": "9b97c7d316d861993463ded43e8488154f060728",
+        "pull_request": "https://github.com/Killer4K-N/OEC/pull/10",
+        "earlier_failed_runs": [
+          {
+            "id": 38601664024,
+            "url": "https://github.com/Killer4K-N/OEC/actions/runs/38601664024",
+            "reason": "notebook code-cell line breaks lost during serialization"
+          },
+          {
+            "id": 38601828023,
+            "url": "https://github.com/Killer4K-N/OEC/actions/runs/38601828023",
+            "reason": "same notebook source-array SyntaxError"
+          }
+        ],
+        "passing_run": {
+          "id": 38601987037,
+          "url": "https://github.com/Killer4K-N/OEC/actions/runs/38601987037"
+        }
+      },
+      "approach": "Pin official pipeline.json to the known cached snapshot; make a read-only-weight /tmp overlay and isolated cache view; fail closed on unknown snapshots; disable implicit Hub downloads during pipeline load.",
+      "expected": "All notebook/CLI and offline cache tests pass, helper/CLI compile, and notebooks remain valid JSON.",
+      "results": {
+        "status": "PASS_34_TESTS_AND_STATIC_CHECKS",
+        "notebook_static_tests": 12,
+        "cli_easy_run_tests": 5,
+        "offline_config_tests": 6,
+        "audiocraft_static_tests": 5,
+        "storage_admission_tests": 6,
+        "total_tests_passed": 34,
+        "total_tests_failed": 0,
+        "python_compile": "PASS",
+        "notebook_json": [
+          "pipeline_trellis_3d.ipynb",
+          "pipeline_trellis_3d_only.ipynb",
+          "pipeline_flux_only.ipynb",
+          "pipeline_audiocraft.ipynb"
+        ]
+      },
+      "interpretation": "The newline-preserving correction restored valid notebook code cells and all 34 tests plus static checks passed. The source patch remains in a review PR, not merged.",
+      "status": "PASS; PR OPEN NOT MERGED",
+      "follow_up": "Review PR #10, then merge only with authorization. Runtime GLB evidence is recorded in TEST-2026-10-14-TRELLIS-OFFLINE-PIPELINE-CONFIG-FIX."
+    },
+    {
       "id": "TEST-2026-10-14-TRELLIS-OFFLINE-PIPELINE-CONFIG-FIX",
       "date": "2026-10-14",
-      "datetime": "2026-10-14T21:51:00+05:30",
+      "datetime": "2026-10-14T22:25:29+05:30",
       "timezone": "Asia/Kolkata",
       "category": "TRELLIS cache-only image-to-3D runtime regression and fix",
       "objective": "Fix the live cached TRELLIS smoke after GPU admission so the local weight snapshot can load its pipeline config without a Hugging Face network request, then generate and validate a fresh GLB.",
@@ -1475,53 +1579,140 @@
         "model_id": "microsoft/TRELLIS.2-4B",
         "cached_snapshot": "af44b45f2e35a493886929c6d786e563ec68364d",
         "runtime": "phase2_3d",
-        "host": "scn17-mn"
+        "host": "scn17-mn",
+        "successful_runtime_run_id": 38598822415,
+        "successful_runtime_job_id": 115972423543,
+        "successful_runtime_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415"
       },
       "approach": "Vendor the official pipeline.json pinned to the selected cache revision, resolve configs only from local files, create a /tmp snapshot overlay with a copied config and read-only links to cached entries, mirror cached HF snapshot/ref metadata into a temporary local cache, and load via the local snapshot path. Add unit coverage for pinned config validation, safe overlay linking, cached repository metadata and fail-closed unknown revisions.",
       "expected": "The smoke loads cached TRELLIS weights without a Hub request, performs image-to-3D inference, exports one GLB to local /tmp, and validates GLB 2.0 plus non-empty mesh geometry. No downloads or shared cache writes.",
       "fix_commits": [
         "https://github.com/Killer4K-N/Connector_1/commit/0fe92d6525540e83819f7a0943fbfded29dad8d6",
         "https://github.com/Killer4K-N/Connector_1/commit/dcc0eb9f8be81e20437416679414b67def6da358",
-        "https://github.com/Killer4K-N/Connector_1/commit/293718c8743a8720296a77a94672b105e244eb46"
+        "https://github.com/Killer4K-N/Connector_1/commit/293718c8743a8720296a77a94672b105e244eb46",
+        "https://github.com/Killer4K-N/Connector_1/commit/4dde5fdd9c815e7c1eee5e11e1e2c2f8840c2908",
+        "https://github.com/Killer4K-N/Connector_1/commit/d543a062b5695a07fd2952396ab8dc88f81a85d6",
+        "https://github.com/Killer4K-N/OEC/commit/9260b6a0522b675d9a4e46ceda3f134118d0b1c4"
       ],
       "validation_runs": {
         "config_vendor_run": {
           "id": 38598747382,
           "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598747382",
-          "status": "IN_PROGRESS_AT_LOG_UPDATE"
+          "status": "FAILED_EXPECTED_PIPELINE_CONFIG_NOT_WIRED"
         },
         "loader_fix_run": {
           "id": 38598822415,
           "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415",
-          "status": "QUEUED_AT_LOG_UPDATE"
+          "status": "PASS_GLB_GENERATION_AND_REOPEN",
+          "artifact_id": 11912523421,
+          "artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415/artifacts/11912523421",
+          "report_artifact_id": 11913208247,
+          "report_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415/artifacts/11913208247",
+          "commit": "dcc0eb9f8be81e20437416679414b67def6da358"
         },
         "regression_suite_run": {
           "id": 38598881722,
           "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598881722",
-          "status": "QUEUED_AT_LOG_UPDATE"
+          "status": "FAIL_TEST_ASSERTION_ONLY; GENERATION_SKIPPED",
+          "reason": "9/10 tests passed; the overlay test incorrectly expected config.json in a synthetic snapshot that intentionally contained only weight.safetensors. The broad artifact path also picked up a previous run's GLB; artifact 11913875417 is stale for this failed run.",
+          "artifact_id_stale": 11913875417,
+          "artifact_url_stale": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598881722/artifacts/11913875417"
+        },
+        "regression_suite_retry": {
+          "id": 38601626147,
+          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38601626147",
+          "status": "TESTS_PASS; GENERATION_IN_PROGRESS_AT_LOG_UPDATE",
+          "commit": "4dde5fdd9c815e7c1eee5e11e1e2c2f8840c2908"
+        },
+        "artifact_path_guard": {
+          "id": 38602330418,
+          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418",
+          "status": "QUEUED",
+          "commit": "d543a062b5695a07fd2952396ab8dc88f81a85d6",
+          "reason": "Restrict GLB upload to the exact run ID so a failed run cannot publish an older file from another /tmp directory."
+        },
+        "oec_source_ci": {
+          "id": 38601987037,
+          "url": "https://github.com/Killer4K-N/OEC/actions/runs/38601987037",
+          "status": "PASS_34_TESTS_AND_STATIC_VALIDATION",
+          "commit": "9b97c7d316d861993463ded43e8488154f060728",
+          "results": {
+            "notebook_static": 12,
+            "cli_easy_run": 5,
+            "trellis_offline_config": 6,
+            "audiocraft_static": 5,
+            "storage_admission": 6,
+            "total": 34,
+            "py_compile": "PASS",
+            "notebook_json": [
+              "pipeline_trellis_3d.ipynb",
+              "pipeline_trellis_3d_only.ipynb",
+              "pipeline_flux_only.ipynb",
+              "pipeline_audiocraft.ipynb"
+            ]
+          }
         }
       },
       "results": {
-        "status": "FIX_COMMITTED_RUNTIME_VALIDATION_PENDING",
+        "status": "RUNTIME_PASS; FRESH_GLB_VALIDATED; OEC_CANDIDATE_CI_PASS; RETEST_PENDING",
         "observed_failure": "OFFLINE_PIPELINE_JSON_NOT_FOUND",
-        "root_cause": "from_pretrained(MODEL_ID) fell back to hf_hub_download('pipeline.json') while offline; the synthetic temporary HF cache exposed the weight snapshot but not its config.",
-        "tests_at_failure_run": "7/7 prior admission/cache tests passed",
-        "fresh_glb_created": false,
-        "inference_success": false,
+        "root_cause": "The cached weight snapshot had no pipeline.json, so upstream from_pretrained attempted a Hub lookup while offline. A pinned local config overlay fixed loading without changing the shared cache.",
+        "tests_at_original_failure_run": "7/7 then-current admission/cache tests passed; the error occurred after GPU admission during pipeline load.",
+        "tests_after_fix": "Runtime generation passed. A subsequent 10-test attempt found one incorrect fixture assertion (9/10); it is fixed, and the corrected test step passed on run 38601626147 before generation started.",
+        "fresh_glb_created": true,
+        "generation_run": 38598822415,
+        "generation_run_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415",
+        "artifact_id": 11912523421,
+        "artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415/artifacts/11912523421",
+        "report_artifact_id": 11913208247,
+        "report_artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415/artifacts/11913208247",
+        "glb_bytes": 8870632,
+        "glb_sha256": "0ba06de0e028d975b7108f4dcb9856a81dcdd76037e94cc852883fc5b2ad6b1e",
+        "glb_validation": {
+          "status": "PASS",
+          "format": "GLB 2.0; declared length consistent; JSON chunk valid",
+          "mesh_count": 1,
+          "primitive_count": 1,
+          "texture_count": 2,
+          "position_accessor_counts": [
+            96532
+          ],
+          "index_accessor_counts": [
+            275958
+          ],
+          "trimesh_reopen": "PASS",
+          "vertices": 96532,
+          "faces": 91986
+        },
+        "gpu_admission": {
+          "status": "PASS_LOW_FOOTPRINT_SHARED",
+          "gpu_index": "1",
+          "free_mib": 39902,
+          "utilization_percent": 0,
+          "active_compute_process_count": 1,
+          "active_compute_process_mib": 416
+        },
         "model_download": false,
         "package_install": false,
         "shared_cache_mutated": false,
         "active_gpu_process_terminated": false,
         "authoritative_quota_snapshot": "MISSING"
       },
-      "interpretation": "This is an actionable cache-only loader defect, not an inference or GLB exporter failure. The fix is committed to the diagnostic branch; do not call the fix accepted until the latest branch run produces and validates a fresh asset.",
+      "interpretation": "The offline loader defect is fixed and a fresh asset has passed structural GLB checks plus trimesh reopen on Connector_1. The same config-overlay helper is in the OEC CLI and both TRELLIS notebooks; OEC candidate CI passes 34 tests and PR #10 is open, not merged. Corrected connector retest and artifact-upload path verification are pending.",
       "limitations": [
-        "Latest loader/test runs were queued behind a self-hosted job at log time.",
-        "Fresh authoritative quota telemetry is still missing; no model download or package install is allowed.",
-        "No currently running GPU process was stopped or signalled."
+        "Artifact 11913875417 from failed run 38598881722 is stale: generation was skipped and the workflow's broad /tmp wildcard matched an older GLB.",
+        "OEC source changes remain on the candidate branch and PR #10; main code was not merged without approval.",
+        "Run 38601626147 had passed tests and was still generating at log update; run 38602330418 (exact run-scoped artifact upload) was queued.",
+        "Authoritative quota telemetry remains missing. No model/dependency download, install, shared-cache mutation, quota bypass, or GPU process termination occurred."
       ],
-      "status": "FIX COMMITTED; FRESH GLB VALIDATION PENDING",
-      "follow_up": "Inspect the loader-fix and latest 10-test workflow runs. Resolve any further cache-only failure, then check the uploaded GLB with glb_check and trimesh geometry validation before closing this item."
+      "status": "RUNTIME FIX VERIFIED; OEC SOURCE PR OPEN; CONNECTOR RETEST IN PROGRESS",
+      "follow_up": "Verify run 38601626147 finishes with a current-run GLB; verify 38602330418 uploads only its own output; review PR #10 and merge only with authorization. Update this record when final retry outcomes are known.",
+      "oec_candidate": {
+        "branch": "fix/trellis-offline-pipeline-config-20261014",
+        "commit": "9b97c7d316d861993463ded43e8488154f060728",
+        "pull_request": "https://github.com/Killer4K-N/OEC/pull/10",
+        "status": "OPEN_FOR_REVIEW_NOT_MERGED"
+      }
     }
   ]
 }
