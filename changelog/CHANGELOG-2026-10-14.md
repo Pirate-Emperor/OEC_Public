@@ -238,3 +238,23 @@ This is the actual main branch CI result, not just the candidate result. It conf
 - Both tests were conducted because prior attempts were capacity-blocked and the user requested generation confirmation. Both results are **blocked by live GPU occupancy**, not model inference failures. No packages or weights were installed/downloaded; no shared cache, runner process or queue was modified.
 
 The logs and outcomes have been added to the cumulative experiment registry on `main`. The historical TRELLIS GLB remains validated, but an idle-GPU window is still required to produce a fresh October 14 asset and PNG.
+
+
+## 2026-10-14 — TRELLIS offline pipeline config regression and correction (runtime validation pending)
+
+### What failed and why
+
+[Connector_1 action 38587490301](https://github.com/Killer4K-N/Connector_1/actions/runs/38587490301), job \`115933256897\`, passed all 7 then-current GPU-admission/HF-cache tests. It selected GPU 1 using the explicit low-footprint policy (39,902 MiB free, 0% GPU utilization, 416 MiB attributed to an existing process). Pipeline load then failed because the cached snapshot had no \`pipeline.json\` and the smoke still called \`Trellis2ImageTo3DPipeline.from_pretrained("microsoft/TRELLIS.2-4B")\`; this triggered a Hub lookup, which is prohibited by offline mode. This is a real loader/cache defect, distinct from a GPU-capacity block.
+
+### Fix committed on diagnostic branch
+
+On [\`diagnose/trellis-asset-generation-20261014\`](https://github.com/Killer4K-N/Connector_1/tree/diagnose/trellis-asset-generation-20261014), three commits were pushed:
+- [\`0fe92d6\`](https://github.com/Killer4K-N/Connector_1/commit/0fe92d6525540e83819f7a0943fbfded29dad8d6) vendors the official TRELLIS \`pipeline.json\` for cached revision \`af44b45f2e35a493886929c6d786e563ec68364d\`.
+- [\`dcc0eb9\`](https://github.com/Killer4K-N/Connector_1/commit/dcc0eb9f8be81e20437416679414b67def6da358) resolves the pipeline config only from validated local sources, copies it into a \`/tmp\` overlay without writing the shared snapshot, locally mirrors cached HF snapshot/ref metadata for other model dependencies, and calls \`from_pretrained\` with the local overlay path.
+- [\`293718c\`](https://github.com/Killer4K-N/Connector_1/commit/293718c8743a8720296a77a94672b105e244eb46) expands the regression suite from 7 to 10 tests, covering config validity/pinning, overlay links, external cache metadata and unknown-snapshot fail-closed behavior.
+
+### Validation disposition
+
+At log time, config-vendor action [38598747382](https://github.com/Killer4K-N/Connector_1/actions/runs/38598747382) remained in progress, loader-fix action [38598822415](https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415) was queued, and the latest regression action [38598881722](https://github.com/Killer4K-N/Connector_1/actions/runs/38598881722) was queued. These statuses are recorded as observed, not as passes. There is no current fresh GLB yet. Acceptance still requires actual pipeline load, inference, export, structural GLB checks and geometry reopen on a current action run.
+
+No quota bypass, package installation, model download, shared-cache modification, reserve edit, GPU process signal, or QA queue mutation occurred. A fresh authoritative quota snapshot remains missing.
