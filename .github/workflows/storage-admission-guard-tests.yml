@@ -11,6 +11,7 @@ on:
     branches:
       - main
       - 'fix/storage-admission-write-guards-20261014'
+      - 'fix/trellis-offline-pipeline-config-20261014'
 
 permissions:
   contents: read
