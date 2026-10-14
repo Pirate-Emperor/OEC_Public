@@ -45,6 +45,8 @@ class TrellisEasyRunTests(unittest.TestCase):
         self.assertIn("managed_storage_operation(", source)
         self.assertIn("snapshot_download(", source)
         self.assertIn("local_files_only=True", source)
+        self.assertIn("prepare_local_trellis_snapshot(", source)
+        self.assertIn("with offline_hub_mode(", source)
         self.assertIn('choices=("gradio", "generate", "check")', source)
         self.assertIn("demo.launch(", source)
         self.assertIn("share=args.share", source)
