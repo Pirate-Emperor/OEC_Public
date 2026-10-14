@@ -1,6 +1,6 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-14 22:58 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-14 23:38 IST (Asia/Kolkata)  
 **Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
@@ -258,3 +258,6 @@ New OEC GPU diagnostic and asset-generation workflows will use `runs-on: [self-h
 [Run 38610558599](https://github.com/Killer4K-N/OEC/actions/runs/38610558599) completed all three sequential jobs successfully. Each expected label matched its real RUNNER_NAME, reported host scn30-mn, detected eight visible A100 devices and reported both TRELLIS and FLUX weight caches as hits. Per-runner JSON artifacts: [oec-1](https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11916534964), [oec-2](https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11918195061), [oec-3](https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11918525046). The probe was read-only; no installs, downloads, shared-cache writes or process signals occurred. Quota snapshot: MISSING.
 
 The cache-only FLUX generation workflow is running on the same three OEC labels, one at a time, in [run 38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955). Its acceptance criteria are package import, model load, inference, a non-empty PNG with valid PNG signature, metadata JSON, and a run-scoped artifact. No result is claimed until the workflow and artifact validation finish.
+## OEC FLUX CLI and runner workflow source validation
+
+[OEC candidate CI run 38612345392](https://github.com/Killer4K-N/OEC/actions/runs/38612345392) passed all 46 tests: 12 TRELLIS notebook-static, 5 TRELLIS easy-run, 6 offline config, 7 FLUX CLI/cache/PNG/notebook, 5 FLUX GPU admission, 5 AudioCraft notebook-static and 6 storage-write-admission tests. Python compilation passed for the TRELLIS and FLUX entry points and helper modules; all four notebooks parsed as valid JSON. The reusable FLUX CLI and the GPU-admission helper are source-tested. The actual FLUX PNG runtime is a separate test, [run 38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955), still in progress with oec-1 at the generation step, followed by oec-2/oec-3 serially. No PNG generation is claimed until its artifact validates. Fresh quota telemetry remains missing, so the workflow must stay cache-only and offline.
