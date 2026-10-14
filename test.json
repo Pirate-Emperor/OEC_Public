@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-14T23:38:00+05:30",
+  "last_updated": "2026-10-14T23:48:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Connector_1 history (677/677 run-level records) is archived in OEC; all 3 OEC runner labels passed the read-only inventory. OEC source CI run 38612345392 passed 46/46 tests, Python compilation and all 4 notebook JSON checks, including shared FLUX CLI/Gradio and safe GPU-admission tests. Actual cache-only FLUX image generation is still running on OEC runner labels in run 38611186955; no image-generation PASS is recorded until a valid exact-run PNG and metadata artifact are verified. Quota telemetry remains missing, so installs/downloads remain blocked.",
+  "latest_summary": "OEC runner migration baseline: all three labels passed read-only inventory and all 677 Connector_1 Action run records are archived. Static OEC candidate CI is green at 46/46 (latest run 38613904439) with TRELLIS/FLUX notebook checks and Python compilation. FLUX live runtime run 38611186955 failed after ~11 minutes without a retrievable log or PNG; later runs 38613199844 and 38613575959 remain queued without runner assignment. The source now loads FLUX directly to CUDA with device_map='cuda', captures stage logs/status on failure, and serializes host GPU use with a /tmp lock, but no runtime image-generation PASS is claimed. Verify/reconnect oec-1/oec-2/oec-3 and clear stale queued runs before retry; authoritative quota snapshot remains missing.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2089,6 +2089,94 @@
         "actual_flux_png_generation": "PENDING_SEPARATE_OEC_SELF_HOSTED_RUN_38611186955"
       },
       "follow_up": "Need finish cache-only FLUX runtime run 38611186955 and verify artifact before claiming image-generation runtime acceptance. The new dependency/cache and safe-GPU behavior must stay fail-closed if the runner exits before generating a valid PNG."
+    },
+    {
+      "id": "TEST-2026-10-14-OEC-FLUX-CACHE-ONLY-RUNTIME-FAILED-NO-ARTIFACT",
+      "date": "2026-10-14",
+      "category": "first FLUX.2 Klein live image-generation attempt on migrated OEC runners",
+      "approach": "Run the cache-only offline FLUX.2 Klein check and a 512x512, four-step image generation using the phase2_3d environment on the OEC oec-1 runner. Verify PNG signature, metadata JSON and upload exact-run artifact.",
+      "reason": "Validate actual image generation on the replacement OEC runner pool after inventory confirmed cached weights and the released dependency set.",
+      "parameters": {
+        "run_id": 38611186955,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38611186955",
+        "job_id": 116014658405,
+        "runner": "oec-1",
+        "runner_id": 21,
+        "runner_host_from_prior_inventory": "scn30-mn",
+        "expected_model": "black-forest-labs/FLUX.2-klein-4B",
+        "expected_snapshot": "e7b7dc27f91deacad38e78976d1f2b499d76a294",
+        "image_dimensions": [
+          512,
+          512
+        ],
+        "inference_steps": 4,
+        "seed": 2048,
+        "mode": "cache-only offline; scratch output under /tmp",
+        "start_utc": "2026-10-14T17:58:28Z",
+        "job_completed_utc": "2026-10-14T18:09:29Z",
+        "elapsed_minutes_approx": 11,
+        "followup_runs": {
+          "first_queued": "https://github.com/Killer4K-N/OEC/actions/runs/38613199844",
+          "updated_logging_and_lock_workflow": "https://github.com/Killer4K-N/OEC/actions/runs/38613575959"
+        }
+      },
+      "results": {
+        "status": "FAIL_NO_PNG_OR_RETRIEVABLE_LOGS",
+        "job_conclusion": "failure",
+        "expected_png_artifact_created": false,
+        "output_metadata_created_or_uploaded": "NOT_VERIFIED",
+        "artifact_count": 0,
+        "log_retrieval": "GitHub job log endpoint returned BlobNotFound/404; job step metadata was inconsistent (job completed failure while generation step remained marked in_progress)",
+        "root_cause": "UNDETERMINED; do not infer out-of-memory or a model import issue without logs",
+        "oec2_job": "QUEUED_WITHOUT_RUNNER_ASSIGNMENT",
+        "oec3_job": "QUEUED_WITHOUT_RUNNER_ASSIGNMENT",
+        "subsequent_runs_queued_without_runner_assignment": [
+          38613199844,
+          38613575959
+        ],
+        "downloads": false,
+        "installs": false,
+        "shared_cache_mutated": false,
+        "gpu_process_terminated": false,
+        "flux_runtime_pass": false
+      },
+      "follow_up": "Before another image-generation attempt, verify oec-1/oec-2/oec-3 are online and cancel stale queued FLUX workflow runs 38611186955, 38613199844 and 38613575959 via Actions UI. New workflow captures a per-stage log/status artifact, uses a host-local flock to serialize GPUs while scheduling labels concurrently, and bounds the inference step. Source adds device_map='cuda' to avoid loading the complete pipeline onto CPU then copying it to GPU. Runtime remains unaccepted until a valid PNG and sidecar artifact is inspected."
+    },
+    {
+      "id": "TEST-2026-10-14-FLUX-CUDA-DEVICE-MAP-CANDIDATE-VALIDATION",
+      "date": "2026-10-14",
+      "category": "FLUX direct-to-CUDA loading and OEC runner-workflow diagnostics static validation",
+      "approach": "Change FLUX pipeline loading to Diffusers from_pretrained(..., device_map='cuda') on the already admitted CUDA device; add assertions that this path is in use and the old pipeline.to('cuda') copy step is absent. Add stage logs, failure-status JSON upload and host-local inference lock to the runner workflow. Run all OEC candidate static suites and Python/notebook checks.",
+      "reason": "First live run terminated after ~11 minutes with no retrievable logs or uploaded output. The new source avoids CPU-load-then-GPU-copy peak host memory and makes the next run diagnosable; static CI checks correctness without risking a GPU run while runner availability is uncertain.",
+      "parameters": {
+        "run_id": 38613904439,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38613904439",
+        "source_commit": "e59426970956ff83fbd433612adc29eb9364d0f8",
+        "branch": "fix/trellis-offline-pipeline-config-20261014",
+        "runner_workflow": "oec-flux-image-smoke.yml",
+        "runtime_workflow_trigger": "explicit .github/flux-smoke.trigger path or workflow_dispatch; source-only edits no longer enqueue more generation jobs"
+      },
+      "results": {
+        "status": "PASS_46_STATIC_TESTS_AND_CHECKS",
+        "suite_counts": {
+          "trellis_notebook_static": 12,
+          "trellis_easy_run": 5,
+          "trellis_offline_config": 6,
+          "flux_cli_cache_png_and_notebook": 7,
+          "flux_gpu_admission": 5,
+          "audiocraft_notebook_static": 5,
+          "storage_write_admission": 6
+        },
+        "total_tests": 46,
+        "failed_tests": 0,
+        "python_compile": "PASS",
+        "notebook_json_and_python_cell_checks": "PASS",
+        "actual_png_generation": "NOT_RUN_BY_THIS_STATIC_CI",
+        "downloads": false,
+        "installs": false,
+        "gpu_process_changes": false
+      },
+      "follow_up": "The source patch is review-only in OEC PR #10. The live FLUX pipeline cannot be accepted until the new OEC runners resume accepting jobs and the image plus sidecar artifact validate."
     }
   ]
 }
