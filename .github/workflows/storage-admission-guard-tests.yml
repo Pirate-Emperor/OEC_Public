@@ -1,0 +1,46 @@
+name: OEC storage write-admission guard tests
+
+on:
+  push:
+    branches:
+      - 'fix/storage-admission-write-guards-20261014'
+
+permissions:
+  contents: read
+
+jobs:
+  static-write-guard-regressions:
+    name: Static notebook, CLI and storage-admission regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated candidate branch
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install lightweight notebook test dependency
+        run: python -m pip install ipython
+      - name: Run notebook, CLI and admission tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_trellis_notebook_static.py' -v
+          python -m unittest discover -s tests -p 'test_trellis_easy_run.py' -v
+          python -m unittest discover -s tests -p 'test_audiocraft_notebook_static.py' -v
+          python -m unittest discover -s tests -p 'test_storage_write_admission.py' -v
+          python -m py_compile pipeline_trellis_3d.py storage_manager.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for name in (
+              "pipeline_trellis_3d.ipynb",
+              "pipeline_trellis_3d_only.ipynb",
+              "pipeline_flux_only.ipynb",
+              "pipeline_audiocraft.ipynb",
+          ):
+              notebook = json.loads(Path(name).read_text(encoding="utf-8"))
+              assert notebook.get("nbformat") == 4, name
+              print(f"NOTEBOOK_JSON=PASS {name} cells={len(notebook['cells'])}")
+          PY
