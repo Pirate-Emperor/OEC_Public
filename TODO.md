@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-14 22:58 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-14 23:38 IST (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 ## 2026-10-14 — quota telemetry and live-checkout diagnosis
 - [x] Verified GitHub state: OEC `main` is `82346c0753e139b92240f53734eb48d2113ed9ad`; `fix/trellis-gradio-notebooks-20261011` is `2543b26d2888e667c6443c984259f84ac5b6c142` (111 ahead, 0 behind). No main-branch change or merge.
@@ -134,5 +134,10 @@ The official Diffusers release notes list Flux2 Klein support in v0.37.0; the cu
 - [x] Archived all 677 reported `Connector_1` Actions workflow-run records (677 unique ids) in [`docs/runner_migration/connector_1_actions_runs.json`](docs/runner_migration/connector_1_actions_runs.json); run-level outcomes: 305 success, 236 failure, 122 cancelled, 13 skipped, 1 queued.
 - [x] Migrated the migration method, historical result counts, source URLs and runner transition plan to [`docs/runner_migration/README.md`](docs/runner_migration/README.md) and registered the experiment in `test.json`. Original job logs/artifacts stay at the original URLs; the GitHub run objects were not moved.
 - [x] **Runner migration acceptance probe:** [OEC run 38610558599](https://github.com/Killer4K-N/OEC/actions/runs/38610558599) successfully ran on all three labels `oec-1`, `oec-2`, `oec-3`; each reported actual identity match, eight visible A100 devices, TRELLIS and FLUX cache hits and an uploaded diagnostic report ([oec-1](https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11916534964), [oec-2](https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11918195061), [oec-3](https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11918525046)). The probe confirms the quota snapshot is missing; no packages were installed, downloads made, caches mutated or processes signalled.
-- [ ] **FLUX live acceptance in progress:** workflow [38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955) uses only the three OEC labels, serialized, requires a safely admitted GPU, checks the cached Diffusers/Hub import before inference, and uploads the exact-run PNG plus metadata. Do not mark generation accepted until a valid PNG artifact is confirmed.
+- [ ] **FLUX live acceptance in progress:** workflow [38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955) currently has `oec-1` in its generation step; `oec-2` and `oec-3` are queued behind the `max-parallel: 1` gate. Its job checks GPU admission and the cached Diffusers/Hub import before inference, then validates/uploads exact-run PNG plus metadata. No runtime PNG PASS yet; do not download/install to repair a mismatch while fresh quota telemetry is missing.
 - [ ] **TRELLIS/FLUX notebooks:** run the relevant Python cells statically, retain Gradio launch/tunnel support, and perform end-to-end runtime confirmation only on the OEC runner labels.
+
+## 2026-10-14 23:38 IST — OEC candidate source validation
+- [x] [OEC CI run 38612345392](https://github.com/Killer4K-N/OEC/actions/runs/38612345392) passed 46/46 tests: TRELLIS notebook static 12, TRELLIS easy-run 5, offline TRELLIS config 6, Flux CLI/notebook/cache/PNG 7, Flux GPU admission 5, AudioCraft static 5, and storage-write admission 6.
+- [x] Six Python sources compiled and all four notebooks parsed as valid JSON. This validates source shape and guard behavior; it is not an end-to-end FLUX image-generation result.
+- [ ] FLUX runtime remains open until [run 38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955) uploads a PNG and metadata that pass validation on the new OEC runners.
