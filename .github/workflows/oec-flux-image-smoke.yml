@@ -19,11 +19,11 @@ jobs:
     name: Generate and validate one FLUX PNG on ${{ matrix.runner }}
     strategy:
       fail-fast: false
-      max-parallel: 1
+      max-parallel: 3
       matrix:
         runner: [oec-1, oec-2, oec-3]
     runs-on: [self-hosted, linux, x64, gpu, a100, "${{ matrix.runner }}"]
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - name: Checkout isolated OEC candidate
         uses: actions/checkout@v4
@@ -94,6 +94,16 @@ jobs:
             exit 21
           fi
 
+          CURRENT_STAGE="gpu_lock"
+          LOCK_FILE="/tmp/oec-flux-inference.lock"
+          exec 9>"$LOCK_FILE"
+          echo "FLUX_STAGE=gpu_lock waiting_at=$(date -Is) lock=$LOCK_FILE"
+          if ! flock -x -w 1500 9; then
+            echo "FLUX_GENERATION=BLOCKED_GPU_LOCK_TIMEOUT wait_seconds=1500"
+            exit 23
+          fi
+          echo "FLUX_GPU_LOCK=ACQUIRED at=$(date -Is)"
+
           CURRENT_STAGE="gpu_admission"
           echo "FLUX_STAGE=gpu_admission started_at=$(date -Is)"
           GPU="$("$PYTHON" -u tools/flux_gpu_admission.py --print-index-only)"
@@ -115,7 +125,7 @@ jobs:
 
           CURRENT_STAGE="pipeline_load_and_inference"
           echo "FLUX_STAGE=pipeline_load_and_inference started_at=$(date -Is) image=512x512 steps=4"
-          timeout --signal=TERM --kill-after=30s 20m "$PYTHON" -u pipeline_flux_image.py \
+          timeout --signal=TERM --kill-after=30s 14m "$PYTHON" -u pipeline_flux_image.py \
             --mode generate --offline --scratch-output --gpu "$GPU" \
             --output "$OUTPUT_DIR/flux2_klein.png" \
             --prompt "A polished red ceramic tea kettle on a quiet studio table, soft natural window light, realistic product photography" \
