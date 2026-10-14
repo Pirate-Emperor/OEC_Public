@@ -6,9 +6,7 @@ on:
     branches:
       - fix/trellis-offline-pipeline-config-20261014
     paths:
-      - ".github/workflows/oec-flux-image-smoke.yml"
-      - "pipeline_flux_image.py"
-      - "tools/flux_gpu_admission.py"
+      - ".github/flux-smoke.trigger"
   workflow_dispatch:
 
 permissions:

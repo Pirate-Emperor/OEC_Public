@@ -283,10 +283,21 @@ def load_flux_pipeline(model_id: str = MODEL_ID, model_cache: str | Path | None 
             "FLUX_PIPELINE_IMPORT=FAIL. Diffusers/Hub is incompatible or incomplete; "
             "run the guarded dependency cell, restart the kernel and retry."
         ) from exc
+    load_started = time.monotonic()
     with _offline_hub():
-        pipeline = Flux2KleinPipeline.from_pretrained(str(snapshot), torch_dtype=torch.bfloat16, local_files_only=True)
-    pipeline.to("cuda")
-    print("FLUX_PIPELINE_LOAD=PASS " + json.dumps({"snapshot": str(snapshot), "packages": versions}, sort_keys=True), flush=True)
+        print("FLUX_PIPELINE_LOAD=START " + json.dumps({
+            "snapshot": str(snapshot), "device_map": "cuda", "dtype": "bfloat16"
+        }, sort_keys=True), flush=True)
+        # Load components directly to the selected CUDA device. This avoids
+        # materializing the full BF16 pipeline on CPU and then copying it to GPU.
+        pipeline = Flux2KleinPipeline.from_pretrained(
+            str(snapshot), torch_dtype=torch.bfloat16, local_files_only=True,
+            device_map="cuda",
+        )
+    print("FLUX_PIPELINE_LOAD=PASS " + json.dumps({
+        "snapshot": str(snapshot), "packages": versions, "device_map": "cuda",
+        "load_seconds": round(time.monotonic() - load_started, 3)
+    }, sort_keys=True), flush=True)
     return pipeline
 
 
