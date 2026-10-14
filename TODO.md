@@ -142,7 +142,7 @@ The official Diffusers release notes list Flux2 Klein support in v0.37.0; the cu
 - [x] Logged the initial capacity-matrix workflow configuration failure, the corrected connector-1 diagnostic and the current TRELLIS smoke blocked by occupied GPUs.
 - [x] **Fresh TRELLIS asset generated and validated:** Connector_1 run 38598822415, artifact 11912523421 (8,870,632 bytes; SHA-256 0ba06de0e028d975b7108f4dcb9856a81dcdd76037e94cc852883fc5b2ad6b1e); GLB structural checks and trimesh reopen passed (96,532 vertices / 91,986 faces).
 - [x] **OEC CLI/notebook source candidate CI:** run 38601987037 passed 34 tests, Python compilation and four notebook JSON checks; review PR #10 is open and not merged.
-- [ ] **OPEN — corrected Connector_1 retry:** run 38601626147 passed its test step and was generating an asset; verify current-run output. Exact-run artifact upload check 38602330418 was queued at last check.
+- [ ] **OPEN — corrected Connector_1 retry:** run 38601626147 completed with 10/10 tests and fresh GLB validation (98,250 vertices / 93,243 faces); its archive bundles multiple files due to the old wildcard. Exact-run artifact upload check 38602330418 is running.
 - [ ] **OPEN — current FLUX image:** cached FLUX weights exist, but the offline generation smoke did not create a PNG because both A100s were occupied. Retry with an idle GPU and verify the output image.
 - [ ] **BLOCKED — fresh quota telemetry:** quota snapshot missing and `quota_check` absent on the compute runner. Keep shared model/dependency downloads and quota-gated writes fail-closed; never substitute Lustre free-space values.
 
