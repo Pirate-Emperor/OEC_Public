@@ -1,6 +1,6 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-14 22:45 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-14 22:58 IST (Asia/Kolkata)  
 **Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
@@ -251,4 +251,10 @@ The archive is deliberately non-destructive: GitHub's historical run objects, pe
 
 ### Next execution pool
 
-New OEC GPU diagnostic and asset-generation workflows will use `runs-on: [self-hosted, linux, x64, gpu, a100, oec-N]`, with `N` one of `1`, `2`, `3`. Runner status reported by the user is not yet an independently executed connectivity test. Next acceptance is a read-only matrix across all three new labels, followed by cache-only FLUX PNG generation and final validation on the selected runner. Existing OEC hosted-runner static CI remains hosted because it is not a legacy connector GPU job.
+New OEC GPU diagnostic and asset-generation workflows will use `runs-on: [self-hosted, linux, x64, gpu, a100, oec-N]`, with `N` one of `1`, `2`, `3`. Read-only matrix [run 38610558599](https://github.com/Killer4K-N/OEC/actions/runs/38610558599) has now passed for all three labels `oec-1`, `oec-2`, `oec-3`. Each job matched the expected runner name, found eight visible A100 devices and hit both model caches; per-runner reports are linked from `TODO.md`. These GPUs are on host `scn30-mn`. The quota snapshot remains missing. A cache-only FLUX PNG generation attempt is running in [run 38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955) with serial GPU admission. Existing OEC hosted-runner static CI remains hosted because it is not a legacy connector GPU job.
+
+## OEC runner migration inventory — observed runtime state
+
+[Run 38610558599](https://github.com/Killer4K-N/OEC/actions/runs/38610558599) completed all three sequential jobs successfully. Each expected label matched its real RUNNER_NAME, reported host scn30-mn, detected eight visible A100 devices and reported both TRELLIS and FLUX weight caches as hits. Per-runner JSON artifacts: [oec-1](https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11916534964), [oec-2](https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11918195061), [oec-3](https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11918525046). The probe was read-only; no installs, downloads, shared-cache writes or process signals occurred. Quota snapshot: MISSING.
+
+The cache-only FLUX generation workflow is running on the same three OEC labels, one at a time, in [run 38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955). Its acceptance criteria are package import, model load, inference, a non-empty PNG with valid PNG signature, metadata JSON, and a run-scoped artifact. No result is claimed until the workflow and artifact validation finish.
