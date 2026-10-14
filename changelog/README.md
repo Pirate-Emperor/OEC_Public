@@ -38,8 +38,14 @@ Daily engineering records live here. Use the local Asia/Kolkata date in each fil
 ## Persistent project tracking
 
 - **One active TODO list:** [`TODO.md`](../TODO.md)
-- **Structured experiment/test log:** [`test.json`](../test.json) — currently 25 experiment records.
+- **Structured experiment/test log:** [`test.json`](../test.json) — currently 28 experiment records.
 - **Cumulative significant results:** [`result.md`](../result.md)
 - **Reusable interactive-model implementation convention:** [`model_entrypoint_convention.md`](../docs/model_entrypoint_convention.md)
 
 Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end of each OEC task. Do not create additional parallel TODO/test/result files.
+
+
+- **2026-10-14 — TRELLIS asset proof and current live-runtime blockers**
+  - Current candidate [run 38571665298](https://github.com/Killer4K-N/OEC/actions/runs/38571665298) passed 28/28 static tests plus compilation and notebook JSON validation.
+  - Historic TRELLIS run [37942265623](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623) produced a real 8,950,028-byte GLB; the recovered artifact was re-opened independently with `trimesh` and contains 97,783 vertices and 92,819 faces. It is linked as a downloadable file in `result.md`.
+  - Current offline TRELLIS smoke [38571363231](https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231) discovered the cached model/source/input but stopped at GPU occupancy before inference; no current GLB was generated. FLUX image generation is similarly blocked by active compute processes. Quota telemetry remains absent, so no download/install bypass is allowed.

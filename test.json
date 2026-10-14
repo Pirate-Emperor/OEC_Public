@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-14T17:24:27+05:30",
+  "last_updated": "2026-10-14T18:24:14+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
   "latest_summary": {
@@ -193,6 +193,46 @@
       "docs_commit": "dac91f09bc6cecd896e38213072fe19142d30390",
       "result": "PASS",
       "experiments_after_append": 25
+    },
+    "latest_trellis_current_smoke": {
+      "run_id": 38571363231,
+      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231",
+      "commit": "c5411612b482e43913e24e6e16decf80a07ac1d8",
+      "result": "BLOCKED_GPU_OCCUPANCY",
+      "model_cache": "HIT; 7 safetensors shards, 14,819,870,530 bytes",
+      "source_checkout": "PRESENT",
+      "input_image": "PRESENT",
+      "output": "NO CURRENT GLB; inference not started",
+      "artifact_id": 11897043384,
+      "note": "Current October 14 smoke stopped safely before inference because no A100 had zero active compute processes and at least 30,000 MiB free. This is not a model failure and not a generation pass."
+    },
+    "latest_trellis_historical_asset": {
+      "original_run_id": 37942265623,
+      "original_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623",
+      "artifact_id": 11622412194,
+      "result": "PASS_HISTORICAL_ASSET_REVALIDATED",
+      "bytes": 8950028,
+      "sha256": "ede239663f21023640356920a5eff129fd8bb1077f914e8ff19fcb720b7ece4d",
+      "trimesh_reopen": "PASS",
+      "vertices": 97783,
+      "faces": 92819,
+      "note": "Real historical asset verified locally. Do not conflate with the current blocked October 14 smoke."
+    },
+    "latest_candidate_runtime_guard_validation": {
+      "branch": "fix/storage-admission-write-guards-20261014",
+      "commit": "f571f508fc693d2afd96c17544702d64a0c29c27",
+      "run_id": 38571665298,
+      "url": "https://github.com/Killer4K-N/OEC/actions/runs/38571665298",
+      "result": "PASS_STATIC",
+      "suite_counts": {
+        "trellis_notebook_static": 12,
+        "trellis_cli_easy_run": 5,
+        "audiocraft_notebook_static": 5,
+        "storage_write_admission": 6,
+        "total": 28
+      },
+      "notebook_json": "4/4 PASS",
+      "python_compile": "PASS"
     }
   },
   "experiments": [
@@ -1196,6 +1236,166 @@
       ],
       "status": "PASS_STATIC",
       "follow_up": "Proceed to runtime checks only after a fresh authoritative quota snapshot is available and a safe idle GPU is confirmed."
+    },
+    {
+      "id": "TEST-2026-10-14-TRELLIS-CACHE-ONLY-ASSET-SMOKE-BLOCKED",
+      "date": "2026-10-14",
+      "datetime": "2026-10-14T18:24:14+05:30",
+      "timezone": "Asia/Kolkata",
+      "category": "shared-runner offline TRELLIS.2 asset-generation smoke",
+      "objective": "Generate an actual image-to-3D asset from already-cached TRELLIS.2 weights on the shared phase2_3d environment without downloading weights or installing packages.",
+      "reason": "Confirm a complete current image-to-GLB path, not merely imports or static test success, and distinguish a model/cache issue from the GPU scheduling prerequisite.",
+      "environment": {
+        "repository": "Killer4K-N/Connector_1",
+        "branch": "diagnose/trellis-asset-generation-20261014",
+        "commit": "c5411612b482e43913e24e6e16decf80a07ac1d8",
+        "workflow_run_id": 38571363231,
+        "workflow_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231",
+        "job_id": 115877117266,
+        "runner": "connector-1 / scn17-mn",
+        "environment": "$HOME/Conda/envs/phase2_3d",
+        "model_id": "microsoft/TRELLIS.2-4B",
+        "snapshot": "/nlsasfs/home/lmedge/rahkus/aireos_models/hub/models--microsoft--TRELLIS.2-4B/snapshots/af44b45f2e35a493886929c6d786e563ec68364d"
+      },
+      "approach": "Find cached safetensor weights and the official TRELLIS example image by local filesystem reads, verify /tmp is local ext4 separate from the shared Lustre model mount, select only a completely idle A100 with at least 30,000 MiB free, enable offline Hugging Face mode, isolate temporary cache metadata under /tmp, run the xFormers probe and model/inference/export, then validate GLB binary structure and reopen geometry.",
+      "expected": "Either generate a non-empty GLB containing nonempty triangle geometry and pass independent reopen validation, or stop safely with the exact failed precondition before model inference.",
+      "results": {
+        "workflow_result": "FAIL_SAFE; stopped before importing torch or running inference",
+        "report_artifact_id": 11897043384,
+        "report_download": "https://api.github.com/repos/Killer4K-N/Connector_1/actions/artifacts/11897043384/zip",
+        "status": "BLOCKED_GPU_OCCUPANCY",
+        "reason": "No idle GPU with at least 30000 MiB free; inference not started",
+        "source_checkout": "PASS at /nlsasfs/home/lmedge/rahkus/aireos_models/TRELLIS.2",
+        "example_input": "PASS at /nlsasfs/home/lmedge/rahkus/aireos_models/TRELLIS.2/assets/example_image/T.png; 1718470 bytes",
+        "cached_weights": "PASS; 7 safetensors shards, 14819870530 total weight bytes",
+        "model_mount": "Lustre mount /nlsasfs",
+        "output_mount": "/tmp on local ext4, different from model filesystem",
+        "network_download": "NOT_ALLOWED and not attempted",
+        "package_install": "NOT_ALLOWED and not attempted",
+        "pipeline_load": "NOT_REACHED",
+        "inference": "NOT_STARTED",
+        "glb_created": "NO",
+        "shared_cache_mutated": "NO",
+        "gpu_processes_changed": "NO"
+      },
+      "interpretation": "The current shared smoke is blocked by GPU occupancy before inference. This does not demonstrate a TRELLIS model/inference failure, but it also does not confirm a new asset from this run. Cached model/source/input discovery succeeded; the next live prerequisite is a legitimately idle GPU.",
+      "limitations": [
+        "No current asset was generated in this run.",
+        "The smoke deliberately declines devices with active compute processes even if reported free memory is high.",
+        "Shared quota telemetry remains unavailable; this run did not download or install anything.",
+        "The previous historical asset result is independent evidence and is recorded separately."
+      ],
+      "status": "BLOCKED_GPU_OCCUPANCY; NO CURRENT GLB",
+      "follow_up": "Rerun the cache-only smoke only after an idle A100 is naturally available and confirmed; do not kill or interfere with the running GPU processes."
+    },
+    {
+      "id": "TEST-2026-10-14-TRELLIS-HISTORICAL-ASSET-REVALIDATION",
+      "date": "2026-10-14",
+      "datetime": "2026-10-14T18:24:14+05:30",
+      "timezone": "Asia/Kolkata",
+      "category": "independent validation of previously generated TRELLIS asset",
+      "objective": "Provide concrete proof that TRELLIS has generated an asset before, and independently validate that the existing GLB contains readable nonempty mesh geometry.",
+      "reason": "The current shared-runner smoke was blocked before inference due GPU occupancy, but the prior successful TRELLIS Action still has its full diagnostic artifact and GLB.",
+      "environment": {
+        "original_workflow_run_id": 37942265623,
+        "original_workflow_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623",
+        "original_job_id": 113859380847,
+        "original_environment": "isolated TRELLIS smoke virtual environment on connector-1 / scn17-mn",
+        "original_artifact_id": 11622412194,
+        "artifact_url": "https://api.github.com/repos/Killer4K-N/Connector_1/actions/artifacts/11622412194/zip",
+        "recovered_file": "/mnt/data/TRELLIS2-historical-validated-asset.glb"
+      },
+      "approach": "Retrieve the previously successful Action artifact, extract the recorded test_100k.glb, then validate GLB magic/version/declared length, parse its JSON chunk, require mesh primitives with nonempty POSITION and index accessors, and reopen it with trimesh.",
+      "expected": "A valid GLB 2.0 container with nonempty geometry that a separate mesh library can read.",
+      "results": {
+        "original_run": "PASS; this run generated a GLB",
+        "original_log_markers": [
+          "XFORMERS_CUDA_WHEEL=PASS",
+          "PIPELINE_LOAD=PASS seconds=142.6",
+          "PREPROCESS=PASS input=T.png size=(1024, 1024) square=(1024, 1024)",
+          "INFERENCE=PASS seconds=222.0",
+          "GLB_EXPORT=PASS seconds=108.6 bytes=8950028",
+          "TRELLIS_IMAGE_TO_3D_SMOKE=PASS"
+        ],
+        "original_mesh_before_export": {
+          "vertices": 6348077,
+          "faces": 13194108
+        },
+        "original_after_simplification": {
+          "vertices": 53154,
+          "faces": 92858
+        },
+        "original_glb_bytes": 8950028,
+        "independently_validated_file": "/mnt/data/TRELLIS2-historical-validated-asset.glb",
+        "validated_sha256": "ede239663f21023640356920a5eff129fd8bb1077f914e8ff19fcb720b7ece4d",
+        "glb_version": 2,
+        "glb_container": "PASS",
+        "mesh_count": 1,
+        "primitive_count": 1,
+        "position_accessor_counts": [
+          97783
+        ],
+        "index_accessor_counts": [
+          278457
+        ],
+        "texture_count": 2,
+        "material_count": 1,
+        "trimesh_reopen": "PASS",
+        "reopened_geometry_count": 1,
+        "reopened_vertices": 97783,
+        "reopened_faces": 92819
+      },
+      "interpretation": "This is direct evidence TRELLIS has generated a real asset. The independently validated file is from the earlier October 9 successful run, not from the current October 14 smoke attempt. It validates the historical image-to-3D pipeline capability while leaving current shared-environment acceptance pending a fresh live generation.",
+      "limitations": [
+        "The asset proves a prior isolated-environment run; it does not prove the current shared notebook/CLI is fixed now.",
+        "The latest October 14 shared-runner smoke is separately blocked at GPU preflight.",
+        "The download is an already-generated artifact, not a newly generated asset from this prompt."
+      ],
+      "status": "PASS_HISTORICAL_ASSET_REVALIDATION; CURRENT_SHARED_RUN_PENDING",
+      "downloadable_asset": "sandbox:/mnt/data/TRELLIS2-historical-validated-asset.glb"
+    },
+    {
+      "id": "TEST-2026-10-14-TRELLIS-FLUX-CACHE-AND-GENERATION-GUARD-FIX",
+      "date": "2026-10-14",
+      "datetime": "2026-10-14T18:24:14+05:30",
+      "timezone": "Asia/Kolkata",
+      "category": "cache discovery, pre-inference admission and export validation",
+      "objective": "Fix cache-root false negatives and avoid spending expensive inference time when output admission is already denied; validate exported assets rather than assuming generation means a valid file exists.",
+      "reason": "Live diagnostics found cached FLUX weights in a different cache root than the combined notebook searched. TRELLIS cache snapshots may contain actual safetensor shards but lack root markers that the old status checks required. The CLI also ran inference before output admission.",
+      "environment": {
+        "repository": "Killer4K-N/OEC",
+        "branch": "fix/storage-admission-write-guards-20261014",
+        "latest_source_commit": "f571f508fc693d2afd96c17544702d64a0c29c27",
+        "latest_workflow_run_id": 38571665298,
+        "latest_workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38571665298"
+      },
+      "approach": "For TRELLIS, try standard local Hugging Face resolution then search its configured cache for safetensors snapshots before declaring a miss. For the combined FLUX notebook, probe both aireos_models and aireos_models/hub. Add fresh-quota preflight before expensive inference, recheck inside the managed output-write lock, and verify expected GLB/PNG signatures; the CLI additionally parses the GLB JSON chunk and requires nonempty mesh position/index accessors.",
+      "expected": "No explicit optional-quota bypasses; recognized cache hits are reused without downloading; blocked output admission prevents heavy inference; exported GLBs must have real mesh accessors.",
+      "results": {
+        "source_commit": "PASS_COMMITTED_ON_CANDIDATE_BRANCH",
+        "static_workflow": "PASS",
+        "static_run_id": 38571665298,
+        "test_counts": {
+          "trellis_notebook_static": 12,
+          "trellis_cli_easy_run": 5,
+          "audiocraft_notebook_static": 5,
+          "storage_write_admission": 6,
+          "total": 28
+        },
+        "python_compile": "PASS",
+        "notebook_json": "4/4 PASS",
+        "live_model_download": "NOT_ATTEMPTED",
+        "live_trellis_inference": "NOT_ATTEMPTED_IN_THIS_VALIDATION",
+        "live_flux_image": "NOT_GENERATED"
+      },
+      "interpretation": "Cache and admission source corrections pass the static regression matrix. The current shared-runner generation acceptance remains blocked by missing authoritative quota for downloads and occupied GPUs for offline inference.",
+      "limitations": [
+        "Static test success does not prove an actual live generation.",
+        "No shared environment was installed, synchronized, reset or cleaned.",
+        "Main branch was not modified."
+      ],
+      "status": "PASS_STATIC; LIVE_GENERATION_ACCEPTANCE_BLOCKED",
+      "follow_up": "Perform a fresh live TRELLIS generation and FLUX PNG generation when their safe prerequisites are satisfied, with per-output validation and artifact retention."
     }
   ]
 }

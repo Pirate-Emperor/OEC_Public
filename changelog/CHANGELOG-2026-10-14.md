@@ -153,3 +153,54 @@ The separate Connector_1 branch [`diagnose/flux-cache-only-smoke-20261014`](http
 ### Tracking-record commit verification
 
 The documentation update was committed as [`dac91f09bc6cecd896e38213072fe19142d30390`](https://github.com/Killer4K-N/OEC/commit/dac91f09bc6cecd896e38213072fe19142d30390). The branch push triggered [run 38559861094](https://github.com/Killer4K-N/OEC/actions/runs/38559861094), job `115837970246`, which passed the same 27/27 static test matrix, Python compilation, and all four notebook JSON checks. This was a documentation-only delta from the already-tested source candidate; it adds repeatability evidence but does not change the runtime blockers or prove inference.
+
+
+## Final TRELLIS / FLUX follow-up — cache fixes, real asset verification, and latest blockers
+
+### Fixes committed
+
+Candidate branch [`fix/storage-admission-write-guards-20261014`](https://github.com/Killer4K-N/OEC/tree/fix/storage-admission-write-guards-20261014), latest commit [`f571f508fc693d2afd96c17544702d64a0c29c27`](https://github.com/Killer4K-N/OEC/commit/f571f508fc693d2afd96c17544702d64a0c29c27):
+- TRELLIS CLI checks actual cached safetensors snapshots if the standard Hugging Face local cache lookup reports a miss; this addresses the false-negative status when root marker/ref metadata is missing.
+- Combined TRELLIS/FLUX notebook checks FLUX.2 Klein at both actual historical cache roots (`aireos_models` and `aireos_models/hub`) before considering any download.
+- TRELLIS and FLUX output quota preflight occurs before expensive inference, and output admission is rechecked inside the managed write operation. GLB and PNG output headers/non-empty checks were added; the CLI additionally validates GLB 2.0 length, JSON chunk, and non-empty mesh accessors.
+- The new regression assertion updates reflect the stage-labelled output-admission helper rather than obsolete error-message text.
+
+### Expected, actual, and failed iteration
+
+- [Run 38570703906](https://github.com/Killer4K-N/OEC/actions/runs/38570703906) failed the new storage guard test iteration because two assertions still expected the previous CLI error text. The 22 earlier static tests passed; this was a stale-assertion failure, not an inference test.
+- [Run 38570895449](https://github.com/Killer4K-N/OEC/actions/runs/38570895449) subsequently passed 12 TRELLIS notebook + 5 CLI/easy-run + 5 AudioCraft notebook + 6 storage-admission tests = **28/28**, plus compilation and JSON validation for all four relevant notebooks.
+- After the latest cache false-negative change, [run 38571665298](https://github.com/Killer4K-N/OEC/actions/runs/38571665298) again passed the same 28-test matrix, Python compilation and 4/4 notebook JSON validation.
+
+### Direct answer: can TRELLIS generate assets?
+
+**Yes — historical actual asset generation is confirmed.** In [run 37942265623](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623), job `113859380847`, the real pipeline load, preprocessing, image-to-3D inference, mesh processing and GLB export all logged PASS. The output was `test_100k.glb`, 8,950,028 bytes. I downloaded the run's real artifact [11622412194](https://api.github.com/repos/Killer4K-N/Connector_1/actions/artifacts/11622412194/zip) and independently validated the contained GLB on October 14:
+- GLB 2.0 and file length are consistent; JSON chunk parses.
+- One mesh, one primitive with nonempty POSITION/index accessors, two textures and one material.
+- `trimesh.load(..., force="scene")` reopens successfully, with 97,783 vertices and 92,819 faces.
+- Asset SHA-256: `ede239663f21023640356920a5eff129fd8bb1077f914e8ff19fcb720b7ece4d`.
+
+This is a real, recoverable artifact from the earlier isolated run; it proves TRELLIS has generated assets. Download link: [`TRELLIS2-historical-validated-asset.glb`](sandbox:/mnt/data/TRELLIS2-historical-validated-asset.glb). It does **not** prove that the current shared environment freshly generated one during this task.
+
+### Current shared-runner attempt
+
+The updated offline smoke on [run 38571363231](https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231) found:
+- Existing TRELLIS source at `/nlsasfs/home/lmedge/rahkus/aireos_models/TRELLIS.2`.
+- Official input image at `assets/example_image/T.png`, 1,718,470 bytes.
+- Cached TRELLIS snapshot `af44b45f2e35a493886929c6d786e563ec68364d`, 7 safetensors files totaling 14,819,870,530 bytes.
+- `/tmp` is local ext4, distinct from the shared `/nlsasfs` Lustre model mount.
+- The job then exited `BLOCKED_GPU_OCCUPANCY`: no idle GPU with at least 30,000 MiB free; inference never started. Report artifact: [11897043384](https://api.github.com/repos/Killer4K-N/Connector_1/actions/artifacts/11897043384/zip). No new GLB was produced, and the script made no package install/model download/shared cache/process mutation.
+
+### FLUX current result and remaining work
+
+- FLUX.2 Klein weights are cached and the historical baseline in [run 38175212786](https://github.com/Killer4K-N/Connector_1/actions/runs/38175212786) passed Diffusers/Flux2Klein import and xFormers attention at that observed time.
+- The offline cached image-generation attempts [38558972259](https://github.com/Killer4K-N/Connector_1/actions/runs/38558972259) and [38559255790](https://github.com/Killer4K-N/Connector_1/actions/runs/38559255790) safely stopped before inference because both A100s had active compute processes. No PNG was produced.
+- The configured authoritative quota snapshot remains missing and `quota_check` remains absent on the compute runner. Large Lustre free-space metrics are not user/project quota, so dependency/model downloads and shared output writes must retain the existing fresh-quota gate.
+- The Connector-1 runtime capacity report completed, but Connector-2 and Connector-5 matrix jobs remained queued; the workflow did not establish a free alternative GPU.
+
+### Final status
+
+**PASS:** latest candidate static tests (28/28); CLI cache fallback and pre-inference quota guards committed; historical TRELLIS GLB recovered and independently validated; old and current runtime evidence recorded.
+
+**BLOCKED / not accepted for current shared runtime:** fresh TRELLIS GLB generation today (A100 occupancy); current FLUX PNG generation (A100 occupancy); any model/dependency downloads (quota telemetry missing); full notebook/UI validation; QA scheduler recovery.
+
+No changes to `main`, no live OEC sync/reset/clean, no package installation, no model download, no reserve-file modification, no queue mutation, and no process signal.
