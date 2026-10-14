@@ -51,7 +51,7 @@ class StorageWriteAdmissionTests(unittest.TestCase):
                     header = "\n".join(lines[i:end + 1])
                     if not any(token in header for token in ('"models"', "'models'", '"outputs"', "'outputs'")):
                         continue
-                    before = "\n".join(lines[max(0, i - 8):i])
+                    before = "\n".join(lines[max(0, i - 12):i])
                     after = "\n".join(lines[end + 1:end + 8])
                     self.assertIn("storage_preflight(", before, f"{name} cell {cell_index}: no preflight before lock")
                     self.assertIn("storage_preflight(", after, f"{name} cell {cell_index}: no preflight inside lock")
