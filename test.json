@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-14T22:45:00+05:30",
+  "last_updated": "2026-10-14T22:58:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Legacy Connector_1 history is now archived in OEC: 677/677 unique Action runs, with run-level status/conclusion and canonical source URLs preserved (305 success, 236 failure, 122 cancelled, 13 skipped, 1 queued). TRELLIS latest exact-run GLB proof remains run 38602330418. Next, validate new OEC self-hosted labels oec-1/oec-2/oec-3, then run cache-only FLUX PNG generation there; legacy run objects/logs/artifacts remain in Connector_1.",
+  "latest_summary": "Legacy Connector_1 Action history (677/677 run-level records) is archived in OEC. All three new OEC labels oec-1/oec-2/oec-3 passed the read-only inventory on run 38610558599: each saw 8 A100 devices and TRELLIS/FLUX caches, but the authoritative quota snapshot was missing. Cache-only FLUX PNG generation is now running on the same OEC labels with serialized GPU admission; no connector runners are used for new GPU jobs.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -1979,6 +1979,69 @@
         "flux_latest_cache_smoke_status": "FAILURE_BEFORE_INFERENCE_GPU_ADMISSION; no PNG created"
       },
       "follow_up": "Use only OEC runners labelled oec-1/oec-2/oec-3 for future self-hosted GPU jobs; preserve this archive and old run URLs as legacy history. OEC hosted ubuntu-latest may remain for non-GPU static tests. Run the new runner inventory before GPU inference; test FLUX end-to-end on an explicitly selected OEC runner with cache-only/local-scratch mode and upload the output artifact."
+    },
+    {
+      "id": "EXP-2026-10-14-OEC-THREE-RUNNER-INVENTORY",
+      "date": "2026-10-14",
+      "category": "read-only validation of migrated OEC self-hosted GPU runner pool",
+      "approach": "Run a sequential GitHub Actions matrix pinned to self-hosted/linux/x64/gpu/a100 and one explicit label (oec-1, oec-2 or oec-3). Each job records actual RUNNER_NAME/host, visible NVIDIA GPU inventory, phase2_3d package versions, model cache presence, mount information and quota telemetry, and uploads a JSON artifact. The probe does not install packages, download models, mutate caches or signal processes.",
+      "reason": "Verify migration targets can accept OEC repository jobs and preserve runner-specific environment/cache facts before attempting FLUX inference.",
+      "parameters": {
+        "run_id": 38610558599,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38610558599",
+        "branch": "fix/trellis-offline-pipeline-config-20261014",
+        "source_commit": "da697c83f14bcf0a9de36c27abfb31220af0dffa",
+        "labels": [
+          "oec-1",
+          "oec-2",
+          "oec-3"
+        ],
+        "concurrency": "max-parallel=1",
+        "artifacts": {
+          "oec-1": "https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11916534964",
+          "oec-2": "https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11918195061",
+          "oec-3": "https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11918525046"
+        }
+      },
+      "results": {
+        "status": "PASS_3_OF_3_RUNNER_INVENTORY",
+        "job_conclusions": {
+          "oec-1": "success",
+          "oec-2": "success",
+          "oec-3": "success"
+        },
+        "identity_and_gpu": [
+          {
+            "runner": "oec-1",
+            "host": "scn30-mn",
+            "a100_count": 8,
+            "flux_cache": "HIT",
+            "trellis_cache": "HIT",
+            "quota_snapshot": "MISSING"
+          },
+          {
+            "runner": "oec-2",
+            "host": "scn30-mn",
+            "a100_count": 8,
+            "flux_cache": "HIT",
+            "trellis_cache": "HIT",
+            "quota_snapshot": "MISSING"
+          },
+          {
+            "runner": "oec-3",
+            "host": "scn30-mn",
+            "a100_count": 8,
+            "flux_cache": "HIT",
+            "trellis_cache": "HIT",
+            "quota_snapshot": "MISSING"
+          }
+        ],
+        "downloads": false,
+        "installs": false,
+        "shared_cache_mutated": false,
+        "processes_signalled": false
+      },
+      "follow_up": "A subsequent sequential FLUX generation workflow targets the same three labels and applies GPU occupancy admission before inference. Because the authoritative quota snapshot is missing, that smoke requires the existing model/dependency cache and does not install/download anything."
     }
   ]
 }
