@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-14T22:36:00+05:30",
+  "last_updated": "2026-10-14T22:39:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "TRELLIS fix fully validated on Connector_1: final run 38602330418 passed 10/10 tests, generated a fresh 8,865,916-byte GLB (SHA 22caca5f...) and uploaded an exact-run artifact plus report; GLB structure and trimesh reopen PASS (96,672 vertices/92,062 faces). OEC CLI/notebook candidate passed 34 tests and PR #10 is open; Connector_1 PR #2 is ready for review. No downloads/shared-cache writes/process termination; quota telemetry remains a separate block on future downloads.",
+  "latest_summary": "TRELLIS cache-only image-to-3D generation is runtime-verified on Connector_1: final run 38602330418 passed 10/10 tests, loaded the pipeline, generated a fresh 8,865,916-byte GLB (SHA-256 22caca5fe9c02c50c095e4385a7c17e94b214b5fc7d87417b94b48c796a89257), uploaded the exact-run artifact and report, and passed GLB structure plus trimesh reopen (96,672 vertices/92,062 faces). OEC CLI/notebook source fix passed 34 static checks and is open in PR #10, not merged; Connector_1 PR #2 is ready for review. No downloads, installs, shared-cache writes, GPU-process termination or quota bypass; FLUX and quota telemetry remain open.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -1869,6 +1869,66 @@
         "pull_request": "https://github.com/Killer4K-N/OEC/pull/10",
         "status": "OPEN_FOR_REVIEW_NOT_MERGED"
       }
+    },
+    {
+      "id": "TEST-2026-10-14-TRELLIS-FINAL-GUARDED-ASSET-RUN",
+      "date": "2026-10-14",
+      "category": "final cache-only TRELLIS.2 image-to-3D generation and exact-run artifact verification",
+      "approach": "Use the configured phase2_3d interpreter and cached source/weights only; admit a GPU under the bounded low-footprint policy; supply the pinned pipeline config through a temporary /tmp overlay; run actual pipeline load/inference/GLB export; validate GLB format, length, JSON chunk, mesh accessors and trimesh reopen; upload only the current run's GLB path.",
+      "reason": "Verify the missing pipeline.json/offline Hub lookup fix end to end and ensure a failed/test-only run cannot accidentally upload a stale GLB from another attempt.",
+      "parameters": {
+        "run_id": 38602330418,
+        "run_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418",
+        "job_id": 115984412406,
+        "commit": "d543a062b5695a07fd2952396ab8dc88f81a85d6",
+        "source_branch": "diagnose/trellis-asset-generation-20261014",
+        "python_environment": "phase2_3d",
+        "model_id": "microsoft/TRELLIS.2-4B",
+        "cached_snapshot": "af44b45f2e35a493886929c6d786e563ec68364d",
+        "mode": "offline/cache-only; no package install or model download",
+        "output_path": "/tmp/oec-trellis-asset-generation-38602330418/trellis_asset.glb",
+        "gpu_admission": {
+          "mode": "LOW_FOOTPRINT_SHARED",
+          "index": "1",
+          "free_mib": 39902,
+          "utilization_percent": 0,
+          "active_compute_process_count": 1,
+          "active_compute_process_mib": 416,
+          "process_terminated": false
+        },
+        "glb_artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11914941709",
+        "report_artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11913529964"
+      },
+      "results": {
+        "status": "PASS",
+        "tests_total": 10,
+        "tests_passed": 10,
+        "tests_failed": 0,
+        "pipeline_load": "PASS",
+        "inference": "PASS",
+        "export": "PASS",
+        "glb_bytes": 8865916,
+        "glb_sha256": "22caca5fe9c02c50c095e4385a7c17e94b214b5fc7d87417b94b48c796a89257",
+        "glb_format": "GLB 2.0",
+        "declared_length_match": true,
+        "json_chunk_valid": true,
+        "mesh_count": 1,
+        "primitive_count": 1,
+        "texture_count": 2,
+        "position_accessor_count": 96672,
+        "index_accessor_count": 276186,
+        "trimesh_reopen": "PASS",
+        "trimesh_vertices": 96672,
+        "trimesh_faces": 92062,
+        "glb_artifact_id": 11914941709,
+        "report_artifact_id": 11913529964,
+        "exact_run_artifact_path": true,
+        "shared_cache_mutated": false,
+        "package_install": false,
+        "model_download": false,
+        "gpu_process_change": false
+      },
+      "follow_up": "OEC CLI/notebook source fix is statically validated and awaits review in PR #10; it is not merged into main. FLUX image generation and fresh authoritative quota telemetry remain separate open items."
     }
   ]
 }
