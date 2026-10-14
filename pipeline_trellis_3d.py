@@ -224,8 +224,25 @@ def _resolve_snapshot(args: argparse.Namespace, runtime: dict[str, Any]) -> Path
 
 
 def _load_pipeline(args: argparse.Namespace, runtime: dict[str, Any]) -> Any:
+    from tools.trellis_offline import offline_hub_mode, prepare_local_trellis_snapshot
+
     snapshot = _resolve_snapshot(args, runtime)
-    pipeline = runtime["pipeline_class"].from_pretrained(str(snapshot))
+    cache_roots = [
+        runtime["cache_dir"],
+        runtime["system_dirs"]["models"],
+        Path.home() / ".cache" / "huggingface" / "hub",
+    ]
+    for cache_env_name in ("HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE", "TRANSFORMERS_CACHE"):
+        cache_env_value = os.environ.get(cache_env_name)
+        if cache_env_value:
+            cache_roots.append(Path(cache_env_value))
+    local_snapshot, overlay_owner = prepare_local_trellis_snapshot(
+        snapshot, repo_id=args.model_id, cache_roots=tuple(cache_roots)
+    )
+    # Keep /tmp overlay/cache links alive while the UI or generate call uses pipeline.
+    runtime["snapshot_overlay_tempdir"] = overlay_owner
+    with offline_hub_mode(overlay_owner):
+        pipeline = runtime["pipeline_class"].from_pretrained(local_snapshot)
     pipeline.cuda()
     print(f"TRELLIS_PIPELINE_LOAD=PASS model={args.model_id}")
     return pipeline

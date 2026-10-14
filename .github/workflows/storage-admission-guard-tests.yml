@@ -11,6 +11,7 @@ on:
     branches:
       - main
       - 'fix/storage-admission-write-guards-20261014'
+      - 'fix/trellis-offline-pipeline-config-20261014'
 
 permissions:
   contents: read
@@ -35,9 +36,12 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s tests -p 'test_trellis_notebook_static.py' -v
           python -m unittest discover -s tests -p 'test_trellis_easy_run.py' -v
+          python -m unittest discover -s tests -p 'test_trellis_offline_config.py' -v
+          python -m unittest discover -s tests -p 'test_flux_image.py' -v
+          python -m unittest discover -s tests -p 'test_flux_gpu_admission.py' -v
           python -m unittest discover -s tests -p 'test_audiocraft_notebook_static.py' -v
           python -m unittest discover -s tests -p 'test_storage_write_admission.py' -v
-          python -m py_compile pipeline_trellis_3d.py storage_manager.py
+          python -m py_compile pipeline_trellis_3d.py pipeline_flux_image.py storage_manager.py tools/trellis_offline.py tools/oec_runner_probe.py tools/flux_gpu_admission.py
           python - <<'PY'
           import json
           from pathlib import Path

@@ -1,0 +1,44 @@
+name: OEC self-hosted runner migration inventory
+
+on:
+  push:
+    branches:
+      - fix/trellis-offline-pipeline-config-20261014
+    paths:
+      - "tools/oec_runner_probe.py"
+      - ".github/workflows/oec-runner-migration-inventory.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    name: Read-only inventory on ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        runner: [oec-1, oec-2, oec-3]
+    runs-on: [self-hosted, linux, x64, gpu, a100, "${{ matrix.runner }}"]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout the OEC candidate in the isolated Actions workspace
+        uses: actions/checkout@v4
+      - name: Probe runner identity, GPU, packages, caches and quota telemetry
+        shell: bash
+        env:
+          OEC_EXPECTED_RUNNER: ${{ matrix.runner }}
+        run: |
+          set -euo pipefail
+          REPORT="$RUNNER_TEMP/oec-runner-$OEC_EXPECTED_RUNNER-inventory.json"
+          python3 tools/oec_runner_probe.py --expected-runner "$OEC_EXPECTED_RUNNER" --output "$REPORT"
+          python3 -m json.tool "$REPORT" >/dev/null
+      - name: Preserve runner inventory report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-runner-inventory-${{ matrix.runner }}
+          path: ${{ runner.temp }}/oec-runner-${{ matrix.runner }}-inventory.json
+          if-no-files-found: warn
+          retention-days: 30
