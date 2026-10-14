@@ -56,8 +56,12 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 
 - Integrated the reviewed TRELLIS/FLUX notebooks and CLI, storage-output admission fixes, regression tests and cumulative tracking files into `main`.
 - Candidate test run [38572444007](https://github.com/Killer4K-N/OEC/actions/runs/38572444007) passed 28/28 static tests, Python compilation and four notebook JSON checks; main-triggered validation is pending.
-- Historical TRELLIS image-to-3D generation is confirmed by [run 37942265623](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623): 8,950,028-byte GLB artifact [11622412194](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194) reopens with 97,783 vertices and 92,819 faces. Current Oct 14 TRELLIS/FLUX generation remains blocked by active GPU processes.
+- Historical TRELLIS image-to-3D generation is confirmed by [run 37942265623](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623): 8,950,028-byte GLB artifact [11622412194](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194) reopens with 97,783 vertices and 92,819 faces. Those earlier Oct 14 TRELLIS attempts were blocked before the later cache-only loader fix; see the newer successful GLB evidence below. FLUX end-to-end generation remains unverified.
 
 - **Main CI result recorded:** [run 38575822798](https://github.com/Killer4K-N/OEC/actions/runs/38575822798) on main commit `9c9d7acc...` passed 28/28 static tests, Python compilation and 4/4 notebook JSON checks. Current shared GPU generation remains blocked separately.
 
 - **Latest GPU smoke retries:** TRELLIS [run 38571363231 attempt 2](https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231) and FLUX [run 38559255790 attempt 2](https://github.com/Killer4K-N/Connector_1/actions/runs/38559255790) both blocked safely at GPU occupancy; the retry results are recorded in `test.json` and the Oct. 14 changelog. Historical TRELLIS GLB remains independently validated.
+
+
+- **TRELLIS fix runtime-verified:** Connector_1 run 38598822415 generated a fresh GLB (8,870,632 bytes; SHA-256 0ba06de0e028d975b7108f4dcb9856a81dcdd76037e94cc852883fc5b2ad6b1e) and reopened it with trimesh (96,532 vertices, 91,986 faces). OEC candidate CI 38601987037 passed 34 tests; review PR #10 is open, not merged.
+- **Follow-up checks:** corrected Connector_1 retry 38601626147 had passed tests and was generating. Exact-run artifact guard run 38602330418 was queued. Artifact 11913875417 from the failed test-only run is stale, not proof of a fresh result.
