@@ -39,7 +39,7 @@ Daily engineering records live here. Use the local Asia/Kolkata date in each fil
 ## Persistent project tracking
 
 - **One active TODO list:** [`TODO.md`](../TODO.md)
-- **Structured experiment/test log:** [`test.json`](../test.json) — currently 41 experiment/test records.
+- **Structured experiment/test log:** [`test.json`](../test.json) — currently 42 experiment/test records.
 - **Cumulative significant results:** [`result.md`](../result.md)
 - **Reusable interactive-model implementation convention:** [`model_entrypoint_convention.md`](../docs/model_entrypoint_convention.md)
 
@@ -72,4 +72,4 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 - Legacy source: [Connector_1 Actions runs](https://github.com/Killer4K-N/Connector_1/actions); captured run-level history: 677/677 unique records, outcomes 305 success / 236 failure / 122 cancelled / 13 skipped / 1 queued.
 - Archive: [`docs/runner_migration/connector_1_actions_runs.json`](../docs/runner_migration/connector_1_actions_runs.json).
 - Migration method and next steps: [`docs/runner_migration/README.md`](../docs/runner_migration/README.md).
-- Inventory [run 38610558599](https://github.com/Killer4K-N/OEC/actions/runs/38610558599) passed for all three new OEC labels, with per-runner reports. The cache-only FLUX generation matrix [38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955) is in progress; migration acceptance requires validating its actual PNG artifact.
+- Inventory [run 38610558599](https://github.com/Killer4K-N/OEC/actions/runs/38610558599) passed for all three new OEC labels, with per-runner reports. The cache-only FLUX generation matrix [38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955) is in progress; migration acceptance requires validating its actual PNG artifact. OEC candidate CI [38612345392](https://github.com/Killer4K-N/OEC/actions/runs/38612345392) passed 46 tests and Python/notebook static checks.
