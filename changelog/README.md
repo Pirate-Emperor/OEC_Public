@@ -65,3 +65,11 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 
 - **TRELLIS fix runtime-verified:** Connector_1 run 38598822415 generated a fresh GLB (8,870,632 bytes; SHA-256 0ba06de0e028d975b7108f4dcb9856a81dcdd76037e94cc852883fc5b2ad6b1e) and reopened it with trimesh (96,532 vertices, 91,986 faces). OEC candidate CI 38601987037 passed 34 tests; review PR #10 is open, not merged.
 - **Follow-up checks:** corrected Connector_1 retry [38601626147](https://github.com/Killer4K-N/Connector_1/actions/runs/38601626147) passed 10/10 tests and generated a fresh validated GLB (98,250 vertices, 93,243 faces); its old wildcard bundled multiple files. The exact-run artifact guard in run [38602330418](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418) is running. Artifact 11913875417 from the failed test-only run is stale, not proof of a fresh result.
+
+
+## Runner migration
+
+- Legacy source: [Connector_1 Actions runs](https://github.com/Killer4K-N/Connector_1/actions); captured run-level history: 677/677 unique records, outcomes 305 success / 236 failure / 122 cancelled / 13 skipped / 1 queued.
+- Archive: [`docs/runner_migration/connector_1_actions_runs.json`](../docs/runner_migration/connector_1_actions_runs.json).
+- Migration method and next steps: [`docs/runner_migration/README.md`](../docs/runner_migration/README.md).
+- New GPU runner labels: `oec-1`, `oec-2`, `oec-3`; migration acceptance is not complete until the new OEC-runner inventory and FLUX PNG-producing run have completed.
