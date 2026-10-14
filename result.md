@@ -136,3 +136,8 @@ Retrospective review of [run 38175212786](https://github.com/Killer4K-N/Connecto
 **Current acceptance remains partial:** source guard regressions and static validation are fixed; authoritative fresh-quota telemetry is still missing; shared TRELLIS full inference/GLB geometry, FLUX generated PNG, Jupyter end-to-end runs, AudioCraft generation, and QA worker recovery remain unverified/blocked. No package install, model download, live checkout sync/reset, cache purge, reserve modification, QA queue mutation, process signal or merge to `main` occurred.
 
 Upstream references consulted for the broader compatibility context (none substitutes for local validation): [TRELLIS.2 setup](https://github.com/microsoft/TRELLIS.2/blob/main/setup.sh), [TRELLIS.2 issue #111](https://github.com/microsoft/TRELLIS.2/issues/111), [xFormers changelog](https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md), [Diffusers FLUX.2 API docs v0.37.0](https://huggingface.co/docs/diffusers/v0.37.0/en/api/pipelines/flux2), and [AudioCraft requirements](https://github.com/facebookresearch/audiocraft/blob/main/requirements.txt).
+
+
+## Post-documentation validation — 2026-10-14
+
+The tracking-only documentation commit [`dac91f09bc6cecd896e38213072fe19142d30390`](https://github.com/Killer4K-N/OEC/commit/dac91f09bc6cecd896e38213072fe19142d30390) triggered [run 38559861094](https://github.com/Killer4K-N/OEC/actions/runs/38559861094), which also passed 27/27 static tests, Python compilation, and four notebook JSON validations. The tested source files were unchanged from `4ade353...`, so this confirms reproducibility of the candidate suite, not an additional runtime success.

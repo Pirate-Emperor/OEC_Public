@@ -148,3 +148,8 @@ The separate Connector_1 branch [`diagnose/flux-cache-only-smoke-20261014`](http
 - [Official xFormers changelog](https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md) — wheel/version context for Torch/CUDA.
 - [Diffusers FLUX.2 API docs v0.37.0](https://huggingface.co/docs/diffusers/v0.37.0/en/api/pipelines/flux2) — supported release/API context.
 - [AudioCraft requirements.txt](https://github.com/facebookresearch/audiocraft/blob/main/requirements.txt) — upstream dependency constraints; `phase1` was not modified.
+
+
+### Tracking-record commit verification
+
+The documentation update was committed as [`dac91f09bc6cecd896e38213072fe19142d30390`](https://github.com/Killer4K-N/OEC/commit/dac91f09bc6cecd896e38213072fe19142d30390). The branch push triggered [run 38559861094](https://github.com/Killer4K-N/OEC/actions/runs/38559861094), job `115837970246`, which passed the same 27/27 static test matrix, Python compilation, and all four notebook JSON checks. This was a documentation-only delta from the already-tested source candidate; it adds repeatability evidence but does not change the runtime blockers or prove inference.

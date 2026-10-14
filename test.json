@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-14T17:20:02+05:30",
+  "last_updated": "2026-10-14T17:24:27+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
   "latest_summary": {
@@ -134,9 +134,10 @@
     },
     "latest_storage_write_guard_validation": {
       "source_branch": "fix/storage-admission-write-guards-20261014",
-      "tested_commit": "4ade353d566bfeb525949f5f4c1905a1ae1e135c",
-      "run_id": 38559330370,
-      "url": "https://github.com/Killer4K-N/OEC/actions/runs/38559330370",
+      "source_commit": "4ade353d566bfeb525949f5f4c1905a1ae1e135c",
+      "docs_commit": "dac91f09bc6cecd896e38213072fe19142d30390",
+      "latest_confirming_run_id": 38559861094,
+      "url": "https://github.com/Killer4K-N/OEC/actions/runs/38559861094",
       "result": "PASS_STATIC",
       "test_counts": {
         "trellis_notebook_static": 12,
@@ -147,7 +148,7 @@
       },
       "python_compile": "PASS",
       "notebook_json": "4/4 PASS",
-      "note": "First guard test run 38558509401 failed with two guard-test failures after the 22 existing tests passed; the AudioCraft under-lock admission guard and the test assumptions were corrected before the successful final run. No live shared environment or main branch was changed."
+      "note": "First guard test run 38558509401 failed two of the new tests after the 22 pre-existing tests passed. AudioCraft under-lock admission and test assumptions were corrected. Source commit 4ade353... and tracking-only commit dac91f... both pass the same 27-test matrix. No shared environment or main branch was changed."
     },
     "latest_flux_cache_only_smoke": {
       "connector_branch": "diagnose/flux-cache-only-smoke-20261014",
@@ -185,6 +186,13 @@
       "flux_cache": "HIT",
       "trellis_2_cache": "MISS",
       "overall": "Storage precheck blocked package/model writes; this was not an end-to-end inference pass."
+    },
+    "documentation_validation_after_tracking_commit": {
+      "run_id": 38559861094,
+      "url": "https://github.com/Killer4K-N/OEC/actions/runs/38559861094",
+      "docs_commit": "dac91f09bc6cecd896e38213072fe19142d30390",
+      "result": "PASS",
+      "experiments_after_append": 25
     }
   },
   "experiments": [
@@ -1151,6 +1159,43 @@
       ],
       "status": "BLOCKED_GPU_OCCUPANCY",
       "follow_up": "Coordinate a window with an idle GPU using the approved scheduler/owner process; then retry this offline smoke. Do not kill/restart an unidentified compute process."
+    },
+    {
+      "id": "TEST-2026-10-14-DOCUMENTATION-COMMIT-REGRESSION-RERUN",
+      "date": "2026-10-14",
+      "datetime": "2026-10-14T17:24:27+05:30",
+      "timezone": "Asia/Kolkata",
+      "category": "automatic hosted static regression rerun after tracking-file commit",
+      "objective": "Confirm the committed changelog, TODO, results and cumulative test registry changes did not disturb the validated source candidate.",
+      "reason": "A push to the source candidate branch automatically reran the isolated GitHub-hosted static validation workflow.",
+      "environment": {
+        "repository": "Killer4K-N/OEC",
+        "branch": "fix/storage-admission-write-guards-20261014",
+        "commit": "dac91f09bc6cecd896e38213072fe19142d30390",
+        "workflow_run_id": 38559861094,
+        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38559861094",
+        "job_id": 115837970246,
+        "runner": "GitHub-hosted ubuntu-latest"
+      },
+      "approach": "Re-run the same four static/unit suites, compile the CLI/storage manager, and parse the four model notebooks.",
+      "expected": "Same 27 source/static tests plus compile and notebook JSON should pass; no live runner is touched.",
+      "results": {
+        "status": "PASS",
+        "trellis_notebook_static": "12/12",
+        "trellis_cli_easy_run": "5/5",
+        "audiocraft_notebook_static": "5/5",
+        "storage_write_admission": "5/5",
+        "total": "27/27",
+        "python_compile": "PASS",
+        "notebook_json": "4/4 PASS"
+      },
+      "interpretation": "The exact documentation commit passed the same static matrix. Since the tested source files were identical to the previously validated source candidate commit, this is a reproducibility confirmation, not a new runtime test.",
+      "limitations": [
+        "No package installs or downloads; no shared environment or live checkout changes.",
+        "No actual TRELLIS/FLUX/AudioCraft inference."
+      ],
+      "status": "PASS_STATIC",
+      "follow_up": "Proceed to runtime checks only after a fresh authoritative quota snapshot is available and a safe idle GPU is confirmed."
     }
   ]
 }
