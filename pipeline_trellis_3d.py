@@ -133,9 +133,36 @@ def _imports_and_probe(args: argparse.Namespace) -> dict[str, Any]:
         cache_available = True
         print(f"TRELLIS_MODEL_CACHE=HIT snapshot={snapshot}")
     except LocalEntryNotFoundError:
-        cache_available = False
-        snapshot = None
-        print(f"TRELLIS_MODEL_CACHE=MISS cache_dir={cache_dir}")
+        # The shared cache contains a TRELLIS.2 weight-shard snapshot that can be
+        # invisible to snapshot_download when repository marker/ref files are absent.
+        # Reuse it offline before declaring a cache miss and requiring a download.
+        repo_cache_name = f"models--{args.model_id.replace('/', '--')}"
+        snapshot_root = cache_dir / repo_cache_name / "snapshots"
+        weight_candidates = []
+        if snapshot_root.is_dir():
+            for entry in snapshot_root.iterdir():
+                if not entry.is_dir():
+                    continue
+                weight_files = []
+                for root, _, names in os.walk(entry):
+                    weight_files.extend(
+                        os.path.join(root, name) for name in names if name.endswith(".safetensors")
+                    )
+                if weight_files:
+                    weight_bytes = sum(os.path.getsize(name) for name in weight_files)
+                    weight_candidates.append((weight_bytes, entry, len(weight_files)))
+        if weight_candidates:
+            weight_bytes, snapshot_path, shard_count = max(weight_candidates, key=lambda item: item[0])
+            snapshot = str(snapshot_path.resolve())
+            cache_available = True
+            print(
+                f"TRELLIS_WEIGHT_SNAPSHOT_CACHE_HIT snapshot={snapshot} "
+                f"shards={shard_count} bytes={weight_bytes}"
+            )
+        else:
+            cache_available = False
+            snapshot = None
+            print(f"TRELLIS_MODEL_CACHE=MISS cache_dir={cache_dir}")
 
     return {
         "core_config": core_config,

@@ -107,6 +107,8 @@ class StorageWriteAdmissionTests(unittest.TestCase):
     def test_cli_model_download_and_glb_export_use_fresh_quota(self):
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
         self.assertIn("TRELLIS model download denied inside managed operation", cli)
+        self.assertIn("repo_cache_name = f\"models--{args.model_id.replace('/', '--')}\"", cli)
+        self.assertIn("TRELLIS_WEIGHT_SNAPSHOT_CACHE_HIT", cli)
         self.assertIn("storage_preflight_path(", cli)
         self.assertIn("GLB {stage} refused by OEC output quota/storage admission", cli)
         self.assertIn("_preflight_target_path()", cli)
