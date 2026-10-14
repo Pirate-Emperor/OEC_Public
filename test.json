@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-14T22:58:00+05:30",
+  "last_updated": "2026-10-14T23:38:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Legacy Connector_1 Action history (677/677 run-level records) is archived in OEC. All three new OEC labels oec-1/oec-2/oec-3 passed the read-only inventory on run 38610558599: each saw 8 A100 devices and TRELLIS/FLUX caches, but the authoritative quota snapshot was missing. Cache-only FLUX PNG generation is now running on the same OEC labels with serialized GPU admission; no connector runners are used for new GPU jobs.",
+  "latest_summary": "Connector_1 history (677/677 run-level records) is archived in OEC; all 3 OEC runner labels passed the read-only inventory. OEC source CI run 38612345392 passed 46/46 tests, Python compilation and all 4 notebook JSON checks, including shared FLUX CLI/Gradio and safe GPU-admission tests. Actual cache-only FLUX image generation is still running on OEC runner labels in run 38611186955; no image-generation PASS is recorded until a valid exact-run PNG and metadata artifact are verified. Quota telemetry remains missing, so installs/downloads remain blocked.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2042,6 +2042,53 @@
         "processes_signalled": false
       },
       "follow_up": "A subsequent sequential FLUX generation workflow targets the same three labels and applies GPU occupancy admission before inference. Because the authoritative quota snapshot is missing, that smoke requires the existing model/dependency cache and does not install/download anything."
+    },
+    {
+      "id": "TEST-2026-10-14-OEC-TRELLIS-FLUX-RUNNER-MIGRATION-CI",
+      "date": "2026-10-14",
+      "category": "OEC candidate CI for runner migration, shared FLUX image pipeline and Gradio notebooks",
+      "approach": "Run all OEC source/static regression suites on a hosted CI worker while all GPU/asset workflows are pinned to OEC's new self-hosted runner labels. Validate TRELLIS notebook static behavior, notebook easy-run conventions, pinned offline model config, Flux CLI/cache/PNG validation, GPU admission policy, AudioCraft notebook and storage admission. Compile Python entry points and parse notebook JSON.",
+      "reason": "Ensure source and tests are coherent before relying on live FLUX image generation on oec-1/oec-2/oec-3.",
+      "parameters": {
+        "run_id": 38612345392,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38612345392",
+        "source_commit": "5a846bf2b2787c72979db38cee587112fb0cb69c",
+        "branch": "fix/trellis-offline-pipeline-config-20261014",
+        "test_suites": {
+          "trellis_notebook_static": 12,
+          "trellis_easy_run": 5,
+          "trellis_offline_config": 6,
+          "flux_image": 7,
+          "flux_gpu_admission": 5,
+          "audiocraft_notebook_static": 5,
+          "storage_write_admission": 6
+        },
+        "python_compile": [
+          "pipeline_trellis_3d.py",
+          "pipeline_flux_image.py",
+          "storage_manager.py",
+          "tools/trellis_offline.py",
+          "tools/oec_runner_probe.py",
+          "tools/flux_gpu_admission.py"
+        ],
+        "notebook_json": [
+          "pipeline_trellis_3d.ipynb",
+          "pipeline_trellis_3d_only.ipynb",
+          "pipeline_flux_only.ipynb",
+          "pipeline_audiocraft.ipynb"
+        ]
+      },
+      "results": {
+        "status": "PASS_46_TESTS_COMPILE_AND_NOTEBOOK_JSON",
+        "tests_total": 46,
+        "tests_passed": 46,
+        "tests_failed": 0,
+        "python_compile": "PASS",
+        "notebook_json": "PASS_4_OF_4",
+        "source_changes_review_only": true,
+        "actual_flux_png_generation": "PENDING_SEPARATE_OEC_SELF_HOSTED_RUN_38611186955"
+      },
+      "follow_up": "Need finish cache-only FLUX runtime run 38611186955 and verify artifact before claiming image-generation runtime acceptance. The new dependency/cache and safe-GPU behavior must stay fail-closed if the runner exits before generating a valid PNG."
     }
   ]
 }
