@@ -112,12 +112,11 @@ The official Diffusers release notes list Flux2 Klein support in v0.37.0; the cu
 ## 2026-10-14 follow-up — TRELLIS offline config fix
 - [x] Reproduced the loader defect in [Connector_1 run 38587490301](https://github.com/Killer4K-N/Connector_1/actions/runs/38587490301): 7/7 previous tests passed and GPU admission selected an allowed device, then model load attempted a forbidden offline Hub lookup for a missing \`pipeline.json\`.
 - [x] Committed the pinned config and local snapshot-overlay fix on [\`diagnose/trellis-asset-generation-20261014\`](https://github.com/Killer4K-N/Connector_1/tree/diagnose/trellis-asset-generation-20261014), with expanded 10-test regression coverage.
-- [ ] **OPEN — corrected Connector_1 retry:** run 38601626147 passed its test step and was generating an asset; verify current-run output. Exact-run artifact upload check 38602330418 was queued at last check.
 - [ ] **BLOCKED — any missing model/dependency download:** fresh authoritative quota telemetry remains missing; no quota bypass, install or download.
 ## 2026-10-14 follow-up — TRELLIS offline pipeline-config fix
 - [x] Reproduced and fixed the weight-only snapshot pipeline.json lookup bug with a pinned /tmp overlay and offline Hub access.
 - [x] Validated a fresh GLB in Connector_1 run 38598822415; artifact 11912523421; structure and trimesh reopen passed.
 - [x] OEC CLI and both TRELLIS notebooks use the shared offline config helper; CI 38601987037 passed 34 tests; PR #10 is open, not merged.
 - [x] Fixed the Connector_1 fixture assertion and narrowed GLB upload to the exact workflow run ID.
-- [ ] Verify Connector_1 run 38601626147 and run-scoped artifact retry 38602330418 complete with expected outcomes.
+- [ ] Verify run-scoped artifact workflow 38602330418 uploads only its own newly generated GLB.
 - [ ] BLOCKED — any missing model/dependency download: authoritative quota telemetry is still missing; no quota bypass, install or download.
