@@ -81,7 +81,7 @@ class StorageWriteAdmissionTests(unittest.TestCase):
         self.assertLess(audio.rindex("Storage admission denied inside managed write"),
                         audio.index("AUDIOGEN_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)"))
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
-        self.assertLess(cli.rindex("GLB target path denied inside managed operation"),
+        self.assertLess(cli.index('_preflight_output("inside managed write")'),
                         cli.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
 
     def test_output_admission_precedes_expensive_model_inference(self):
@@ -108,8 +108,9 @@ class StorageWriteAdmissionTests(unittest.TestCase):
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
         self.assertIn("TRELLIS model download denied inside managed operation", cli)
         self.assertIn("storage_preflight_path(", cli)
-        self.assertIn("GLB export denied inside managed operation", cli)
+        self.assertIn("GLB {stage} refused by OEC output quota/storage admission", cli)
         self.assertIn("_preflight_target_path()", cli)
+        self.assertIn("GLB export contains no non-empty mesh geometry", cli)
 
 
 if __name__ == "__main__":
