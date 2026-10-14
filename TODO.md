@@ -2,9 +2,7 @@
 
 **Last updated:** 2026-10-14 (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
-
 ## 2026-10-14 — quota telemetry and live-checkout diagnosis
-
 - [x] Verified GitHub state: OEC `main` is `82346c0753e139b92240f53734eb48d2113ed9ad`; `fix/trellis-gradio-notebooks-20261011` is `2543b26d2888e667c6443c984259f84ac5b6c142` (111 ahead, 0 behind). No main-branch change or merge.
 - [x] Reviewed failed remediation [run 38175212786](https://github.com/Killer4K-N/Connector_1/actions/runs/38175212786). Main job blocked on missing fresh quota; separate connector-2 QA recovery failed with `scontrol: stepd_available: Couldn't find nodename` and `sacct` connection refusal to `localhost:6819`.
 - [x] Created the read-only Connector_1 diagnostic on [branch `diagnose/oec-storage-telemetry-20261014`](https://github.com/Killer4K-N/Connector_1/tree/diagnose/oec-storage-telemetry-20261014), commit `70d9000ba48cfdd6a6413276d7a4d4fe2888ad17`. [Run 38555689884](https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884) succeeded, job `115824133792`; JSON artifact [11888967874](https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884/artifacts/11888967874).
@@ -15,9 +13,7 @@
 - [ ] Obtain genuine quota values via the approved site/login-node route, publish with `tools/quota_snapshot.py` from actual `quota_check` values, verify shared visibility/freshness, and rerun admission. If the login route is still unavailable, resolve that transport or provide a site-approved telemetry producer; do not invent values.
 - [ ] Diagnose the connector-2 Slurm control/accounting failure before QA recovery. Preserve the stopped process and queue until ownership and the replacement job state can be verified.
 - [ ] After admission passes, complete actual xFormers/CUDA attention, TRELLIS model load/inference/GLB geometry, FLUX image-generation, intended-kernel notebook, and separate AudioCraft/QA checks. Runtime acceptance remains open.
-
 ## Completed in this workstream
-
 - [x] Add standalone `pipeline_trellis_3d.py` with `check`, `generate`, and optional `gradio` modes; configurable GPU, model/cache/source paths, output path/folder, port, bind host, offline behavior and mesh/texture options.
 - [x] Make TRELLIS notebook model loading cache-first and pass a local snapshot path to the TRELLIS loader (rather than passing the unsupported `local_files_only` loader kwarg).
 - [x] Make model/dependency download/install cells use OEC fresh-quota admission and the managed storage operation lock. No quota bypass.
@@ -31,67 +27,44 @@
 - [x] Run offline source tests on connector-1, connector-2 and connector-5. The matrix at run [38157725815](https://github.com/Killer4K-N/Connector_1/actions/runs/38157725815) passed 17 TRELLIS/entry-point tests, 5 AudioCraft notebook tests, 10 QA recovery tests, and 6 alias tests per runner (38 per runner, 114 total).
 - [x] Provision this single TODO, `test.json`, and cumulative `result.md` so future prompts can update persistent project tracking.
 - [x] Copy and validate the tracking files in the live shared OEC tree with [connector-1 sync run 38160976083](https://github.com/Killer4K-N/Connector_1/actions/runs/38160976083); the staged JSON parse and all four offline test suites passed.
-
 ## P0 — unblock runtime safely
-
 - [ ] **Fresh authoritative quota snapshot.** On the approved login node, run `quota_check` and use the actual reported usage/limit values (do not estimate) to create a fresh snapshot, e.g. `python ~/OEC/tools/quota_snapshot.py --used-gb <ACTUAL_USED_GB> --limit-gb <ACTUAL_LIMIT_GB> --source "quota_check"`. Use actual bytes with `--used-bytes`/ `--limit-bytes` if the command returns bytes. Then re-run the guarded admission probe. All three compute runners currently report no fresh snapshot; connector-1 cannot use its prior login-host route, and the other runners do not have an SSH client.
 - [ ] **TRELLIS CUDA attention.** Once admission passes, install only the compatible `xformers==0.0.29.post2` wheel for the current `torch==2.6.0+cu124` stack via the cu124 wheel index, under the managed-operation lock. First snapshot the current environment as already implemented. Require an actual CUDA `memory_efficient_attention` probe to pass before model load. `xformers==0.0.29.post1` currently fails this probe; `flash-attn` is not installed and its fallback probe also failed.
 - [ ] **TRELLIS.2 model cache.** The read-only cache probe for `microsoft/TRELLIS.2-4B` returned `LocalEntryNotFoundError` on all three runners. After fresh quota admission, download/cache the license-compliant source model via the guarded loader, then run offline image-to-3D, export a GLB, reopen it with trimesh, assert vertices/faces, and repeat export to check CuMesh stability. No model was downloaded during the audits.
 - [ ] **FLUX.2 environment.** The model `black-forest-labs/FLUX.2-klein-4B` is cached, but the current package stack cannot import the FLUX pipeline: `diffusers==0.40.0.dev0` imports `get_cached_repo_tree`, missing from `huggingface-hub==0.36.2`. After quota admission, let the notebook reconcile the pinned released stack (`diffusers==0.37.0`, `huggingface-hub==0.36.0`, `transformers==4.56.1`) and verify imports, then generate and open one image from the existing cache. Do not claim FLUX fixed until this is tested in the real `phase2_3d` environment.
 - [ ] **QA worker.** On connector-2, PID 2529002 (`qa_compliance_worker.py`) was observed stopped (`T`) under an interactive shell, started Oct 9; do not send SIGCONT to the stale process because it predates the latest guards. After checking user/session ownership and replacing it with the updated file, verify CUDA/quota/model-cache prerequisites and then launch exactly one guarded worker using the appropriate `--gpu`. Confirm logs advance and `PENDING_QA` rows transition; do not run a second worker or bulk-requeue claims on top of it.
 - [ ] **Quota-gated model cache for QA.** The QA model `Qwen/Qwen2-VL-7B-Instruct` must be checked locally first. If missing, get fresh admission before download; otherwise the updated worker correctly stops rather than downloading.
-
 ## P1 — fix remaining dependency/backlog items
-
 - [ ] **AudioCraft original wheel-build issue.** The current `phase1` environment imports `AudioGen` and `audio_write`, but `pip check` reports `thinc==8.3.6` requiring NumPy >=2 while phase1 has NumPy 1.26.4. The original build traceback was not found in recent logs and was not reproduced. Capture the exact failing command/traceback and prepare an isolated, license-compliant dependency plan before changing phase1. Do not blindly upgrade NumPy or reinstall AudioCraft in place.
 - [ ] **QA backlog triage.** Read-only DB snapshot: 225 rows — `FAILED_MISSING_FILE=78`, `PENDING=144`, `PENDING_QA=2`, `PROCESSING_QA=1`. Inspect the affected file paths and error history. Preserve failure rows; only requeue a specific row after proving its files exist and active worker ownership is clear.
 - [ ] **GPU utilization/worker liveness.** Current samples were 0% GPU utilization on the three hosts. The connector-2 video worker and upload daemon were sleeping in poll loops; QA process was stopped. After safe QA replacement and quota/model prerequisites, watch utilization, logs, queue latency and worker progress to separate idle queue time from inefficient active inference.
 - [ ] **Jupyter/UI acceptance.** The notebook Python-cell syntax tests pass and a temporary Jupyter server/kernel smoke previously passed, but the user's actual persistent Jupyter session/browser SSH tunnel has not been verified. Run the updated TRELLIS, TRELLIS-only, FLUX-only and AudioCraft notebooks in their intended kernels end-to-end after the quota/dependency blockers clear.
 - [ ] **AudioCraft wheel/install reproducibility.** Add the original build command and bounded build logs to `test.json` when the user/environment can reproduce the issue. Record the exact versions/platform/accelerator in that experiment record.
-
 ## P2 — ongoing project hygiene
-
 - [ ] Keep `changelog/README.md` indexed to all day-specific changelogs.
 - [ ] At the end of every new task, append a dated experiment to `test.json`, update this TODO list, append to the current day's changelog (create a new daily file when local date changes), and update `result.md` when a material result changes.
 - [ ] Never merge these changes into `main` without explicit approval. Preserve dirty/untracked files in the live OEC checkout; do not force checkout/reset/clean.
 - [ ] Continue using only the authorized runner labels `connector-1`, `connector-2`, and `connector-5` for parallel audit/test jobs.
-
-
 ## Latest sync note — 2026-10-11
-
 The latest source sync copied the current tracker set from feature revision `70411afa152a862e4356cb09ccdc83cb1278b2fc`. `TRACKING_FILES_VALIDATION=PASS`; source/static results were 17 TRELLIS, 5 AudioCraft notebook, 10 QA, and 6 path-alias tests passing. `STORAGE_ADMISSION=BLOCKED`, therefore package installation and live TRELLIS inference were not run. See the daily changelog and `test.json` for the details.
-
-
 The official Diffusers release notes list Flux2 Klein support in v0.37.0; the current Hugging Face Hub docs expose `get_cached_repo_tree`, explaining the observed import mismatch with the installed older Hub. This supports the proposed version pin but is not a substitute for the gated live import/generation smoke.
-
-
 ### Latest confirmed sync — run 38161408008
-
 - [x] Fixed the missing quote in `MODEL_NOTEBOOKS_VALIDATED` after run 38161193474 failed before staging; the workflow now runs `bash -n tools/sync_trellis_and_audit_oec.sh` first and logs `SYNC_SCRIPT_SYNTAX=PASS`.
 - [x] The subsequent [run 38161408008](https://github.com/Killer4K-N/Connector_1/actions/runs/38161408008) passed shell syntax, tracking validation, staged notebook/CLI validation, tracker-file copy, and the static suites (17 TRELLIS, 5 AudioCraft notebook, 10 QA, 6 alias tests).
 - [ ] Runtime package/model installation and TRELLIS inference remain blocked on fresh quota telemetry. No packages were installed, no model was downloaded and no QA queue rows were changed.
-
-
 ## Final confirmed sync — run 38161747478
-
 - [x] Shell preflight `bash -n tools/sync_trellis_and_audit_oec.sh` passed; the prior quote parse error is resolved.
 - [x] `TRACKING_FILES_VALIDATION=PASS` and `STAGED_NOTEBOOK_AND_CLI_VALIDATION=PASS`; the run copied the latest `TODO.md`, `test.json`, `result.md`, daily changelog and index.
 - [x] Four suites passed again: 17 TRELLIS/entry-point, 5 AudioCraft notebook, 10 QA, and 6 path-alias tests. Queue handling stayed report-only.
 - [ ] Live TRELLIS/FLUX runtime remains gated by missing fresh quota data; no package installation or model download was performed.
-
-
 ## 2026-10-12 — Runtime remediation in progress
-
 ### Guarded fixes prepared (awaiting new action validation)
-
 - [x] Created an isolated Connector_1 branch `ops/runtime-remediation-20261012` and corrected all 12 package/model admission calls in the sync helper plus all 6 write-related QA-helper admission calls to require fresh quota data. StorageManager must still check the existing allocated reserve, allocation target, and actual filesystem headroom; reserve resizing/deletion and cache purging remain forbidden.
 - [x] Constrain the `xformers==0.0.29.post2` candidate to a prebuilt wheel (`--only-binary=:all:`) for the official Torch 2.6/CUDA 12.4 combination. It still needs a real CUDA fp16 attention probe after admission; do not mark fixed based only on the wheel version.
 - [x] Correct the AudioCraft repair plan to pin `numpy==1.26.4`, `spacy==3.7.6`, and the spaCy-compatible `thinc==8.2.5` with binary wheels only. Runtime package consistency and imports must pass after the guarded action.
 - [x] Harden QA recovery: pass the scheduled GPU via `--gpu`, capture PID/parent/session/TTY/job identifiers, revalidate them before retirement, and never retire the old stopped process until the replacement Slurm job has reached RUNNING. The model/dependency preflight still fails closed if a required download/install lacks a fresh snapshot.
 - [x] Include `changelog/CHANGELOG-2026-10-12.md` in the explicit snapshot and staging allowlists so the guarded sync preserves the required daily tracking records.
-
 ### Runtime acceptance still pending
-
 - [ ] **Quota:** obtain real values by running `quota_check` in the approved login shell and create `~/.cache/aieros/quota_snapshot.json` with `tools/quota_snapshot.py`. Never estimate, forge a timestamp, or turn off `require_fresh_quota`. Latest verified audit reported no fresh snapshot; all package/model writes remain blocked until this is resolved.
 - [ ] **TRELLIS attention:** run the actual CUDA attention probe after wheel admission. If xFormers still fails, assess a separately quota-gated, upstream `flash-attn==2.7.3` path from [Microsoft TRELLIS.2 setup](https://github.com/microsoft/TRELLIS.2/blob/main/setup.sh).
 - [ ] **TRELLIS.2 inference:** cache-first check/download `microsoft/TRELLIS.2-4B`, generate one sample, export GLB, re-open with trimesh, and verify nonempty geometry.
@@ -100,12 +73,8 @@ The official Diffusers release notes list Flux2 Klein support in v0.37.0; the cu
 - [ ] **QA backlog:** retain the 225-row status snapshot as report-only. Do not requeue any of the 78 `FAILED_MISSING_FILE` records or mutate any row without file-by-file and process-ownership evidence.
 - [ ] **AudioCraft:** after quota admission, require `pip check`, `AudioGen` and `audio_write` imports to pass; perform small generation/write validation only when model-cache and runtime prerequisites are satisfied.
 - [ ] **Action verification:** the remediation helpers have source commits, but no new run has yet validated the combined helper flow. Record the exact run ID and result in `test.json`, this daily changelog, `result.md`, and this TODO once the new branch action finishes.
-
 **Upstream references reviewed:** [TRELLIS.2](https://github.com/microsoft/TRELLIS.2), [xFormers changelog](https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md), [Diffusers FLUX.2 v0.37.0 docs](https://huggingface.co/docs/diffusers/v0.37.0/en/api/pipelines/flux2), and [AudioCraft requirements](https://github.com/facebookresearch/audiocraft/blob/main/requirements.txt). Source reference review is not runtime acceptance.
-
-
 ## 2026-10-14 follow-up — storage write-guard fix and runtime smoke evidence
-
 - [x] Created the source candidate branch [`fix/storage-admission-write-guards-20261014`](https://github.com/Killer4K-N/OEC/tree/fix/storage-admission-write-guards-20261014); current source commit [`4ade353d566bfeb525949f5f4c1905a1ae1e135c`](https://github.com/Killer4K-N/OEC/commit/4ade353d566bfeb525949f5f4c1905a1ae1e135c). Rollback/reference branch [`backup/oec-before-write-guards-20261014`](https://github.com/Killer4K-N/OEC/tree/backup/oec-before-write-guards-20261014) pins the pre-code baseline. `main` remains unchanged at `82346c0753e139b92240f53734eb48d2113ed9ad`.
 - [x] Corrected unsafe `require_fresh_quota=False` calls across the four model notebooks and TRELLIS CLI. Explicit StoragePolicy preflight now runs before and again inside managed model/output write locks; combined and TRELLIS-only setup commands gate pip installs/git clones; output directories are created only after admission. This is a source guard fix, not permission to bypass the missing telemetry gate.
 - [x] Added `tests/test_storage_write_admission.py` and `.github/workflows/storage-admission-guard-tests.yml`. Final hosted validation [run 38559330370](https://github.com/Killer4K-N/OEC/actions/runs/38559330370) on commit `4ade353...` passed 27/27 static tests (12 TRELLIS notebook + 5 CLI/easy run + 5 AudioCraft notebook + 5 new storage-admission tests), Python compilation, and JSON validation for all four notebooks (16/15/10/6 cells). First run [38558509401](https://github.com/Killer4K-N/OEC/actions/runs/38558509401) failed two of the new tests; the log exposed the missing AudioCraft under-lock recheck and a too-narrow test assertion. Those were corrected and the final run passed.
@@ -117,12 +86,8 @@ The official Diffusers release notes list Flux2 Klein support in v0.37.0; the cu
 - [ ] **OPEN — notebook and AudioCraft runtime:** static checks passed only. No Jupyter end-to-end execution, AudioCraft repair or generated output was completed; do not modify `phase1` without approval.
 - [ ] **BLOCKED — QA worker:** separate connector-2 recovery failed due Slurm node-name and accounting DB connectivity. Keep queue and stopped process unchanged until scheduler state and process ownership are reverified.
 - [ ] **OPEN — shared state reconciliation:** investigate the reserve-size discrepancy and plan a safe snapshot of the detached live OEC checkout with ten tracked dirty paths before any permitted sync. The reserve file and live checkout were not modified.
-
 - [x] Final tracking commit `dac91f09bc6cecd896e38213072fe19142d30390` was itself revalidated by [hosted run 38559861094](https://github.com/Killer4K-N/OEC/actions/runs/38559861094): 27/27 static tests, Python compilation, and all four notebook JSON checks passed. This rerun confirms the documentation commit did not change source-test outcomes; it is not runtime inference acceptance.
-
-
 ## 2026-10-14 — TRELLIS / FLUX generation verification follow-up
-
 - [x] Corrected TRELLIS cache discovery: the CLI's local-only Hub lookup now falls back to scanning the configured cache for actual `.safetensors` shards before reporting a miss or requesting a download. Latest candidate source commit: [`f571f508fc693d2afd96c17544702d64a0c29c27`](https://github.com/Killer4K-N/OEC/commit/f571f508fc693d2afd96c17544702d64a0c29c27).
 - [x] Corrected combined notebook cache resolution: FLUX.2 Klein is tried from both `aireos_models` and `aireos_models/hub`; current cache location is accounted for before the quota-gated download path.
 - [x] Added output-admission checks before costly TRELLIS/FLUX inference, plus GLB/PNG checks after saving. The CLI also verifies the GLB 2.0 header/length, JSON chunk and nonempty mesh accessors.
@@ -133,10 +98,7 @@ The official Diffusers release notes list Flux2 Klein support in v0.37.0; the cu
 - [ ] **Still blocked — current live FLUX generation:** cached FLUX.2 Klein weights exist and historical imports passed, but the recent smoke found one active compute process on each A100. Retry an offline cache-only generation when an idle GPU is confirmed; validate the resulting nonempty PNG.
 - [ ] **Still blocked — model downloads and package writes:** authoritative quota snapshot remains missing and `quota_check` remains absent on the compute node. Get genuine quota values from the approved site/login route and publish them through the existing snapshot writer before any new model/dependency download. Never use Lustre free space as a quota substitute.
 - [ ] After live runtime passes, update this same TODO, `test.json`, `result.md` and dated changelog with the exact run ID, artifact path/hash, model/runtime versions, failure details and geometry/image validation.
-
-
 ## 2026-10-14 main-branch integration (requested)
-
 - [x] Integrated tested TRELLIS/FLUX notebook and CLI updates, storage write-admission guards, static regression suite and cumulative run records into `main`. The main-hosted validation run is pending and must be added here with its exact result before this task is considered closed.
 - [x] Added the latest candidate static rerun [38572444007](https://github.com/Killer4K-N/OEC/actions/runs/38572444007): 28/28 static tests, Python compilation PASS and four notebook JSON checks PASS.
 - [x] Logged the initial capacity-matrix workflow configuration failure, the corrected connector-1 diagnostic and the current TRELLIS smoke blocked by occupied GPUs.
@@ -145,24 +107,14 @@ The official Diffusers release notes list Flux2 Klein support in v0.37.0; the cu
 - [ ] **OPEN — corrected Connector_1 retry:** run 38601626147 completed with 10/10 tests and fresh GLB validation (98,250 vertices / 93,243 faces); its archive bundles multiple files due to the old wildcard. Exact-run artifact upload check 38602330418 is running.
 - [ ] **OPEN — current FLUX image:** cached FLUX weights exist, but the offline generation smoke did not create a PNG because both A100s were occupied. Retry with an idle GPU and verify the output image.
 - [ ] **BLOCKED — fresh quota telemetry:** quota snapshot missing and `quota_check` absent on the compute runner. Keep shared model/dependency downloads and quota-gated writes fail-closed; never substitute Lustre free-space values.
-
 - [x] **Main-branch CI verified:** commit [`9c9d7acc12e47658f37e71840449f8558b42ee2b`](https://github.com/Killer4K-N/OEC/commit/9c9d7acc12e47658f37e71840449f8558b42ee2b), [run 38575822798](https://github.com/Killer4K-N/OEC/actions/runs/38575822798), job `115892512804`: 28/28 static tests PASS, compilation PASS, all four notebook JSON checks PASS. The test/run result has been added to the cumulative registry and dated changelog on main.
-
 - [x] Re-tried the current TRELLIS and FLUX cache-only GPU smoke workflows. TRELLIS run `38571363231` attempt 2 remained blocked at idle-GPU preflight (report artifact `11899728417`); FLUX run `38559255790` attempt 2 found one active compute process on each A100 and generated no PNG. Both reasons/results have been added to `test.json` and the dated changelog on main.
-
-
 ## 2026-10-14 follow-up — TRELLIS offline config fix
-
 - [x] Reproduced the loader defect in [Connector_1 run 38587490301](https://github.com/Killer4K-N/Connector_1/actions/runs/38587490301): 7/7 previous tests passed and GPU admission selected an allowed device, then model load attempted a forbidden offline Hub lookup for a missing \`pipeline.json\`.
 - [x] Committed the pinned config and local snapshot-overlay fix on [\`diagnose/trellis-asset-generation-20261014\`](https://github.com/Killer4K-N/Connector_1/tree/diagnose/trellis-asset-generation-20261014), with expanded 10-test regression coverage.
-- [x] **Fresh TRELLIS asset generated and validated:** Connector_1 run 38598822415, artifact 11912523421 (8,870,632 bytes; SHA-256 0ba06de0e028d975b7108f4dcb9856a81dcdd76037e94cc852883fc5b2ad6b1e); GLB structural checks and trimesh reopen passed (96,532 vertices / 91,986 faces).
-- [x] **OEC CLI/notebook source candidate CI:** run 38601987037 passed 34 tests, Python compilation and four notebook JSON checks; review PR #10 is open and not merged.
 - [ ] **OPEN — corrected Connector_1 retry:** run 38601626147 passed its test step and was generating an asset; verify current-run output. Exact-run artifact upload check 38602330418 was queued at last check.
 - [ ] **BLOCKED — any missing model/dependency download:** fresh authoritative quota telemetry remains missing; no quota bypass, install or download.
-
-
 ## 2026-10-14 follow-up — TRELLIS offline pipeline-config fix
-
 - [x] Reproduced and fixed the weight-only snapshot pipeline.json lookup bug with a pinned /tmp overlay and offline Hub access.
 - [x] Validated a fresh GLB in Connector_1 run 38598822415; artifact 11912523421; structure and trimesh reopen passed.
 - [x] OEC CLI and both TRELLIS notebooks use the shared offline config helper; CI 38601987037 passed 34 tests; PR #10 is open, not merged.
