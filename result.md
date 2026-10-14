@@ -1,12 +1,12 @@
 # OEC Significant Results
 
 **Last updated:** 2026-10-14 (Asia/Kolkata)  
-**Branch:** `fix/trellis-gradio-notebooks-20261011`  
+**Branch:** `fix/storage-admission-write-guards-20261014` (candidate only; no merge)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
 ## Current status
 
-**Static validation has historical PASS evidence; shared-environment runtime is still not accepted.** The October 14 read-only runner probe confirms that the configured quota snapshot is missing and `quota_check` is unavailable on connector-1/scn17-mn. The measured Lustre free space does not establish user/project quota headroom, so package/model writes remain gated. The current live OEC checkout is detached and has tracked dirty files; no sync/reset was attempted.
+**Static validation has historical PASS evidence; shared-environment runtime is still not accepted.** The October 14 read-only runner probe confirms that the configured quota snapshot is missing and `quota_check` is unavailable on connector-1/scn17-mn. The candidate source guard fix passes 27/27 static tests, but remains unmerged and does not authorize bypassing fresh-quota admission. The measured Lustre free space does not establish user/project quota headroom, so package/model writes remain gated. The current live OEC checkout is detached and has tracked dirty files; no sync/reset was attempted.
 
 ## Material fixes delivered in the feature branch
 
@@ -119,3 +119,20 @@ Conclusion: **diagnostic PASS / storage admission BLOCKED**. Do not replace `req
 The separate [run 38175212786](https://github.com/Killer4K-N/Connector_1/actions/runs/38175212786) connector-2 QA job also failed with `scontrol: stepd_available: Couldn't find nodename` and `sacct` connection refusal to `localhost:6819`. This is an independent Slurm/scheduler issue and must not be confused with the quota telemetry failure.
 
 No package was installed, no model was downloaded, no shared cache/reserve was changed, no queue row was mutated, and no process was signalled. TRELLIS shared-environment inference, FLUX generation, full notebook UI execution, AudioCraft repair/generation, and QA worker replacement remain unverified. The historical isolated TRELLIS GLB success remains isolated-environment evidence, not shared `phase2_3d` acceptance.
+
+
+## 2026-10-14 — Quota-gated notebook/CLI write paths and static regression pass
+
+Candidate branch: [`fix/storage-admission-write-guards-20261014`](https://github.com/Killer4K-N/OEC/tree/fix/storage-admission-write-guards-20261014), source commit [`4ade353d566bfeb525949f5f4c1905a1ae1e135c`](https://github.com/Killer4K-N/OEC/commit/4ade353d566bfeb525949f5f4c1905a1ae1e135c); backup reference [`backup/oec-before-write-guards-20261014`](https://github.com/Killer4K-N/OEC/tree/backup/oec-before-write-guards-20261014). OEC `main` remains `82346c0753e139b92240f53734eb48d2113ed9ad`.
+
+The source audit found several notebook/CLI paths using `require_fresh_quota=False`. Also, `managed_storage_operation()` is a serialization/reserve coordinator and does not enforce freshness by itself. The candidate now explicitly checks fresh quota before managed operations and rechecks inside the lock for model and output writes; TRELLIS setup package installs and source clones are routed through a quota-gated managed operation; output directory creation is deferred until after admission. The CLI also preflights the actual destination's existing ancestor before making a custom output directory. No change was made to shared storage manager defaults or live machine config.
+
+[Hosted workflow run 38559330370](https://github.com/Killer4K-N/OEC/actions/runs/38559330370), job `115836225568`, on commit `4ade353...` passed 27/27 static tests (12 TRELLIS notebook, 5 CLI/easy-run, 5 AudioCraft notebook, 5 new storage-admission regression tests), Python compilation and all four notebook JSON checks. The prior [run 38558509401](https://github.com/Killer4K-N/OEC/actions/runs/38558509401) failed the new guard tests, revealing the missing AudioCraft under-lock recheck plus a too-specific assertion; both were corrected before the final pass. This proves source/static guard consistency, not model inference.
+
+A separate offline/cache-only FLUX smoke on Connector_1 was blocked before torch/Diffusers import and inference. [Run 38559255790](https://github.com/Killer4K-N/Connector_1/actions/runs/38559255790) confirmed the FLUX.2 Klein cache snapshot exists, but GPU0 had 31,536 MiB free and one active compute process, GPU1 had 39,902 MiB free and one active compute process; the test requires an otherwise idle GPU and did not proceed. The first attempt [38558972259](https://github.com/Killer4K-N/Connector_1/actions/runs/38558972259) also stopped before inference. No PNG was generated and no process was changed.
+
+Retrospective review of [run 38175212786](https://github.com/Killer4K-N/Connector_1/actions/runs/38175212786), job `114576061200`, corrects an older stale summary: that pre-admission baseline on `scn17-mn` had `xformers==0.0.29.post2`, CUDA memory-efficient attention PASS, Flux2 Klein import PASS with Diffusers/Hub/Transformers `0.37.0/0.36.0/4.56.1`, and FLUX cache HIT; TRELLIS.2-4B cache was MISS. That action still failed at the storage admission gate and never completed inference. Earlier xformers.post1 failure logs remain valid observations from an older state; cause of version change is unknown.
+
+**Current acceptance remains partial:** source guard regressions and static validation are fixed; authoritative fresh-quota telemetry is still missing; shared TRELLIS full inference/GLB geometry, FLUX generated PNG, Jupyter end-to-end runs, AudioCraft generation, and QA worker recovery remain unverified/blocked. No package install, model download, live checkout sync/reset, cache purge, reserve modification, QA queue mutation, process signal or merge to `main` occurred.
+
+Upstream references consulted for the broader compatibility context (none substitutes for local validation): [TRELLIS.2 setup](https://github.com/microsoft/TRELLIS.2/blob/main/setup.sh), [TRELLIS.2 issue #111](https://github.com/microsoft/TRELLIS.2/issues/111), [xFormers changelog](https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md), [Diffusers FLUX.2 API docs v0.37.0](https://huggingface.co/docs/diffusers/v0.37.0/en/api/pipelines/flux2), and [AudioCraft requirements](https://github.com/facebookresearch/audiocraft/blob/main/requirements.txt).

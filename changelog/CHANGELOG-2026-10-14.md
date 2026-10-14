@@ -95,3 +95,56 @@ The required next step is to obtain genuine usage/limit output through the site-
 **Still blocked/unverified:** fresh authoritative quota production/propagation; shared `phase2_3d` CUDA attention and TRELLIS model/inference/GLB validation; FLUX import/image generation; notebook end-to-end UI/kernel behavior; AudioCraft repair/generation; safe QA worker replacement and queue progress; reconciliation of reserve measurement discrepancy and live detached dirty checkout.
 
 **Shared-state guarantees:** no main merge; no live OEC checkout sync/reset/clean; no package changes; no model download; no shared cache purge; no reserve mutation; no phase1 changes; no QA queue mutation; no process signals.
+
+
+## Follow-up batch — source-level write guard fix and GPU-safe FLUX attempt
+
+### Source issue and implementation
+
+A second audit found that explicit `require_fresh_quota=False` values were still present in notebook/CLI cache-miss and output-save flows. This is not equivalent to an explicit fresh quota check. The current `storage_manager.py` implementation documents `managed_storage_operation()` quota arguments as accepted for API compatibility but unused, and uses the context for lock/reserve management; therefore callers must perform StoragePolicy preflight themselves.
+
+Created the isolated OEC candidate branch [`fix/storage-admission-write-guards-20261014`](https://github.com/Killer4K-N/OEC/tree/fix/storage-admission-write-guards-20261014), with a rollback/reference branch [`backup/oec-before-write-guards-20261014`](https://github.com/Killer4K-N/OEC/tree/backup/oec-before-write-guards-20261014). Latest source commit at validation was [`4ade353d566bfeb525949f5f4c1905a1ae1e135c`](https://github.com/Killer4K-N/OEC/commit/4ade353d566bfeb525949f5f4c1905a1ae1e135c).
+
+Changed:
+- `pipeline_flux_only.ipynb`, `pipeline_trellis_3d.ipynb`, `pipeline_trellis_3d_only.ipynb`, `pipeline_audiocraft.ipynb`: eliminate optional-quota write flags, add explicit preflight before/inside managed model/output operations, guard TRELLIS setup `pip install`/source clone commands under managed locking, and defer shared output-directory creation until after write admission.
+- `pipeline_trellis_3d.py`: apply fresh-quota admission to model download and GLB output; validate the actual custom destination path through an existing ancestor before creating a missing output directory.
+- Existing static test assertions updated; added `tests/test_storage_write_admission.py` and hosted-only `.github/workflows/storage-admission-guard-tests.yml`.
+- Created a pre-change branch so the code-only candidate can be reviewed/compared without touching OEC main. No shared runner/environment or working tree was altered.
+
+### Guard validation — expected, actual, and failure-to-fix trail
+
+Expected: all relevant static guards and syntax/JSON checks pass, proving these code paths no longer opt out of fresh quota and the guards recheck under lock. This is not runtime inference acceptance.
+
+- [First run 38558509401](https://github.com/Killer4K-N/OEC/actions/runs/38558509401), job `115833504283`, on candidate commit `01327b02...`: **FAIL**. Existing TRELLIS static tests `12/12`, CLI/easy run `5/5`, and AudioCraft static `5/5` passed. The new test suite had 3 passes and 2 failures: AudioCraft model download had no explicit under-lock recheck, and a test assumed an error-marker string in the AudioCraft output cell that was not there. Corrected the AudioCraft path and assertions, then reran.
+- [Run 38558689233](https://github.com/Killer4K-N/OEC/actions/runs/38558689233), job `115834099853`: **PASS**, 27/27 static tests, compilation and notebook JSON checks.
+- [Final style-normalized run 38559330370](https://github.com/Killer4K-N/OEC/actions/runs/38559330370), job `115836225568`, on source commit `4ade353...`: **PASS**. 12 TRELLIS notebook static + 5 CLI/easy run + 5 AudioCraft static + 5 new storage guard tests = `27/27`. `py_compile` passed for CLI and storage manager, and notebook JSON passed for combined TRELLIS/FLUX (16 cells), TRELLIS-only (15), FLUX-only (10), AudioCraft (6).
+- What this establishes: source, static assertions and JSON/syntax are consistent with quota-gated write operations. What it does not establish: live kernel cell execution, model loading, complete generation, or fresh quota telemetry on the shared runner.
+
+### Historical runtime baseline correction
+
+Retrospective review of [Connector_1 run 38175212786](https://github.com/Killer4K-N/Connector_1/actions/runs/38175212786), job `114576061200`, found these **pre-storage-gate checkpoints** on `scn17-mn`: Python 3.10.20, Torch `2.6.0+cu124`, xFormers `0.0.29.post2`; CUDA memory-efficient attention probe **PASS**; `Flux2KleinPipeline` import **PASS** with Diffusers `0.37.0`, Hub `0.36.0`, Transformers `4.56.1`; FLUX.2 Klein model cache **HIT**; TRELLIS.2-4B cache **MISS**. The workflow still failed later because fresh-quota admission was unavailable. No FLUX image generation or TRELLIS full inference happened. Earlier xFormers.post1 incompatibility remained true for the older observed environment; exact reason/version transition is not established.
+
+### Cache-only FLUX smoke result
+
+The separate Connector_1 branch [`diagnose/flux-cache-only-smoke-20261014`](https://github.com/Killer4K-N/Connector_1/tree/diagnose/flux-cache-only-smoke-20261014), latest source commit [`a4a8492c80a2eff5bdc612866301d6fbe86ee2a6`](https://github.com/Killer4K-N/Connector_1/commit/a4a8492c80a2eff5bdc612866301d6fbe86ee2a6), attempts one offline generation using the cache only, puts ephemeral output/framework caches under `/tmp`, blocks network model downloads, and refuses a GPU while any compute process is present.
+
+- [Run 38558972259](https://github.com/Killer4K-N/Connector_1/actions/runs/38558972259): **BLOCKED**, no eligible idle device with 30,000 MiB free.
+- [Run 38559255790](https://github.com/Killer4K-N/Connector_1/actions/runs/38559255790), job `115835971223`: cache snapshot confirmed at `/nlsasfs/home/lmedge/rahkus/aireos_models/models--black-forest-labs--FLUX.2-klein-4B/snapshots/e7b7dc27f91deacad38e78976d1f2b499d76a294`. GPU0: 31,536/40,960 MiB free with one active compute process; GPU1: 39,902/40,960 MiB free with one active compute process. **Both were deemed ineligible**, so the smoke exited before importing Torch/Diffusers, loading weights or generating an image. No packages/models installed/downloaded; no cache or GPU process changed. This is occupancy blocking inference, not a model failure.
+
+### Latest state and remaining blockers
+
+- Source guard changes and hosted static suite: **PASS** on candidate branch, unmerged; OEC main unchanged at `82346c0753e139b92240f53734eb48d2113ed9ad`.
+- Fresh quota snapshot: **MISSING**, `quota_check` **NOT_FOUND** on compute node. Keep write admission fail-closed until approved site/login-node telemetry is published from genuine quota output.
+- TRELLIS.2 full inference/GLB validation: **BLOCKED** (model cache miss and no admitted download).
+- FLUX generated PNG: **BLOCKED** by both A100s having active compute processes; cache exists.
+- AudioCraft setup/output and notebooks: static validation only, no runtime generation in this batch.
+- QA worker recovery: still blocked by independent Slurm host-name/accounting DB errors from run 38175212786.
+- Live OEC checkout remains detached/dirty; reserve size discrepancy remains unresolved. No live sync/reset, reserve operation, queue mutation, process signal, package installation or merge to main took place.
+
+### External sources referenced
+
+- [Microsoft TRELLIS.2 setup.sh](https://github.com/microsoft/TRELLIS.2/blob/main/setup.sh) — upstream dependency and attention-backend direction.
+- [Microsoft TRELLIS.2 issue #111](https://github.com/microsoft/TRELLIS.2/issues/111) — installation compatibility pitfalls.
+- [Official xFormers changelog](https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md) — wheel/version context for Torch/CUDA.
+- [Diffusers FLUX.2 API docs v0.37.0](https://huggingface.co/docs/diffusers/v0.37.0/en/api/pipelines/flux2) — supported release/API context.
+- [AudioCraft requirements.txt](https://github.com/facebookresearch/audiocraft/blob/main/requirements.txt) — upstream dependency constraints; `phase1` was not modified.
