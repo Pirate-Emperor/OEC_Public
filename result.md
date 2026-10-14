@@ -195,3 +195,17 @@ Main commit [`9c9d7acc12e47658f37e71840449f8558b42ee2b`](https://github.com/Kill
 - These tests were re-run to see whether GPU availability had changed. They are blocked capacity checks, not model-generation failures. Both outcomes are now part of the 35-record experiment registry committed on `main`.
 
 The remaining acceptance gate is a verified idle GPU for fresh TRELLIS and FLUX inference, followed by GLB geometry and PNG decoding/hash validation. The current quota snapshot is still missing, so downloads and shared storage writes remain fail-closed.
+
+
+## 2026-10-14 — TRELLIS cache-only loader defect isolated; targeted fix under validation
+
+The latest current-code action [38587490301](https://github.com/Killer4K-N/Connector_1/actions/runs/38587490301), job \`115933256897\`, passed the 7 existing admission/cache tests and safely selected GPU 1 (39,902 MiB free, 0% GPU utilization, 416 MiB attributed to an existing compute process). It then failed at model loading: \`Trellis2ImageTo3DPipeline.from_pretrained(MODEL_ID)\` tried to resolve \`pipeline.json\` through the Hugging Face Hub, but the temporary offline cache exposed only the weight snapshot and no pipeline config.
+
+The correction is on the diagnostic branch of [Connector_1](https://github.com/Killer4K-N/Connector_1/tree/diagnose/trellis-asset-generation-20261014):
+- [0fe92d6](https://github.com/Killer4K-N/Connector_1/commit/0fe92d6525540e83819f7a0943fbfded29dad8d6) adds the official \`pipeline.json\` for the pinned cached revision.
+- [dcc0eb9](https://github.com/Killer4K-N/Connector_1/commit/dcc0eb9f8be81e20437416679414b67def6da358) resolves the config offline, creates a local \`/tmp\` snapshot overlay, mirrors cached Hub metadata locally, and loads from the local snapshot path.
+- [293718c](https://github.com/Killer4K-N/Connector_1/commit/293718c8743a8720296a77a94672b105e244eb46) adds regression tests for the pinned config, offline overlay, cache links and fail-closed behavior for unknown snapshots.
+
+The config-vendor run [38598747382](https://github.com/Killer4K-N/Connector_1/actions/runs/38598747382) was still in progress when this note was written; the loader fix [38598822415](https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415) and expanded 10-test suite [38598881722](https://github.com/Killer4K-N/Connector_1/actions/runs/38598881722) were queued behind it. **Fresh asset generation remains pending** until a current run loads the model, performs inference, exports a GLB and validates actual geometry. Historical successful asset evidence remains [run 37942265623](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623), artifact [11622412194](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194).
+
+No package installation, model download, shared-cache mutation, quota bypass, or process termination was performed. The missing authoritative quota snapshot remains a separate blocker for any downloads.
