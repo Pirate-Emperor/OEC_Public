@@ -1,323 +1,29 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-14T19:29:15+05:30",
+  "last_updated": "2026-10-14T21:51:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": {
-    "source_branch": "fix/trellis-gradio-notebooks-20261011",
-    "latest_three_runner_static_matrix": {
-      "run_id": 38157725815,
-      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38157725815",
-      "tested_source_sha": "624e26d84d997e72b4b890ce7e5c654598d0c2b8",
-      "runners": [
-        {
-          "label": "connector-1",
-          "host": "scn17-mn",
-          "result": "PASS"
-        },
-        {
-          "label": "connector-2",
-          "host": "scn20-mn",
-          "result": "PASS"
-        },
-        {
-          "label": "connector-5",
-          "host": "scn21-mn",
-          "result": "PASS"
-        }
-      ],
-      "tests_per_runner": {
-        "trellis_and_entrypoint_static": 17,
-        "audiocraft_notebook_static": 5,
-        "qa_queue_recovery": 10,
-        "path_aliases": 6,
-        "total": 38
-      },
-      "total_passed_across_three_runners": 114,
-      "note": "Offline/static/unit validation only; it does not establish successful live model inference."
-    },
-    "latest_live_targeted_sync": {
-      "run_id": 38161747478,
-      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38161747478",
-      "source_sha": "141567d4a322261dd41c977f80b6b2f8314535b0",
-      "result": "SCRIPT_SYNTAX_TRACKING_SYNC_AND_STATIC_PASS_RUNTIME_INCOMPLETE",
-      "details": {
-        "bash_syntax_preflight": "PASS",
-        "tracking_files_validation": "PASS",
-        "staged_notebook_and_python_validation": "PASS",
-        "copied_tracking_files": [
-          "TODO.md",
-          "test.json",
-          "result.md",
-          "changelog/CHANGELOG-2026-10-11.md",
-          "changelog/README.md"
-        ],
-        "trellis_entrypoint_tests": "17/17 PASS",
-        "audiocraft_notebook_tests": "5/5 PASS",
-        "qa_recovery_tests": "10/10 PASS",
-        "path_alias_tests": "6/6 PASS",
-        "alias_repair": "PASS",
-        "qa_queue_repair": "REPORT_ONLY",
-        "storage_admission": "BLOCKED",
-        "package_install": "NOT_RUN",
-        "model_download": "NOT_RUN",
-        "trellis_inference": "NOT_RUN",
-        "queue_mutation": "NOT_PERFORMED"
-      },
-      "note": "This confirms the marker quote was fixed and bash -n preflight ran before the guarded sync. The tracking files and all static suites passed; workflow remains incomplete because fresh-quota admission is unavailable."
-    },
-    "tested_feature_source_sha": "624e26d84d997e72b4b890ce7e5c654598d0c2b8",
-    "documentation_state_before_tracking_files": "82296851860bff2ba977d6c020418713e0d56d43",
-    "latest_verified_live_audit": {
-      "run_id": 38161901000,
-      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38161901000",
-      "result": "SOURCE_SYNC_AND_STATIC_PASS_RUNTIME_INCOMPLETE",
-      "observed": {
-        "bash_syntax_preflight": "PASS",
-        "tracking_validation": "PASS",
-        "static_tests": "PASS 17 TRELLIS/entrypoint + 5 AudioCraft notebook + 10 QA queue/worker + 6 path aliases",
-        "fresh_quota_snapshot": "UNAVAILABLE_OR_STALE",
-        "storage_admission": "BLOCKED",
-        "xformers_attention": "UNVERIFIED because package writes were blocked",
-        "trellis_model_download": "NOT_ATTEMPTED",
-        "flux_image_generation": "NOT_ATTEMPTED",
-        "audiocraft_repair": "NOT_ATTEMPTED",
-        "qa_worker_recovery": "NOT_RUN_AFTER_GLOBAL_STORAGE_ADMISSION_BLOCK",
-        "queue_mutation": "NOT_PERFORMED",
-        "queue_statuses": {
-          "FAILED_MISSING_FILE": 78,
-          "PENDING": 144,
-          "PENDING_QA": 2,
-          "PROCESSING_QA": 1
-        }
-      },
-      "note": "The script source/static sync passed; the overall action failed intentionally at its fail-closed fresh-quota gate. Do not label model/runtime blockers fixed."
-    },
-    "runtime_remediation_2026_10_12": {
-      "connector_repository": "Killer4K-N/Connector_1",
-      "connector_branch": "ops/runtime-remediation-20261012",
-      "latest_helper_commit": "67e5f28d9fc5f496a866a7b9c3988b5b2221ad1c",
-      "helper_changes": [
-        "All package/model-write preflights in sync helper now require fresh quota.",
-        "xformers==0.0.29.post2 is restricted to prebuilt wheels.",
-        "AudioCraft repair explicitly pins thinc==8.2.5 with numpy==1.26.4 and spacy==3.7.6; binary wheels only.",
-        "QA recovery explicitly passes --gpu and defers retiring a stopped process until replacement Slurm job is RUNNING, with identity/session revalidation.",
-        "October 12 daily changelog added to explicit sync snapshot/staging allowlists."
-      ],
-      "official_references": [
-        "https://github.com/microsoft/TRELLIS.2",
-        "https://github.com/microsoft/TRELLIS.2/blob/main/setup.sh",
-        "https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md",
-        "https://huggingface.co/docs/diffusers/v0.37.0/en/api/pipelines/flux2",
-        "https://github.com/facebookresearch/audiocraft/blob/main/requirements.txt",
-        "https://github.com/microsoft/TRELLIS.2/issues/111"
-      ],
-      "verification_status": "SOURCE_CHANGES_COMMITTED; WAITING_FOR_NEW_WORKFLOW_RUN",
-      "actual_install_or_inference": "NOT_RUN",
-      "queue_mutation": "NOT_PERFORMED",
-      "caveat": "This is a source guard correction, not evidence of successful runtime repair. Fresh, authoritative quota telemetry is still required."
-    },
-    "latest_storage_quota_diagnostic": {
-      "run_id": 38555689884,
-      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884",
-      "artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884/artifacts/11888967874",
-      "connector_commit": "70d9000ba48cfdd6a6413276d7a4d4fe2888ad17",
-      "runner": "connector-1/scn17-mn",
-      "result": "PASS_READ_ONLY_REPORT",
-      "quota_snapshot": "MISSING",
-      "quota_check": "NOT_FOUND",
-      "admission": "BLOCKED; not bypassed",
-      "install_download_inference": "NOT_RUN",
-      "queue_and_process_mutation": "NOT_PERFORMED",
-      "note": "Lustre filesystem has very large free capacity but does not reveal authoritative user/project quota. Live OEC checkout is detached at 081aaf34... with tracked dirty files; reserve size differs from earlier logged measurement and needs safe reconciliation."
-    },
-    "latest_storage_write_guard_validation": {
-      "source_branch": "fix/storage-admission-write-guards-20261014",
-      "source_commit": "4ade353d566bfeb525949f5f4c1905a1ae1e135c",
-      "docs_commit": "dac91f09bc6cecd896e38213072fe19142d30390",
-      "latest_confirming_run_id": 38559861094,
-      "url": "https://github.com/Killer4K-N/OEC/actions/runs/38559861094",
-      "result": "PASS_STATIC",
-      "test_counts": {
-        "trellis_notebook_static": 12,
-        "trellis_cli_easy_run": 5,
-        "audiocraft_notebook_static": 5,
-        "storage_write_admission": 5,
-        "total": 27
-      },
-      "python_compile": "PASS",
-      "notebook_json": "4/4 PASS",
-      "note": "First guard test run 38558509401 failed two of the new tests after the 22 pre-existing tests passed. AudioCraft under-lock admission and test assumptions were corrected. Source commit 4ade353... and tracking-only commit dac91f... both pass the same 27-test matrix. No shared environment or main branch was changed."
-    },
-    "latest_flux_cache_only_smoke": {
-      "connector_branch": "diagnose/flux-cache-only-smoke-20261014",
-      "source_commit": "a4a8492c80a2eff5bdc612866301d6fbe86ee2a6",
-      "latest_run_id": 38559255790,
-      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38559255790",
-      "result": "BLOCKED_GPU_OCCUPANCY; inference not started",
-      "cache": "HIT",
-      "gpu_0": {
-        "free_mib": 31536,
-        "total_mib": 40960,
-        "active_compute_process_count": 1
-      },
-      "gpu_1": {
-        "free_mib": 39902,
-        "total_mib": 40960,
-        "active_compute_process_count": 1
-      },
-      "no_package_install": true,
-      "no_model_download": true,
-      "no_image_generated": true,
-      "note": "Safe preflight refused to use either A100 because both had active compute processes. This is not a FLUX model-generation failure."
-    },
-    "latest_runtime_reconciliation": {
-      "run_id": 38175212786,
-      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38175212786",
-      "phase2_3d_python": "3.10.20",
-      "torch": "2.6.0+cu124",
-      "xformers": "0.0.29.post2",
-      "attention_probe": "PASS",
-      "diffusers": "0.37.0",
-      "huggingface_hub": "0.36.0",
-      "transformers": "4.56.1",
-      "flux_import": "PASS",
-      "flux_cache": "HIT",
-      "trellis_2_cache": "MISS",
-      "overall": "Storage precheck blocked package/model writes; this was not an end-to-end inference pass."
-    },
-    "documentation_validation_after_tracking_commit": {
-      "run_id": 38559861094,
-      "url": "https://github.com/Killer4K-N/OEC/actions/runs/38559861094",
-      "docs_commit": "dac91f09bc6cecd896e38213072fe19142d30390",
-      "result": "PASS",
-      "experiments_after_append": 25
-    },
-    "latest_trellis_current_smoke": {
-      "run_id": 38571363231,
-      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231",
-      "commit": "c5411612b482e43913e24e6e16decf80a07ac1d8",
-      "result": "BLOCKED_GPU_OCCUPANCY",
-      "model_cache": "HIT; 7 safetensors shards, 14,819,870,530 bytes",
-      "source_checkout": "PRESENT",
-      "input_image": "PRESENT",
-      "output": "NO CURRENT GLB; inference not started",
-      "artifact_id": 11897043384,
-      "note": "Current October 14 smoke stopped safely before inference because no A100 had zero active compute processes and at least 30,000 MiB free. This is not a model failure and not a generation pass."
-    },
-    "latest_trellis_historical_asset": {
-      "original_run_id": 37942265623,
-      "original_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623",
-      "artifact_id": 11622412194,
-      "result": "PASS_HISTORICAL_ASSET_REVALIDATED",
-      "bytes": 8950028,
-      "sha256": "ede239663f21023640356920a5eff129fd8bb1077f914e8ff19fcb720b7ece4d",
-      "trimesh_reopen": "PASS",
-      "vertices": 97783,
-      "faces": 92819,
-      "note": "Real historical asset verified locally. Do not conflate with the current blocked October 14 smoke."
-    },
-    "latest_candidate_runtime_guard_validation": {
-      "branch": "fix/storage-admission-write-guards-20261014",
-      "commit": "f571f508fc693d2afd96c17544702d64a0c29c27",
-      "run_id": 38571665298,
-      "url": "https://github.com/Killer4K-N/OEC/actions/runs/38571665298",
-      "result": "PASS_STATIC",
-      "suite_counts": {
-        "trellis_notebook_static": 12,
-        "trellis_cli_easy_run": 5,
-        "audiocraft_notebook_static": 5,
-        "storage_write_admission": 6,
-        "total": 28
-      },
-      "notebook_json": "4/4 PASS",
-      "python_compile": "PASS"
-    },
-    "source_branch_integration": {
-      "target_branch": "main",
-      "source_branch": "fix/storage-admission-write-guards-20261014",
-      "source_commit": "f8ed9453f296594fc2da0cdfd55c32f79f6e1359",
-      "main_commit": "9c9d7acc12e47658f37e71840449f8558b42ee2b",
-      "main_commit_url": "https://github.com/Killer4K-N/OEC/commit/9c9d7acc12e47658f37e71840449f8558b42ee2b",
-      "main_validation_run_id": 38575822798,
-      "main_validation_url": "https://github.com/Killer4K-N/OEC/actions/runs/38575822798",
-      "result": "PASS_MAIN_STATIC_CI",
-      "suite_counts": {
-        "trellis_notebook_static": 12,
-        "trellis_cli_easy_run": 5,
-        "audiocraft_notebook_static": 5,
-        "storage_write_admission": 6,
-        "total": 28
-      },
-      "python_compile": "PASS",
-      "notebook_json": "4/4 PASS",
-      "runtime_status": "TRELLIS historical asset confirmed; today's TRELLIS/FLUX generation blocked by GPU occupancy; quota snapshot missing",
-      "tracking_commit": "dc68823805f11a74c6eda6586451e7001f5f001f",
-      "latest_tracking_commit_pending": "this commit records second GPU-smoke retry outcomes"
-    },
-    "latest_trellis_asset_generation": {
-      "historical_run_id": 37942265623,
-      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623",
-      "artifact_id": 11622412194,
-      "artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194",
-      "historical_result": "PASS_HISTORICAL_ASSET_REVALIDATED",
-      "bytes": 8950028,
-      "sha256": "ede239663f21023640356920a5eff129fd8bb1077f914e8ff19fcb720b7ece4d",
-      "glb_version": 2,
-      "mesh_count": 1,
-      "primitive_count": 1,
-      "texture_count": 2,
-      "material_count": 1,
-      "trimesh_reopen": "PASS",
-      "vertices": 97783,
-      "faces": 92819,
-      "current_attempt_1": {
-        "run_id": 38569413681,
-        "result": "BLOCKED_GPU_OCCUPANCY"
-      },
-      "current_attempt_2": {
-        "run_id": 38571363231,
-        "attempt": 2,
-        "job_id": 115893795773,
-        "result": "BLOCKED_GPU_OCCUPANCY",
-        "report_artifact_id": 11899728417,
-        "glb_created": false
-      },
-      "note": "TRELLIS asset generation is proven historically. Current Oct 14 fresh asset generation remains blocked because no idle A100 passed the admission check."
-    },
-    "latest_flux_image_generation": {
-      "model_cache": "HIT",
-      "historical_pipeline_import": "PASS at baseline run 38175212786",
-      "first_attempt": {
-        "run_id": 38559255790,
-        "attempt": 1,
-        "result": "BLOCKED_GPU_OCCUPANCY"
-      },
-      "latest_attempt": {
-        "run_id": 38559255790,
-        "attempt": 2,
-        "job_id": 115894428716,
-        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38559255790",
-        "status": "BLOCKED_GPU_OCCUPANCY",
-        "image_generated": false
-      },
-      "gpu0": {
-        "free_mib": 31536,
-        "total_mib": 40960,
-        "active_compute_process_count": 1
-      },
-      "gpu1": {
-        "free_mib": 39902,
-        "total_mib": 40960,
-        "active_compute_process_count": 1
-      },
-      "quota_snapshot": "MISSING",
-      "quota_check": "NOT_FOUND",
-      "note": "Both reruns safely refused to start inference with active compute processes; no PNG was created."
-    }
-  },
+  "latest_summary": "TRELLIS offline config defect isolated and patched on Connector_1 diagnostic branch; updated self-hosted verification still pending. Historical validated GLB remains proof of prior real generation; do not mark current fix accepted until a fresh GLB is generated and reopened.",
   "experiments": [
+    {
+      "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
+      "date": "2026-10-09",
+      "category": "prior isolated end-to-end inference",
+      "approach": "Run TRELLIS image-to-3D in a separate compatible virtual environment, export GLB and reopen geometry.",
+      "reason": "Show that TRELLIS can work with a compatible package stack while the shared environment remains broken.",
+      "parameters": {
+        "run_id": 37942265623,
+        "environment": "isolated scratch virtualenv; not shared phase2_3d",
+        "artifact": "https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194"
+      },
+      "results": {
+        "marker": "TRELLIS_IMAGE_TO_3D_SMOKE=PASS",
+        "glb_bytes": 8950028,
+        "mesh_geometry_reopened": true
+      },
+      "limitation": "Does not validate current shared phase2_3d."
+    },
     {
       "id": "EXP-2026-10-11-TRELLIS-STATIC-MATRIX",
       "date": "2026-10-11",
@@ -582,24 +288,6 @@
         "packages_modified": false
       },
       "action": "Reproduce and capture exact pip/wheel build error before resolving this conflict in an isolated environment."
-    },
-    {
-      "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
-      "date": "2026-10-09",
-      "category": "prior isolated end-to-end inference",
-      "approach": "Run TRELLIS image-to-3D in a separate compatible virtual environment, export GLB and reopen geometry.",
-      "reason": "Show that TRELLIS can work with a compatible package stack while the shared environment remains broken.",
-      "parameters": {
-        "run_id": 37942265623,
-        "environment": "isolated scratch virtualenv; not shared phase2_3d",
-        "artifact": "https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194"
-      },
-      "results": {
-        "marker": "TRELLIS_IMAGE_TO_3D_SMOKE=PASS",
-        "glb_bytes": 8950028,
-        "mesh_geometry_reopened": true
-      },
-      "limitation": "Does not validate current shared phase2_3d."
     },
     {
       "id": "EXP-2026-10-11-JUPYTER-SMOKE-HISTORICAL",
@@ -914,6 +602,64 @@
       "limitation": "The current work corrects guard logic but cannot claim runtime acceptance until the remediated action passes syntax/static tests and fresh quota telemetry authorizes actual package/model writes. Do not estimate quota, bypass admission, purge shared caches, or merge to main."
     },
     {
+      "id": "EXP-2026-10-12-RUNTIME-BASELINE-RECONCILIATION",
+      "date": "2026-10-12",
+      "datetime": "2026-10-12T02:43:14+05:30",
+      "timezone": "Asia/Kolkata",
+      "category": "retrospective review of live pre-admission runtime baseline",
+      "objective": "Reconcile the latest baseline output in Connector_1 run 38175212786 with older xFormers and Diffusers/Hub import failures.",
+      "reason": "Previous consolidated notes still described xformers.post1 and the Flux2 Klein import mismatch as the latest shared environment state, but the later action log contains a successful live baseline before the storage-admission gate.",
+      "environment": {
+        "repository": "Killer4K-N/Connector_1",
+        "branch": "ops/runtime-remediation-20261012",
+        "run_id": 38175212786,
+        "job_id": 114576061200,
+        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38175212786",
+        "runner": "connector-1 / scn17-mn",
+        "environment": "phase2_3d",
+        "python": "3.10.20",
+        "torch": "2.6.0+cu124",
+        "xformers": "0.0.29.post2",
+        "diffusers": "0.37.0",
+        "huggingface_hub": "0.36.0",
+        "transformers": "4.56.1"
+      },
+      "approach": "Review the recorded live workflow baseline and distinguish its exact stage-level results from the later full job conclusion.",
+      "expected": "A successful prerequisite probe would establish only the tested import/backend/cache checkpoints, not end-to-end generation.",
+      "results": {
+        "runtime_baseline": "PASS",
+        "xformers_cuda_memory_efficient_attention": "PASS",
+        "flux2_klein_pipeline_import": "PASS",
+        "flux_model_cache": "HIT at /nlsasfs/home/lmedge/rahkus/aireos_models/models--black-forest-labs--FLUX.2-klein-4B/snapshots/e7b7dc27f91deacad38e78976d1f2b499d76a294",
+        "trellis_2_model_cache": "MISS for microsoft/TRELLIS.2-4B",
+        "overall_action": "FAIL because fresh-quota storage precheck was false; package/model writes and full inference did not proceed"
+      },
+      "interpretation": "This later pre-admission baseline supersedes older runtime status notes only for the checkpoints above: xformers 0.0.29.post2 attention and the Flux2 Klein import passed on scn17-mn at that time, and Flux2 Klein weights were cached. Earlier failures using xformers 0.0.29.post1 remain valid historical observations; why the installed version changed is not established. Actual Flux image generation and shared TRELLIS inference were not tested.",
+      "limitations": [
+        "This is retrospective log interpretation, not a newly rerun baseline.",
+        "No package install, model download, image generation or TRELLIS inference occurred in this run because storage admission failed.",
+        "Do not infer the same package versions or GPU availability now."
+      ],
+      "status": "BASELINE_CHECKPOINTS_PASS; FULL_RUNTIME_BLOCKED",
+      "external_sources": [
+        {
+          "title": "Microsoft TRELLIS.2 setup",
+          "url": "https://github.com/microsoft/TRELLIS.2/blob/main/setup.sh",
+          "supports": "Upstream CUDA/attention backend setup context."
+        },
+        {
+          "title": "xFormers changelog",
+          "url": "https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md",
+          "supports": "Version/wheel compatibility context for xformers 0.0.29.post2."
+        },
+        {
+          "title": "Diffusers FLUX.2 v0.37.0 API docs",
+          "url": "https://huggingface.co/docs/diffusers/v0.37.0/en/api/pipelines/flux2",
+          "supports": "Pipeline support/API context; no local generation inferred from docs."
+        }
+      ]
+    },
+    {
       "id": "EXP-2026-10-14-STORAGE-QUOTA-TELEMETRY-READONLY",
       "date": "2026-10-14",
       "datetime": "2026-10-14T16:49:45.592369+05:30",
@@ -1041,64 +787,6 @@
       ]
     },
     {
-      "id": "EXP-2026-10-12-RUNTIME-BASELINE-RECONCILIATION",
-      "date": "2026-10-12",
-      "datetime": "2026-10-12T02:43:14+05:30",
-      "timezone": "Asia/Kolkata",
-      "category": "retrospective review of live pre-admission runtime baseline",
-      "objective": "Reconcile the latest baseline output in Connector_1 run 38175212786 with older xFormers and Diffusers/Hub import failures.",
-      "reason": "Previous consolidated notes still described xformers.post1 and the Flux2 Klein import mismatch as the latest shared environment state, but the later action log contains a successful live baseline before the storage-admission gate.",
-      "environment": {
-        "repository": "Killer4K-N/Connector_1",
-        "branch": "ops/runtime-remediation-20261012",
-        "run_id": 38175212786,
-        "job_id": 114576061200,
-        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38175212786",
-        "runner": "connector-1 / scn17-mn",
-        "environment": "phase2_3d",
-        "python": "3.10.20",
-        "torch": "2.6.0+cu124",
-        "xformers": "0.0.29.post2",
-        "diffusers": "0.37.0",
-        "huggingface_hub": "0.36.0",
-        "transformers": "4.56.1"
-      },
-      "approach": "Review the recorded live workflow baseline and distinguish its exact stage-level results from the later full job conclusion.",
-      "expected": "A successful prerequisite probe would establish only the tested import/backend/cache checkpoints, not end-to-end generation.",
-      "results": {
-        "runtime_baseline": "PASS",
-        "xformers_cuda_memory_efficient_attention": "PASS",
-        "flux2_klein_pipeline_import": "PASS",
-        "flux_model_cache": "HIT at /nlsasfs/home/lmedge/rahkus/aireos_models/models--black-forest-labs--FLUX.2-klein-4B/snapshots/e7b7dc27f91deacad38e78976d1f2b499d76a294",
-        "trellis_2_model_cache": "MISS for microsoft/TRELLIS.2-4B",
-        "overall_action": "FAIL because fresh-quota storage precheck was false; package/model writes and full inference did not proceed"
-      },
-      "interpretation": "This later pre-admission baseline supersedes older runtime status notes only for the checkpoints above: xformers 0.0.29.post2 attention and the Flux2 Klein import passed on scn17-mn at that time, and Flux2 Klein weights were cached. Earlier failures using xformers 0.0.29.post1 remain valid historical observations; why the installed version changed is not established. Actual Flux image generation and shared TRELLIS inference were not tested.",
-      "limitations": [
-        "This is retrospective log interpretation, not a newly rerun baseline.",
-        "No package install, model download, image generation or TRELLIS inference occurred in this run because storage admission failed.",
-        "Do not infer the same package versions or GPU availability now."
-      ],
-      "status": "BASELINE_CHECKPOINTS_PASS; FULL_RUNTIME_BLOCKED",
-      "external_sources": [
-        {
-          "title": "Microsoft TRELLIS.2 setup",
-          "url": "https://github.com/microsoft/TRELLIS.2/blob/main/setup.sh",
-          "supports": "Upstream CUDA/attention backend setup context."
-        },
-        {
-          "title": "xFormers changelog",
-          "url": "https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md",
-          "supports": "Version/wheel compatibility context for xformers 0.0.29.post2."
-        },
-        {
-          "title": "Diffusers FLUX.2 v0.37.0 API docs",
-          "url": "https://huggingface.co/docs/diffusers/v0.37.0/en/api/pipelines/flux2",
-          "supports": "Pipeline support/API context; no local generation inferred from docs."
-        }
-      ]
-    },
-    {
       "id": "TEST-2026-10-14-STORAGE-GUARD-REGRESSION-INITIAL-FAIL",
       "date": "2026-10-14",
       "datetime": "2026-10-14T17:13:07+05:30",
@@ -1129,61 +817,6 @@
       "diagnosis": "The first test run found a real missing under-lock guard in the AudioCraft model-download path and an over-specific test assertion. The source was corrected to recheck admission inside the lock; custom path/preflight ordering and indentation were reviewed as part of the follow-up.",
       "follow_up": "Re-run the same suite on subsequent candidate commits and preserve this failed run for before/after comparison.",
       "status": "FAIL; issues addressed in later candidate commits"
-    },
-    {
-      "id": "TEST-2026-10-14-STORAGE-GUARD-REGRESSION-PASS",
-      "date": "2026-10-14",
-      "datetime": "2026-10-14T17:20:02+05:30",
-      "timezone": "Asia/Kolkata",
-      "category": "hosted static regression test — final candidate source commit",
-      "objective": "Verify the quota-admission source guards and preserve the existing notebook/CLI regression guarantees after fixing the failures caught in the first run.",
-      "reason": "Prevent notebook/CLI dependency or model writes from using filesystem-only admission on shared Lustre; verify under-lock checks because managed_storage_operation() is a lock/reserve coordinator and not a substitute for StoragePolicy preflight.",
-      "environment": {
-        "repository": "Killer4K-N/OEC",
-        "branch": "fix/storage-admission-write-guards-20261014",
-        "commit": "4ade353d566bfeb525949f5f4c1905a1ae1e135c",
-        "workflow_run_id": 38559330370,
-        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38559330370",
-        "job_id": 115836225568,
-        "runner": "GitHub-hosted ubuntu-latest",
-        "python": "3.11.17"
-      },
-      "approach": "Run test_trellis_notebook_static.py; test_trellis_easy_run.py; test_audiocraft_notebook_static.py; test_storage_write_admission.py; py_compile for pipeline_trellis_3d.py and storage_manager.py; parse all four relevant notebooks.",
-      "parameters": {
-        "test_counts": {
-          "trellis_notebook_static": 12,
-          "trellis_cli_easy_run": 5,
-          "audiocraft_notebook_static": 5,
-          "storage_write_admission": 5
-        },
-        "total": 27,
-        "notebooks": [
-          "pipeline_trellis_3d.ipynb",
-          "pipeline_trellis_3d_only.ipynb",
-          "pipeline_flux_only.ipynb",
-          "pipeline_audiocraft.ipynb"
-        ]
-      },
-      "results": {
-        "status": "PASS",
-        "unit_and_static_tests": "27/27 PASS",
-        "python_compile": "PASS",
-        "notebook_json": "4/4 PASS",
-        "cells": {
-          "pipeline_trellis_3d_ipynb": 16,
-          "pipeline_trellis_3d_only_ipynb": 15,
-          "pipeline_flux_only_ipynb": 10,
-          "pipeline_audiocraft_ipynb": 6
-        }
-      },
-      "interpretation": "The candidate source and static regression expectations pass on the hosted runner. This does not prove Jupyter cells execute in the live kernel, model generation works, or a fresh quota snapshot exists on the shared compute runner.",
-      "limitations": [
-        "No shared A100 environment was modified.",
-        "No package installation or model download was attempted.",
-        "No TRELLIS inference, FLUX image generation or AudioCraft output generation was run."
-      ],
-      "status": "PASS_STATIC; LIVE_RUNTIME_STILL_BLOCKED",
-      "follow_up": "Resolve approved authoritative quota telemetry, then stage actual model runtime checks one at a time."
     },
     {
       "id": "TEST-2026-10-14-FLUX-CACHE-ONLY-SMOKE-INITIAL-BLOCKED",
@@ -1281,6 +914,61 @@
       ],
       "status": "BLOCKED_GPU_OCCUPANCY",
       "follow_up": "Coordinate a window with an idle GPU using the approved scheduler/owner process; then retry this offline smoke. Do not kill/restart an unidentified compute process."
+    },
+    {
+      "id": "TEST-2026-10-14-STORAGE-GUARD-REGRESSION-PASS",
+      "date": "2026-10-14",
+      "datetime": "2026-10-14T17:20:02+05:30",
+      "timezone": "Asia/Kolkata",
+      "category": "hosted static regression test — final candidate source commit",
+      "objective": "Verify the quota-admission source guards and preserve the existing notebook/CLI regression guarantees after fixing the failures caught in the first run.",
+      "reason": "Prevent notebook/CLI dependency or model writes from using filesystem-only admission on shared Lustre; verify under-lock checks because managed_storage_operation() is a lock/reserve coordinator and not a substitute for StoragePolicy preflight.",
+      "environment": {
+        "repository": "Killer4K-N/OEC",
+        "branch": "fix/storage-admission-write-guards-20261014",
+        "commit": "4ade353d566bfeb525949f5f4c1905a1ae1e135c",
+        "workflow_run_id": 38559330370,
+        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38559330370",
+        "job_id": 115836225568,
+        "runner": "GitHub-hosted ubuntu-latest",
+        "python": "3.11.17"
+      },
+      "approach": "Run test_trellis_notebook_static.py; test_trellis_easy_run.py; test_audiocraft_notebook_static.py; test_storage_write_admission.py; py_compile for pipeline_trellis_3d.py and storage_manager.py; parse all four relevant notebooks.",
+      "parameters": {
+        "test_counts": {
+          "trellis_notebook_static": 12,
+          "trellis_cli_easy_run": 5,
+          "audiocraft_notebook_static": 5,
+          "storage_write_admission": 5
+        },
+        "total": 27,
+        "notebooks": [
+          "pipeline_trellis_3d.ipynb",
+          "pipeline_trellis_3d_only.ipynb",
+          "pipeline_flux_only.ipynb",
+          "pipeline_audiocraft.ipynb"
+        ]
+      },
+      "results": {
+        "status": "PASS",
+        "unit_and_static_tests": "27/27 PASS",
+        "python_compile": "PASS",
+        "notebook_json": "4/4 PASS",
+        "cells": {
+          "pipeline_trellis_3d_ipynb": 16,
+          "pipeline_trellis_3d_only_ipynb": 15,
+          "pipeline_flux_only_ipynb": 10,
+          "pipeline_audiocraft_ipynb": 6
+        }
+      },
+      "interpretation": "The candidate source and static regression expectations pass on the hosted runner. This does not prove Jupyter cells execute in the live kernel, model generation works, or a fresh quota snapshot exists on the shared compute runner.",
+      "limitations": [
+        "No shared A100 environment was modified.",
+        "No package installation or model download was attempted.",
+        "No TRELLIS inference, FLUX image generation or AudioCraft output generation was run."
+      ],
+      "status": "PASS_STATIC; LIVE_RUNTIME_STILL_BLOCKED",
+      "follow_up": "Resolve approved authoritative quota telemetry, then stage actual model runtime checks one at a time."
     },
     {
       "id": "TEST-2026-10-14-DOCUMENTATION-COMMIT-REGRESSION-RERUN",
@@ -1480,44 +1168,6 @@
       "follow_up": "Perform a fresh live TRELLIS generation and FLUX PNG generation when their safe prerequisites are satisfied, with per-output validation and artifact retention."
     },
     {
-      "id": "TEST-2026-10-14-LATEST-CANDIDATE-STATIC-RERUN",
-      "date": "2026-10-14",
-      "datetime": "2026-10-14T19:01:22+05:30",
-      "timezone": "Asia/Kolkata",
-      "category": "final static regression rerun before main integration",
-      "objective": "Confirm the latest cache fallback and output-admission fixes for TRELLIS/FLUX pass after source updates.",
-      "reason": "The updates address false-negative Hugging Face cache detection and deny expensive inference before it starts when output storage admission is already blocked.",
-      "environment": {
-        "repository": "Killer4K-N/OEC",
-        "branch": "fix/storage-admission-write-guards-20261014",
-        "commit": "f8ed9453f296594fc2da0cdfd55c32f79f6e1359",
-        "workflow_run_id": 38572444007,
-        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38572444007",
-        "job_id": 115880848367,
-        "runner": "GitHub-hosted ubuntu-latest",
-        "python": "3.11"
-      },
-      "approach": "Run TRELLIS notebook static tests, CLI/easy-run tests, AudioCraft notebook tests, storage admission tests, Python compilation, and JSON validation for four notebooks.",
-      "expected": "All 28 static checks and syntax/JSON checks pass.",
-      "results": {
-        "status": "PASS",
-        "trellis_notebook_static": "12/12",
-        "trellis_cli_easy_run": "5/5",
-        "audiocraft_notebook_static": "5/5",
-        "storage_write_admission": "6/6",
-        "total": "28/28",
-        "python_compile": "PASS",
-        "notebook_json": "4/4 PASS"
-      },
-      "interpretation": "Source/static test evidence is green; no current live model generation is claimed.",
-      "limitations": [
-        "No model inference ran in this hosted validation.",
-        "No live model download, package install or shared machine mutation."
-      ],
-      "status": "PASS_STATIC",
-      "follow_up": "Commit these validated files and tracking records to main, then record the actual main-hosted Action result."
-    },
-    {
       "id": "TEST-2026-10-14-CAPACITY-MATRIX-WORKFLOW-FIRST-FAIL",
       "date": "2026-10-14",
       "datetime": "2026-10-14T18:25:53+05:30",
@@ -1584,6 +1234,44 @@
       "interpretation": "Connector-1 cache and source are present, but both GPUs were busy; queued connector-2/5 checks did not establish an alternate device.",
       "status": "PARTIAL; NO IDLE GPU CONFIRMED",
       "follow_up": "Retry only after an idle GPU is positively verified; leave other workloads untouched."
+    },
+    {
+      "id": "TEST-2026-10-14-LATEST-CANDIDATE-STATIC-RERUN",
+      "date": "2026-10-14",
+      "datetime": "2026-10-14T19:01:22+05:30",
+      "timezone": "Asia/Kolkata",
+      "category": "final static regression rerun before main integration",
+      "objective": "Confirm the latest cache fallback and output-admission fixes for TRELLIS/FLUX pass after source updates.",
+      "reason": "The updates address false-negative Hugging Face cache detection and deny expensive inference before it starts when output storage admission is already blocked.",
+      "environment": {
+        "repository": "Killer4K-N/OEC",
+        "branch": "fix/storage-admission-write-guards-20261014",
+        "commit": "f8ed9453f296594fc2da0cdfd55c32f79f6e1359",
+        "workflow_run_id": 38572444007,
+        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38572444007",
+        "job_id": 115880848367,
+        "runner": "GitHub-hosted ubuntu-latest",
+        "python": "3.11"
+      },
+      "approach": "Run TRELLIS notebook static tests, CLI/easy-run tests, AudioCraft notebook tests, storage admission tests, Python compilation, and JSON validation for four notebooks.",
+      "expected": "All 28 static checks and syntax/JSON checks pass.",
+      "results": {
+        "status": "PASS",
+        "trellis_notebook_static": "12/12",
+        "trellis_cli_easy_run": "5/5",
+        "audiocraft_notebook_static": "5/5",
+        "storage_write_admission": "6/6",
+        "total": "28/28",
+        "python_compile": "PASS",
+        "notebook_json": "4/4 PASS"
+      },
+      "interpretation": "Source/static test evidence is green; no current live model generation is claimed.",
+      "limitations": [
+        "No model inference ran in this hosted validation.",
+        "No live model download, package install or shared machine mutation."
+      ],
+      "status": "PASS_STATIC",
+      "follow_up": "Commit these validated files and tracking records to main, then record the actual main-hosted Action result."
     },
     {
       "id": "TEST-2026-10-14-MAIN-BRANCH-SOURCE-AND-TRACKING-PUSH",
@@ -1769,6 +1457,71 @@
       ],
       "status": "BLOCKED_GPU_OCCUPANCY; NO CURRENT PNG",
       "follow_up": "Retry when an idle A100 is available, then verify PNG decoding, dimensions and SHA-256."
+    },
+    {
+      "id": "TEST-2026-10-14-TRELLIS-OFFLINE-PIPELINE-CONFIG-FIX",
+      "date": "2026-10-14",
+      "datetime": "2026-10-14T21:51:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "category": "TRELLIS cache-only image-to-3D runtime regression and fix",
+      "objective": "Fix the live cached TRELLIS smoke after GPU admission so the local weight snapshot can load its pipeline config without a Hugging Face network request, then generate and validate a fresh GLB.",
+      "reason": "Run 38587490301 passed all 7 admission/cache unit tests and selected GPU 1 safely (39,902 MiB free, 0% utilization, 416 MiB existing process memory), but model load failed because pipeline.json was absent from the isolated HF cache and from_pretrained was still called with the Hub model ID.",
+      "environment": {
+        "repository": "Killer4K-N/Connector_1",
+        "branch": "diagnose/trellis-asset-generation-20261014",
+        "observed_failure_run_id": 38587490301,
+        "observed_failure_job_id": 115933256897,
+        "failure_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38587490301",
+        "model_id": "microsoft/TRELLIS.2-4B",
+        "cached_snapshot": "af44b45f2e35a493886929c6d786e563ec68364d",
+        "runtime": "phase2_3d",
+        "host": "scn17-mn"
+      },
+      "approach": "Vendor the official pipeline.json pinned to the selected cache revision, resolve configs only from local files, create a /tmp snapshot overlay with a copied config and read-only links to cached entries, mirror cached HF snapshot/ref metadata into a temporary local cache, and load via the local snapshot path. Add unit coverage for pinned config validation, safe overlay linking, cached repository metadata and fail-closed unknown revisions.",
+      "expected": "The smoke loads cached TRELLIS weights without a Hub request, performs image-to-3D inference, exports one GLB to local /tmp, and validates GLB 2.0 plus non-empty mesh geometry. No downloads or shared cache writes.",
+      "fix_commits": [
+        "https://github.com/Killer4K-N/Connector_1/commit/0fe92d6525540e83819f7a0943fbfded29dad8d6",
+        "https://github.com/Killer4K-N/Connector_1/commit/dcc0eb9f8be81e20437416679414b67def6da358",
+        "https://github.com/Killer4K-N/Connector_1/commit/293718c8743a8720296a77a94672b105e244eb46"
+      ],
+      "validation_runs": {
+        "config_vendor_run": {
+          "id": 38598747382,
+          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598747382",
+          "status": "IN_PROGRESS_AT_LOG_UPDATE"
+        },
+        "loader_fix_run": {
+          "id": 38598822415,
+          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415",
+          "status": "QUEUED_AT_LOG_UPDATE"
+        },
+        "regression_suite_run": {
+          "id": 38598881722,
+          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598881722",
+          "status": "QUEUED_AT_LOG_UPDATE"
+        }
+      },
+      "results": {
+        "status": "FIX_COMMITTED_RUNTIME_VALIDATION_PENDING",
+        "observed_failure": "OFFLINE_PIPELINE_JSON_NOT_FOUND",
+        "root_cause": "from_pretrained(MODEL_ID) fell back to hf_hub_download('pipeline.json') while offline; the synthetic temporary HF cache exposed the weight snapshot but not its config.",
+        "tests_at_failure_run": "7/7 prior admission/cache tests passed",
+        "fresh_glb_created": false,
+        "inference_success": false,
+        "model_download": false,
+        "package_install": false,
+        "shared_cache_mutated": false,
+        "active_gpu_process_terminated": false,
+        "authoritative_quota_snapshot": "MISSING"
+      },
+      "interpretation": "This is an actionable cache-only loader defect, not an inference or GLB exporter failure. The fix is committed to the diagnostic branch; do not call the fix accepted until the latest branch run produces and validates a fresh asset.",
+      "limitations": [
+        "Latest loader/test runs were queued behind a self-hosted job at log time.",
+        "Fresh authoritative quota telemetry is still missing; no model download or package install is allowed.",
+        "No currently running GPU process was stopped or signalled."
+      ],
+      "status": "FIX COMMITTED; FRESH GLB VALIDATION PENDING",
+      "follow_up": "Inspect the loader-fix and latest 10-test workflow runs. Resolve any further cache-only failure, then check the uploaded GLB with glb_check and trimesh geometry validation before closing this item."
     }
   ]
 }
