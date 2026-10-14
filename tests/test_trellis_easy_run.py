@@ -74,7 +74,7 @@ class TrellisEasyRunTests(unittest.TestCase):
         cells = cell_sources(ROOT / "pipeline_trellis_3d_only.ipynb")
         setup = next((cell for cell in cells if "IRONCLAD PYTORCH" in cell), "")
         self.assertIn("storage_preflight_path", setup)
-        self.assertIn("require_fresh_quota=False", setup)
+        self.assertIn("require_fresh_quota=True", setup)
         self.assertLess(setup.index("storage_preflight_path"), setup.index('"pip", "install"'))
 
     def test_notebook_gradio_ports_match_tunnel_instructions(self):

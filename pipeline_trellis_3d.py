@@ -158,7 +158,7 @@ def _resolve_snapshot(args: argparse.Namespace, runtime: dict[str, Any]) -> Path
     if args.offline:
         raise RuntimeError(
             f"Model {args.model_id!r} is not cached in {runtime['cache_dir']}. "
-            "Run without --offline only when OEC StorageManager confirms configured allocation and filesystem headroom."
+            "Run without --offline only when OEC StorageManager confirms fresh authoritative quota, configured allocation, and filesystem headroom."
         )
 
     from storage_manager import managed_storage_operation, storage_preflight
@@ -170,7 +170,7 @@ def _resolve_snapshot(args: argparse.Namespace, runtime: dict[str, Any]) -> Path
     ok, reason = storage_preflight(
         "models",
         required_gb=required_gb,
-        require_fresh_quota=False,
+        require_fresh_quota=True,
         minimum_free_gb=minimum_free_gb,
     )
     if not ok:
@@ -179,9 +179,15 @@ def _resolve_snapshot(args: argparse.Namespace, runtime: dict[str, Any]) -> Path
     with managed_storage_operation(
         "models",
         required_gb=required_gb,
-        require_fresh_quota=False,
+        require_fresh_quota=True,
         minimum_free_gb=minimum_free_gb,
     ):
+        ok, reason = storage_preflight(
+            "models", required_gb=required_gb, require_fresh_quota=True,
+            minimum_free_gb=minimum_free_gb,
+        )
+        if not ok:
+            raise RuntimeError(f"TRELLIS model download denied inside managed operation: {reason}")
         snapshot = runtime["snapshot_download"](
             repo_id=args.model_id,
             cache_dir=str(runtime["cache_dir"]),
@@ -230,7 +236,7 @@ def generate_glb(
     decimation_target: int,
     texture_size: int,
 ) -> str:
-    from storage_manager import managed_storage_operation
+    from storage_manager import managed_storage_operation, storage_preflight, storage_preflight_path
     import torch
 
     if decimation_target < 1_000:
@@ -254,7 +260,6 @@ def generate_glb(
         destination = Path(output_path).expanduser().resolve()
         destination_dir = destination.parent
 
-    destination_dir.mkdir(parents=True, exist_ok=True)
     glb = o_voxel.postprocess.to_glb(
         vertices=mesh.vertices,
         faces=mesh.faces,
@@ -270,13 +275,43 @@ def generate_glb(
         remesh_project=0,
         verbose=False,
     )
-    # Managed output operation keeps the existing storage policy in force.
+    # Enforce quota for configured output allocation and actual target path.
+    def _preflight_target_path():
+        # storage_preflight_path creates missing paths; inspect an existing ancestor
+        # until admission has passed.
+        probe_path = destination_dir
+        while not probe_path.is_dir() and probe_path.parent != probe_path:
+            probe_path = probe_path.parent
+        return storage_preflight_path(
+            probe_path, required_gb=0.20, require_fresh_quota=True,
+            minimum_free_gb=0.05,
+        )
+
+    ok, reason = storage_preflight(
+        "outputs", required_gb=0.20, require_fresh_quota=True,
+        minimum_free_gb=0.05,
+    )
+    if not ok:
+        raise RuntimeError(f"GLB export denied by OEC quota/storage admission: {reason}")
+    ok, reason = _preflight_target_path()
+    if not ok:
+        raise RuntimeError(f"GLB target path denied by OEC quota/storage admission: {reason}")
     with managed_storage_operation(
         "outputs",
         required_gb=0.20,
-        require_fresh_quota=False,
+        require_fresh_quota=True,
         minimum_free_gb=0.05,
     ):
+        ok, reason = storage_preflight(
+            "outputs", required_gb=0.20, require_fresh_quota=True,
+            minimum_free_gb=0.05,
+        )
+        if not ok:
+            raise RuntimeError(f"GLB export denied inside managed operation: {reason}")
+        ok, reason = _preflight_target_path()
+        if not ok:
+            raise RuntimeError(f"GLB target path denied inside managed operation: {reason}")
+        destination_dir.mkdir(parents=True, exist_ok=True)
         glb.export(str(destination), extension_webp=True)
 
     if not destination.is_file() or destination.stat().st_size == 0:
