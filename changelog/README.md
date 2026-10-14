@@ -38,7 +38,7 @@ Daily engineering records live here. Use the local Asia/Kolkata date in each fil
 ## Persistent project tracking
 
 - **One active TODO list:** [`TODO.md`](../TODO.md)
-- **Structured experiment/test log:** [`test.json`](../test.json) — currently 32 experiment records.
+- **Structured experiment/test log:** [`test.json`](../test.json) — currently 35 experiment records.
 - **Cumulative significant results:** [`result.md`](../result.md)
 - **Reusable interactive-model implementation convention:** [`model_entrypoint_convention.md`](../docs/model_entrypoint_convention.md)
 
@@ -58,3 +58,5 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 - Historical TRELLIS image-to-3D generation is confirmed by [run 37942265623](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623): 8,950,028-byte GLB artifact [11622412194](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194) reopens with 97,783 vertices and 92,819 faces. Current Oct 14 TRELLIS/FLUX generation remains blocked by active GPU processes.
 
 - **Main CI result recorded:** [run 38575822798](https://github.com/Killer4K-N/OEC/actions/runs/38575822798) on main commit `9c9d7acc...` passed 28/28 static tests, Python compilation and 4/4 notebook JSON checks. Current shared GPU generation remains blocked separately.
+
+- **Latest GPU smoke retries:** TRELLIS [run 38571363231 attempt 2](https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231) and FLUX [run 38559255790 attempt 2](https://github.com/Killer4K-N/Connector_1/actions/runs/38559255790) both blocked safely at GPU occupancy; the retry results are recorded in `test.json` and the Oct. 14 changelog. Historical TRELLIS GLB remains independently validated.

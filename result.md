@@ -186,3 +186,12 @@ The historical GLB's tracked download link points to GitHub artifact [1162241219
 Main commit [`9c9d7acc12e47658f37e71840449f8558b42ee2b`](https://github.com/Killer4K-N/OEC/commit/9c9d7acc12e47658f37e71840449f8558b42ee2b) passed [GitHub Actions run 38575822798](https://github.com/Killer4K-N/OEC/actions/runs/38575822798), job `115892512804`: 28/28 static tests (12 TRELLIS notebook + 5 CLI/easy-run + 5 AudioCraft notebook + 6 storage-admission), Python compilation, and 4/4 notebook JSON checks. The cumulative JSON registry now contains 33 experiment/test records, including the run and why it was conducted.
 
 **Still open:** this main CI run did not perform inference. TRELLIS has a real, independently validated historical GLB; current TRELLIS and FLUX attempts remain blocked by active GPU compute processes. Authoritative quota telemetry is missing, so no model/dependency download or bypass was attempted.
+
+
+### Latest runtime retries after main integration — 2026-10-14
+
+- TRELLIS run [38571363231 attempt 2](https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231) (job `115893795773`) stayed blocked by GPU occupancy; report [11899728417](https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231/artifacts/11899728417). It did not start model loading or inference and created no new GLB.
+- FLUX run [38559255790 attempt 2](https://github.com/Killer4K-N/Connector_1/actions/runs/38559255790) (job `115894428716`) again detected the cached model but both A100s had an active compute process. It did not import Torch/Diffusers, run inference or create a PNG.
+- These tests were re-run to see whether GPU availability had changed. They are blocked capacity checks, not model-generation failures. Both outcomes are now part of the 35-record experiment registry committed on `main`.
+
+The remaining acceptance gate is a verified idle GPU for fresh TRELLIS and FLUX inference, followed by GLB geometry and PNG decoding/hash validation. The current quota snapshot is still missing, so downloads and shared storage writes remain fail-closed.

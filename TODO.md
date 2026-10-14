@@ -145,3 +145,5 @@ The official Diffusers release notes list Flux2 Klein support in v0.37.0; the cu
 - [ ] **BLOCKED — fresh quota telemetry:** quota snapshot missing and `quota_check` absent on the compute runner. Keep shared model/dependency downloads and quota-gated writes fail-closed; never substitute Lustre free-space values.
 
 - [x] **Main-branch CI verified:** commit [`9c9d7acc12e47658f37e71840449f8558b42ee2b`](https://github.com/Killer4K-N/OEC/commit/9c9d7acc12e47658f37e71840449f8558b42ee2b), [run 38575822798](https://github.com/Killer4K-N/OEC/actions/runs/38575822798), job `115892512804`: 28/28 static tests PASS, compilation PASS, all four notebook JSON checks PASS. The test/run result has been added to the cumulative registry and dated changelog on main.
+
+- [x] Re-tried the current TRELLIS and FLUX cache-only GPU smoke workflows. TRELLIS run `38571363231` attempt 2 remained blocked at idle-GPU preflight (report artifact `11899728417`); FLUX run `38559255790` attempt 2 found one active compute process on each A100 and generated no PNG. Both reasons/results have been added to `test.json` and the dated changelog on main.

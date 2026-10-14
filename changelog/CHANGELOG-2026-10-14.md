@@ -229,3 +229,12 @@ The main integration commit [`9c9d7acc12e47658f37e71840449f8558b42ee2b`](https:/
 - Total 28/28; Python compilation PASS; all four notebook JSON checks PASS (16/15/10/6 cells).
 
 This is the actual main branch CI result, not just the candidate result. It confirms the source/test integration and quota guards. It does not replace live inference acceptance. Current TRELLIS smoke [38571363231](https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231) stopped before inference because both A100s were occupied; FLUX image generation remains blocked for the same reason. The quota snapshot is still absent and `quota_check` remains unavailable on the compute runner. Historical TRELLIS asset [11622412194](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194) is independently validated (GLB 2.0, 97,783 vertices, 92,819 faces, SHA-256 `ede239663f21023640356920a5eff129fd8bb1077f914e8ff19fcb720b7ece4d`).
+
+
+### Fresh TRELLIS and FLUX retries — both safely blocked
+
+- **TRELLIS retry 2:** [run 38571363231, attempt 2](https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231), job `115893795773`, report artifact [11899728417](https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231/artifacts/11899728417). Cache/source/input checks reached the GPU admission step, but the job again returned `BLOCKED_GPU_OCCUPANCY` (no idle GPU with at least 30,000 MiB free). Pipeline loading/inference were not reached; no current GLB was created.
+- **FLUX retry 2:** [run 38559255790, attempt 2](https://github.com/Killer4K-N/Connector_1/actions/runs/38559255790), job `115894428716`. The cache snapshot is a hit. GPU 0 had 31,536/40,960 MiB free and one active compute process; GPU 1 had 39,902/40,960 MiB free and one active compute process. The smoke exited before importing Torch/Diffusers; no PNG was produced.
+- Both tests were conducted because prior attempts were capacity-blocked and the user requested generation confirmation. Both results are **blocked by live GPU occupancy**, not model inference failures. No packages or weights were installed/downloaded; no shared cache, runner process or queue was modified.
+
+The logs and outcomes have been added to the cumulative experiment registry on `main`. The historical TRELLIS GLB remains validated, but an idle-GPU window is still required to produce a fresh October 14 asset and PNG.

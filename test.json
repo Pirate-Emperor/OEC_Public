@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-14T18:36:00+05:30",
+  "last_updated": "2026-10-14T19:29:15+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
   "latest_summary": {
@@ -252,7 +252,9 @@
       },
       "python_compile": "PASS",
       "notebook_json": "4/4 PASS",
-      "runtime_status": "TRELLIS historical asset confirmed; today's TRELLIS/FLUX generation blocked by GPU occupancy; quota snapshot missing"
+      "runtime_status": "TRELLIS historical asset confirmed; today's TRELLIS/FLUX generation blocked by GPU occupancy; quota snapshot missing",
+      "tracking_commit": "dc68823805f11a74c6eda6586451e7001f5f001f",
+      "latest_tracking_commit_pending": "this commit records second GPU-smoke retry outcomes"
     },
     "latest_trellis_asset_generation": {
       "historical_run_id": 37942265623,
@@ -270,29 +272,49 @@
       "trimesh_reopen": "PASS",
       "vertices": 97783,
       "faces": 92819,
-      "current_run_id": 38571363231,
-      "current_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231",
-      "current_result": "BLOCKED_GPU_OCCUPANCY; no current GLB generated",
-      "note": "Historical generation is confirmed; current Oct 14 fresh generation is blocked because both A100s had active compute processes."
+      "current_attempt_1": {
+        "run_id": 38569413681,
+        "result": "BLOCKED_GPU_OCCUPANCY"
+      },
+      "current_attempt_2": {
+        "run_id": 38571363231,
+        "attempt": 2,
+        "job_id": 115893795773,
+        "result": "BLOCKED_GPU_OCCUPANCY",
+        "report_artifact_id": 11899728417,
+        "glb_created": false
+      },
+      "note": "TRELLIS asset generation is proven historically. Current Oct 14 fresh asset generation remains blocked because no idle A100 passed the admission check."
     },
     "latest_flux_image_generation": {
       "model_cache": "HIT",
       "historical_pipeline_import": "PASS at baseline run 38175212786",
-      "latest_run_id": 38559255790,
-      "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38559255790",
-      "status": "BLOCKED_GPU_OCCUPANCY",
-      "image_generated": false,
+      "first_attempt": {
+        "run_id": 38559255790,
+        "attempt": 1,
+        "result": "BLOCKED_GPU_OCCUPANCY"
+      },
+      "latest_attempt": {
+        "run_id": 38559255790,
+        "attempt": 2,
+        "job_id": 115894428716,
+        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38559255790",
+        "status": "BLOCKED_GPU_OCCUPANCY",
+        "image_generated": false
+      },
       "gpu0": {
         "free_mib": 31536,
+        "total_mib": 40960,
         "active_compute_process_count": 1
       },
       "gpu1": {
         "free_mib": 39902,
+        "total_mib": 40960,
         "active_compute_process_count": 1
       },
       "quota_snapshot": "MISSING",
       "quota_check": "NOT_FOUND",
-      "note": "No compute process was stopped; retry offline generation only when an idle GPU is available."
+      "note": "Both reruns safely refused to start inference with active compute processes; no PNG was created."
     }
   },
   "experiments": [
@@ -1460,7 +1482,7 @@
     {
       "id": "TEST-2026-10-14-LATEST-CANDIDATE-STATIC-RERUN",
       "date": "2026-10-14",
-      "datetime": "2026-10-14T18:30:00+05:30",
+      "datetime": "2026-10-14T19:01:22+05:30",
       "timezone": "Asia/Kolkata",
       "category": "final static regression rerun before main integration",
       "objective": "Confirm the latest cache fallback and output-admission fixes for TRELLIS/FLUX pass after source updates.",
@@ -1498,7 +1520,7 @@
     {
       "id": "TEST-2026-10-14-CAPACITY-MATRIX-WORKFLOW-FIRST-FAIL",
       "date": "2026-10-14",
-      "datetime": "2026-10-14T18:30:00+05:30",
+      "datetime": "2026-10-14T18:25:53+05:30",
       "timezone": "Asia/Kolkata",
       "category": "read-only cross-runner capacity diagnostic — workflow configuration failure",
       "objective": "Inspect model cache, quota availability and GPU occupancy across registered runners.",
@@ -1524,7 +1546,7 @@
     {
       "id": "TEST-2026-10-14-CAPACITY-MATRIX-CONNECTOR1-PARTIAL",
       "date": "2026-10-14",
-      "datetime": "2026-10-14T18:30:00+05:30",
+      "datetime": "2026-10-14T18:26:45+05:30",
       "timezone": "Asia/Kolkata",
       "category": "read-only cross-runner capacity diagnostic — partial result",
       "objective": "Find cached model assets and a safe idle GPU target for TRELLIS/FLUX.",
@@ -1566,7 +1588,7 @@
     {
       "id": "TEST-2026-10-14-MAIN-BRANCH-SOURCE-AND-TRACKING-PUSH",
       "date": "2026-10-14",
-      "datetime": "2026-10-14T18:30:00+05:30",
+      "datetime": "2026-10-14T19:24:37+05:30",
       "timezone": "Asia/Kolkata",
       "category": "main integration of TRELLIS/FLUX fixes and cumulative tracking",
       "objective": "Push the tested model source fixes and cumulative logs/test/experiment records to main, as explicitly requested.",
@@ -1609,7 +1631,7 @@
     {
       "id": "TEST-2026-10-14-MAIN-CI-VALIDATION",
       "date": "2026-10-14",
-      "datetime": "2026-10-14T18:36:00+05:30",
+      "datetime": "2026-10-14T19:24:53+05:30",
       "timezone": "Asia/Kolkata",
       "category": "main branch integration CI validation",
       "objective": "Validate the exact main-branch integration commit containing TRELLIS/FLUX source fixes, static regressions and the cumulative tracking records.",
@@ -1650,6 +1672,103 @@
       ],
       "status": "PASS_MAIN_STATIC_CI",
       "follow_up": "When an idle GPU is available, re-run cache-only TRELLIS and FLUX inference; validate generated GLB geometry and PNG, then add actual run IDs/artifact hashes to main."
+    },
+    {
+      "id": "TEST-2026-10-14-TRELLIS-RETRY-2-BLOCKED",
+      "date": "2026-10-14",
+      "datetime": "2026-10-14T19:27:39+05:30",
+      "timezone": "Asia/Kolkata",
+      "category": "fresh retry of offline TRELLIS.2 image-to-3D asset generation",
+      "objective": "Re-attempt a real TRELLIS asset generation using the already cached source, input image and seven-safetensor-shard model snapshot, with no package installation or model download.",
+      "reason": "The previous attempt was blocked by GPU occupancy; a rerun checks whether an idle A100 became available, as the historical asset pass does not prove current-session generation.",
+      "environment": {
+        "repository": "Killer4K-N/Connector_1",
+        "branch": "diagnose/trellis-asset-generation-20261014",
+        "run_id": 38571363231,
+        "run_attempt": 2,
+        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231",
+        "job_id": 115893795773,
+        "host": "scn17-mn",
+        "model_id": "microsoft/TRELLIS.2-4B"
+      },
+      "approach": "Check cached model/source/input; verify local /tmp mount; refuse to import Torch or run inference unless an A100 has zero active compute processes and at least 30,000 MiB free; export under /tmp and inspect the GLB only if generation is allowed.",
+      "expected": "If an eligible idle GPU exists, run real image-to-3D inference, export GLB and validate GLB 2.0 plus nonempty mesh geometry.",
+      "results": {
+        "status": "BLOCKED_GPU_OCCUPANCY",
+        "message": "No idle GPU with at least 30000 MiB free; inference not started",
+        "pipeline_load": "NOT_REACHED",
+        "inference": "NOT_STARTED",
+        "glb_created": false,
+        "shared_cache_mutation": false,
+        "package_install": false,
+        "model_download": false,
+        "gpu_process_change": false,
+        "report_artifact_id": 11899728417,
+        "report_artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231/artifacts/11899728417"
+      },
+      "interpretation": "This is a fail-safe capacity block, not a TRELLIS model or export failure. Historical real generation remains confirmed by run 37942265623 and validated artifact 11622412194.",
+      "limitations": [
+        "No current GLB generated on this attempt.",
+        "Both active compute processes were left untouched.",
+        "Quota telemetry is still missing, so no new download was attempted."
+      ],
+      "status": "BLOCKED_GPU_OCCUPANCY; NO CURRENT GLB",
+      "follow_up": "Retry only after an idle A100 is confirmed by read-only nvidia-smi; validate the generated GLB with trimesh before marking current generation accepted."
+    },
+    {
+      "id": "TEST-2026-10-14-FLUX-RETRY-2-BLOCKED",
+      "date": "2026-10-14",
+      "datetime": "2026-10-14T19:28:45+05:30",
+      "timezone": "Asia/Kolkata",
+      "category": "fresh retry of offline cache-only FLUX.2 Klein text-to-image smoke",
+      "objective": "Re-attempt one FLUX.2 Klein PNG generation from the existing cached snapshot without package installation or network download.",
+      "reason": "The first FLUX run was blocked by GPU occupancy; rerun verifies whether an idle A100 has become available.",
+      "environment": {
+        "repository": "Killer4K-N/Connector_1",
+        "branch": "diagnose/flux-cache-only-smoke-20261014",
+        "run_id": 38559255790,
+        "run_attempt": 2,
+        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38559255790",
+        "job_id": 115894428716,
+        "host": "scn17-mn",
+        "model_id": "black-forest-labs/FLUX.2-klein-4B",
+        "steps": 4,
+        "minimum_free_gpu_mib": 30000
+      },
+      "approach": "Locate cached snapshot; read per-GPU free memory and compute process counts; refuse model import/inference unless GPU is idle; output only to /tmp.",
+      "expected": "An eligible device permits loading cached weights and generating/verifying a non-empty PNG.",
+      "results": {
+        "status": "BLOCKED_GPU_OCCUPANCY",
+        "cache": "HIT at /nlsasfs/home/lmedge/rahkus/aireos_models/models--black-forest-labs--FLUX.2-klein-4B/snapshots/e7b7dc27f91deacad38e78976d1f2b499d76a294",
+        "gpu0": {
+          "free_mib": 31536,
+          "total_mib": 40960,
+          "active_compute_process_count": 1,
+          "eligible": false
+        },
+        "gpu1": {
+          "free_mib": 39902,
+          "total_mib": 40960,
+          "active_compute_process_count": 1,
+          "eligible": false
+        },
+        "torch_imported": false,
+        "diffusers_imported": false,
+        "model_loaded": false,
+        "inference_started": false,
+        "png_created": false,
+        "package_install": false,
+        "model_download": false,
+        "shared_cache_mutated": false
+      },
+      "interpretation": "Model snapshot is present; both A100s still have active compute processes, so inference safely did not start. This does not show FLUX generation failing after model load.",
+      "limitations": [
+        "No PNG generated.",
+        "No compute process was stopped or modified.",
+        "Fresh authoritative quota snapshot remains missing."
+      ],
+      "status": "BLOCKED_GPU_OCCUPANCY; NO CURRENT PNG",
+      "follow_up": "Retry when an idle A100 is available, then verify PNG decoding, dimensions and SHA-256."
     }
   ]
 }
