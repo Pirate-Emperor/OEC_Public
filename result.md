@@ -228,3 +228,16 @@ Expanded Connector_1 test run [38598881722](https://github.com/Killer4K-N/Connec
 The same fix is in the OEC standalone CLI and both TRELLIS notebooks on branch [fix/trellis-offline-pipeline-config-20261014](https://github.com/Killer4K-N/OEC/tree/fix/trellis-offline-pipeline-config-20261014). CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 tests (12 notebook static, 5 CLI, 6 offline config, 5 AudioCraft, 6 storage admission), Python compilation and four notebook JSON checks. Review PR [#10](https://github.com/Killer4K-N/OEC/pull/10) is open and not merged.
 
 Authoritative quota telemetry remains missing. Any missing model/dependency download remains denied; the successful path uses cached files plus /tmp only.
+
+
+## 2026-10-14 22:36 IST — Final TRELLIS guarded run PASS
+
+[Connector_1 run 38602330418](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418) completed successfully with all job steps green. Its 10/10 offline cache/GPU admission tests passed; image-to-3D generation and both artifact uploads passed. The GLB is the exact run-specific output at \`/tmp/oec-trellis-asset-generation-38602330418/trellis_asset.glb\`.
+
+- **GLB artifact:** [11914941709](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11914941709), artifact archive 7,243,343 bytes; SHA-256 of GLB \`22caca5fe9c02c50c095e4385a7c17e94b214b5fc7d87417b94b48c796a89257\`, GLB size 8,865,916 bytes.
+- **Validation report:** [11913529964](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11913529964).
+- **Geometry:** GLB 2.0, declared length matched, valid JSON chunk, one mesh and primitive, two textures, 96,672 position vertices and 92,062 faces; \`trimesh_reopen=PASS\`.
+- **GPU admission:** GPU 1 admitted under the low-footprint policy (39,902 MiB free, 0% utilization, one pre-existing process attributed 416 MiB). Existing process was not stopped.
+- **Source candidate:** OEC CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) remains green at 34 tests plus compilation/notebook JSON checks; [OEC PR #10](https://github.com/Killer4K-N/OEC/pull/10) is open and unmerged. [Connector_1 PR #2](https://github.com/Killer4K-N/Connector_1/pull/2) is now ready for review and also unmerged.
+
+This resolves the TRELLIS config-load/generation acceptance criteria. The historical broad-wildcard artifact failure remains documented and is superseded by the exact-run upload that completed here. No model/package downloads, shared cache writes, quota bypass or process termination occurred; fresh authoritative quota remains necessary before any future downloads.
