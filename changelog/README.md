@@ -4,11 +4,11 @@ Daily engineering records live here. Use the local Asia/Kolkata date in each fil
 
 ## Daily records
 
-- [2026-10-14 — Read-only quota telemetry diagnosis and runtime blockers](CHANGELOG-2026-10-14.md)
+- [2026-10-14 — TRELLIS generation verified; quota and FLUX blockers tracked](CHANGELOG-2026-10-14.md)
   - [Connector_1 run 38555689884](https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884) succeeded in producing a read-only report: the configured quota snapshot is missing and `quota_check` is unavailable on scn17-mn.
   - Model storage is on shared Lustre with very high measured filesystem free capacity; that is not user/project quota proof, so package/model write admission remains blocked.
   - The live OEC checkout is detached at `081aaf34...` with tracked dirty paths; no live sync/reset occurred. Reserve size differs from an earlier logged value and needs read-only reconciliation.
-  - TRELLIS runtime diagnostic [run 38587490301](https://github.com/Killer4K-N/Connector_1/actions/runs/38587490301) passed its 7 then-current tests and safely admitted a low-footprint GPU, then exposed a missing local `pipeline.json` lookup in offline mode. The pinned-config/local-overlay correction is on [Connector_1 diagnostic branch](https://github.com/Killer4K-N/Connector_1/tree/diagnose/trellis-asset-generation-20261014); loader validation [run 38598822415](https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415) is in progress and the expanded 10-test run [38598881722](https://github.com/Killer4K-N/Connector_1/actions/runs/38598881722) is queued. Fresh GLB acceptance remains pending.
+  - Root cause was the cached weight snapshot's missing `pipeline.json`; a pinned local config plus a temporary `/tmp` overlay and local Hugging Face metadata view fixed the offline load without modifying shared cache files. Final [Connector_1 run 38602330418](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418) passed 10/10 tests, loaded the pipeline, ran inference, and uploaded the exact-run GLB [11914941709](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11914941709): 8,865,916 bytes, SHA-256 `22caca5fe9c02c50c095e4385a7c17e94b214b5fc7d87417b94b48c796a89257`, 96,672 vertices / 92,062 faces; `trimesh_reopen=PASS`. OEC CLI/notebook source candidate [PR #10](https://github.com/Killer4K-N/OEC/pull/10) and Connector_1 [PR #2](https://github.com/Killer4K-N/Connector_1/pull/2) remain open and unmerged.
   - The connector-2 QA recovery job separately failed on Slurm host discovery/accounting DB connectivity. Queue/process mutation is not claimed.
 
 - [2026-10-12 — Runtime blocker remediation and official upstream compatibility review](CHANGELOG-2026-10-12.md)
@@ -39,7 +39,7 @@ Daily engineering records live here. Use the local Asia/Kolkata date in each fil
 ## Persistent project tracking
 
 - **One active TODO list:** [`TODO.md`](../TODO.md)
-- **Structured experiment/test log:** [`test.json`](../test.json) — currently 35 experiment records.
+- **Structured experiment/test log:** [`test.json`](../test.json) — currently 39 experiment/test records.
 - **Cumulative significant results:** [`result.md`](../result.md)
 - **Reusable interactive-model implementation convention:** [`model_entrypoint_convention.md`](../docs/model_entrypoint_convention.md)
 
@@ -49,7 +49,7 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 - **2026-10-14 — TRELLIS asset proof and current live-runtime blockers**
   - Current candidate [run 38571665298](https://github.com/Killer4K-N/OEC/actions/runs/38571665298) passed 28/28 static tests plus compilation and notebook JSON validation.
   - Historic TRELLIS run [37942265623](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623) produced a real 8,950,028-byte GLB; the recovered artifact was re-opened independently with `trimesh` and contains 97,783 vertices and 92,819 faces. It is linked as a downloadable file in `result.md`.
-  - Current offline TRELLIS smoke [38571363231](https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231) discovered the cached model/source/input but stopped at GPU occupancy before inference; no current GLB was generated. FLUX image generation is similarly blocked by active compute processes. Quota telemetry remains absent, so no download/install bypass is allowed.
+  - The early offline TRELLIS smoke [38571363231](https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231) was blocked by GPU occupancy and did not generate an asset; that result is superseded by the later successful run 38602330418 documented above. FLUX image generation still has no passing PNG-producing run. Quota telemetry remains absent, so no download/install bypass is allowed.
 
 
 ## 2026-10-14 — Main branch integration
