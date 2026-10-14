@@ -237,6 +237,8 @@ def generate_glb(
     texture_size: int,
 ) -> str:
     from storage_manager import managed_storage_operation, storage_preflight, storage_preflight_path
+    import json
+    import struct
     import torch
 
     if decimation_target < 1_000:
@@ -244,84 +246,85 @@ def generate_glb(
     if texture_size < 256 or texture_size > 8192:
         raise ValueError("texture_size must be between 256 and 8192.")
 
-    prepared = _prepare_image(image, max_image_size)
-    with torch.inference_mode():
-        meshes = pipeline.run(prepared)
-    if not meshes:
-        raise RuntimeError("TRELLIS returned no mesh for this image.")
-    mesh = meshes[0]
-
+    # Resolve destination without creating directories; check admission before GPU inference.
     if output_path is None:
-        destination_dir = output_dir or (Path(system_dirs["outputs"]) / "3d_models")
-        destination_dir = Path(destination_dir).expanduser().resolve()
+        destination_dir = Path(output_dir or (Path(system_dirs["outputs"]) / "3d_models")).expanduser().resolve()
         filename = f"trellis2_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.glb"
         destination = destination_dir / filename
     else:
         destination = Path(output_path).expanduser().resolve()
         destination_dir = destination.parent
 
-    glb = o_voxel.postprocess.to_glb(
-        vertices=mesh.vertices,
-        faces=mesh.faces,
-        attr_volume=mesh.attrs,
-        coords=mesh.coords,
-        attr_layout=mesh.layout,
-        voxel_size=mesh.voxel_size,
-        aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
-        decimation_target=int(decimation_target),
-        texture_size=int(texture_size),
-        remesh=True,
-        remesh_band=1,
-        remesh_project=0,
-        verbose=False,
-    )
-    # Enforce quota for configured output allocation and actual target path.
     def _preflight_target_path():
-        # storage_preflight_path creates missing paths; inspect an existing ancestor
-        # until admission has passed.
         probe_path = destination_dir
         while not probe_path.is_dir() and probe_path.parent != probe_path:
             probe_path = probe_path.parent
         return storage_preflight_path(
-            probe_path, required_gb=0.20, require_fresh_quota=True,
-            minimum_free_gb=0.05,
+            probe_path, required_gb=0.20, require_fresh_quota=True, minimum_free_gb=0.05,
         )
 
-    ok, reason = storage_preflight(
-        "outputs", required_gb=0.20, require_fresh_quota=True,
-        minimum_free_gb=0.05,
-    )
-    if not ok:
-        raise RuntimeError(f"GLB export denied by OEC quota/storage admission: {reason}")
-    ok, reason = _preflight_target_path()
-    if not ok:
-        raise RuntimeError(f"GLB target path denied by OEC quota/storage admission: {reason}")
-    with managed_storage_operation(
-        "outputs",
-        required_gb=0.20,
-        require_fresh_quota=True,
-        minimum_free_gb=0.05,
-    ):
+    def _preflight_output(stage: str):
         ok, reason = storage_preflight(
-            "outputs", required_gb=0.20, require_fresh_quota=True,
-            minimum_free_gb=0.05,
+            "outputs", required_gb=0.20, require_fresh_quota=True, minimum_free_gb=0.05,
         )
         if not ok:
-            raise RuntimeError(f"GLB export denied inside managed operation: {reason}")
+            raise RuntimeError(f"GLB {stage} refused by OEC output quota/storage admission: {reason}")
         ok, reason = _preflight_target_path()
         if not ok:
-            raise RuntimeError(f"GLB target path denied inside managed operation: {reason}")
+            raise RuntimeError(f"GLB target path {stage} refused by OEC quota/storage admission: {reason}")
+
+    _preflight_output("before TRELLIS inference")
+    prepared = _prepare_image(image, max_image_size)
+    with torch.inference_mode():
+        meshes = pipeline.run(prepared)
+    if not meshes:
+        raise RuntimeError("TRELLIS returned no mesh for this image.")
+    mesh = meshes[0]
+    if len(mesh.vertices) <= 0 or len(mesh.faces) <= 0:
+        raise RuntimeError("TRELLIS returned an empty mesh.")
+
+    glb = o_voxel.postprocess.to_glb(
+        vertices=mesh.vertices, faces=mesh.faces, attr_volume=mesh.attrs,
+        coords=mesh.coords, attr_layout=mesh.layout, voxel_size=mesh.voxel_size,
+        aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
+        decimation_target=int(decimation_target), texture_size=int(texture_size),
+        remesh=True, remesh_band=1, remesh_project=0, verbose=False,
+    )
+    with managed_storage_operation(
+        "outputs", required_gb=0.20, require_fresh_quota=True, minimum_free_gb=0.05,
+    ):
+        _preflight_output("inside managed write")
         destination_dir.mkdir(parents=True, exist_ok=True)
         glb.export(str(destination), extension_webp=True)
 
-    if not destination.is_file() or destination.stat().st_size == 0:
+    if not destination.is_file() or destination.stat().st_size <= 20:
         raise RuntimeError(f"GLB export did not create a non-empty file: {destination}")
-    print(f"TRELLIS_GLB={destination} BYTES={destination.stat().st_size}")
+    raw = destination.read_bytes()
+    if raw[:4] != b"glTF" or len(raw) < 20:
+        raise RuntimeError(f"GLB export has an invalid header: {destination}")
+    version, declared_length = struct.unpack_from("<II", raw, 4)
+    if version != 2 or declared_length != len(raw):
+        raise RuntimeError(f"GLB header version/length mismatch: version={version}, declared={declared_length}, actual={len(raw)}")
+    json_length, json_type = struct.unpack_from("<II", raw, 12)
+    if json_type != 0x4E4F534A or 20 + json_length > len(raw):
+        raise RuntimeError("GLB JSON chunk is invalid.")
+    gltf = json.loads(raw[20:20 + json_length].decode("utf-8").rstrip(" \\t\\r\\n\\x00"))
+    primitives = [p for m in gltf.get("meshes", []) for p in m.get("primitives", [])]
+    positions, indices = [], []
+    for primitive in primitives:
+        position_id = primitive.get("attributes", {}).get("POSITION")
+        index_id = primitive.get("indices")
+        if isinstance(position_id, int) and position_id < len(gltf.get("accessors", [])):
+            positions.append(int(gltf["accessors"][position_id].get("count", 0)))
+        if isinstance(index_id, int) and index_id < len(gltf.get("accessors", [])):
+            indices.append(int(gltf["accessors"][index_id].get("count", 0)))
+    if not primitives or not any(positions) or not any(indices):
+        raise RuntimeError(f"GLB export contains no non-empty mesh geometry: {destination}")
+    print(f"TRELLIS_GLB={destination} BYTES={len(raw)} MESHES={len(gltf.get('meshes', []))} PRIMITIVES={len(primitives)} POSITIONS={positions} INDICES={indices}")
     del mesh, glb, meshes
     gc.collect()
     torch.cuda.empty_cache()
     return str(destination)
-
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)

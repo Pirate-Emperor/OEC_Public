@@ -84,6 +84,26 @@ class StorageWriteAdmissionTests(unittest.TestCase):
         self.assertLess(cli.rindex("GLB target path denied inside managed operation"),
                         cli.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
 
+    def test_output_admission_precedes_expensive_model_inference(self):
+        cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
+        generate = cli.split("def generate_glb(", 1)[1].split("\\ndef main(", 1)[0]
+        self.assertLess(generate.index('_preflight_output("before TRELLIS inference")'),
+                        generate.index("meshes = pipeline.run(prepared)"))
+        self.assertLess(generate.index("with managed_storage_operation("),
+                        generate.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
+        self.assertIn("GLB JSON chunk is invalid", generate)
+        self.assertIn("no non-empty mesh geometry", generate)
+        for name, cell in (("pipeline_trellis_3d.ipynb", 10),
+                           ("pipeline_trellis_3d_only.ipynb", 11)):
+            source = dict(code_cells(name))[cell]
+            self.assertLess(source.index("TRELLIS generation refused before inference"),
+                            source.index("mesh = trellis_pipe.run(input_image)[0]"))
+        for name, cell in (("pipeline_flux_only.ipynb", 6),
+                           ("pipeline_trellis_3d.ipynb", 12)):
+            source = dict(code_cells(name))[cell]
+            self.assertLess(source.index("FLUX generation refused before inference"),
+                            source.index("image = flux_pipe("))
+
     def test_cli_model_download_and_glb_export_use_fresh_quota(self):
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
         self.assertIn("TRELLIS model download denied inside managed operation", cli)
