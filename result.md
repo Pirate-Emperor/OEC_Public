@@ -1,7 +1,7 @@
 # OEC Significant Results
 
 **Last updated:** 2026-10-14 (Asia/Kolkata)  
-**Branch:** `main` (reviewed source/tracking integration from candidate `fix/storage-admission-write-guards-20261014`; main-hosted validation pending)  
+**Branch:** `main` (reviewed source/tracking integration from candidate `fix/storage-admission-write-guards-20261014`; main-hosted validation [run 38575822798](https://github.com/Killer4K-N/OEC/actions/runs/38575822798) passed 28/28 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
 ## Current status
@@ -179,3 +179,10 @@ Authoritative quota telemetry also remains missing on the compute node (`quota_c
 The reviewed TRELLIS/FLUX source fixes, static tests/workflow, changelog, TODO, result summary and cumulative experiment JSON are being committed directly to `main` at the user's explicit request. Source basis: candidate `f8ed9453f296594fc2da0cdfd55c32f79f6e1359`; candidate verification [run 38572444007](https://github.com/Killer4K-N/OEC/actions/runs/38572444007) passed 28/28 static tests, Python compilation and four notebook JSON checks. The main-hosted validation result will be recorded in the following tracking-only commit.
 
 The historical GLB's tracked download link points to GitHub artifact [11622412194](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194). Current shared TRELLIS/FLUX inference remains blocked by active GPU workloads; the authoritative quota snapshot remains missing. No live runner process, reserve, shared model cache, detached checkout or QA queue was changed.
+
+
+### Main branch validation result — 2026-10-14
+
+Main commit [`9c9d7acc12e47658f37e71840449f8558b42ee2b`](https://github.com/Killer4K-N/OEC/commit/9c9d7acc12e47658f37e71840449f8558b42ee2b) passed [GitHub Actions run 38575822798](https://github.com/Killer4K-N/OEC/actions/runs/38575822798), job `115892512804`: 28/28 static tests (12 TRELLIS notebook + 5 CLI/easy-run + 5 AudioCraft notebook + 6 storage-admission), Python compilation, and 4/4 notebook JSON checks. The cumulative JSON registry now contains 33 experiment/test records, including the run and why it was conducted.
+
+**Still open:** this main CI run did not perform inference. TRELLIS has a real, independently validated historical GLB; current TRELLIS and FLUX attempts remain blocked by active GPU compute processes. Authoritative quota telemetry is missing, so no model/dependency download or bypass was attempted.

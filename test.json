@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-14T18:30:00+05:30",
+  "last_updated": "2026-10-14T18:36:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
   "latest_summary": {
@@ -238,9 +238,11 @@
       "target_branch": "main",
       "source_branch": "fix/storage-admission-write-guards-20261014",
       "source_commit": "f8ed9453f296594fc2da0cdfd55c32f79f6e1359",
-      "previous_main_sha": "82346c0753e139b92240f53734eb48d2113ed9ad",
-      "candidate_static_run_id": 38572444007,
-      "url": "https://github.com/Killer4K-N/OEC/actions/runs/38572444007",
+      "main_commit": "9c9d7acc12e47658f37e71840449f8558b42ee2b",
+      "main_commit_url": "https://github.com/Killer4K-N/OEC/commit/9c9d7acc12e47658f37e71840449f8558b42ee2b",
+      "main_validation_run_id": 38575822798,
+      "main_validation_url": "https://github.com/Killer4K-N/OEC/actions/runs/38575822798",
+      "result": "PASS_MAIN_STATIC_CI",
       "suite_counts": {
         "trellis_notebook_static": 12,
         "trellis_cli_easy_run": 5,
@@ -248,8 +250,9 @@
         "storage_write_admission": 6,
         "total": 28
       },
-      "status": "MAIN_PUSH_IN_PROGRESS; MAIN_ACTION_VALIDATION_PENDING",
-      "note": "This record is included as part of user's requested main-branch integration; later tracking-only update will record main job result."
+      "python_compile": "PASS",
+      "notebook_json": "4/4 PASS",
+      "runtime_status": "TRELLIS historical asset confirmed; today's TRELLIS/FLUX generation blocked by GPU occupancy; quota snapshot missing"
     },
     "latest_trellis_asset_generation": {
       "historical_run_id": 37942265623,
@@ -1573,19 +1576,80 @@
         "target_branch": "main",
         "source_branch": "fix/storage-admission-write-guards-20261014",
         "source_commit": "f8ed9453f296594fc2da0cdfd55c32f79f6e1359",
-        "previous_main_sha": "82346c0753e139b92240f53734eb48d2113ed9ad"
+        "previous_main_sha": "82346c0753e139b92240f53734eb48d2113ed9ad",
+        "main_commit": "9c9d7acc12e47658f37e71840449f8558b42ee2b",
+        "main_commit_url": "https://github.com/Killer4K-N/OEC/commit/9c9d7acc12e47658f37e71840449f8558b42ee2b",
+        "main_workflow_run_id": 38575822798,
+        "main_workflow_job_id": 115892512804,
+        "main_workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38575822798"
       },
       "approach": "Overlay the tested TRELLIS/FLUX notebooks/CLI, static tests and workflow, TODO, changelogs, results, and cumulative JSON on the verified main tree.",
       "expected": "Main contains the source fixes and 32 experiment records; main-hosted tests start on this source commit.",
       "results": {
-        "status": "MAIN_INTEGRATION_STARTED; MAIN_ACTION_VALIDATION_PENDING",
+        "status": "PASS_MAIN_PUSH_AND_CI",
         "source_and_tracking_included": true,
         "candidate_static_suite": "PASS 28/28",
         "historical_trellis_glb": "PASS",
-        "current_trellis_flux_generation": "BLOCKED_GPU_OCCUPANCY"
+        "current_trellis_flux_generation": "BLOCKED_GPU_OCCUPANCY",
+        "main_commit": "9c9d7acc12e47658f37e71840449f8558b42ee2b",
+        "main_workflow": "PASS",
+        "main_test_counts": {
+          "trellis_notebook_static": 12,
+          "trellis_cli_easy_run": 5,
+          "audiocraft_notebook_static": 5,
+          "storage_write_admission": 6,
+          "total": 28
+        },
+        "python_compile": "PASS",
+        "notebook_json": "4/4 PASS"
       },
-      "status": "MAIN_PUSH_AND_ACTIONS_VALIDATION_PENDING",
-      "follow_up": "Record main commit SHA and main workflow result in a tracking-only commit."
+      "status": "PASS_MAIN_PUSH_AND_CI",
+      "follow_up": "Keep updating these tracking files on main after future runs; actual GPU inference remains separately blocked."
+    },
+    {
+      "id": "TEST-2026-10-14-MAIN-CI-VALIDATION",
+      "date": "2026-10-14",
+      "datetime": "2026-10-14T18:36:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "category": "main branch integration CI validation",
+      "objective": "Validate the exact main-branch integration commit containing TRELLIS/FLUX source fixes, static regressions and the cumulative tracking records.",
+      "reason": "The candidate passed, but main must be tested independently after integrating the source files and workflow.",
+      "environment": {
+        "repository": "Killer4K-N/OEC",
+        "branch": "main",
+        "commit": "9c9d7acc12e47658f37e71840449f8558b42ee2b",
+        "workflow_run_id": 38575822798,
+        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38575822798",
+        "job_id": 115892512804,
+        "runner": "GitHub-hosted ubuntu-latest",
+        "python": "3.11"
+      },
+      "approach": "Run the main-triggered static notebook, CLI and output-admission regressions; compile TRELLIS CLI/storage manager; parse all four model notebooks.",
+      "expected": "28/28 tests pass, compilation succeeds, and all notebook JSON files validate.",
+      "results": {
+        "status": "PASS",
+        "trellis_notebook_static": "12/12",
+        "trellis_cli_easy_run": "5/5",
+        "audiocraft_notebook_static": "5/5",
+        "storage_write_admission": "6/6",
+        "total": "28/28",
+        "python_compile": "PASS",
+        "notebook_json": "4/4 PASS",
+        "notebooks": {
+          "pipeline_trellis_3d": 16,
+          "pipeline_trellis_3d_only": 15,
+          "pipeline_flux_only": 10,
+          "pipeline_audiocraft": 6
+        }
+      },
+      "interpretation": "The actual main tree passes the hosted static suite. This validates the integration and guards; it does not count as actual TRELLIS/FLUX inference.",
+      "limitations": [
+        "TRELLIS current live generation was blocked by active GPU processes; the historic GLB was independently validated.",
+        "FLUX current live image generation was blocked by active GPU processes.",
+        "Fresh quota snapshot remains missing; no downloads or installs were attempted on the shared runner."
+      ],
+      "status": "PASS_MAIN_STATIC_CI",
+      "follow_up": "When an idle GPU is available, re-run cache-only TRELLIS and FLUX inference; validate generated GLB geometry and PNG, then add actual run IDs/artifact hashes to main."
     }
   ]
 }

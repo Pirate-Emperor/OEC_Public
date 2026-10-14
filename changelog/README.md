@@ -56,3 +56,5 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 - Integrated the reviewed TRELLIS/FLUX notebooks and CLI, storage-output admission fixes, regression tests and cumulative tracking files into `main`.
 - Candidate test run [38572444007](https://github.com/Killer4K-N/OEC/actions/runs/38572444007) passed 28/28 static tests, Python compilation and four notebook JSON checks; main-triggered validation is pending.
 - Historical TRELLIS image-to-3D generation is confirmed by [run 37942265623](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623): 8,950,028-byte GLB artifact [11622412194](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194) reopens with 97,783 vertices and 92,819 faces. Current Oct 14 TRELLIS/FLUX generation remains blocked by active GPU processes.
+
+- **Main CI result recorded:** [run 38575822798](https://github.com/Killer4K-N/OEC/actions/runs/38575822798) on main commit `9c9d7acc...` passed 28/28 static tests, Python compilation and 4/4 notebook JSON checks. Current shared GPU generation remains blocked separately.

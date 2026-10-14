@@ -217,3 +217,15 @@ Latest candidate validation [run 38572444007](https://github.com/Killer4K-N/OEC/
 **TRELLIS asset generation confirmation:** historical [run 37942265623](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623) completed real image-to-3D inference and exported an 8,950,028-byte GLB. Artifact [11622412194](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194) was independently validated: GLB 2.0, valid JSON chunk, one non-empty primitive, two textures and one material; `trimesh` reopened it with 97,783 vertices and 92,819 faces. SHA-256: `ede239663f21023640356920a5eff129fd8bb1077f914e8ff19fcb720b7ece4d`. This proves TRELLIS has generated assets before.
 
 Current shared-runner generation is not yet accepted: [run 38571363231](https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231) confirmed seven cached TRELLIS weight shards, source and input image, but stopped before inference because neither A100 met the idle-GPU rule. FLUX is similarly cache-ready but generation-blocked by the active workloads. Quota telemetry remains absent; no model/dependency download or shared-cache/process/queue mutation was attempted.
+
+
+### Main-branch hosted validation — PASS
+
+The main integration commit [`9c9d7acc12e47658f37e71840449f8558b42ee2b`](https://github.com/Killer4K-N/OEC/commit/9c9d7acc12e47658f37e71840449f8558b42ee2b) triggered [run 38575822798](https://github.com/Killer4K-N/OEC/actions/runs/38575822798), job `115892512804`. Result **PASS**:
+- TRELLIS notebook static tests 12/12.
+- TRELLIS CLI/easy-run tests 5/5.
+- AudioCraft notebook tests 5/5.
+- Storage write-admission tests 6/6.
+- Total 28/28; Python compilation PASS; all four notebook JSON checks PASS (16/15/10/6 cells).
+
+This is the actual main branch CI result, not just the candidate result. It confirms the source/test integration and quota guards. It does not replace live inference acceptance. Current TRELLIS smoke [38571363231](https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231) stopped before inference because both A100s were occupied; FLUX image generation remains blocked for the same reason. The quota snapshot is still absent and `quota_check` remains unavailable on the compute runner. Historical TRELLIS asset [11622412194](https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194) is independently validated (GLB 2.0, 97,783 vertices, 92,819 faces, SHA-256 `ede239663f21023640356920a5eff129fd8bb1077f914e8ff19fcb720b7ece4d`).
