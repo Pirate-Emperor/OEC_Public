@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-14T22:39:00+05:30",
+  "last_updated": "2026-10-14T22:45:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "TRELLIS cache-only image-to-3D generation is runtime-verified on Connector_1: final run 38602330418 passed 10/10 tests, loaded the pipeline, generated a fresh 8,865,916-byte GLB (SHA-256 22caca5fe9c02c50c095e4385a7c17e94b214b5fc7d87417b94b48c796a89257), uploaded the exact-run artifact and report, and passed GLB structure plus trimesh reopen (96,672 vertices/92,062 faces). OEC CLI/notebook source fix passed 34 static checks and is open in PR #10, not merged; Connector_1 PR #2 is ready for review. No downloads, installs, shared-cache writes, GPU-process termination or quota bypass; FLUX and quota telemetry remain open.",
+  "latest_summary": "Legacy Connector_1 history is now archived in OEC: 677/677 unique Action runs, with run-level status/conclusion and canonical source URLs preserved (305 success, 236 failure, 122 cancelled, 13 skipped, 1 queued). TRELLIS latest exact-run GLB proof remains run 38602330418. Next, validate new OEC self-hosted labels oec-1/oec-2/oec-3, then run cache-only FLUX PNG generation there; legacy run objects/logs/artifacts remain in Connector_1.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -1929,6 +1929,56 @@
         "gpu_process_change": false
       },
       "follow_up": "OEC CLI/notebook source fix is statically validated and awaits review in PR #10; it is not merged into main. FLUX image generation and fresh authoritative quota telemetry remain separate open items."
+    },
+    {
+      "id": "EXP-2026-10-14-CONNECTOR-RUN-HISTORY-MIGRATION",
+      "date": "2026-10-14",
+      "category": "legacy Connector_1 Actions history inventory and migration to OEC tracking",
+      "approach": "Enumerate every page of the source repository's Actions workflow-runs API (7 pages, 100 per page except the last), preserve the run ID, workflow path/name, title, branch, commit SHA, trigger, attempt, timestamps, result/status, actor, PR references and canonical source URL as a versioned JSON archive in OEC. Cross-link the latest TRELLIS and FLUX outcomes with the existing detailed experiment records. Keep original run logs and binary artifacts at their source-run URLs; do not claim GitHub Actions run objects themselves were moved.",
+      "reason": "Before dispatching jobs onto OEC's new oec-1/oec-2/oec-3 runners, preserve the legacy Connector_1 history so earlier work, failures, blockers and validated outputs remain discoverable and comparisons stay auditable.",
+      "parameters": {
+        "source_repository": "Killer4K-N/Connector_1",
+        "target_repository": "Killer4K-N/OEC",
+        "archive_path": "docs/runner_migration/connector_1_actions_runs.json",
+        "archive_url": "https://github.com/Killer4K-N/OEC/blob/main/docs/runner_migration/connector_1_actions_runs.json",
+        "archive_commit": "56fa0df575654ff5b8d86caddcf7c0ef2b3056a1",
+        "total_runs_reported": 677,
+        "records_captured": 677,
+        "unique_run_ids": 677,
+        "pages_fetched": 7,
+        "run_conclusion_counts": {
+          "success": 305,
+          "failure": 236,
+          "cancelled": 122,
+          "skipped": 13,
+          "queued": 1
+        },
+        "original_logs_and_artifacts": "remain canonical under original Connector_1 Actions URLs; relevant GLB/report artifact URLs separately retained in test.json and result.md",
+        "next_runner_pool": [
+          "oec-1",
+          "oec-2",
+          "oec-3"
+        ]
+      },
+      "results": {
+        "status": "PASS_RUN_LEVEL_HISTORY_ARCHIVED",
+        "all_reported_run_records_captured": true,
+        "duplicates": 0,
+        "run_level_conclusions": {
+          "success": 305,
+          "failure": 236,
+          "cancelled": 122,
+          "skipped": 13,
+          "queued": 1
+        },
+        "job_level_runner_assignment_details": "not expanded for all 677 runs; the migrated snapshot contains run-level outcome metadata and canonical links, while original per-job logs/artifacts remain source-of-truth",
+        "trellis_latest_success_run": 38602330418,
+        "trellis_asset_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11914941709",
+        "trellis_report_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11913529964",
+        "flux_latest_cache_smoke_run": 38559255790,
+        "flux_latest_cache_smoke_status": "FAILURE_BEFORE_INFERENCE_GPU_ADMISSION; no PNG created"
+      },
+      "follow_up": "Use only OEC runners labelled oec-1/oec-2/oec-3 for future self-hosted GPU jobs; preserve this archive and old run URLs as legacy history. OEC hosted ubuntu-latest may remain for non-GPU static tests. Run the new runner inventory before GPU inference; test FLUX end-to-end on an explicitly selected OEC runner with cache-only/local-scratch mode and upload the output artifact."
     }
   ]
 }
