@@ -147,3 +147,11 @@ The official Diffusers release notes list Flux2 Klein support in v0.37.0; the cu
 - [x] **Main-branch CI verified:** commit [`9c9d7acc12e47658f37e71840449f8558b42ee2b`](https://github.com/Killer4K-N/OEC/commit/9c9d7acc12e47658f37e71840449f8558b42ee2b), [run 38575822798](https://github.com/Killer4K-N/OEC/actions/runs/38575822798), job `115892512804`: 28/28 static tests PASS, compilation PASS, all four notebook JSON checks PASS. The test/run result has been added to the cumulative registry and dated changelog on main.
 
 - [x] Re-tried the current TRELLIS and FLUX cache-only GPU smoke workflows. TRELLIS run `38571363231` attempt 2 remained blocked at idle-GPU preflight (report artifact `11899728417`); FLUX run `38559255790` attempt 2 found one active compute process on each A100 and generated no PNG. Both reasons/results have been added to `test.json` and the dated changelog on main.
+
+
+## 2026-10-14 follow-up — TRELLIS offline config fix
+
+- [x] Reproduced the loader defect in [Connector_1 run 38587490301](https://github.com/Killer4K-N/Connector_1/actions/runs/38587490301): 7/7 previous tests passed and GPU admission selected an allowed device, then model load attempted a forbidden offline Hub lookup for a missing \`pipeline.json\`.
+- [x] Committed the pinned config and local snapshot-overlay fix on [\`diagnose/trellis-asset-generation-20261014\`](https://github.com/Killer4K-N/Connector_1/tree/diagnose/trellis-asset-generation-20261014), with expanded 10-test regression coverage.
+- [ ] **OPEN — current TRELLIS asset:** inspect [loader-fix run 38598822415](https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415) and [regression run 38598881722](https://github.com/Killer4K-N/Connector_1/actions/runs/38598881722) after the self-hosted queue processes them. Do not mark fixed until a fresh GLB has non-empty geometry and reopens successfully.
+- [ ] **BLOCKED — any missing model/dependency download:** fresh authoritative quota telemetry remains missing; no quota bypass, install or download.
