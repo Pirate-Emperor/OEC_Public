@@ -1,6 +1,6 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-14 22:39 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-14 22:45 IST (Asia/Kolkata)  
 **Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
@@ -241,3 +241,14 @@ Authoritative quota telemetry remains missing. Any missing model/dependency down
 - **Source candidate:** OEC CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) remains green at 34 tests plus compilation/notebook JSON checks; [OEC PR #10](https://github.com/Killer4K-N/OEC/pull/10) is open and unmerged. [Connector_1 PR #2](https://github.com/Killer4K-N/Connector_1/pull/2) is now ready for review and also unmerged.
 
 This resolves the TRELLIS config-load/generation acceptance criteria. The historical broad-wildcard artifact failure remains documented and is superseded by the exact-run upload that completed here. No model/package downloads, shared cache writes, quota bypass or process termination occurred; fresh authoritative quota remains necessary before any future downloads.
+
+
+## Legacy runner-history migration (October 14, 2026)
+
+Before new OEC self-hosted runners are exercised, all **677/677** reported run records from [Connector_1 Actions](https://github.com/Killer4K-N/Connector_1/actions) were captured across seven API pages and archived in [`docs/runner_migration/connector_1_actions_runs.json`](docs/runner_migration/connector_1_actions_runs.json). The snapshot has 677 unique run ids and run-level statuses/conclusions: 305 success, 236 failure, 122 cancelled, 13 skipped and 1 queued. The how/why and transition plan are in [`docs/runner_migration/README.md`](docs/runner_migration/README.md).
+
+The archive is deliberately non-destructive: GitHub's historical run objects, per-job logs and binary artifacts remain canonical at their original Connector_1 URLs; the migration copies run-level metadata/results and retains those links, it does not falsely claim those objects were transferred to another repository. The detailed TRELLIS pass and FLUX GPU-admission failure are cross-linked in the main experiment register.
+
+### Next execution pool
+
+New OEC GPU diagnostic and asset-generation workflows will use `runs-on: [self-hosted, linux, x64, gpu, a100, oec-N]`, with `N` one of `1`, `2`, `3`. Runner status reported by the user is not yet an independently executed connectivity test. Next acceptance is a read-only matrix across all three new labels, followed by cache-only FLUX PNG generation and final validation on the selected runner. Existing OEC hosted-runner static CI remains hosted because it is not a legacy connector GPU job.
