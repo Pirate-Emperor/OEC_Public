@@ -1,17 +1,26 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-15 19:15 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 20:29 IST (Asia/Kolkata)  
 **Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
 ## Current status
 
-**The latest review candidate adds supervised background launch/stop workflows and explicit TRELLIS existing-image-folder mode; hosted validation is green (78/78 tests), but new live LTX/Gradio/folder-inference acceptance is still pending.** PR [#11](https://github.com/Killer4K-N/OEC/pull/11) is open and not merged. Source code/workflow/notebook changes remain isolated on `fix/flux-trellis-pipeline-20261015`; main is tracking-only.
+**The latest review candidate adds supervised local/multi-node background services, detailed CLI help, TRELLIS existing-image-folder mode, and separate-GPU combined Gradio services; hosted validation is green (86/86 tests), while live three-node launch, browser/Gradio and folder-inference acceptance are still pending.** PR [#11](https://github.com/Killer4K-N/OEC/pull/11) is open and not merged. Source code/workflow/notebook changes remain isolated on `fix/flux-trellis-pipeline-20261015`; main is tracking-only.
 **OEC now has standalone FLUX and TRELLIS runtime evidence and a successful combined FLUX → TRELLIS.2 run on a review branch.** The FLUX stage generated and validated a 512×512 PNG (255,946 bytes; SHA-256 2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb), which was passed as the exact TRELLIS input. OEC run [38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076), job 116389784906, ended with report status PASS after 419.848s on oec-1 / host scn30-mn. TRELLIS exported [artifact 11967418646](https://github.com/Killer4K-N/OEC/actions/runs/38725376076/artifacts/11967418646): a 3,484,804-byte GLB (SHA-256 74e3654625a0662302ecb1bf1c0c79885833563753b6a30acbeee45a5c4b360e). Independent trimesh reopen passed with 54,597 vertices and 93,617 faces.
 
 The preceding failed combined run [38723286765](https://github.com/Killer4K-N/OEC/actions/runs/38723286765) exposed a missing subprocess import in the TRELLIS scratch-filesystem findmnt guard and an over-permissive GPU IDLE predicate (100% utilization with no visible compute process). The import and forced-findmnt regression test were added; the idle GPU predicate now requires known utilization at or below 5%, with re-sampling for up to 180 seconds. Guarded hosted CI [38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281) passed 58/58 tests, Python compilation and all four notebook checks.
 
 These source changes remain on review branch fix/flux-trellis-pipeline-20261015 and are not merged into main. The combined run was cache-only with downloads/installations/shared-output writes disabled. Fresh authoritative quota telemetry remains unresolved; managed shared writes and missing model/dependency downloads continue to fail closed.
+## 2026-10-15 20:29 follow-up — cluster services and notebook isolation
+
+- PR [#11](https://github.com/Killer4K-N/OEC/pull/11) now includes the cluster coordinator and a per-user example config template with profiles for a three-node LTX pool, mixed FLUX/TRELLIS/LTX services, four FLUX one-shot jobs, combined FLUX→TRELLIS, and TRELLIS folder batch.
+- `tools/oec_service_manager.py` has action/service-specific `--help`; the help/cluster regression suite exercises every advertised action/service, profile validation, plan output, and cluster dry-run without contacting GPUs.
+- The combined notebook no longer loads both full model pipelines in the same kernel/GPU. TRELLIS stays in the notebook on GPU 0 and FLUX launches as a supervised child on GPU 1 by default (ports 7862/7863); these IDs must be distinct and free.
+- Latest hosted CI [run 38760561720](https://github.com/Killer4K-N/OEC/actions/runs/38760561720) passed 86 tests, Python compilation, and all four notebook JSON/Python-cell checks after updating the tests to match this architecture.
+- The new cluster profile has not been run against the actual nodes; actual browser Gradio submission and existing-image-folder TRELLIS inference were not run. The earlier combined cache-only single-image inference remains separate evidence. Fresh quota telemetry remains missing, so no model/dependency downloads or managed shared-output writes were attempted.
+- The code, config template, notebooks, tests and service manager remain on the open, unmerged source PR. Only results/changelog/TODO tracking was updated on main.
+
 ## Material fixes delivered in the feature branch
 
 - **TRELLIS Python entry point:** `pipeline_trellis_3d.py` supports a lightweight environment check, one-image GLB generation, and optional Gradio rendering. GPU, mode, input/output, model ID/cache/repository, offline mode, host/port, attention backend, and quality/performance controls are configurable. Cache lookup precedes download and missing-model downloads require fresh quota admission. Gradio share defaults off.
