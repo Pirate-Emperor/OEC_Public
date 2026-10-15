@@ -1,7 +1,20 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-16 01:26 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-16 01:48 IST (Asia/Kolkata)
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
+
+
+## 2026-10-16 01:48 IST — QA worker hardening (review branch)
+
+- [x] Reviewed `qa_compliance_worker.py`; identified missing output-schema validation, unsafe all-row queue recovery, non-atomic job claims, silent CPU fallback, default model-cache purge/download behavior, and a video-frame path bug for formats other than lowercase MP4.
+- [x] Added `tools/qa_checks.py` with strict model-response validation, atomic SQLite claims and timestamped lease recovery. Added a dedicated 15-test suite in `tests/test_qa_checks.py`.
+- [x] Changed the worker candidate to separate invalid VLM output from actual content rejection, retain failure queue states, make cache purge opt-in, require explicit download approval plus fresh storage admission, and validate extracted frames/normalized videos and storage writes.
+- [x] Updated the `oec-1` sync workflow so it compiles and runs the CPU-only QA suite from the review branch before copying only `tools/qa_checks.py` into the persistent checkout. The dirty live `qa_compliance_worker.py` remains protected from overwriting.
+- [ ] **CI result not verified:** no new Actions run/check status was returned for trigger commit [`b257edc`](https://github.com/Killer4K-N/OEC/commit/b257edced2d651b9913ddf72c6ace7c26db81edb). Do not mark the branch tests or live helper sync as passed until the actual job logs confirm them.
+- [ ] Reconcile the preserved dirty A100 `qa_compliance_worker.py` with the reviewed candidate before deploying the new import of `tools.qa_checks`; do not replace the local file blindly.
+- [ ] After review and fresh storage checks, exercise QA against isolated test media and a disposable SQLite fixture on `oec-1`, then perform a cache-only QA model check. Do not use the production queue or real assets for the first test.
+- [ ] Add multi-frame video review and retain rejection metadata/queue history. The current candidate still samples one representative frame and removes the queue record/sidecar for a genuine category-1 rejection.
+
 ## 2026-10-16 — A100 pipeline-tool and TRELLIS entry-point synchronization
 
 - [x] Checked current Actions status. Pipeline source remains on [PR #11](https://github.com/Killer4K-N/OEC/pull/11), not merged to main.
