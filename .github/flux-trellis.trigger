@@ -1,5 +1,4 @@
 One-shot push trigger for .github/workflows/oec-flux-trellis-pipeline.yml.
-Purpose: execute the cache-only FLUX PNG -> TRELLIS GLB pipeline on oec-1.
-Safety: no package installs, no model downloads, no shared output writes; all artifacts under /tmp.
+Purpose: retry after the TRELLIS scratch probe import fix and high-utilization GPU admission guard hardening.
+Safety: cache-only; no package installs or model downloads; all output artifacts under local /tmp; wait/re-sample GPU eligibility then fail closed.
 Date: 2026-10-15 Asia/Kolkata.
-Trigger attempt: 2, after replacing all dispatch-only inputs.runner references with a push-safe default.
