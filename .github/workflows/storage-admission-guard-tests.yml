@@ -50,7 +50,6 @@ jobs:
           python -m unittest discover -s tests -p 'test_oec_service_manager.py' -v
           python -m unittest discover -s tests -p 'test_oec_service_manager_help.py' -v
           python -m unittest discover -s tests -p 'test_ltx_worker_config.py' -v
-          python -m unittest discover -s tests -p 'test_oec_service_manager.py' -v
           python -m py_compile pipeline_trellis_3d.py pipeline_flux_image.py pipeline_flux_trellis.py storage_manager.py worker_ltx_video.py qa_compliance_worker.py tools/oec_service_manager.py tools/ltx_worker_config.py tools/trellis_offline.py tools/oec_runner_probe.py tools/flux_gpu_admission.py
           python - <<'PY'
           import json
