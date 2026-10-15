@@ -277,8 +277,8 @@ def sweep_stuck_jobs(db_path):
     except Exception as e:
         print(f"[QA-NODE] Failed to sweep DB: {e}")
 
-def process_qa_queue(purge_after_load=True):
-    qa = QANode(gpu_id=0, purge_after_load=purge_after_load)
+def process_qa_queue(purge_after_load=True, gpu_id=0):
+    qa = QANode(gpu_id=gpu_id, purge_after_load=purge_after_load)
     
     sweep_stuck_jobs(QUEUE_DB_PATH)
     
@@ -383,8 +383,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="QA & Compliance Worker Node")
     parser.add_argument("--purge", action="store_true", help="Purge model from disk after loading into VRAM (Default)")
     parser.add_argument("--no-purge", dest="purge", action="store_false", help="Keep model on disk after loading")
+    parser.add_argument("--gpu", default=os.environ.get("AIEROS_QA_GPU", "0"),
+                        help="Physical GPU index to expose before loading the QA model (default: 0).")
     parser.set_defaults(purge=True)
     args = parser.parse_args()
+    if not str(args.gpu).isdigit():
+        parser.error("--gpu must be a non-negative physical GPU index.")
     
-    print("[SYSTEM] Starting QA Compliance Worker...")
-    process_qa_queue(purge_after_load=args.purge)
+    print(f"[SYSTEM] Starting QA Compliance Worker on physical GPU {args.gpu}...")
+    process_qa_queue(purge_after_load=args.purge, gpu_id=str(int(args.gpu)))
