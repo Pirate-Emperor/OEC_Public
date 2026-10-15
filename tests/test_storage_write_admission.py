@@ -81,16 +81,23 @@ class StorageWriteAdmissionTests(unittest.TestCase):
         self.assertLess(audio.rindex("Storage admission denied inside managed write"),
                         audio.index("AUDIOGEN_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)"))
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
-        self.assertLess(cli.index('_preflight_output("inside managed write")'),
-                        cli.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
+        shared_write = cli.split('    else:\n        with managed_storage_operation(', 1)[1]
+        self.assertLess(shared_write.index('_preflight_output("inside managed write")'),
+                        shared_write.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
+        scratch_write = cli.split('    if scratch_output:\n        _preflight_output("before scratch GLB write")', 1)[1].split(
+            '    else:\n        with managed_storage_operation(', 1
+        )[0]
+        self.assertLess(scratch_write.index('_preflight_output("before scratch GLB write")'),
+                        scratch_write.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
 
     def test_output_admission_precedes_expensive_model_inference(self):
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
         generate = cli.split("def generate_glb(", 1)[1].split("\\ndef main(", 1)[0]
         self.assertLess(generate.index('_preflight_output("before TRELLIS inference")'),
                         generate.index("meshes = pipeline.run(prepared)"))
-        self.assertLess(generate.index("with managed_storage_operation("),
-                        generate.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
+        shared_write = generate.split("    else:\n        with managed_storage_operation(", 1)[1]
+        self.assertLess(shared_write.index('_preflight_output("inside managed write")'),
+                        shared_write.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
         self.assertIn("GLB JSON chunk is invalid", generate)
         self.assertIn("no non-empty mesh geometry", generate)
         for name, cell in (("pipeline_trellis_3d.ipynb", 10),

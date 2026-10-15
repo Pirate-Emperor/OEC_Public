@@ -86,3 +86,10 @@ No package/model download, install, quota telemetry write, reserve-file modifica
 2. Dispatch the combined flow on one selected OEC A100 runner in cache-only mode.
 3. Verify same-run PNG, sidecar, GLB artifact, SHA-256 and trimesh reopen; then append that run to the cumulative records.
 4. Keep main unchanged until explicit merge permission is given.
+
+
+## CI regression and correction
+
+- New branch [run 38721841953](https://github.com/Killer4K-N/OEC/actions/runs/38721841953), job 116378048847, failed in the final storage-write-admission suite with two assertions: test_output_admission_precedes_expensive_model_inference and test_output_directories_are_created_only_after_admission.
+- The tests incorrectly treated the newly added local-scratch path and the quota-managed shared-output path as one linear source-order path. This is a regression-test assumption mismatch, not evidence of a quota bypass or model runtime failure. The managed branch still performs its preflight inside managed_storage_operation before mkdir.
+- Corrected the tests to verify scratch and shared paths independently. No pass is claimed for this correction until the next hosted run completes.

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-15T16:00:00+05:30",
+  "last_updated": "2026-10-15T16:08:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Fresh runtime evidence supersedes the earlier FLUX-pending summary: OEC run 38613575959 generated and validated cache-only FLUX PNGs on oec-1/oec-2/oec-3 (3/3 jobs). Connector_1 run 38602330418 separately generated and reopened a TRELLIS.2 GLB. Existing PR #10 is 14 commits ahead and 43 behind current main 99d9796; no merge was attempted. New review branch fix/flux-trellis-pipeline-20261015 adds an offline sequential orchestrator, temporary artifact handoff and strict GLB reopen validation; its CI/runtime acceptance has not yet run. Fresh quota telemetry remains missing, so shared writes/downloads remain fail-closed.",
+  "latest_summary": "Both standalone model runtimes are verified: OEC run 38613575959 generated FLUX PNGs on oec-1/oec-2/oec-3, and Connector_1 run 38602330418 generated and reopened a TRELLIS GLB. New branch fix/flux-trellis-pipeline-20261015 adds the combined orchestrator. Its first hosted CI run 38721841953 failed two source-order assertions in the storage regression tests; those assertions were corrected to distinguish local scratch from managed shared output. Full CI rerun and combined GPU execution remain pending. Shared output/download admission remains fail-closed while quota telemetry is missing.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2298,6 +2298,42 @@
       ],
       "limitation": "This is a real Connector_1 cached-runtime run, not the new OEC combined pipeline. Shared dependencies were not changed during this review.",
       "follow_up": "Use this accepted behavior as the reference when the OEC combined pipeline reaches TRELLIS; retain cache, attention and output admission guards."
+    },
+    {
+      "id": "TEST-2026-10-15-FLUX-TRELLIS-STATIC-CI-FIRST-RUN",
+      "date": "2026-10-15",
+      "category": "first hosted static CI validation of sequential FLUX-to-TRELLIS candidate",
+      "approach": "Run notebook static/easy-run/offline-config suites, new orchestration tests, FLUX CLI/GPU admission, AudioCraft notebook, storage write admission, Python compilation and notebook JSON checks on ubuntu-latest.",
+      "reason": "Detect code integration issues and ensure the new scratch-only output route does not weaken managed shared-output admission before A100 inference.",
+      "parameters": {
+        "run_id": 38721841953,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38721841953",
+        "job_id": 116378048847,
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "commit": "0fb0b4f14cfc1297aef09aad71c05bb9367dd290",
+        "runner": "GitHub-hosted ubuntu-latest",
+        "model_inference": false
+      },
+      "results": {
+        "status": "FAIL_TWO_STORAGE_ASSERTIONS",
+        "failed_tests": [
+          {
+            "name": "test_output_admission_precedes_expensive_model_inference",
+            "cause": "The test compared the first managed_storage_operation occurrence against a mkdir in the earlier scratch-output branch."
+          },
+          {
+            "name": "test_output_directories_are_created_only_after_admission",
+            "cause": "The test compared inside-managed-write preflight against mkdir from a distinct scratch-output branch."
+          }
+        ],
+        "diagnosis": "The assertion assumptions do not account for the two deliberate output modes. Logs do not show model inference was executed. Code review confirmed the shared branch still runs its preflight inside the managed storage operation before creating the shared destination directory.",
+        "python_compile": "NOT_REACHED_AFTER_TEST_FAILURE",
+        "notebook_json": "NOT_REACHED_AFTER_TEST_FAILURE"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38721841953"
+      ],
+      "follow_up": "The two assertions were narrowed to verify scratch and managed-output ordering separately. Await the new hosted CI run; only then consider combined GPU execution."
     }
   ]
 }
