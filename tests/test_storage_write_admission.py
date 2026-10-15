@@ -103,11 +103,17 @@ class StorageWriteAdmissionTests(unittest.TestCase):
             source = dict(code_cells(name))[cell]
             self.assertLess(source.index("TRELLIS generation refused before inference"),
                             source.index("mesh = trellis_pipe.run(input_image)[0]"))
-        for name, cell in (("pipeline_flux_only.ipynb", 6),
-                           ("pipeline_trellis_3d.ipynb", 12)):
-            notebook_cell = dict(code_cells(name))[cell]
-            self.assertIn("load_flux_pipeline", notebook_cell)
-            self.assertIn("create_gradio_demo", notebook_cell)
+        # The FLUX-only notebook loads its own pipeline directly. In the
+        # combined notebook, FLUX is a separate supervised process/GPU so it
+        # cannot overlap TRELLIS weights in the notebook kernel.
+        flux_only_cell = dict(code_cells("pipeline_flux_only.ipynb"))[6]
+        self.assertIn("load_flux_pipeline", flux_only_cell)
+        self.assertIn("create_gradio_demo", flux_only_cell)
+        combined_flux_cell = dict(code_cells("pipeline_trellis_3d.ipynb"))[12]
+        self.assertIn("tools/oec_service_manager.py", combined_flux_cell)
+        self.assertIn('["start", "flux-ui", "--gpu", FLUX_UI_GPU', combined_flux_cell)
+        self.assertNotIn("load_flux_pipeline(", combined_flux_cell)
+        self.assertNotIn("create_gradio_demo(", combined_flux_cell)
         flux_cli = (ROOT / "pipeline_flux_image.py").read_text(encoding="utf-8")
         generate = flux_cli.split("def generate_flux_image(", 1)[1].split("\\ndef create_gradio_demo(", 1)[0]
         self.assertLess(generate.index("_output_preflight()"),
