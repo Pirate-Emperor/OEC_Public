@@ -129,6 +129,12 @@ class FluxTrellisPipelineTests(unittest.TestCase):
                 self.assertTrue(trellis_cli._same_filesystem(left, right))
                 self.assertEqual(run.call_count, 2)
 
+    def test_folder_mode_completion_does_not_reference_single_glb_variable(self):
+        source = (ROOT / "pipeline_flux_trellis.py").read_text(encoding="utf-8")
+        self.assertNotIn('_emit("glb_validation_pass", **glb_info)', source)
+        self.assertIn('for glb_path in glb_paths:', source)
+        self.assertIn('report["result_artifacts"]["glbs"] = [str(p) for p in glb_paths]', source)
+
     def test_report_and_output_names_are_run_scoped(self):
         source = (ROOT / "pipeline_flux_trellis.py").read_text(encoding="utf-8")
         self.assertIn("Refusing to reuse an existing run directory", source)
