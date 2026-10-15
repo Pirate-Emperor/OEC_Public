@@ -85,7 +85,5 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 - **Repository-wide follow-up:** qa_compliance_worker.py imports PyTorch before the per-worker CUDA visibility override (lines 15–80 on main). No QA process or queue actions were taken; track this as a separate focused change.
 
 
-- **Latest combined-pipeline guard CI:** [run 38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281) passed 58/58 tests, compilation and four notebook checks at commit d075b4442d87904e5b57128cb2f430bc53781738. It verifies the missing subprocess import path and rejects the previously observed 100%-utilization/zero-visible-process IDLE state; actual integrated TRELLIS inference remains pending.
+- **FLUX/TRELLIS fix accepted end to end:** [combined run 38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076) passed on oec-1, generating a validated 512×512 FLUX PNG and a GLB that passed structural checks and trimesh reopen (54,597 vertices / 93,617 faces). Exact-run [artifact 11967418646](https://github.com/Killer4K-N/OEC/actions/runs/38725376076/artifacts/11967418646) contains image, sidecar, report and GLB. The prior scratch probe NameError is fixed and covered by the 58/58 passing hosted CI run 38725202281. Main remains unchanged; quota-gated operations stay blocked.
 
-
-- **Combined retry 38725376076: IN_PROGRESS_AT_LAST_CHECK.** [Run link](https://github.com/Killer4K-N/OEC/actions/runs/38725376076). The combined runner job remains in progress; no final log/artifact conclusion is yet available.

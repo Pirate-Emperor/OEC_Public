@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-15 16:42 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 17:02 IST (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 ## 2026-10-14 — quota telemetry and live-checkout diagnosis
 - [x] Verified GitHub state: OEC `main` is `82346c0753e139b92240f53734eb48d2113ed9ad`; `fix/trellis-gradio-notebooks-20261011` is `2543b26d2888e667c6443c984259f84ac5b6c142` (111 ahead, 0 behind). No main-branch change or merge.
@@ -213,3 +213,18 @@ The first hosted run on this branch, [38721841953](https://github.com/Killer4K-N
 - Tested ref: 3092ee7e11b56413a08f4b849e21f806537a2ea5; workflow status: in_progress; conclusion: not concluded; job: 116389784906 (in_progress).
 - The combined runner job remains in progress; no final log/artifact conclusion is yet available.
 - [ ] OPEN — do not mark integrated pipeline complete until the uploaded per-run report and logs demonstrate a validated FLUX PNG handoff, TRELLIS inference/export, and independent GLB geometry reopen.
+
+
+## 2026-10-15 — Final FLUX-to-TRELLIS acceptance result
+
+This final status supersedes the earlier “retry in progress” and “integrated route not yet complete” flags in earlier dated entries below.
+
+- [x] Fixed the real TRELLIS generation failure: pipeline_trellis_3d.py called subprocess.run() in its scratch-filesystem findmnt fallback without importing subprocess. Added the import and a regression test that forces this path.
+- [x] Hardened GPU admission after the first combined run reported utilization 100% with zero visible compute processes but still classified the GPU as IDLE. The idle predicate now requires known utilization at or below 5%; the orchestrator re-samples for up to 180 seconds and fails closed if no GPU qualifies.
+- [x] Verified both fixes with [hosted CI run 38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281): 58/58 tests passed, py_compile passed, and JSON/Python-cell checks passed for all four notebooks. The suites include test_trellis_same_filesystem_probe_can_use_findmnt and the high-utilization/no-visible-process GPU admission regression.
+- [x] End-to-end acceptance passed on [OEC run 38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076), job 116389784906, runner oec-1 / host scn30-mn, tested source SHA 3092ee7e11b56413a08f4b849e21f806537a2ea5. The exact-run report says PASS, total duration 419.848 seconds, cache-only, downloads disabled, package installs disabled, and managed shared-output writes disabled.
+- [x] FLUX output: 512×512 PNG, 255,946 bytes, seed 2048, SHA-256 2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb; the same path was passed to TRELLIS.
+- [x] TRELLIS output: artifact [11967418646](https://github.com/Killer4K-N/OEC/actions/runs/38725376076/artifacts/11967418646) includes pipeline_report.json, the FLUX PNG and sidecar, and trellis_asset.glb. The GLB is 3,484,804 bytes, SHA-256 74e3654625a0662302ecb1bf1c0c79885833563753b6a30acbeee45a5c4b360e, GLB 2.0; independent trimesh reopen passed with 54,597 vertices and 93,617 faces.
+- [x] Current review branch head is documentation-only commit(s) after the tested source revision; main remains at 99d9796d5bd5afc1731600b310ced3b5be521ee9 and no model/code changes have been merged.
+- [ ] OPEN — authoritative fresh quota telemetry is still unresolved. Keep package/model downloads and managed shared-output writes blocked until fresh quota is available; the accepted flow uses existing caches and local /tmp only.
+- [ ] Separate repository follow-up — audit qa_compliance_worker.py CUDA visibility/import ordering only as a separate, scoped change. No QA process/queue changes were made here.

@@ -137,10 +137,26 @@ Run [OEC Actions 38723286765](https://github.com/Killer4K-N/OEC/actions/runs/387
 Hosted review-branch run [38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281), job 116389198433, tested commit d075b4442d87904e5b57128cb2f430bc53781738. All 58 targeted unit/static tests passed; Python compilation passed; notebook JSON/Python-cell validation passed for 4/4 notebooks. Suite counts: TRELLIS notebook static 12, TRELLIS CLI/easy-run 6, offline config 6, combined pipeline 10, FLUX image 7, GPU admission 6, AudioCraft static 5, storage admission 6. This includes the forced findmnt/subprocess path test and the no-visible-process/high-utilization denial test. Hosted runner only; this does not prove model inference. Next action: rerun the combined pipeline on oec-1.
 
 
-## Combined retry 38725376076 — IN_PROGRESS_AT_LAST_CHECK
 
-- Run URL: https://github.com/Killer4K-N/OEC/actions/runs/38725376076
-- Tested revision: 3092ee7e11b56413a08f4b849e21f806537a2ea5; workflow status in_progress; conclusion not concluded; job 116389784906 (in_progress).
-- The combined runner job remains in progress; no final log/artifact conclusion is yet available.
-- Artifact metadata: []
-- Relevant log lines: No final job log lines were available at the time of this update.
+
+## Final result — combined FLUX-to-TRELLIS accepted (2026-10-15)
+
+### The fix
+
+The first real combined attempt [38723286765](https://github.com/Killer4K-N/OEC/actions/runs/38723286765) created a valid FLUX PNG and completed TRELLIS cache, CUDA/xFormers attention, and model-loading checks. It then failed before image-to-3D inference because validate_scratch_output_path() called subprocess.run() through the findmnt fallback without pipeline_trellis_3d.py importing subprocess. Added the missing import and a regression test that forces the findmnt path (test_trellis_same_filesystem_probe_can_use_findmnt).
+
+That same run logged a GPU state with zero visible compute processes but utilization_percent=100, which was incorrectly admitted as IDLE. Hardened the idle predicate to require known utilization at or below 5%, in addition to free-memory/process checks. The orchestrator now waits and re-samples GPU admission for up to 180 seconds and fails closed if no eligible device appears; it never terminates or signals an existing process.
+
+### Verification
+
+- Static CI: [OEC run 38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281), commit d075b4442d87904e5b57128cb2f430bc53781738, passed 58/58 tests. py_compile passed, and all four notebooks passed JSON/Python-cell validation. Tests include the scratch filesystem probe through findmnt and rejection of 100% GPU utilization when no compute process is visible.
+- End-to-end runtime: [OEC run 38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076), job 116389784906, ran on oec-1, host scn30-mn, source SHA 3092ee7e11b56413a08f4b849e21f806537a2ea5. Final report: PASS, 419.848 seconds. Workflow was offline/cache-only, disabled downloads/installations, and wrote run artifacts only under local /tmp.
+- FLUX: black-forest-labs/FLUX.2-klein-4B, GPU index 0. Generated PNG flux2_klein.png, 512×512, 255,946 bytes, seed 2048, SHA-256 2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb; sidecar flux2_klein_info.json was written and validated.
+- Exact handoff: TRELLIS generation consumed /tmp/oec-flux-trellis-38725376076-oec-1/flux2_klein.png as --input. TRELLIS used cached snapshot af44b45f2e35a493886929c6d786e563ec68364d, torch 2.6.0+cu124, CUDA 12.4, xformers 0.0.29.post2, and GPU index 1. Cache/runtime/attention checks and model loading passed.
+- GLB: [artifact 11967418646](https://github.com/Killer4K-N/OEC/actions/runs/38725376076/artifacts/11967418646) contains four files: flux2_klein.png, flux2_klein_info.json, pipeline_report.json, and trellis_asset.glb. The GLB is 3,484,804 bytes, SHA-256 74e3654625a0662302ecb1bf1c0c79885833563753b6a30acbeee45a5c4b360e, GLB 2.0, one mesh/primitive, 54,597 position vertices and 280,851 indices. Independent trimesh reopen verified 54,597 vertices and 93,617 faces. glb_validation=PASS; overall report status PASS.
+
+### Storage, scope and remaining work
+
+No model/dependency downloads, package installs, managed shared-output writes, process signals, QA queue changes, reserve-file edits or phase1 changes occurred. Fresh authoritative quota telemetry is still unresolved, so missing-cache downloads and managed shared-output operations remain blocked. The accepted test demonstrates the cached FLUX → PNG → TRELLIS → GLB path on oec-1; it does not waive storage policy on other hosts.
+
+The code fix remains on review branch fix/flux-trellis-pipeline-20261015. Main remains 99d9796d5bd5afc1731600b310ced3b5be521ee9; code has not been merged to main. The separately noted QA-worker CUDA visibility/import-order audit is outside this FLUX/TRELLIS fix; no QA worker or queue action was made.
