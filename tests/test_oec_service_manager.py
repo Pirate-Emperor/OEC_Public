@@ -90,9 +90,11 @@ class OECServiceManagerTests(unittest.TestCase):
         }
         parent = [{"pid": 12345, "cmdline": "python /repo/worker_ltx_video.py"}]
         child = [{"pid": 12346, "cmdline": "python -c multiprocessing.spawn"}]
-        with patch.object(manager, "_matching_members", return_value=parent), \\
-             patch.object(manager, "_managed_group_members", side_effect=[child, []]), \\
-             patch.object(manager.os, "killpg") as killpg:
+        with (
+            patch.object(manager, "_matching_members", return_value=parent),
+            patch.object(manager, "_managed_group_members", side_effect=[child, []]),
+            patch.object(manager.os, "killpg") as killpg,
+        ):
             self.assertTrue(manager._stop_state(state, grace_seconds=0))
             self.assertEqual(killpg.call_count, 2)
             self.assertEqual(killpg.call_args_list[0].args, (12345, signal.SIGTERM))
