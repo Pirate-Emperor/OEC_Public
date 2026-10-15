@@ -187,6 +187,9 @@ class QAWorkerIntegrationTests(unittest.TestCase):
         self.assertIn("claim_next_qa_job(QUEUE_DB_PATH, worker_id)", self.source)
         self.assertIn("qa_started_at = NULL, qa_worker_id = NULL", self.source)
         self.assertIn("FAILED_QA_RUNTIME", self.source)
+        self.assertIn('"category": None', self.source)
+        self.assertIn("FAILED_QA_OUTPUT", self.source)
+        self.assertIn("without rejecting the media", self.source)
         self.assertNotIn(
             "UPDATE assets SET status = 'PENDING_QA' WHERE status = 'PROCESSING_QA'",
             self.source,
