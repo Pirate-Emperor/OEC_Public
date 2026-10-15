@@ -45,3 +45,45 @@ OEC combined run [38723286765](https://github.com/Killer4K-N/OEC/actions/runs/38
 - Fresh authoritative quota telemetry is still unavailable. Continue to block missing-model/dependency downloads and managed shared-output writes until fresh quota admission passes.
 - A separate repo-wide observation is that qa_compliance_worker.py should be reviewed for CUDA visibility/import ordering. It was not changed here and no QA worker or queue was touched.
 - Code is still review-only on fix/flux-trellis-pipeline-20261015. Main is receiving only the daily log, results, test ledger, TODO and changelog index in this commit.
+
+
+## 2026-10-15 evening — Background LTX/FLUX/TRELLIS pipelines and Gradio notebook audit
+
+### Objective and repository review
+
+Audit the supplied shell launch and termination recipe; add one supervised background-service interface for LTX, FLUX-only image generation, TRELLIS-only image-folder conversion, and the combined FLUX→TRELLIS pipeline; retain the combined pipeline's default FLUX source while allowing an explicit folder-input mode; check the three relevant Jupyter/Gradio notebooks; and document tested results and remaining live-runtime checks.
+
+Code and workflow changes for this section are on review branch `fix/flux-trellis-pipeline-20261015`, PR [#11](https://github.com/Killer4K-N/OEC/pull/11), not merged to main. Only this tracking update is on main.
+
+### Findings in the supplied LTX shell recipe
+
+- The shell can background the named long-running programs, but the compound semicolon/ampersand command has weak failure visibility, shared logs, no per-service identity, no GPU reservation check and no coordinated rollback. A successful shell return does not establish that each daemon loaded, reached its poll loop, or can consume a job.
+- `brain.py` uses Transformers automatic device placement, while the QA worker's old default also selected GPU 0. Starting both together can make them compete. The new controller service pins Brain to physical GPU 0 and does not implicitly co-start QA; QA is a separate service with explicit `--gpu`.
+- The previous LTX worker path checked distributed purge based on `--cluster-gpus` even when `--no-purge` was provided; in that path a distributed purge/synchronization could still run. The worker now gates the distributed purge and its local barrier on the actual purge flag.
+- Broad `pkill -f` and especially `pkill -9 -f "python"` may terminate unrelated Python programs, Jupyter kernels or jobs. These are not safe general shutdown commands. The new supervisor maintains a per-host state record and log, launches independent process sessions, checks the managed session before signaling and escalates only within the recorded session after a grace period.
+- GPU conflict checking tracks supervisor-managed services, not all unmanaged programs/Jupyter kernels. Verify the target host with `nvidia-smi` before launch. No live user processes were started, signaled or stopped during this source audit.
+
+### Pipeline implementation
+
+1. `tools/oec_service_manager.py` adds `start`, `stop`, `status` and `logs` controls, Conda interpreter resolution for `phase1_ltx` and `phase2_3d`, per-service logs/state, GPU claims, and managed-session child tracking for multiprocessing workers.
+2. `tools/ltx_worker_config.py`, `worker_ltx_video.py` and `qa_compliance_worker.py` add physical GPU-ID validation, a GPU-0-free default when the node has additional GPUs, purge-aware LTX synchronization, and explicit QA GPU selection. The LTX controller service runs storage manager, upload daemon and Brain separately; QA stays separate.
+3. `pipeline_trellis_3d.py` adds `--mode generate-batch --input-dir ... [--recursive]`, deterministic image ordering, output names, refusal to overwrite outputs, and per-asset GLB checks while reusing one loaded model.
+4. `pipeline_flux_trellis.py` adds `--source-mode images --image-dir ... [--recursive]`. Default remains `--source-mode flux`; folder mode bypasses FLUX and validates each generated GLB and reopened geometry.
+5. The service manager includes background single-image FLUX, FLUX Gradio, TRELLIS Gradio, TRELLIS folder-batch, combined FLUX→TRELLIS and combined folder-input commands. One-shot jobs use run-specific local `/tmp` output, stay offline/cache-only, and fail closed on missing caches.
+6. Added `docs/background-pipelines.md` and removed stale saved execution counts/outputs from `pipeline_flux_only.ipynb`, `pipeline_trellis_3d_only.ipynb` and `pipeline_trellis_3d.ipynb`. Static checks assert private Gradio sharing and the intended ports: FLUX-only 7864, TRELLIS-only 7862, combined TRELLIS 7862 and FLUX 7863.
+
+### Tests, runs, regressions and fixes
+
+- **Run [38743502455](https://github.com/Killer4K-N/OEC/actions/runs/38743502455) — FAIL (test expectation):** existing TRELLIS easy-run test expected only `gradio/generate/check`. Adding `generate-batch` made that old assertion stale. No inference was attempted. Updated the expected mode list and added an assertion for `--input-dir`.
+- **Run [38743634536](https://github.com/Killer4K-N/OEC/actions/runs/38743634536) — FAIL (new test syntax):** existing TRELLIS/FLUX/notebook/storage/LTX suites before the supervisor import passed; CI then failed to import the newly added supervisor tests because a multi-context `with` statement had literal escaped continuation characters. Corrected it to a parenthesized context manager. No inference was attempted.
+- **Run [38743800209](https://github.com/Killer4K-N/OEC/actions/runs/38743800209) — PASS:** 78 tests across notebook static 13, TRELLIS CLI 6, TRELLIS offline config 6, combined pipeline 15, FLUX CLI 7, GPU admission 6, AudioCraft notebook static 5, storage write admission 6, LTX GPU/purge config 6, and service manager 8. Python compilation passed for the pipeline scripts, storage manager, LTX/QA workers and helper modules. Four notebook JSON/Python-cell checks passed (`pipeline_trellis_3d.ipynb` 16 cells; `pipeline_trellis_3d_only.ipynb` 15; `pipeline_flux_only.ipynb` 10; `pipeline_audiocraft.ipynb` 6).
+- Focused new regressions cover default FLUX source, explicit folder source, file type/filtering, nested-image ordering, empty folders, symlink rejection, deterministic batch names, LTX GPU validation, `--no-purge`, explicit QA GPU selection, supervisor routes/log/state, and child-process shutdown escalation.
+- Previous live FLUX→TRELLIS proof remains run [38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076): cache-only FLUX PNG handed to TRELLIS and validated GLB with independent `trimesh` reopen. This is historical evidence for the already-working combined single-image path, not a new folder-mode or Gradio-browser run.
+
+### Status, limitations and next improvements
+
+- **Static/CLI CI is green.** It does not prove that a browser can reach and submit to all three Gradio interfaces, nor that the LTX daemons, multi-GPU workers and QA process start correctly on each target compute node. Those live host checks remain open. Do not claim the entire newly supervised LTX/folder/Gradio pipeline has passed real inference until separate hardware-backed smoke runs complete.
+- Fresh authoritative quota telemetry is still missing. Model/dependency downloads and managed shared-output writes remain blocked; no quota guard was bypassed. The new generation commands use cached weights and local scratch for this validation.
+- The service manager does not inspect every external or notebook process; manually launched Jupyter/other services require a read-only `nvidia-smi` check before assigning GPU IDs.
+- `brain_config.json` prompt/decision rules were read as project context but not changed: a claimed quality/profitability improvement requires controlled comparisons using acceptance rate, QA rejection, cost/time and downstream conversion results; no such result was measured in this task.
+- No live process, QA queue, `.storage_reserve.bin`, shared model-cache content or `phase1_ltx` packages were modified. Source changes remain in PR #11, unmerged.
