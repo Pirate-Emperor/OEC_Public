@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-15 16:00 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 16:18 IST (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 ## 2026-10-14 — quota telemetry and live-checkout diagnosis
 - [x] Verified GitHub state: OEC `main` is `82346c0753e139b92240f53734eb48d2113ed9ad`; `fix/trellis-gradio-notebooks-20261011` is `2543b26d2888e667c6443c984259f84ac5b6c142` (111 ahead, 0 behind). No main-branch change or merge.
@@ -158,7 +158,7 @@ This section supersedes older October 14 TODO statements that FLUX image generat
 - [x] Current source-of-truth audit: main is 99d9796d5bd5afc1731600b310ced3b5be521ee9; older candidate fix/trellis-offline-pipeline-config-20261014 is e59426970956ff83fbd433612adc29eb9364d0f8. Existing PR #10 is 14 commits ahead and 43 behind, so no wholesale branch merge was attempted.
 - [x] Created isolated branch fix/flux-trellis-pipeline-20261015 from the current main. New pipeline candidate creates a FLUX PNG, validates its metadata, then supplies that exact image path to TRELLIS in a separate subprocess. It serializes participating OEC GPU jobs with the existing /tmp/oec-flux-inference.lock and repeats GPU admission before the TRELLIS stage.
 - [x] Added explicit TRELLIS --scratch-output mode for run artifacts only. It requires a new path under local temp, at least 512 MiB measured free space and a temp filesystem distinct from configured shared model storage. The default managed output path continues requiring fresh quota and managed-storage lock checks.
-- [ ] OPEN — validate the new combined candidate: correct two write-admission assertions found in hosted CI run 38721841953, rerun the full hosted suite, then dispatch .github/workflows/oec-flux-trellis-pipeline.yml on one selected OEC runner. Acceptance requires same-run FLUX_IMAGE_GENERATION=PASS, validated PNG+JSON, TRELLIS generation PASS, GLB 2.0/accessor checks and trimesh reopen with non-empty geometry. Add the actual run/job and artifacts before marking complete.
+- [ ] OPEN — validate the new combined candidate: resolve write-admission assertion failures from hosted CI runs 38721841953 and 38722197428, rerun the full hosted suite, then dispatch .github/workflows/oec-flux-trellis-pipeline.yml on one selected OEC runner. Acceptance requires same-run FLUX_IMAGE_GENERATION=PASS, validated PNG+JSON, TRELLIS generation PASS, GLB 2.0/accessor checks and trimesh reopen with non-empty geometry. Add the actual run/job and artifacts before marking complete.
 - [ ] BLOCKED — managed shared-output writes and model/dependency downloads: authoritative quota telemetry remains unresolved. Do not weaken require_fresh_quota=True; combined runtime must remain cache-only and scratch-only.
 - [ ] Preserve the shared environment: no reserve-file modification, queue mutation, process termination, phase1 changes, or live-checkout sync/reset was performed.
 
@@ -166,3 +166,10 @@ This section supersedes older October 14 TODO statements that FLUX image generat
 ### CI refinement — 2026-10-15
 
 The first hosted run on this branch, [38721841953](https://github.com/Killer4K-N/OEC/actions/runs/38721841953), failed two assertions in tests/test_storage_write_admission.py. They compared scratch-path directory creation to the later managed shared-write lock as though the CLI had only one output path. The source deliberately separates local-scratch and managed shared-output writes; the assertions have now been narrowed to inspect each branch independently, requiring preflight before mkdir for both. This is a test-assumption correction, not a runtime success claim. Rerun pending.
+
+
+### Second hosted CI attempt — 2026-10-15
+
+- [x] Refined the storage test following [run 38722197428](https://github.com/Killer4K-N/OEC/actions/runs/38722197428), job 116379225276. The second run reached the same storage suite: 53 tests passed and one errored because the corrected assertion sliced off the preflight marker before searching for it (ValueError: substring not found). This was still a test-only failure; no model inference ran.
+- [x] Corrected the assertion again to compare the absolute source index of _preflight_output("before scratch GLB write") with the subsequent scratch mkdir.
+- [ ] OPEN — third hosted CI run must pass all suites and Python/notebook checks before triggering the A100 combined pipeline.

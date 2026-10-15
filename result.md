@@ -279,3 +279,8 @@ No merged-to-main claim is made. Static CI for the new commit and the one-run co
 ## 2026-10-15 — Static regression refinement
 
 The first hosted CI run on the sequential pipeline branch failed exactly two storage-write-admission assertions. The assertions assumed destination-directory creation and the managed-storage lock were one linear path, but the implementation has (a) a separately preflighted local scratch branch and (b) an independently quota-guarded shared-output branch. The tests have been updated to assert preflight-before-mkdir within each path; the source retains fresh-quota checks inside managed_storage_operation for shared output. Run [38721841953](https://github.com/Killer4K-N/OEC/actions/runs/38721841953), job 116378048847. No GPU inference was performed by this hosted failure. Rerun result pending.
+
+
+## 2026-10-15 — Second hosted CI regression result
+
+Review-branch hosted run [38722197428](https://github.com/Killer4K-N/OEC/actions/runs/38722197428), job 116379225276, reached the final storage-write-admission suite. The preceding suites passed (48 tests); the storage suite had five passes and one error, for 53 passed / 1 error overall. The single error was a ValueError: substring not found in the newly corrected scratch-output ordering assertion: its slice excluded the preflight marker. The test is now changed to compare absolute source positions. No GPU inference was run. The next static run is required before any combined A100 dispatch.

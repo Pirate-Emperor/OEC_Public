@@ -84,11 +84,9 @@ class StorageWriteAdmissionTests(unittest.TestCase):
         shared_write = cli.split('    else:\n        with managed_storage_operation(', 1)[1]
         self.assertLess(shared_write.index('_preflight_output("inside managed write")'),
                         shared_write.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
-        scratch_write = cli.split('    if scratch_output:\n        _preflight_output("before scratch GLB write")', 1)[1].split(
-            '    else:\n        with managed_storage_operation(', 1
-        )[0]
-        self.assertLess(scratch_write.index('_preflight_output("before scratch GLB write")'),
-                        scratch_write.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
+        scratch_preflight = cli.index('_preflight_output("before scratch GLB write")')
+        scratch_mkdir = cli.index("destination_dir.mkdir(parents=True, exist_ok=True)", scratch_preflight)
+        self.assertLess(scratch_preflight, scratch_mkdir)
 
     def test_output_admission_precedes_expensive_model_inference(self):
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-15T16:08:00+05:30",
+  "last_updated": "2026-10-15T16:18:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Both standalone model runtimes are verified: OEC run 38613575959 generated FLUX PNGs on oec-1/oec-2/oec-3, and Connector_1 run 38602330418 generated and reopened a TRELLIS GLB. New branch fix/flux-trellis-pipeline-20261015 adds the combined orchestrator. Its first hosted CI run 38721841953 failed two source-order assertions in the storage regression tests; those assertions were corrected to distinguish local scratch from managed shared output. Full CI rerun and combined GPU execution remain pending. Shared output/download admission remains fail-closed while quota telemetry is missing.",
+  "latest_summary": "Standalone FLUX runtime is verified on all three OEC runners (38613575959); standalone TRELLIS.2 generated and reopened a valid GLB on Connector_1 (38602330418). The new combined orchestrator is on review branch fix/flux-trellis-pipeline-20261015. Hosted CI run 38721841953 failed two storage test assumptions; run 38722197428 then had 53 passes and one ValueError from a faulty scratch assertion, now corrected to compare absolute source positions. Another full hosted rerun is required before GPU integration. Shared model/output writes remain fail-closed because authoritative quota telemetry is missing.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2334,6 +2334,47 @@
         "https://github.com/Killer4K-N/OEC/actions/runs/38721841953"
       ],
       "follow_up": "The two assertions were narrowed to verify scratch and managed-output ordering separately. Await the new hosted CI run; only then consider combined GPU execution."
+    },
+    {
+      "id": "TEST-2026-10-15-FLUX-TRELLIS-STATIC-CI-SECOND-RUN",
+      "date": "2026-10-15",
+      "category": "second hosted static CI validation of sequential FLUX-to-TRELLIS candidate",
+      "approach": "Rerun notebook/CLI/admission suites after correcting two assertions in test_storage_write_admission.py, then inspect the exact failure and traceback.",
+      "reason": "Verify the initial assertion correction did not mask issues in source path ordering, and get the new branch green before expensive GPU inference.",
+      "parameters": {
+        "run_id": 38722197428,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38722197428",
+        "job_id": 116379225276,
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "commit": "c01d0b0e523bca8f780e49aa5ae5e80a7c788e36",
+        "runner": "GitHub-hosted ubuntu-latest",
+        "model_inference": false
+      },
+      "results": {
+        "status": "FAIL_ONE_TEST_ERROR",
+        "test_counts": {
+          "trellis_notebook_static": 12,
+          "trellis_easy_run": 5,
+          "trellis_offline_config": 6,
+          "flux_trellis_pipeline": 8,
+          "flux_image": 7,
+          "flux_gpu_admission": 5,
+          "audiocraft_notebook_static": 5,
+          "storage_write_admission_passed": 5,
+          "storage_write_admission_errored": 1,
+          "total_passed": 53,
+          "total_errors": 1
+        },
+        "failed_test": "test_output_directories_are_created_only_after_admission",
+        "exception": "ValueError: substring not found",
+        "diagnosis": "The assertion sliced the source after the scratch preflight string and then searched the slice for that same removed string. The actual scratch/shared-write source paths still retained their admission guards.",
+        "python_compile": "NOT_REACHED_AFTER_TEST_FAILURE",
+        "notebook_json": "NOT_REACHED_AFTER_TEST_FAILURE"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38722197428"
+      ],
+      "follow_up": "Replace the faulty sliced-string assertion with absolute source-position comparison, commit the correction and require a fully successful static workflow before the combined GPU attempt."
     }
   ]
 }
