@@ -19,13 +19,20 @@ jobs:
       - name: Check out the reviewed source revision
         uses: actions/checkout@v4
 
-      - name: Run isolated QA validation and queue regression tests
+      - name: Run QA and TRELLIS notebook regression tests before live synchronization
         shell: bash
         run: |
           set -Eeuo pipefail
           cd "$GITHUB_WORKSPACE"
-          python3 -m py_compile qa_compliance_worker.py tools/qa_checks.py
-          python3 -m unittest discover -s tests -p 'test_qa_checks.py' -v
+          PYTHON="${OEC_PYTHON:-$HOME/Conda/envs/phase2_3d/bin/python}"
+          if [ ! -x "$PYTHON" ]; then
+            echo "A100_TOOL_SYNC=BLOCKED_PHASE2_3D_TEST_PYTHON_MISSING path=$PYTHON"
+            exit 20
+          fi
+          "$PYTHON" -m py_compile qa_compliance_worker.py tools/qa_checks.py
+          "$PYTHON" -m unittest discover -s tests -p 'test_qa_checks.py' -v
+          "$PYTHON" -m unittest discover -s tests -p 'test_trellis_notebook_static.py' -v
+          "$PYTHON" -m unittest discover -s tests -p 'test_storage_write_admission.py' -v
 
       - name: Back up and synchronize only the pipeline support files
         shell: bash
