@@ -89,6 +89,8 @@ class FluxImageTests(unittest.TestCase):
         combined_studio = cell_source(combined["cells"][12])
         self.assertIn("tools/oec_service_manager.py", combined_studio)
         self.assertIn('["start", "flux-ui", "--gpu", FLUX_UI_GPU, "--port", str(FLUX_SERVER_PORT)]', combined_studio)
+        self.assertIn("_MANAGER_CONDA_ROOT", combined_studio)
+        self.assertIn('"--conda-root", str(_MANAGER_CONDA_ROOT)', combined_studio)
         self.assertIn('FLUX_SERVER_PORT = int(os.environ.get("AIEROS_FLUX_GRADIO_PORT", "7863"))', combined_studio)
         self.assertIn("FLUX_UI_GPU", combined_studio)
         self.assertIn("TRELLIS_UI_GPU", combined_studio)
