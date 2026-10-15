@@ -116,7 +116,11 @@ def recover_stale_qa_jobs(db_path: str, stale_after_minutes: int = 180) -> int:
     Legacy PROCESSING_QA rows with no lease timestamp are deliberately left
     untouched because their owner cannot be proven dead safely.
     """
-    if isinstance(stale_after_minutes, bool) or stale_after_minutes < 1:
+    if (
+        isinstance(stale_after_minutes, bool)
+        or not isinstance(stale_after_minutes, int)
+        or stale_after_minutes < 1
+    ):
         raise ValueError("stale_after_minutes must be a positive integer")
     with sqlite3.connect(db_path, timeout=30) as conn:
         result = conn.execute(
