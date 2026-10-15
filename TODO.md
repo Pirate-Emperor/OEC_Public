@@ -1,7 +1,17 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-15 19:15 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 20:29 IST (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
+## 2026-10-15 20:29 IST — cluster coordinator, CLI help and notebook GPU isolation
+
+- [x] Added per-action and per-service `--help` documentation and regression tests for all local services and cluster actions in `tools/oec_service_manager.py`.
+- [x] Added `tools/oec_cluster_services.example.json` with the `ltx-3node`, `mixed-stack`, `flux-image-once`, `flux-trellis`, and `trellis-folder` profiles. The coordinator supports one-command SSH fan-out, status, log collection and owned-service stop; it does not deploy/sync code. Host aliases and paths remain operator-local.
+- [x] Fixed the combined notebook to keep TRELLIS in the Jupyter kernel while launching FLUX Gradio in a separate managed process/GPU (default physical GPUs 0/1, ports 7862/7863); updated stale tests for this execution architecture.
+- [x] The new current-head hosted CI [run 38760561720](https://github.com/Killer4K-N/OEC/actions/runs/38760561720) passed **86/86 tests**, Python compilation, and JSON/Python-cell validation of all four notebooks.
+- [ ] OPEN — the cluster profile is validated via config/help/plan/dry-run only. Actual three-node SSH preflight/start/status/stop remains unrun on the user's hosts.
+- [ ] OPEN — actual browser/Gradio submissions, live LTX/QA runtime and existing-image-folder TRELLIS GPU inference remain unrun. Earlier single-image combined cache-only inference [38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076) is prior evidence, not proof of these new UI/folder paths.
+- [ ] OPEN — authoritative fresh quota data remains missing. Do not download missing model/dependency files or write managed shared outputs until fresh admission passes.
+
 ## 2026-10-15 evening — supervised background pipelines and notebook follow-through
 
 - [x] Audited the supplied LTX launch/kill commands and documented why compound background shells and broad `pkill -9 -f "python"` are unsafe for shared work nodes.
@@ -12,7 +22,7 @@
 - [x] Hosted CI [run 38743800209](https://github.com/Killer4K-N/OEC/actions/runs/38743800209) passed 78 tests before final QA GPU-isolation hardening. Final current-head CI [run 38744924124](https://github.com/Killer4K-N/OEC/actions/runs/38744924124) again passed all 78 tests, py_compile and JSON/Python-cell validation for all 4 notebooks after verifying QA `CUDA_VISIBLE_DEVICES` is set before Python starts. Earlier run [38743502455](https://github.com/Killer4K-N/OEC/actions/runs/38743502455) failed on an outdated TRELLIS CLI test expectation; [38743634536](https://github.com/Killer4K-N/OEC/actions/runs/38743634536) failed on syntax in a new test. Both defects were fixed and their causes retained in the changelog/test ledger.
 - [x] Refreshed the daily changelog, `test.json` (48 experiment records), results and index with this evidence. All source/workflow/notebook changes remain on PR #11; main received tracking files only.
 - [ ] OPEN — run a live LTX controller + worker smoke on chosen compute nodes, using `nvidia-smi` first and launching QA separately on an unclaimed GPU. Verify service status/logs, safe stop, and one known test job end-to-end. Hosted static CI is not live LTX validation.
-- [ ] Startup safety before rollout — the supervisor only tracks services it launches itself. Before starting its services, inspect any existing manually launched daemons and gracefully stop only exact owned PIDs if they must be replaced; do not start duplicates and do not use broad `pkill` patterns.
+- [ ] Startup safety before rollout — the supervisor only tracks services it launches itself. Review exact per-node assignments and unmanaged jobs before launching any profile. Before starting its services, inspect any existing manually launched daemons and gracefully stop only exact owned PIDs if they must be replaced; do not start duplicates and do not use broad `pkill` patterns.
 - [ ] OPEN — launch each FLUX, TRELLIS and combined Gradio UI on a selected cached-environment host, establish SSH tunnels, and submit one small generation per UI; live browser/submission testing was not run in hosted CI.
 - [ ] OPEN — test a small existing-image folder with TRELLIS batch and combined `--source-mode images`; inspect each real GLB after inference. Static tests validate the batch code/path but do not prove folder inference on GPU.
 - [ ] OPEN — fresh authoritative quota telemetry is still missing. Do not download missing model/dependency files or write managed shared outputs until admission succeeds.
