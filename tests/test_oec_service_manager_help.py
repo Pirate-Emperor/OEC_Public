@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 from types import SimpleNamespace
 
@@ -109,18 +110,21 @@ class OECServiceManagerHelpTests(unittest.TestCase):
 
     def test_invalid_config_rejects_unknown_service_and_duplicate_task_ids(self):
         valid = json.loads(EXAMPLE.read_text(encoding="utf-8"))
-        bad_service = json.loads(json.dumps(valid))
-        bad_service["profiles"]["bad"] = [{"id":"broken","node":"control","service":"made-up","args":[]}]
-        with self.assertRaisesRegex(ValueError, "not supported"):
-            manager._cluster_config_from_dict_for_test(bad_service)
-
-        duplicate = json.loads(json.dumps(valid))
-        duplicate["profiles"]["bad"] = [
-            {"id":"same","node":"control","service":"qa","args":[]},
-            {"id":"same","node":"worker2","service":"qa","args":[]},
-        ]
-        with self.assertRaisesRegex(ValueError, "Duplicate task id"):
-            manager._cluster_config_from_dict_for_test(duplicate)
+        cases = (
+            ({"id":"broken","node":"control","service":"made-up","args":[]}, "not supported"),
+            ([
+                {"id":"same","node":"control","service":"qa","args":[]},
+                {"id":"same","node":"worker2","service":"qa","args":[]},
+            ], "Duplicate task id"),
+        )
+        for task_data, expected_error in cases:
+            bad = json.loads(json.dumps(valid))
+            bad["profiles"]["bad"] = task_data if isinstance(task_data, list) else [task_data]
+            with tempfile.TemporaryDirectory() as td:
+                config_path = Path(td) / "invalid.json"
+                config_path.write_text(json.dumps(bad), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, expected_error):
+                    manager._cluster_config(config_path)
 
 
 if __name__ == "__main__":
