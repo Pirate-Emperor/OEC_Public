@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "description": "Example only. Copy to oec_cluster_services.local.json, replace SSH aliases and input folders, and confirm each node is running this OEC branch.",
+  "conda_root": "~/Conda",
+  "manager_env": "phase1_ltx",
+  "nodes": {
+    "control": {
+      "host": "local",
+      "project_dir": "~/OEC",
+      "conda_activate": "~/Conda/bin/activate",
+      "conda_root": "~/Conda",
+      "manager_env": "phase1_ltx"
+    },
+    "worker2": {
+      "host": "oec-worker-2",
+      "project_dir": "~/OEC",
+      "conda_activate": "~/Conda/bin/activate",
+      "conda_root": "~/Conda",
+      "manager_env": "phase1_ltx"
+    },
+    "worker3": {
+      "host": "oec-worker-3",
+      "project_dir": "~/OEC",
+      "conda_activate": "~/Conda/bin/activate",
+      "conda_root": "~/Conda",
+      "manager_env": "phase1_ltx"
+    }
+  },
+  "profiles": {
+    "ltx-3node": [
+      {
+        "id": "control-services",
+        "node": "control",
+        "service": "ltx-control",
+        "args": []
+      },
+      {
+        "id": "qa-control-gpu1",
+        "node": "control",
+        "service": "qa",
+        "args": [
+          "--gpu",
+          "1"
+        ]
+      },
+      {
+        "id": "ltx-control-gpus23",
+        "node": "control",
+        "service": "ltx-worker",
+        "args": [
+          "--gpus",
+          "2,3",
+          "--cluster-gpus",
+          "10"
+        ]
+      },
+      {
+        "id": "ltx-worker2-all",
+        "node": "worker2",
+        "service": "ltx-worker",
+        "args": [
+          "--gpus",
+          "0,1,2,3",
+          "--cluster-gpus",
+          "10"
+        ]
+      },
+      {
+        "id": "ltx-worker3-all",
+        "node": "worker3",
+        "service": "ltx-worker",
+        "args": [
+          "--gpus",
+          "0,1,2,3",
+          "--cluster-gpus",
+          "10"
+        ]
+      }
+    ],
+    "mixed-stack": [
+      {
+        "id": "control-services",
+        "node": "control",
+        "service": "ltx-control",
+        "args": []
+      },
+      {
+        "id": "qa-control-gpu1",
+        "node": "control",
+        "service": "qa",
+        "args": [
+          "--gpu",
+          "1"
+        ]
+      },
+      {
+        "id": "ltx-control-gpus23",
+        "node": "control",
+        "service": "ltx-worker",
+        "args": [
+          "--gpus",
+          "2,3",
+          "--cluster-gpus",
+          "2"
+        ]
+      },
+      {
+        "id": "flux-ui-worker2",
+        "node": "worker2",
+        "service": "flux-ui",
+        "args": [
+          "--gpu",
+          "0",
+          "--port",
+          "7864"
+        ]
+      },
+      {
+        "id": "trellis-ui-worker3",
+        "node": "worker3",
+        "service": "trellis-ui",
+        "args": [
+          "--gpu",
+          "0",
+          "--port",
+          "7862"
+        ]
+      }
+    ],
+    "flux-image-once": [
+      {
+        "id": "flux-image-worker2-gpu0",
+        "node": "worker2",
+        "service": "flux-image",
+        "args": [
+          "--gpu",
+          "0",
+          "--prompt",
+          "A cinematic premium product photo of a ceramic vessel, warm natural light."
+        ]
+      },
+      {
+        "id": "flux-image-worker2-gpu1",
+        "node": "worker2",
+        "service": "flux-image",
+        "args": [
+          "--gpu",
+          "1",
+          "--prompt",
+          "An abstract liquid-glass sculpture in a clean studio."
+        ]
+      },
+      {
+        "id": "flux-image-worker2-gpu2",
+        "node": "worker2",
+        "service": "flux-image",
+        "args": [
+          "--gpu",
+          "2",
+          "--prompt",
+          "Macro bioluminescent fungi on a wet forest floor."
+        ]
+      },
+      {
+        "id": "flux-image-worker2-gpu3",
+        "node": "worker2",
+        "service": "flux-image",
+        "args": [
+          "--gpu",
+          "3",
+          "--prompt",
+          "A polished red ceramic tea kettle on a quiet studio table."
+        ]
+      }
+    ],
+    "flux-trellis": [
+      {
+        "id": "flux-to-trellis-worker2",
+        "node": "worker2",
+        "service": "flux-trellis",
+        "args": []
+      }
+    ],
+    "trellis-folder": [
+      {
+        "id": "trellis-folder-worker3",
+        "node": "worker3",
+        "service": "trellis-batch",
+        "args": [
+          "--gpu",
+          "0",
+          "--image-dir",
+          "/data/oec-images"
+        ]
+      }
+    ]
+  }
+}
