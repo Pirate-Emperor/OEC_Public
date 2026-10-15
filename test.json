@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-15T19:15:00+05:30",
+  "last_updated": "2026-10-16T01:26:19+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Background generation source remains on open PR #11, not merged to main. Final current-head CI run 38744924124 passed all 78 tests, py_compile and JSON/Python-cell checks for all four notebooks after one additional hardening: the QA supervisor now sets CUDA_VISIBLE_DEVICES in the child environment before Python imports Torch. The candidate adds supervised LTX control/worker/QA, offline FLUX-only generation/UI, TRELLIS folder batch/UI, and combined FLUX-by-default or explicit existing-image-folder routing. Live LTX startup, browser/Gradio submissions and new folder-mode GPU inference remain untested; prior single-image FLUX→TRELLIS proof is run 38725376076. Fresh quota remains unavailable; cache misses and managed shared writes stay blocked.",
+  "latest_summary": "On 2026-10-16 Asia/Kolkata, three OEC A100 sync runs used oec-1 to populate the persistent checkout. Run 38796743755 created and validated all seven pipeline tools under OEC/tools. Run 38797010011 partially synced root entry points and correctly preserved dirty conflicts (overall failure due conflict guard). Follow-up run 38797414327 backed up and synchronized pipeline_trellis_3d.py and both TRELLIS notebooks, passed static checks, and left the dirty FLUX-only notebook and QA worker untouched. No package installs, model downloads, or new inference occurred. PR #11 remains open/unmerged.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2444,6 +2444,181 @@
         "https://github.com/Killer4K-N/OEC/pull/11"
       ],
       "follow_up": "Proceed with a separately authorized cache-only live smoke on an identified compute host: check nvidia-smi for unmanaged processes first, start/stop QA/LTX services through the supervisor, submit a small request to each Gradio UI over approved SSH tunnels, then run a small folder-mode TRELLIS batch and validate every GLB. Do not start duplicate daemons beside existing manually launched background processes. No model downloads or managed shared-output writes until fresh quota admission passes."
+    },
+    {
+      "id": "TEST-2026-10-16-OEC-A100-TOOLS-SYNC-38796743755",
+      "date": "2026-10-16",
+      "category": "Create and validate FLUX/TRELLIS/LTX pipeline support tools in persistent A100 OEC checkout",
+      "approach": "Used reviewed feature-branch sources in a guarded self-hosted Actions workflow. Verified runner identity, target remote/path, live checkout revision and dirty status. Created only missing files under tools/ and validated source/config formats plus supervisor help.",
+      "reason": "The tools existed on the GitHub feature branch but were absent from the persistent A100 OEC/tools directory.",
+      "parameters": {
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "source_commit": "739e01b04ae3110079b80486e1c9d0e9cb4ff4ac",
+        "run_id": 38796743755,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38796743755",
+        "job_id": 116635010500,
+        "job_url": "https://github.com/Killer4K-N/OEC/actions/runs/38796743755/job/116635010500",
+        "runner": "oec-1",
+        "live_root": "/nlsasfs/home/lmedge/rahkus/OEC",
+        "live_checkout_commit": "081aaf34f6379873bdc925d1dcf6b9c3d50349d3",
+        "dirty_paths_before_sync": 31,
+        "created_files": [
+          "tools/flux_gpu_admission.py",
+          "tools/ltx_worker_config.py",
+          "tools/oec_cluster_services.example.json",
+          "tools/oec_runner_probe.py",
+          "tools/oec_service_manager.py",
+          "tools/trellis2_pipeline.json",
+          "tools/trellis_offline.py"
+        ],
+        "counts": {
+          "created": 7,
+          "updated": 0,
+          "unchanged": 0,
+          "conflicts": 0
+        },
+        "validation": {
+          "python_ast_files": 5,
+          "python_ast": "PASS",
+          "json_config_files": 2,
+          "json_parse": "PASS",
+          "service_manager_help": "PASS"
+        }
+      },
+      "results": {
+        "status": "PASS",
+        "workflow_conclusion": "success",
+        "file_copy_and_hash_verification": "PASS",
+        "runtime_inference": "NOT_RUN",
+        "dependency_install": "NOT_RUN",
+        "model_download": "NOT_RUN"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38796743755",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38796743755/job/116635010500"
+      ],
+      "follow_up": "Sync and validate root entry points and TRELLIS notebooks called by the tools; preserve local edits and back up specifically authorized TRELLIS replacements."
+    },
+    {
+      "id": "TEST-2026-10-16-OEC-A100-ENTRYPOINT-SYNC-38797010011",
+      "date": "2026-10-16",
+      "category": "Expand A100 synchronization to root entry points, notebooks, and LTX worker",
+      "approach": "Added a guarded pass over root runtime entry points, notebooks, LTX/QA scripts, and the pipeline guide. Checked Git dirty status before changing targets; backed up the prior LTX worker before replacing it.",
+      "reason": "Copying tools alone could leave the service manager pointing to missing or older root entry points.",
+      "parameters": {
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "source_commit": "ce7a8ff96bb3f146fc0f84508260789be53dbe43",
+        "run_id": 38797010011,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38797010011",
+        "job_id": 116635951180,
+        "job_url": "https://github.com/Killer4K-N/OEC/actions/runs/38797010011/job/116635951180",
+        "runner": "oec-1",
+        "live_root": "/nlsasfs/home/lmedge/rahkus/OEC",
+        "live_checkout_commit": "081aaf34f6379873bdc925d1dcf6b9c3d50349d3",
+        "requirements_txt": "ABSENT at repository root",
+        "backup_root": "/nlsasfs/home/lmedge/rahkus/.local/state/oec-live-sync-backups/38797010011"
+      },
+      "results": {
+        "status": "FAIL_PARTIAL_SYNC_DIRTY_CONFLICTS_PRESERVED",
+        "workflow_conclusion": "failure",
+        "created": [
+          "pipeline_flux_image.py",
+          "pipeline_flux_trellis.py",
+          "docs/background-pipelines.md"
+        ],
+        "updated_after_backup": [
+          "worker_ltx_video.py"
+        ],
+        "preserved_conflicts": [
+          "pipeline_trellis_3d.py",
+          "pipeline_flux_only.ipynb",
+          "pipeline_trellis_3d.ipynb",
+          "pipeline_trellis_3d_only.ipynb",
+          "qa_compliance_worker.py"
+        ],
+        "static_validation": "PASS (10 Python files, two configuration JSON files, three notebook JSON files)",
+        "service_manager_help": "PASS",
+        "reason": "The workflow deliberately returned non-zero after finding five dirty target paths. Other verified copies remained in place; follow-up narrowed the overwrite authorization for three TRELLIS files.",
+        "dependency_install": "NOT_RUN",
+        "model_download": "NOT_RUN",
+        "runtime_inference": "NOT_RUN"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38797010011",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38797010011/job/116635951180"
+      ],
+      "follow_up": "Back up and sync only the specifically authorized TRELLIS script and notebooks; retain unrelated dirty paths."
+    },
+    {
+      "id": "TEST-2026-10-16-OEC-A100-TRELLIS-BACKUP-SYNC-38797414327",
+      "date": "2026-10-16",
+      "category": "Back up and synchronize TRELLIS entry point/notebooks; final A100 static validation",
+      "approach": "Adjusted the feature-branch sync workflow to make and verify run-specific backups before overwriting the three specifically authorized TRELLIS targets. Kept the modified FLUX-only notebook and QA worker on the preserve-conflict path.",
+      "reason": "The expanded sync correctly refused to overwrite dirty targets; the earlier explicit TRELLIS sync authorization allowed these specific files to be replaced after verified backup.",
+      "parameters": {
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "source_commit": "d2b35baa8b8871cca910318bf2d38968c7e99a2c",
+        "run_id": 38797414327,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38797414327",
+        "job_id": 116637348316,
+        "job_url": "https://github.com/Killer4K-N/OEC/actions/runs/38797414327/job/116637348316",
+        "runner": "oec-1",
+        "live_root": "/nlsasfs/home/lmedge/rahkus/OEC",
+        "live_checkout_commit": "081aaf34f6379873bdc925d1dcf6b9c3d50349d3",
+        "backup_root": "/nlsasfs/home/lmedge/rahkus/.local/state/oec-live-sync-backups/38797414327",
+        "live_requirements_txt": "ABSENT",
+        "updated_files": {
+          "pipeline_trellis_3d.py": {
+            "sha256": "d861ed3029c8c828debdbbad1bb6d214fbe1337846046675cd8c5cbe896367a4",
+            "backup_verified": true
+          },
+          "pipeline_trellis_3d.ipynb": {
+            "sha256": "b6b8e5349946159aa5c99cc452556e1b2b8bc6b58252eba1b50f994377dba526",
+            "backup_verified": true
+          },
+          "pipeline_trellis_3d_only.ipynb": {
+            "sha256": "d323ed64b490562e6d8fff08fca46b9932e5dcf02aacba6527f96f6cf0361b7b",
+            "backup_verified": true
+          }
+        },
+        "counts": {
+          "created": 0,
+          "updated": 3,
+          "unchanged": 11,
+          "preserved_conflicts": 2
+        },
+        "preserved_conflicts": [
+          "pipeline_flux_only.ipynb",
+          "qa_compliance_worker.py"
+        ],
+        "validation": {
+          "python_ast_files": 10,
+          "python_ast": "PASS",
+          "json_config_files": 2,
+          "json_parse": "PASS",
+          "notebook_json_files": 3,
+          "notebook_json": "PASS",
+          "service_manager_help": "PASS"
+        }
+      },
+      "results": {
+        "status": "PASS_WITH_UNRELATED_DIRTY_FILES_PRESERVED",
+        "workflow_conclusion": "success",
+        "target_file_copy_hash_verification": "PASS",
+        "backups": "PASS for every replaced TRELLIS file",
+        "unrelated_dirty_files": "PRESERVED",
+        "dependency_install": "NOT_RUN",
+        "model_download": "NOT_RUN",
+        "runtime_inference": "NOT_RUN",
+        "storage_reserve_access": "NOT_PERFORMED"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38797414327",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38797414327/job/116637348316",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38797010011",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38796743755"
+      ],
+      "follow_up": "Review the still-dirty FLUX-only notebook and QA worker before updating them; then perform cache-only GPU smoke checks when idle hardware and required cached models/dependencies are confirmed."
     }
   ]
 }

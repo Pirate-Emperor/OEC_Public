@@ -4,6 +4,10 @@ Daily engineering records live here. Use the local Asia/Kolkata date in each fil
 
 ## Daily records
 
+- [2026-10-16 — A100 pipeline tools and TRELLIS entry points synchronized](CHANGELOG-2026-10-16.md)
+  - [Run 38796743755](https://github.com/Killer4K-N/OEC/actions/runs/38796743755) created and validated seven missing OEC/tools support files on oec-1.
+  - The expanded sync first preserved dirty conflicts; [run 38797414327](https://github.com/Killer4K-N/OEC/actions/runs/38797414327) then backed up and synced the authorized TRELLIS Python entry point and two notebooks and passed AST, JSON, notebook, and CLI-help checks. The dirty FLUX-only notebook and QA worker remain untouched; no dependency install or new inference was run.
+
 - [2026-10-15 — FLUX/TRELLIS fix validated end to end on review branch](CHANGELOG-2026-10-15.md)
   - Hosted CI [38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281) passed 58/58 tests, Python compilation and all four notebook checks. This includes the findmnt/subprocess and high-utilization GPU-admission regressions.
   - First combined attempt [38723286765](https://github.com/Killer4K-N/OEC/actions/runs/38723286765) found the missing subprocess import in the scratch filesystem probe and an over-permissive IDLE policy at 100% utilization. Both were corrected on the review branch.

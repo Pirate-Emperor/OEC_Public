@@ -303,3 +303,12 @@ Open follow-ups are in `TODO.md`; per-run results and experiment details are in 
 ### Final launch-safety follow-through
 
 CI [run 38744924124](https://github.com/Killer4K-N/OEC/actions/runs/38744924124) is the current-head revalidation after the QA GPU-visibility fix and passed all 78 tests, compilation and four notebook JSON/Python-cell checks. Before rollout, first inventory any existing manually launched background jobs on each node. The supervisor cannot adopt them; do not start duplicate daemon/worker instances or use broad kill patterns. Stop only exact owned legacy PIDs after inspecting them, then use the supervisor's per-service status/logs/stop controls. No user host or running process was touched in this task.
+
+
+## 2026-10-16 — A100 pipeline support files and TRELLIS source synchronization
+
+**Confirmed result:** [A100 sync run 38796743755](https://github.com/Killer4K-N/OEC/actions/runs/38796743755) created all seven missing files under /nlsasfs/home/lmedge/rahkus/OEC/tools/ on runner oec-1. A follow-up created the root FLUX/combined pipeline entry points and guide and updated worker_ltx_video.py after a verified backup. Final [run 38797414327](https://github.com/Killer4K-N/OEC/actions/runs/38797414327) backed up and synced pipeline_trellis_3d.py, pipeline_trellis_3d.ipynb, and pipeline_trellis_3d_only.ipynb. Validation passed for 10 Python files, two config JSON files, three notebook JSON documents, and supervisor help. The dirty pipeline_flux_only.ipynb and qa_compliance_worker.py were preserved.
+
+Intermediate run [38797010011](https://github.com/Killer4K-N/OEC/actions/runs/38797010011) exited non-zero because it correctly preserved dirty conflicts; its verified partial copies were retained and reconciled by the later run. The live checkout remains detached/dirty. No model download, package installation, new inference, or access to .storage_reserve.bin occurred. Root requirements.txt was absent. PR #11 remains open and unmerged.
+
+This establishes file synchronization and lightweight validation, not new live FLUX/TRELLIS inference, LTX worker startup, Gradio browser submission, or folder-based GLB generation. Earlier single-image runtime evidence is recorded separately at [run 38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076).

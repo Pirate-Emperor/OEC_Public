@@ -1,7 +1,21 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-15 19:15 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-16 01:26 IST (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
+## 2026-10-16 — A100 pipeline-tool and TRELLIS entry-point synchronization
+
+- [x] Checked current Actions status. Pipeline source remains on [PR #11](https://github.com/Killer4K-N/OEC/pull/11), not merged to main.
+- [x] Created and hash-verified seven missing support files under /nlsasfs/home/lmedge/rahkus/OEC/tools/ on oec-1. [Run 38796743755](https://github.com/Killer4K-N/OEC/actions/runs/38796743755) passed five Python AST checks, two JSON configuration checks, and service-manager --help.
+- [x] Synced pipeline_flux_image.py, pipeline_flux_trellis.py, docs/background-pipelines.md, and worker_ltx_video.py; the prior worker file was backed up at /nlsasfs/home/lmedge/rahkus/.local/state/oec-live-sync-backups/38797010011/worker_ltx_video.py.
+- [x] Backed up and synced pipeline_trellis_3d.py, pipeline_trellis_3d.ipynb, and pipeline_trellis_3d_only.ipynb. Their old copies are under /nlsasfs/home/lmedge/rahkus/.local/state/oec-live-sync-backups/38797414327/ and were verified before replacement. Final A100 sync [run 38797414327](https://github.com/Killer4K-N/OEC/actions/runs/38797414327) passed copy verification and static validation.
+- [x] Kept the persistent checkout detached at its existing revision; no reset/clean, package install, model download, live inference, or storage-reserve access occurred.
+- [ ] OPEN — preserved local conflicts: pipeline_flux_only.ipynb and qa_compliance_worker.py were left untouched because they have local modifications. Review their diffs before syncing either.
+- [ ] OPEN — runtime acceptance: this batch did not generate a new FLUX image/GLB, run folder inference, submit a live Gradio request, or start LTX services. The earlier single-image FLUX-to-TRELLIS pass [38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076) is separate evidence.
+- [ ] BLOCKED — dependencies/models: the live checkout has no root requirements.txt; no dependencies were installed. Keep model/download/write admission guarded until prerequisites and storage telemetry permit an authorized runtime test.
+
+Detailed history: changelog/CHANGELOG-2026-10-16.md. The cumulative test ledger contains separate records for the initial pass, guarded partial sync, and final backup-and-sync pass.
+
+
 ## 2026-10-15 evening — supervised background pipelines and notebook follow-through
 
 - [x] Audited the supplied LTX launch/kill commands and documented why compound background shells and broad `pkill -9 -f "python"` are unsafe for shared work nodes.
