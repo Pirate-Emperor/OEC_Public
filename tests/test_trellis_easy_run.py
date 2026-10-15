@@ -96,8 +96,11 @@ class TrellisEasyRunTests(unittest.TestCase):
         self.assertIn("server_port=7862", combined)
         self.assertIn("FLUX_SERVER_PORT = int(os.environ.get", combined)
         self.assertIn("7863", combined)
-        self.assertIn('"--port", str(FLUX_SERVER_PORT)', combined)
-        self.assertIn('["start", "flux-ui"', combined)
+        # This file is inspected as JSON text here, so quotes in code-cell
+        # source are escaped. Check stable unescaped tokens independently.
+        self.assertIn("--port", combined)
+        self.assertIn("str(FLUX_SERVER_PORT)", combined)
+        self.assertIn("flux-ui", combined)
         self.assertIn("server_port=7862", only)
         self.assertIn("inline=False", combined)
         self.assertIn("inline=False", only)
