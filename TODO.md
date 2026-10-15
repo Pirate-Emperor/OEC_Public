@@ -1,7 +1,23 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-15 17:02 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 18:50 IST (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
+## 2026-10-15 evening — supervised background pipelines and notebook follow-through
+
+- [x] Audited the supplied LTX launch/kill commands and documented why compound background shells and broad `pkill -9 -f "python"` are unsafe for shared work nodes.
+- [x] Added `tools/oec_service_manager.py` and usage guide `docs/background-pipelines.md` on [review PR #11](https://github.com/Killer4K-N/OEC/pull/11): LTX control/worker/QA, FLUX-only background image/UI, TRELLIS folder batch/UI, combined FLUX-by-default, and combined existing-image-folder mode.
+- [x] Fixed LTX worker source so `--no-purge` suppresses distributed purge and associated synchronization/barriers; added GPU-ID validation/default GPU-0 reservation and explicit QA `--gpu`.
+- [x] Added TRELLIS `generate-batch` input-folder mode and combined `--source-mode images --image-dir ... [--recursive]`; the default combined source remains FLUX.
+- [x] Cleared saved execution outputs and execution counts on the three relevant notebooks, preserving private Gradio defaults: FLUX-only 7864; TRELLIS-only 7862; combined TRELLIS 7862 and FLUX 7863.
+- [x] Final hosted CI [run 38743800209](https://github.com/Killer4K-N/OEC/actions/runs/38743800209) passed 78 tests, Python compilation and JSON/Python-cell validation for all 4 notebooks. Earlier run [38743502455](https://github.com/Killer4K-N/OEC/actions/runs/38743502455) failed on an outdated TRELLIS CLI test expectation; [38743634536](https://github.com/Killer4K-N/OEC/actions/runs/38743634536) failed on syntax in a new test. Both defects were fixed and the final run passed.
+- [x] Refreshed the daily changelog, `test.json` (48 experiment records), results and index with this evidence. All source/workflow/notebook changes remain on PR #11; main received tracking files only.
+- [ ] OPEN — run a live LTX controller + worker smoke on chosen compute nodes, using `nvidia-smi` first and launching QA separately on an unclaimed GPU. Verify service status/logs, safe stop, and one known test job end-to-end. Hosted static CI is not live LTX validation.
+- [ ] OPEN — launch each FLUX, TRELLIS and combined Gradio UI on a selected cached-environment host, establish SSH tunnels, and submit one small generation per UI; live browser/submission testing was not run in hosted CI.
+- [ ] OPEN — test a small existing-image folder with TRELLIS batch and combined `--source-mode images`; inspect each real GLB after inference. Static tests validate the batch code/path but do not prove folder inference on GPU.
+- [ ] OPEN — fresh authoritative quota telemetry is still missing. Do not download missing model/dependency files or write managed shared outputs until admission succeeds.
+- [ ] OPEN — evaluate any `brain_config.json` prompt/rule or profitability changes in controlled experiments with QA acceptance/rejection, runtime/cost and downstream conversion measures before changing prompts. No speculative prompt change was made.
+- [ ] Policy — do not merge PR #11 source changes to `main` without explicit permission. No live queue, process or reserve-file mutation was done during this task.
+
 ## 2026-10-14 — quota telemetry and live-checkout diagnosis
 - [x] Verified GitHub state: OEC `main` is `82346c0753e139b92240f53734eb48d2113ed9ad`; `fix/trellis-gradio-notebooks-20261011` is `2543b26d2888e667c6443c984259f84ac5b6c142` (111 ahead, 0 behind). No main-branch change or merge.
 - [x] Reviewed failed remediation [run 38175212786](https://github.com/Killer4K-N/Connector_1/actions/runs/38175212786). Main job blocked on missing fresh quota; separate connector-2 QA recovery failed with `scontrol: stepd_available: Couldn't find nodename` and `sacct` connection refusal to `localhost:6819`.
