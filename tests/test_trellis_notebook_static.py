@@ -101,6 +101,28 @@ class TrellisNotebookStaticTests(unittest.TestCase):
             self.assertIn('os.environ.get("AIEROS_ALLOW_SHARED_MODEL_PURGE") == "1"', all_source)
             self.assertIn("Shared model/cache files retained", all_source)
 
+    def test_trellis_only_setup_only_requires_quota_for_actual_writes(self):
+        setup = self.only[10]
+        self.assertLess(
+            setup.index("def _trellis_setup_storage_admission"),
+            setup.index("ok, reason = storage_preflight_path("),
+            "quota preflight should live inside the write-admission helper, not run unconditionally",
+        )
+        self.assertIn("_missing_basic_packages", setup)
+        self.assertIn("_distribution_is_satisfied", setup)
+        self.assertIn('if not is_installed("utils3d")', setup)
+        self.assertIn("_trellis_setup_blocked(reason, \"setup write\")", setup)
+        self.assertIn("Refresh the site's approved login-node quota-metadata job", setup)
+
+    def test_trellis_only_ui_defaults_to_verified_local_scratch(self):
+        studio = self.find(self.only, "def _trellis_ui_scratch_preflight")
+        self.assertIn('os.environ.get("AIEROS_TRELLIS_UI_OUTPUT_MODE", "scratch")', studio)
+        self.assertIn('scratch_probe.stat().st_dev == model_probe.stat().st_dev', studio)
+        self.assertIn("free_bytes < 512 * 1024 * 1024", studio)
+        self.assertIn("TRELLIS_OUTPUT_MODE=local_scratch_only", studio)
+        self.assertIn('if TRELLIS_UI_OUTPUT_MODE == "shared":', studio)
+        self.assertIn("require_fresh_quota=True", studio)
+
     def test_trellis_only_gpu_is_selected_before_torch_import(self):
         first_code = next("".join(c.get("source", [])) for c in self.only_nb["cells"] if c.get("cell_type") == "code")
         self.assertIn('os.environ["CUDA_VISIBLE_DEVICES"] = TARGET_GPU', first_code)
