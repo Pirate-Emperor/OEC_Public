@@ -63,6 +63,39 @@ def _python_prefix(env_name: str, conda_root: Path, python_override: str | None 
     )
 
 
+def _available_physical_gpus() -> list[str]:
+    try:
+        output = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=index", "--format=csv,noheader"],
+            encoding="utf-8", stderr=subprocess.STDOUT, timeout=10,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Unable to verify local physical GPUs with nvidia-smi: {type(exc).__name__}: {exc}") from exc
+    ids = [str(int(line.strip())) for line in output.splitlines() if line.strip().isdigit()]
+    if not ids:
+        raise RuntimeError("nvidia-smi reported no physical GPU IDs.")
+    return ids
+
+
+def _resolve_worker_gpus(requested: str | None) -> set[str]:
+    available = _available_physical_gpus()
+    if requested is None or not requested.strip():
+        selected = [gpu for gpu in available if gpu != "0"] or available
+    else:
+        parts = [part.strip() for part in requested.split(",") if part.strip()]
+        if not parts or any(not part.isdigit() for part in parts):
+            raise ValueError("--gpus must contain comma-separated non-negative integer IDs.")
+        selected = [str(int(part)) for part in parts]
+        if len(selected) != len(set(selected)):
+            raise ValueError(f"--gpus contains duplicates: {selected}")
+        missing = [part for part in selected if part not in available]
+        if missing:
+            raise ValueError(f"Requested GPU IDs {missing}, but this node reports {available}.")
+    if not selected:
+        raise RuntimeError("No worker GPUs selected.")
+    return set(selected)
+
+
 def _base_env() -> dict[str, str]:
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
@@ -312,14 +345,10 @@ def start_service(args: argparse.Namespace) -> None:
             _emit("LTX_CONTROL_READY storage/upload/brain launched. QA is intentionally separate: use a free GPU on a worker node.")
             return
         if service == "ltx-worker":
-            gpus = {x.strip() for x in args.gpus.split(",") if x.strip()} if args.gpus else set()
-            if args.gpus:
-                if any(not x.isdigit() for x in gpus):
-                    raise ValueError("--gpus must be comma-separated non-negative physical GPU indices.")
-                _assert_gpu_available(gpus)
-            cmd_args = ["--no-purge", "--cluster-gpus", str(args.cluster_gpus)]
-            if args.gpus:
-                cmd_args += ["--gpus", args.gpus]
+            gpus = _resolve_worker_gpus(args.gpus)
+            _assert_gpu_available(gpus)
+            resolved_gpu_arg = ",".join(sorted(gpus, key=int))
+            cmd_args = ["--no-purge", "--cluster-gpus", str(args.cluster_gpus), "--gpus", resolved_gpu_arg]
             state = _launch(
                 "ltx-worker", service, _script("worker_ltx_video.py"), "phase1_ltx",
                 cmd_args, conda_root, args.python, {"CUDA_VISIBLE_DEVICES": None}, gpus,
@@ -377,12 +406,7 @@ def start_service(args: argparse.Namespace) -> None:
             run_tag = datetime.now().strftime("%Y%m%d-%H%M%S") + f"-{os.getpid()}"
             instance = f"flux-trellis-{run_tag}"
             work = Path("/tmp") / f"oec-flux-trellis-{run_tag}"
-            cmd_args = ["--work-dir", str(work), "--python", _python_prefix("phase2_3d", conda_root, args.python)[-1] if args.python else str((conda_root / "envs" / "phase2_3d" / "bin" / "python"))] + cmd_args
-            if not args.python:
-                # If that env path is absent, let the supervisor's Conda launcher interpreter handle it.
-                py_path = conda_root / "envs" / "phase2_3d" / "bin" / "python"
-                if not py_path.is_file():
-                    raise FileNotFoundError(f"Combined CLI uses --python and requires {py_path}. Activate phase2_3d or set OEC_PYTHON_PHASE2_3D.")
+            cmd_args = ["--work-dir", str(work)] + cmd_args
             state = _launch(
                 instance, service, _script("pipeline_flux_trellis.py"), "phase2_3d",
                 cmd_args, conda_root, args.python, {"CUDA_VISIBLE_DEVICES": None}, set(),
