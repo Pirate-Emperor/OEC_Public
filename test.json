@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-15T16:22:00+05:30",
+  "last_updated": "2026-10-15T16:26:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Evidence: standalone FLUX image generation passes on oec-1/oec-2/oec-3 (run 38613575959); separate Connector_1 TRELLIS image-to-GLB plus geometry reopen passes (run 38602330418). New combined pipeline exists on review branch fix/flux-trellis-pipeline-20261015. Hosted CI run 38722551001 passed 54 tests, py_compile and 4 notebook checks at commit d2dad157349f61fb01cb370f25bb6c178c5fa2a6. Subsequent changes now make offline TRELLIS cache misses fail-closed and restrict combined artifacts to /tmp; these changes are not yet retested, so latest CI must pass before dispatching combined A100 inference.",
+  "latest_summary": "Standalone FLUX generation passes on all three OEC runners (38613575959); standalone TRELLIS GLB export/reopen passes on Connector_1 (38602330418). The combined orchestrator branch's hosted static CI passed 56/56 tests, py_compile and 4/4 notebook checks at commit ca6a2d3a893b29767a01fe3d4f7666ba30313457 (run 38722873210). The first one-shot combined workflow run 38722963930 failed before creating any jobs because its runner selector and artifact path still used dispatch-only inputs.runner; these references have been fixed but a rerun and actual combined GPU inference remain pending. Shared output/download admission remains fail-closed; pipeline only uses cached models and /tmp outputs.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2414,6 +2414,36 @@
       ],
       "limitation": "This pass is for d2dad157...; later hardening changes to the cache-check exit code and /tmp-only workdir have not yet run through CI.",
       "follow_up": "Run complete hosted CI against the next commit, then trigger the combined pipeline on a single OEC runner if it passes."
+    },
+    {
+      "id": "TEST-2026-10-15-FLUX-TRELLIS-COMBINED-WORKFLOW-WIRING-FIRST-TRIGGER",
+      "date": "2026-10-15",
+      "category": "first one-shot push-triggered end-to-end workflow wiring check",
+      "approach": "Use the branch-only marker path to start the manual-acceptance workflow with oec-1 default, then retrieve run metadata and job list before interpreting it as runtime inference.",
+      "reason": "Automate one same-run image-to-3D acceptance attempt after the full hosted static suite passed.",
+      "parameters": {
+        "run_id": 38722963930,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38722963930",
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "trigger_commit": "c6704cce5c4efa722b3b171b0363682718f3efea",
+        "workflow_path": ".github/workflows/oec-flux-trellis-pipeline.yml",
+        "event": "push",
+        "expected_runner": "oec-1"
+      },
+      "results": {
+        "status": "FAIL_BEFORE_JOB_CREATION",
+        "conclusion": "failure",
+        "jobs_created": 0,
+        "runner_assigned": false,
+        "python_started": false,
+        "model_inference": "NOT_RUN",
+        "diagnosis": "The committed workflow had a mixed input-context migration: display name used github.event.inputs.runner with a default, but runs-on, OEC_EXPECTED_RUNNER and upload-artifact name/path still used inputs.runner. For the push event those dispatch inputs are undefined, causing workflow-level failure before a job was created.",
+        "evidence_limit": "GitHub API exposed run metadata and zero jobs, but no workflow job logs/validation message. The precise source mismatch is directly confirmed by the workflow file at the failed commit; it is the confirmed configuration defect."
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38722963930"
+      ],
+      "follow_up": "Replace every dispatch-only runner input reference with github.event.inputs.runner || 'oec-1', rerun hosted validation, and retrigger the marker. Require a real job ID before interpreting any model stage outcome."
     }
   ]
 }

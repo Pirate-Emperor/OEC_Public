@@ -289,3 +289,8 @@ Review-branch hosted run [38722197428](https://github.com/Killer4K-N/OEC/actions
 ## 2026-10-15 — Hosted static CI passed before final preflight refinements
 
 OEC review-branch [run 38722551001](https://github.com/Killer4K-N/OEC/actions/runs/38722551001), job 116380401503, passed 54/54 unit/static tests, py_compile for the selected Python entry points, and JSON/Python-cell validation for 4/4 notebooks. This run tested commit d2dad157349f61fb01cb370f25bb6c178c5fa2a6; later code changes make offline TRELLIS cache absence return a blocked exit code and restrict the combined work directory to /tmp. Therefore the pass is evidence for the prior candidate commit, not the latest source; another full CI pass remains required before the GPU run.
+
+
+## 2026-10-15 — First combined workflow dispatch failed before runner assignment
+
+The one-shot marker push created run [38722963930](https://github.com/Killer4K-N/OEC/actions/runs/38722963930), but its Actions job endpoint returned zero jobs and no runner was assigned. It therefore did not execute the Python entry point and is not a FLUX/TRELLIS inference result. Inspection of the workflow at that commit showed the run-on selector, expected runner identity and upload path still referenced `inputs.runner`; only the job display name had been changed to use `github.event.inputs.runner || 'oec-1'`. Those remaining dispatch-only references are now changed to the same event-input fallback. Post-fix CI and a new one-run acceptance attempt remain required.

@@ -106,3 +106,8 @@ Hosted run [38722197428](https://github.com/Killer4K-N/OEC/actions/runs/38722197
 - A final code review found that the TRELLIS check-only command treated an offline model cache miss as exit-success. The CLI is now changed to return 20 and print TRELLIS_READY=BLOCKED_MODEL_CACHE_MISS whenever --mode check and --offline are both selected but the model cache is missing; a regression test covers this behavior.
 - Tightened pipeline work-directory policy to explicit /tmp rather than trusting TMPDIR or tempfile.gettempdir(), because project setup can redirect TMPDIR to shared model/cache storage. A regression test rejects /var/tmp even if TMPDIR points there.
 - These latest changes require a fresh CI pass; no combined A100 result is yet claimed.
+
+
+## Combined workflow wiring attempt — no job created
+
+The one-shot marker push triggered [run 38722963930](https://github.com/Killer4K-N/OEC/actions/runs/38722963930), but GitHub reported failure with zero jobs and no job logs; the Python command never started and no GPU was assigned. Source inspection at commit c6704cce5c4efa722b3b171b0363682718f3efea revealed the remaining `inputs.runner` references in `runs-on`, `OEC_EXPECTED_RUNNER`, and artifact name/path. Only the job name had been updated to default using `github.event.inputs.runner || 'oec-1'`. The workflow is now corrected to use the same fallback for all runner references. The exact GitHub workflow-validation message was not exposed by the available run/job endpoints, so the diagnosis is based on the confirmed mismatch and zero-job result. No model inference, install, download or shared write occurred.

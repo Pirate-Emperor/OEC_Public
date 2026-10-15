@@ -29,10 +29,10 @@ permissions:
 jobs:
   flux-to-trellis:
     name: FLUX image to TRELLIS GLB on ${{ github.event.inputs.runner || 'oec-1' }}
-    runs-on: [self-hosted, linux, x64, gpu, a100, "${{ inputs.runner }}"]
+    runs-on: [self-hosted, linux, x64, gpu, a100, "${{ github.event.inputs.runner || 'oec-1' }}"]
     timeout-minutes: 50
     env:
-      OEC_EXPECTED_RUNNER: ${{ inputs.runner }}
+      OEC_EXPECTED_RUNNER: ${{ github.event.inputs.runner || 'oec-1' }}
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
       HF_HUB_DISABLE_TELEMETRY: "1"
@@ -90,7 +90,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: oec-flux-trellis-${{ inputs.runner }}-${{ github.run_id }}
-          path: /tmp/oec-flux-trellis-${{ github.run_id }}-${{ inputs.runner }}/*
+          name: oec-flux-trellis-${{ github.event.inputs.runner || 'oec-1' }}-${{ github.run_id }}
+          path: /tmp/oec-flux-trellis-${{ github.run_id }}-${{ github.event.inputs.runner || 'oec-1' }}/*
           if-no-files-found: warn
           retention-days: 30

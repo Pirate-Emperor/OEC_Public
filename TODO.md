@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-15 16:22 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 16:26 IST (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 ## 2026-10-14 — quota telemetry and live-checkout diagnosis
 - [x] Verified GitHub state: OEC `main` is `82346c0753e139b92240f53734eb48d2113ed9ad`; `fix/trellis-gradio-notebooks-20261011` is `2543b26d2888e667c6443c984259f84ac5b6c142` (111 ahead, 0 behind). No main-branch change or merge.
@@ -180,4 +180,11 @@ The first hosted run on this branch, [38721841953](https://github.com/Killer4K-N
 - [x] Hosted run [38722551001](https://github.com/Killer4K-N/OEC/actions/runs/38722551001), job 116380401503, passed 54/54 tests, Python compilation and notebook JSON/Python-cell checks for 4/4 notebooks. This validated commit d2dad157349f61fb01cb370f25bb6c178c5fa2a6.
 - [x] Code review identified that TRELLIS `--mode check --offline` reported success even when no cached model snapshot was present. The CLI now returns exit code 20 with `TRELLIS_READY=BLOCKED_MODEL_CACHE_MISS` in that case, and a mocked regression test covers the fail-closed path. This change is not yet validated by CI.
 - [x] Tightened the combined orchestrator's work directory to require `/tmp` explicitly. It no longer trusts `TMPDIR` as a temp root because `core_config` may redirect temporary paths to shared model/cache storage. Added a negative regression test.
-- [ ] OPEN — validate this latest source commit in hosted CI, then use the one-run A100 workflow with local /tmp output only.
+- [ ] OPEN — validate the runner-context fix in hosted CI, then retrigger the one-run A100 workflow with local /tmp output only.
+
+
+### End-to-end workflow wiring — 2026-10-15
+
+- [x] The one-shot run [38722963930](https://github.com/Killer4K-N/OEC/actions/runs/38722963930) failed before job creation; the API returned zero jobs, so no A100 was assigned and no inference ran. Inspection of the exact committed workflow found that `runs-on`, runner identity, and artifact path still referenced dispatch-only `inputs.runner`, even though the workflow had been changed to support a push trigger.
+- [x] Updated every runner reference to use `github.event.inputs.runner || 'oec-1'`; manual dispatch can still choose a runner and a one-shot push falls back to `oec-1`. The fix has not yet passed its post-change CI/run.
+- [ ] OPEN — wait for hosted checks on the workflow correction, then create a new marker commit to start the combined pipeline on oec-1. Treat failure with zero jobs as workflow wiring; a job-level run is required before diagnosing model/runtime issues.
