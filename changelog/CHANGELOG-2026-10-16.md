@@ -103,3 +103,33 @@ The separate historical cache-only FLUX-to-TRELLIS runtime run [38725376076](htt
 - [Final backed-up TRELLIS sync run](https://github.com/Killer4K-N/OEC/actions/runs/38797414327)
 - [Prior cache-only FLUX-to-TRELLIS runtime evidence](https://github.com/Killer4K-N/OEC/actions/runs/38725376076)
 - [Earlier hosted regression check](https://github.com/Killer4K-N/OEC/actions/runs/38761609742)
+
+
+## QA worker review and failure-mode hardening
+
+This work remains on review branch `fix/flux-trellis-pipeline-20261015`; PR #11 is still open and no source changes were merged to `main`.
+
+### Findings corrected in the candidate source
+
+- The QA worker accepted a VLM category without validating the full response contract. Categories 2 and 3 now require an integer category, a non-empty title of at most 150 characters, and exactly 30 non-empty, case-insensitively distinct keywords. Invalid model output is recorded as `FAILED_QA_OUTPUT`, not mistaken for a content violation and rejected.
+- The video frame extractor used a string replacement that only worked for lowercase `.mp4`. For WebM, AVI, and uppercase extensions that could leave the source path unchanged as the FFmpeg output target. It now creates a unique frame path, probes duration, samples at the earlier of two seconds or the clip midpoint, verifies the extracted image, and cleans up a failed partial frame.
+- Queue claims now use a SQLite write transaction and record a worker/timestamp lease. Recovery only requeues timestamped leases older than the configured timeout; legacy processing rows without a lease are left alone and reported for review instead of being reset blindly.
+- QA now refuses an accidental CPU model load or a missing `qwen-vl-utils` dependency. Model-cache purging is off by default, and a cache miss cannot start a download unless `AIEROS_QA_ALLOW_MODEL_DOWNLOAD=1` is explicitly set and fresh model-storage admission succeeds.
+- Video normalization output is checked for existence and nonzero size; normalized WebM/AVI results receive a proper MP4 path. The normalized video and updated sidecar writes require fresh output-storage admission. Missing files and bad sidecars remain represented by failure states instead of having their queue record deleted.
+- Added `tools/qa_checks.py` and `tests/test_qa_checks.py` for schema, queue-lease and worker-safety regressions. The self-hosted `oec-1` sync workflow now compiles the branch QA files and runs this CPU-only suite before it may copy the new helper to the persistent checkout.
+
+### Validation and limitations
+
+- Seven earlier local checks of a temporary copy of the pure-Python QA helper logic passed. That was a limited helper-behavior check, not execution of the complete branch test suite.
+- The workflow source and trigger were updated to run the exact branch suite on `oec-1` before syncing `tools/qa_checks.py`. No Actions run/check result was returned for the latest trigger commit `b257edced2d651b9913ddf72c6ace7c26db81edb`, so branch-test completion and helper synchronization are **not verified**.
+- The locally modified A100 `qa_compliance_worker.py` remains a dirty conflict and was deliberately not overwritten. The new QA worker implementation has not been deployed to that path.
+- No QA model was loaded, no real queue row or media was processed, and no QA service/GPU inference was run. This is source hardening, not runtime acceptance.
+- Remaining QA limitations: the current policy assesses a representative frame rather than scanning multiple points through an entire video; category-1 media are still moved to the rejected folder and their sidecar/queue row are deleted. Audit-preserving rejection handling and multi-frame evaluation remain follow-up work.
+
+### Relevant files
+
+- [QA helper](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tools/qa_checks.py)
+- [QA tests](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tests/test_qa_checks.py)
+- [QA worker candidate](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/qa_compliance_worker.py)
+- [A100 sync workflow](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/.github/workflows/sync-a100-pipeline-tools.yml)
+- [Open pipeline review PR #11](https://github.com/Killer4K-N/OEC/pull/11)
