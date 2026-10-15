@@ -133,3 +133,32 @@ This work remains on review branch `fix/flux-trellis-pipeline-20261015`; PR #11 
 - [QA worker candidate](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/qa_compliance_worker.py)
 - [A100 sync workflow](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/.github/workflows/sync-a100-pipeline-tools.yml)
 - [Open pipeline review PR #11](https://github.com/Killer4K-N/OEC/pull/11)
+
+
+## TRELLIS-only notebook quota error and safe cached-model testing
+
+The user reported that cell 10 stopped with `fresh quota telemetry is required but no fresh snapshot is available`. This is a fail-closed storage-policy result: `storage_policy.py` reads the configured quota snapshot and does not create one; `storage_manager.py` describes the snapshot as produced by a lightweight login-node metadata job. The default snapshot path is `~/.cache/aieros/quota_snapshot.json`, and the default accepted age is 900 seconds. No snapshot was fabricated and no admission check was disabled.
+
+### Source fixes on the review branch
+
+- Removed the unconditional quota preflight at the top of the TRELLIS-only setup cell. Read-only runtime/package checks can now proceed without quota telemetry; each actual package install, source clone, extension build, or model download remains behind fresh quota admission.
+- Made the basic dependency step idempotent: it checks installed distribution versions and only requests installation for missing/unpinned or version-mismatched packages. It also skips the pinned `utils3d` install when the module is already available.
+- Added a clearer error for a genuinely required setup write that remains blocked by missing quota telemetry. It explains that the write was not started and instructs the operator to refresh the site's approved login-node quota metadata job rather than manufacture the snapshot or bypass policy.
+- Added `AIEROS_TRELLIS_UI_OUTPUT_MODE=scratch` as the Gradio notebook's default. Before inference and before writing, the notebook checks that the target is under `/tmp`, that the scratch filesystem differs from model storage, that at least 512 MiB is free, and that it will not overwrite an existing scratch GLB. Explicit `shared` mode continues to require fresh quota admission and the managed-storage write lock. Scratch outputs are temporary and not automatically archived.
+- Updated the notebook's quick-start text, the background pipeline guide, and static regression tests for conditional setup admission and scratch output safety.
+- The `oec-1` sync workflow now runs Python compilation, QA tests, TRELLIS notebook static tests, and storage-write-admission tests in the `phase2_3d` interpreter before it changes the persistent checkout. The triggering commit is [`647d762`](https://github.com/Killer4K-N/OEC/commit/647d7627dca9c8c6b8816b6f5cd3c2f7f4dd0b23).
+
+### Validation and current status
+
+- Source inspection confirms the unconditional first quota gate is removed and the remaining install/clone/build/download paths still request fresh telemetry.
+- The notebook JSON has been re-read after serialization and confirms valid nbformat 4, 15 cells, and zero saved outputs. This is a serialization check, not a substitute for executing the notebook code cells.
+- The GitHub connector returned no commit status or associated PR-triggered workflow run for the new changes. Therefore the new regression suites are **not claimed as passed**, and the persistent A100 notebook sync is **not confirmed**. Do not assume the open Jupyter session now has these edits until the sync job is observed or the live cell source is verified.
+- No dependency installation, model download, Gradio launch, GPU inference, shared-output write, or access to `.storage_reserve.bin` was performed by this source-editing step. `main` was not changed.
+
+### References
+
+- [Corrected TRELLIS-only notebook](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_trellis_3d_only.ipynb)
+- [Notebook regression tests](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tests/test_trellis_notebook_static.py)
+- [Storage write-admission tests](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tests/test_storage_write_admission.py)
+- [A100 regression-gated sync workflow](https://github.com/Killer4K-N/OEC/actions/workflows/sync-a100-pipeline-tools.yml)
+- [Trigger commit](https://github.com/Killer4K-N/OEC/commit/647d7627dca9c8c6b8816b6f5cd3c2f7f4dd0b23)
