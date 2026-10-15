@@ -56,8 +56,8 @@ The supervisor refuses assignments that overlap other services it is managing on
 ### One image, in the background
 
 ```bash
-python tools/oec_service_manager.py start flux-image --gpu 4 \\
-  --prompt "A luminous bioluminescent fern in a rain-dark forest, premium macro product photography" \\
+python tools/oec_service_manager.py start flux-image --gpu 4 \
+  --prompt "A luminous bioluminescent fern in a rain-dark forest, premium macro product photography" \
   --seed 42 --width 512 --height 512 --steps 4
 python tools/oec_service_manager.py status flux-image
 python tools/oec_service_manager.py logs flux-image --tail 100
@@ -79,7 +79,7 @@ Use an unused GPU; the manager refuses collisions with managed services. Public 
 ### Generate 3D assets from existing images in a folder
 
 ```bash
-python tools/oec_service_manager.py start trellis-batch --gpu 4 \\
+python tools/oec_service_manager.py start trellis-batch --gpu 4 \
   --image-dir /path/to/input_images --recursive
 python tools/oec_service_manager.py status trellis-batch
 python tools/oec_service_manager.py logs trellis-batch --tail 120
@@ -109,7 +109,7 @@ python tools/oec_service_manager.py logs flux-trellis --tail 160
 To bypass FLUX and use a set of images instead:
 
 ```bash
-python tools/oec_service_manager.py start flux-trellis \\
+python tools/oec_service_manager.py start flux-trellis \
   --source-mode images --image-dir /path/to/input_images --recursive
 ```
 
@@ -146,9 +146,13 @@ Open notebooks from `~/OEC` with the `phase2_3d` kernel and run their cells top-
 
 - `pipeline_flux_only.ipynb`: FLUX Gradio, port 7864.
 - `pipeline_trellis_3d_only.ipynb`: TRELLIS Gradio, port 7862.
-- `pipeline_trellis_3d.ipynb`: combined notebook with separate TRELLIS (7862) and FLUX (7863) studios.
+- `pipeline_trellis_3d.ipynb`: combined notebook with TRELLIS (port 7862) and FLUX (port 7863). TRELLIS stays in the notebook kernel; FLUX is launched as a separately supervised Gradio process so the two model weights do not compete for one GPU.
 
-All have public sharing disabled by default. Use separate SSH tunnels for each port. Static CI validates notebook JSON and parses every Python code cell, plus checks critical cache, storage and Gradio behavior. These static checks do not replace an actual browser interaction on the target compute node; each deployed kernel still needs a live cache/CUDA check before generation.
+For the combined notebook, select two distinct free physical GPUs: `AIEROS_TRELLIS_UI_GPU=0` and `AIEROS_FLUX_UI_GPU=1` are the defaults. If these IDs are already occupied, choose two other distinct IDs before running the first cell. The first cell verifies that the IDs differ; the FLUX cell uses `tools/oec_service_manager.py` and the FLUX model runs in its own `phase2_3d` process. This is still a two-GPU workflow, not a way to make both models fit on one 40-GB GPU.
+
+All have public sharing disabled by default. Use separate SSH tunnels for each port. To stop the separately managed FLUX UI from the notebook/control terminal, run `python tools/oec_service_manager.py stop flux-ui`; the TRELLIS studio inside the notebook kernel can be closed with `demo_trellis.close()` or by restarting that notebook kernel.
+
+Static CI validates notebook JSON and parses every Python code cell, plus checks critical cache, storage and Gradio behavior. These static checks do not replace an actual browser interaction on the target compute node; each deployed kernel still needs a live cache/CUDA check before generation.
 
 ## Quota/cache guardrails
 
@@ -226,8 +230,8 @@ python tools/oec_service_manager.py cluster-start flux-trellis --config tools/oe
 To use a folder of existing images instead, override the source mode and specify the path visible on the worker node:
 
 ```bash
-python tools/oec_service_manager.py cluster-start flux-trellis \\
-  --source-mode images --image-dir /path/visible/on/worker2/images --recursive \\
+python tools/oec_service_manager.py cluster-start flux-trellis \
+  --source-mode images --image-dir /path/visible/on/worker2/images --recursive \
   --config tools/oec_cluster_services.local.json
 ```
 
