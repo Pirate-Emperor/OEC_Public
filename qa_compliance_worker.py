@@ -87,9 +87,6 @@ sys.excepthook = global_exception_handler
 # QA & COMPLIANCE WORKER (Assign to GPU 0)
 # ==============================================================================
 
-REJECTED_DIR = os.path.join(SYSTEM_DIRS['outputs'], "rejected")
-os.makedirs(REJECTED_DIR, exist_ok=True)
-
 try:
     from qwen_vl_utils import process_vision_info
 except ImportError:
@@ -266,8 +263,12 @@ class QANode:
                 print(f"[QA-NODE] Source image failed validation: {type(e).__name__}: {e}")
                 return None, False
 
+        scratch_dir = Path("/tmp")
+        if shutil.disk_usage(scratch_dir).free < 512 * 1024 * 1024:
+            print("[QA-NODE] Frame extraction blocked: less than 512 MiB free in local /tmp.")
+            return None, False
         frame_path = str(
-            source.with_name(f"{source.stem}_qa_frame_{time.time_ns()}.jpg")
+            scratch_dir / f"oec-qa-frame-{os.getpid()}-{time.time_ns()}.jpg"
         )
         try:
             duration_result = subprocess.run(
@@ -436,14 +437,45 @@ def process_qa_queue(purge_after_load=False, gpu_id=0):
                     continue
 
                 if category == 1:
-                    reason = analysis.get("rejection_reason", "Failed Adobe Stock Guidelines")
-                    print(f"[QA-NODE] ❌ REJECTED: {reason}. Moving to trash.")
-                    
-                    shutil.move(raw_vid_path, os.path.join(REJECTED_DIR, os.path.basename(raw_vid_path)))
-                    os.remove(json_path)
-                    
-                    with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                        conn.execute("DELETE FROM assets WHERE id = ?", (record_id,))
+                    reason = str(
+                        analysis.get("rejection_reason", "Failed compliance checks")
+                    ).strip() or "Failed compliance checks"
+                    metadata["qa_category"] = 1
+                    metadata["qa_passed"] = False
+                    metadata["qa_rejection_reason"] = reason[:500]
+                    sidecar_size_gb = os.path.getsize(json_path) / BYTES_PER_GB
+                    try:
+                        with managed_storage_operation(
+                            "outputs",
+                            required_gb=max(0.001, sidecar_size_gb * 1.25),
+                            require_fresh_quota=True,
+                            minimum_free_gb=float(
+                                os.environ.get("AIEROS_OUTPUT_MIN_FREE_GB", "0.05")
+                            ),
+                        ):
+                            with open(json_path, "w", encoding="utf-8") as f:
+                                json.dump(metadata, f, indent=4)
+                            with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
+                                conn.execute(
+                                    "UPDATE assets SET status = 'REJECTED_QA', qa_started_at = NULL, "
+                                    "qa_worker_id = NULL WHERE id = ?",
+                                    (record_id,),
+                                )
+                        print(
+                            f"[QA-NODE] REJECTED_QA asset={record_id}; reason={reason}; "
+                            "asset and sidecar retained for audit and excluded from upload."
+                        )
+                    except Exception as e:
+                        print(
+                            f"[QA-NODE] Could not persist rejection outcome for asset {record_id}: "
+                            f"{type(e).__name__}: {e}"
+                        )
+                        with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
+                            conn.execute(
+                                "UPDATE assets SET status = 'FAILED_QA_REJECT_RECORD', "
+                                "qa_started_at = NULL, qa_worker_id = NULL WHERE id = ?",
+                                (record_id,),
+                            )
                     continue
                     
                 cat_string = "Photorealistic / Human-Created" if category == 3 else "AI-Generated Style"
