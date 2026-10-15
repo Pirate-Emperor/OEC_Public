@@ -133,3 +133,12 @@ Provide readable per-command CLI guidance for `tools/oec_service_manager.py`, en
 
 ### Branch and rollout
 The implementation and tests remain on `fix/flux-trellis-pipeline-20261015`, PR #11 open and unmerged. These changelog/results/test/TODO tracking updates are documentation-only commits on `main`. Roll out only after configuring actual node aliases/paths, checking existing unmanaged services/GPU use, confirming fresh quota admission for any required writes, and running an explicitly authorized live cache-only smoke.
+
+
+## 20:35 IST — example Conda-root adjustment and final CI revalidation
+
+- The example cluster config was corrected to `~/OEC/Conda` and `~/OEC/Conda/bin/activate`, reflecting the supplied pattern `source Conda/bin/activate` when the shell is in `~/OEC`. These remain template values: if a node's actual project/Conda paths differ, configure that node explicitly before using cluster-start.
+- Hosted CI [run 38761087455](https://github.com/Killer4K-N/OEC/actions/runs/38761087455), job 116512226198, passed **86/86 tests**, `py_compile`, and all four notebook JSON/Python-cell checks. Test counts: notebook static 13, TRELLIS CLI 6, TRELLIS offline config 6, combined pipeline 16, FLUX image 7, GPU admission 6, AudioCraft static 5, storage admission 6, service manager 8, manager help/profile/dry-run 7, LTX config 6.
+- Final review status: PR [#11](https://github.com/Killer4K-N/OEC/pull/11) remains open, unmerged and mergeable. Main received only tracking/docs changes; source files, manager and notebooks remain on the feature branch.
+- Runtime limitations unchanged: no actual three-node SSH preflight/start/stop was run; no LTX or QA worker was launched; no live browser/Gradio submission or new folder-driven TRELLIS generation was attempted. The prior single-image cache-only FLUX→TRELLIS pass [38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076) remains separate evidence.
+- Authoritative fresh quota telemetry is still missing; no cache-miss download, dependency install, managed shared output write, process signal, QA queue change, or reserve-file modification was performed.
