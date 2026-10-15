@@ -1,6 +1,6 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-15 19:15 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-16 01:48 IST (Asia/Kolkata)
 **Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
@@ -312,3 +312,12 @@ CI [run 38744924124](https://github.com/Killer4K-N/OEC/actions/runs/38744924124)
 Intermediate run [38797010011](https://github.com/Killer4K-N/OEC/actions/runs/38797010011) exited non-zero because it correctly preserved dirty conflicts; its verified partial copies were retained and reconciled by the later run. The live checkout remains detached/dirty. No model download, package installation, new inference, or access to .storage_reserve.bin occurred. Root requirements.txt was absent. PR #11 remains open and unmerged.
 
 This establishes file synchronization and lightweight validation, not new live FLUX/TRELLIS inference, LTX worker startup, Gradio browser submission, or folder-based GLB generation. Earlier single-image runtime evidence is recorded separately at [run 38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076).
+
+
+## 2026-10-16 — QA worker source hardening (review branch; runtime not accepted)
+
+Reviewed the compliance worker after identifying that earlier validation covered pipeline/notebook structure but did not include a focused QA suite. The review-branch changes now validate the VLM response schema, separate malformed responses from content rejection, claim queue items atomically, recover only expired leases, preserve missing-file/metadata/runtime failure states, correct unique frame extraction paths across video formats, and prevent cache purge or model downloads by default. Fresh storage admission is required for normalized media and sidecar writes.
+
+A new helper and 15-test CPU-only suite were added, and the A100 synchronization workflow was updated to compile and run the branch suite before syncing only the helper. Seven prior scratch checks of the helper logic passed, but those were not the complete branch suite. No run/check status was returned for trigger commit [`b257edc`](https://github.com/Killer4K-N/OEC/commit/b257edced2d651b9913ddf72c6ace7c26db81edb), so neither CI acceptance nor A100 helper synchronization is confirmed.
+
+The persistent A100 `qa_compliance_worker.py` is locally modified and was intentionally preserved. No QA model was loaded, no production queue or media was touched, and no GPU QA service was tested. The QA candidate remains unmerged in [PR #11](https://github.com/Killer4K-N/OEC/pull/11). Before acceptance, the dirty live worker must be reconciled safely, its import of `tools.qa_checks` verified, and isolated cache-only runtime checks completed. Multi-frame video review and an audit-preserving rejection path remain open improvements.
