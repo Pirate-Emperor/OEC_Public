@@ -1,3 +1,2 @@
-Request targeted synchronization of OEC FLUX/TRELLIS/LTX support into the persistent A100 OEC checkout.
-Seven pipeline tools are already synced. This pass snapshots and replaces only the authorized TRELLIS entry point and TRELLIS notebooks after verifying backups, copies missing FLUX/combined entry points, preserves unrelated dirty files, and revalidates CLI/config/notebook syntax.
-The live checkout has no root requirements.txt; no dependencies are installed. No model download, inference, broad checkout reset, cache purge, or storage-reserve access.
+Request targeted synchronization of OEC pipeline support into the persistent A100 checkout on oec-1.
+This pass first compiles and runs the new CPU-only QA response-validation and SQLite lease tests from the reviewed branch, then syncs tools/qa_checks.py only if those tests pass. The modified live qa_compliance_worker.py remains a preserved dirty conflict and is not overwritten. No model downloads, package installs, inference, broad checkout reset, cache purge, or storage-reserve access.
