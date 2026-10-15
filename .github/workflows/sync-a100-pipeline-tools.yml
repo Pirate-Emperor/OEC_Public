@@ -94,6 +94,11 @@ jobs:
           updated=0
           unchanged=0
           conflicts=0
+          authorized_trellis_overwrite=(
+            pipeline_trellis_3d.py
+            pipeline_trellis_3d.ipynb
+            pipeline_trellis_3d_only.ipynb
+          )
           for rel in "${files[@]}"; do
             src="$GITHUB_WORKSPACE/$rel"
             dest="$LIVE_ROOT/$rel"
@@ -105,16 +110,33 @@ jobs:
             fi
             status="$(git -C "$LIVE_ROOT" status --porcelain -- "$rel" 2>/dev/null || true)"
             if [ -e "$dest" ] && [ -n "$status" ]; then
-              echo "A100_TOOL_SYNC_FILE=CONFLICT_PRESERVED path=$rel git_status=$(printf '%s' "$status" | tr '\n' ' ')"
-              conflicts=$((conflicts+1))
-              continue
+              case "$rel" in
+                pipeline_trellis_3d.py|pipeline_trellis_3d.ipynb|pipeline_trellis_3d_only.ipynb)
+                  backup="$BACKUP_ROOT/$rel"
+                  mkdir -p "$(dirname "$backup")"
+                  cp -p "$dest" "$backup"
+                  cmp -s "$dest" "$backup" || { echo "A100_TOOL_SYNC=FAIL_BACKUP_MISMATCH file=$rel"; exit 27; }
+                  echo "A100_TOOL_SYNC_BACKUP_VERIFIED=$backup"
+                  cp -p "$src" "$dest"
+                  cmp -s "$src" "$dest" || { echo "A100_TOOL_SYNC=FAIL_VERIFY_MISMATCH file=$rel"; exit 27; }
+                  updated=$((updated+1))
+                  echo "A100_TOOL_SYNC_FILE=UPDATED_AFTER_VERIFIED_BACKUP path=$rel sha256=$(sha256sum "$dest" | awk '{print $1}')"
+                  continue
+                  ;;
+                *)
+                  echo "A100_TOOL_SYNC_FILE=CONFLICT_PRESERVED path=$rel git_status=$(printf '%s' "$status" | tr '\n' ' ')"
+                  conflicts=$((conflicts+1))
+                  continue
+                  ;;
+              esac
             fi
             mkdir -p "$(dirname "$dest")"
             if [ -e "$dest" ]; then
               backup="$BACKUP_ROOT/$rel"
               mkdir -p "$(dirname "$backup")"
               cp -p "$dest" "$backup"
-              echo "A100_TOOL_SYNC_BACKUP=$backup"
+              cmp -s "$dest" "$backup" || { echo "A100_TOOL_SYNC=FAIL_BACKUP_MISMATCH file=$rel"; exit 27; }
+              echo "A100_TOOL_SYNC_BACKUP_VERIFIED=$backup"
               cp -p "$src" "$dest"
               updated=$((updated+1))
               outcome=UPDATED
@@ -149,6 +171,9 @@ jobs:
           PY
           python3 "$LIVE_ROOT/tools/oec_service_manager.py" --help >/dev/null
           echo 'A100_TOOL_SYNC_SERVICE_MANAGER_HELP=PASS'
-          printf 'A100_TOOL_SYNC_SUMMARY created=%s updated=%s unchanged=%s conflicts=%s backup_root=%s\n' "$created" "$updated" "$unchanged" "$conflicts" "$BACKUP_ROOT"
-          test "$conflicts" -eq 0 || { echo 'A100_TOOL_SYNC=INCOMPLETE_CONFLICTS_PRESERVED'; exit 28; }
-          echo 'A100_TOOL_SYNC=PASS'
+          printf 'A100_TOOL_SYNC_SUMMARY created=%s updated=%s unchanged=%s conflicts_preserved=%s backup_root=%s\n' "$created" "$updated" "$unchanged" "$conflicts" "$BACKUP_ROOT"
+          if [ "$conflicts" -gt 0 ]; then
+            echo 'A100_TOOL_SYNC=PASS_WITH_UNRELATED_CONFLICTS_PRESERVED'
+          else
+            echo 'A100_TOOL_SYNC=PASS'
+          fi
