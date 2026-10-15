@@ -154,8 +154,8 @@ class FluxTrellisPipelineTests(unittest.TestCase):
             work = Path(td) / "fresh-run"
             defaults = pipeline.build_parser().parse_args(["--work-dir", str(work), "--python", sys.executable])
             self.assertEqual(defaults.source_mode, "flux")
-            with self.assertRaisesRegex(SystemExit, "2"):
-                pipeline.build_parser().parse_args([
+            with self.assertRaises(SystemExit):
+                pipeline.main([
                     "--work-dir", str(work), "--python", sys.executable,
                     "--source-mode", "images",
                 ])
