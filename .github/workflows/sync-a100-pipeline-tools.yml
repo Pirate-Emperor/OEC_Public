@@ -19,6 +19,14 @@ jobs:
       - name: Check out the reviewed source revision
         uses: actions/checkout@v4
 
+      - name: Run isolated QA validation and queue regression tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cd "$GITHUB_WORKSPACE"
+          python3 -m py_compile qa_compliance_worker.py tools/qa_checks.py
+          python3 -m unittest discover -s tests -p 'test_qa_checks.py' -v
+
       - name: Back up and synchronize only the pipeline support files
         shell: bash
         run: |
@@ -78,6 +86,7 @@ jobs:
             tools/oec_cluster_services.example.json
             tools/oec_runner_probe.py
             tools/oec_service_manager.py
+            tools/qa_checks.py
             tools/trellis2_pipeline.json
             tools/trellis_offline.py
             pipeline_flux_image.py
@@ -156,7 +165,7 @@ jobs:
           python_files = [
               'tools/flux_gpu_admission.py', 'tools/ltx_worker_config.py',
               'tools/oec_runner_probe.py', 'tools/oec_service_manager.py',
-              'tools/trellis_offline.py', 'pipeline_flux_image.py',
+              'tools/qa_checks.py', 'tools/trellis_offline.py', 'pipeline_flux_image.py',
               'pipeline_flux_trellis.py', 'pipeline_trellis_3d.py',
               'worker_ltx_video.py', 'qa_compliance_worker.py',
           ]
