@@ -203,10 +203,6 @@ class QANode:
         print(f"[QA-NODE-GPU{self.gpu_id}] VLM Fully Loaded into VRAM.")
         
         if self.purge_after_load:
-            if os.environ.get("AIEROS_ALLOW_SHARED_MODEL_PURGE") != "1":
-                raise RuntimeError(
-                    "Model-cache purge is disabled unless AIEROS_ALLOW_SHARED_MODEL_PURGE=1 is set explicitly."
-                )
             DiskPurgeManager.purge_hf_model(self.repo_id)
 
     def analyze_and_tag(self, image_path):
@@ -291,7 +287,7 @@ class QANode:
             with managed_storage_operation(
                 "outputs",
                 required_gb=max(0.05, raw_size_gb * 1.25),
-                require_fresh_quota=False,
+                require_fresh_quota=True,
                 minimum_free_gb=float(
                     os.environ.get("AIEROS_OUTPUT_MIN_FREE_GB", "0.05")
                 ),
@@ -305,6 +301,8 @@ class QANode:
                     "-movflags", "+faststart",
                     target_path
                 ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            if not os.path.isfile(target_path) or os.path.getsize(target_path) <= 0:
+                raise RuntimeError("Quality improver produced no non-empty output file.")
             return True
         except Exception as e:
             print(f"[QA-NODE] Quality Improver failed: {e}")
@@ -313,7 +311,14 @@ class QANode:
 def sweep_stuck_jobs(db_path):
     """Recover only timestamped, expired QA leases; never reset a live claim."""
     try:
-        ensure_qa_lease_schema(db_path)
+        # Schema migration mutates the queue database under the output-storage policy.
+        with managed_storage_operation(
+            "outputs",
+            required_gb=0.01,
+            require_fresh_quota=True,
+            minimum_free_gb=float(os.environ.get("AIEROS_OUTPUT_MIN_FREE_GB", "0.05")),
+        ):
+            ensure_qa_lease_schema(db_path)
         stale_after = max(30, int(os.environ.get("AIEROS_QA_STALE_MINUTES", "180")))
         recovered = recover_stale_qa_jobs(db_path, stale_after)
         if recovered:
@@ -408,19 +413,33 @@ def process_qa_queue(purge_after_load=False, gpu_id=0):
                 improved_path = raw_path.with_name(f"{raw_path.stem}_qa_improved_{record_id}.mp4")
                 improved_vid_path = str(improved_path)
                 success = qa.improve_and_standardize_video(raw_vid_path, improved_vid_path)
-                
+
                 if success:
-                    if raw_vid_path.lower().endswith(('.mp4', '.webm', '.avi')):
-                        os.replace(improved_vid_path, raw_vid_path)
-                        
-                    with open(json_path, "w") as f:
+                    final_asset_path = raw_vid_path
+                    if raw_path.suffix.lower() in {".mp4", ".webm", ".avi"}:
+                        if raw_path.suffix.lower() == ".mp4":
+                            os.replace(improved_vid_path, raw_vid_path)
+                        else:
+                            # Preserve the source extension correctly: the normalized file is MP4.
+                            normalized_path = raw_path.with_name(
+                                f"{raw_path.stem}_qa_normalized_{record_id}.mp4"
+                            )
+                            if normalized_path.exists():
+                                normalized_path = raw_path.with_name(
+                                    f"{raw_path.stem}_qa_normalized_{record_id}_{time.time_ns()}.mp4"
+                                )
+                            os.replace(improved_vid_path, normalized_path)
+                            final_asset_path = str(normalized_path)
+                            metadata["qa_original_asset_path"] = raw_vid_path
+
+                    with open(json_path, "w", encoding="utf-8") as f:
                         json.dump(metadata, f, indent=4)
-                        
-                    new_size = os.path.getsize(raw_vid_path) + os.path.getsize(json_path)
+
+                    new_size = os.path.getsize(final_asset_path) + os.path.getsize(json_path)
                     with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
                         conn.execute(
-                            "UPDATE assets SET status = 'PENDING_UPLOAD', total_size_bytes = ?, qa_started_at = NULL, qa_worker_id = NULL WHERE id = ?", 
-                            (new_size, record_id)
+                            "UPDATE assets SET asset_path = ?, status = 'PENDING_UPLOAD', total_size_bytes = ?, qa_started_at = NULL, qa_worker_id = NULL WHERE id = ?",
+                            (final_asset_path, new_size, record_id),
                         )
                     print(f"[QA-NODE] QA Complete. Asset handed over to HF Upload Daemon.")
                 else:
