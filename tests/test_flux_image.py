@@ -71,23 +71,31 @@ class FluxImageTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "invalid PNG signature"):
                 flux.validate_png_file(invalid)
 
-    def test_flux_notebooks_use_shared_pipeline_and_keep_gradio(self):
-        for name, studio_index, port in (
-            ("pipeline_flux_only.ipynb", 6, "7864"),
-            ("pipeline_trellis_3d.ipynb", 12, "7863"),
-        ):
-            notebook = json.loads((ROOT / name).read_text(encoding="utf-8"))
-            self.assertEqual(notebook.get("nbformat"), 4, name)
-            studio = cell_source(notebook["cells"][studio_index])
-            self.assertIn("load_flux_pipeline", studio)
-            self.assertIn("create_gradio_demo", studio)
-            self.assertIn("demo_flux.launch(", studio)
-            self.assertIn("FLUX_SERVER_PORT = int(os.environ.get", studio)
-            self.assertIn(f'"{port}"', studio)
-            self.assertIn("server_port=FLUX_SERVER_PORT", studio)
-            self.assertIn("share=False", studio)
-            self.assertNotIn("guidance_scale=3.5", studio)
-            self.assertNotIn("kwargs", studio)
+    def test_flux_notebooks_keep_gradio_without_combined_gpu_collisions(self):
+        notebook = json.loads((ROOT / "pipeline_flux_only.ipynb").read_text(encoding="utf-8"))
+        self.assertEqual(notebook.get("nbformat"), 4)
+        studio = cell_source(notebook["cells"][6])
+        self.assertIn("load_flux_pipeline", studio)
+        self.assertIn("create_gradio_demo", studio)
+        self.assertIn("demo_flux.launch(", studio)
+        self.assertIn('FLUX_SERVER_PORT = int(os.environ.get', studio)
+        self.assertIn('"7864"', studio)
+        self.assertIn("server_port=FLUX_SERVER_PORT", studio)
+        self.assertIn("share=False", studio)
+        self.assertNotIn("guidance_scale=3.5", studio)
+        self.assertNotIn("kwargs", studio)
+
+        combined = json.loads((ROOT / "pipeline_trellis_3d.ipynb").read_text(encoding="utf-8"))
+        combined_studio = cell_source(combined["cells"][12])
+        self.assertIn("tools/oec_service_manager.py", combined_studio)
+        self.assertIn('["start", "flux-ui", "--gpu", FLUX_UI_GPU, "--port", str(FLUX_SERVER_PORT)]', combined_studio)
+        self.assertIn('FLUX_SERVER_PORT = int(os.environ.get("AIEROS_FLUX_GRADIO_PORT", "7863"))', combined_studio)
+        self.assertIn("FLUX_UI_GPU", combined_studio)
+        self.assertIn("TRELLIS_UI_GPU", combined_studio)
+        self.assertIn("different physical GPUs", combined_studio)
+        self.assertNotIn("load_flux_pipeline(", combined_studio)
+        self.assertNotIn("demo_flux.launch(", combined_studio)
+        self.assertIn("share=False", combined_studio)
 
     def test_runner_inventory_source_is_read_only(self):
         source = (ROOT / "tools" / "oec_runner_probe.py").read_text(encoding="utf-8")
