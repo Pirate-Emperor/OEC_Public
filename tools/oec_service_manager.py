@@ -138,10 +138,11 @@ def _proc_entry(pid: int) -> dict[str, Any] | None:
             return None
         state = tail[0]
         pgid = int(tail[2])  # proc stat field 5: pgrp
+        sid = int(tail[3])  # proc stat field 6: session
         start_time = int(tail[19])  # field 22: starttime, after fields 3..22
         cmdline_raw = Path(f"/proc/{pid}/cmdline").read_bytes()
         cmdline = cmdline_raw.replace(b"\0", b" ").decode("utf-8", "replace").strip()
-        return {"pid": pid, "pgid": pgid, "state": state, "start_time": start_time, "cmdline": cmdline}
+        return {"pid": pid, "pgid": pgid, "sid": sid, "state": state, "start_time": start_time, "cmdline": cmdline}
     except (OSError, ValueError, IndexError):
         return None
 
@@ -173,8 +174,26 @@ def _matching_members(state: dict[str, Any]) -> list[dict[str, Any]]:
     return [p for p in _group_members(pgid) if script in p["cmdline"]]
 
 
+def _managed_group_members(state: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return live descendants in the exact isolated session started by this supervisor."""
+    try:
+        pgid = int(state["pgid"])
+        expected_start = state.get("leader_start_time")
+    except (KeyError, TypeError, ValueError):
+        return []
+    members = [
+        p for p in _group_members(pgid)
+        if p.get("sid") == pgid and p.get("state") not in ("Z", "X")
+    ]
+    # Guard against a recycled leader PID if it is currently occupied by a different process.
+    leader = next((p for p in members if p["pid"] == pgid), None)
+    if leader is not None and expected_start is not None and leader["start_time"] != expected_start:
+        return []
+    return members
+
+
 def _is_running(state: dict[str, Any]) -> bool:
-    return bool(_matching_members(state))
+    return bool(_managed_group_members(state))
 
 
 def _save_state(state: dict[str, Any]) -> None:
@@ -250,6 +269,7 @@ def _launch(
     finally:
         log_handle.close()
 
+    leader_info = _proc_entry(proc.pid)
     state = {
         "schema_version": 1,
         "instance_id": instance_id,
@@ -258,6 +278,7 @@ def _launch(
         "host": HOST,
         "pid": proc.pid,
         "pgid": proc.pid,
+        "leader_start_time": leader_info.get("start_time") if leader_info else None,
         "script_path": str(script),
         "environment": env_name,
         "argv": argv,
@@ -288,18 +309,25 @@ def _stop_state(state: dict[str, Any], grace_seconds: float = 25.0) -> bool:
         return False
     deadline = time.monotonic() + grace_seconds
     while time.monotonic() < deadline:
-        if not _matching_members(state):
+        if not _managed_group_members(state):
             _emit(f"STOPPED service={state.get('instance_id')} gracefully")
             return True
         time.sleep(0.25)
-    # Escalate only while the exact recorded script remains in this exact managed group.
-    members = _matching_members(state)
+    # After the initial exact-script check and SIGTERM, include spawned multiprocessing
+    # children too; their argv often contains multiprocessing.spawn rather than the script.
+    members = _managed_group_members(state)
     if members:
-        _emit(f"GRACE_EXPIRED service={state.get('instance_id')}; verified members remain; sending SIGKILL to managed group only")
+        _emit(f"GRACE_EXPIRED service={state.get('instance_id')}; verified managed-session members remain; sending SIGKILL to that isolated group only")
         try:
             os.killpg(pgid, signal.SIGKILL)
         except ProcessLookupError:
             pass
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            if not _managed_group_members(state):
+                _emit(f"STOPPED service={state.get('instance_id')} after verified escalation")
+                return True
+            time.sleep(0.2)
     _emit(f"STOP_REQUESTED service={state.get('instance_id')}")
     return True
 
