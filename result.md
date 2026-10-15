@@ -1,6 +1,6 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-16 01:48 IST (Asia/Kolkata)
+**Last updated:** 2026-10-16 01:50 IST (Asia/Kolkata)
 **Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
@@ -321,3 +321,5 @@ Reviewed the compliance worker after identifying that earlier validation covered
 A new helper and 15-test CPU-only suite were added, and the A100 synchronization workflow was updated to compile and run the branch suite before syncing only the helper. Seven prior scratch checks of the helper logic passed, but those were not the complete branch suite. No run/check status was returned for trigger commit [`b257edc`](https://github.com/Killer4K-N/OEC/commit/b257edced2d651b9913ddf72c6ace7c26db81edb), so neither CI acceptance nor A100 helper synchronization is confirmed.
 
 The persistent A100 `qa_compliance_worker.py` is locally modified and was intentionally preserved. No QA model was loaded, no production queue or media was touched, and no GPU QA service was tested. The QA candidate remains unmerged in [PR #11](https://github.com/Killer4K-N/OEC/pull/11). Before acceptance, the dirty live worker must be reconciled safely, its import of `tools.qa_checks` verified, and isolated cache-only runtime checks completed. Multi-frame video review and an audit-preserving rejection path remain open improvements.
+
+- Additional safety follow-through: malformed model responses now become `FAILED_QA_OUTPUT`, not content rejection; clip frames are written to unique local `/tmp` files only after a free-space check; genuine `REJECTED_QA` assets keep the media, sidecar, queue row and rejection reason instead of deleting the audit trail. These paths still require an isolated fixture/runtime test.
