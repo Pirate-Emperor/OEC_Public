@@ -558,6 +558,284 @@ def show_logs(service: str, tail: int) -> None:
             print(f"Unable to read log: {exc}")
 
 
+
+CLUSTER_CONFIG_DEFAULT = REPO_ROOT / "tools" / "oec_cluster_services.local.json"
+CLUSTER_SERVICES = {"ltx-control", "ltx-worker", "qa", "flux-image", "flux-ui", "trellis-batch", "trellis-ui", "flux-trellis"}
+
+
+def _cluster_config(path: Path) -> dict[str, Any]:
+    try:
+        cfg = json.loads(path.expanduser().read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError(f"Cluster config not found: {path}. Copy tools/oec_cluster_services.example.json to tools/oec_cluster_services.local.json and edit node aliases.") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid cluster JSON: {exc}") from exc
+    if not isinstance(cfg, dict) or cfg.get("schema_version") != 1:
+        raise ValueError("Cluster config must have schema_version: 1.")
+    if not isinstance(cfg.get("nodes"), dict) or not cfg["nodes"]:
+        raise ValueError("Cluster config needs a non-empty nodes object.")
+    if not isinstance(cfg.get("profiles"), dict) or not cfg["profiles"]:
+        raise ValueError("Cluster config needs a non-empty profiles object.")
+    for name, node in cfg["nodes"].items():
+        if not isinstance(node, dict) or not isinstance(node.get("host"), str) or not node["host"]:
+            raise ValueError(f"nodes.{name}.host must be 'local' or an SSH hostname/alias.")
+        for key in ("project_dir", "conda_activate"):
+            if not isinstance(node.get(key), str) or not node[key]:
+                raise ValueError(f"nodes.{name}.{key} must be a non-empty string.")
+        if not 1 <= int(node.get("ssh_port", 22)) <= 65535:
+            raise ValueError(f"nodes.{name}.ssh_port must be in 1..65535.")
+    for name, tasks in cfg["profiles"].items():
+        if not isinstance(tasks, list) or not tasks:
+            raise ValueError(f"profiles.{name} must be a non-empty array.")
+        ids, seen_node_services = set(), set()
+        for i, task in enumerate(tasks):
+            where = f"profiles.{name}[{i}]"
+            if not isinstance(task, dict) or not task.get("id") or not task.get("node") or not task.get("service"):
+                raise ValueError(f"{where} requires id, node, and service.")
+            if task["id"] in ids:
+                raise ValueError(f"Duplicate task id {task['id']} in profile {name}.")
+            ids.add(task["id"])
+            if task["node"] not in cfg["nodes"]:
+                raise ValueError(f"{where}.node does not exist in nodes.")
+            if task["service"] not in CLUSTER_SERVICES:
+                raise ValueError(f"{where}.service {task['service']!r} is not supported.")
+            key = (task["node"], task["service"])
+            if key in seen_node_services:
+                raise ValueError(f"{where}: a profile may invoke each service at most once per node.")
+            seen_node_services.add(key)
+            if not isinstance(task.get("args", []), list) or not all(isinstance(a, str) for a in task.get("args", [])):
+                raise ValueError(f"{where}.args must be an array of strings.")
+    cfg["_config_path"] = str(path.expanduser().resolve())
+    return cfg
+
+
+def _cluster_shell_path(value: str) -> str:
+    if value == "~":
+        return '"$HOME"'
+    if value.startswith("~/"):
+        return '"$HOME"/' + shlex.quote(value[2:])
+    return shlex.quote(value)
+
+
+def _cluster_invoke(node: dict[str, Any], cfg: dict[str, Any], action: str, service: str,
+                    service_args: list[str], timeout: int = 60) -> subprocess.CompletedProcess:
+    conda_root = node.get("conda_root", cfg.get("conda_root", "~/Conda"))
+    if node["host"] == "local":
+        argv = [sys.executable, str(_script("tools/oec_service_manager.py")),
+                "--conda-root", str(Path(conda_root).expanduser()), action, service, *service_args]
+        return subprocess.run(argv, cwd=REPO_ROOT, capture_output=True, text=True, timeout=timeout, check=False)
+
+    project_dir = node["project_dir"]
+    activate = node["conda_activate"]
+    manager_env = node.get("manager_env", cfg.get("manager_env", "phase1_ltx"))
+    tail = shlex.join([action, service, *service_args])
+    remote_script = (
+        f"cd {_cluster_shell_path(project_dir)}"
+        f" && source {_cluster_shell_path(activate)}"
+        f" && conda activate {shlex.quote(manager_env)}"
+        f" && python tools/oec_service_manager.py --conda-root {_cluster_shell_path(conda_root)} {tail}"
+    )
+    target = f"{node['user']}@{node['host']}" if node.get("user") else node["host"]
+    ssh = ["ssh", "-T", "-p", str(int(node.get("ssh_port", 22))),
+           "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+           target, "bash -lc " + shlex.quote(remote_script)]
+    return subprocess.run(ssh, capture_output=True, text=True, timeout=timeout, check=False)
+
+
+def _cluster_tasks(cfg: dict[str, Any], profile: str, args: argparse.Namespace) -> list[dict[str, Any]]:
+    if profile not in cfg["profiles"]:
+        raise ValueError(f"Unknown cluster profile {profile!r}; available: {', '.join(sorted(cfg['profiles']))}.")
+    tasks = json.loads(json.dumps(cfg["profiles"][profile]))
+    for task in tasks:
+        task["args"] = list(task.get("args", []))
+        if task["service"] != "flux-trellis":
+            continue
+        mode, image_dir, recursive = args.source_mode, args.image_dir, args.recursive
+        if image_dir is not None and mode is None:
+            mode = "images"
+        if recursive and mode is None:
+            mode = "images"
+        if mode is not None:
+            if mode == "images" and image_dir is None and "--image-dir" not in task["args"]:
+                raise ValueError("--source-mode images requires --image-dir or a configured --image-dir in the profile.")
+            if mode == "flux":
+                image_dir, recursive = None, False
+            task["args"] = _set_flag(task["args"], "--source-mode", mode)
+        if image_dir is not None:
+            task["args"] = _set_flag(task["args"], "--image-dir", str(image_dir.expanduser()))
+        if recursive:
+            if "--recursive" not in task["args"]:
+                task["args"].append("--recursive")
+        else:
+            task["args"] = [a for a in task["args"] if a != "--recursive"]
+    return tasks
+
+
+def _set_flag(items: list[str], flag: str, value: str) -> list[str]:
+    out, i = [], 0
+    while i < len(items):
+        if items[i] == flag:
+            i += 2
+            continue
+        out.append(items[i])
+        i += 1
+    out.extend([flag, value])
+    return out
+
+
+def _cluster_preflight(node: dict[str, Any], cfg: dict[str, Any], service: str) -> None:
+    # This is a help-only check. It verifies reachability, working tree and CLI
+    # syntax on each node without starting a model or touching a GPU.
+    result = _cluster_invoke(node, cfg, "start", service, ["--help"], timeout=30)
+    if result.returncode:
+        detail = (result.stdout + "\n" + result.stderr).strip()[-1600:]
+        raise RuntimeError(f"Preflight failed for node {node['host']} service {service}: {detail}")
+
+
+def _cluster_manifest_dir() -> Path:
+    return STATE_ROOT / "clusters"
+
+
+def _cluster_manifest_path(rid: str) -> Path:
+    return _cluster_manifest_dir() / f"{_safe_id(rid)}.json"
+
+
+def _cluster_run_id() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + os.urandom(4).hex()
+
+
+def _cluster_load_run(run_id: str | None) -> dict[str, Any]:
+    folder = _cluster_manifest_dir()
+    files = sorted(folder.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True) if folder.exists() else []
+    if run_id is None:
+        if not files:
+            raise ValueError("No cluster run manifest found. Run cluster-start first.")
+        path = files[0]
+    else:
+        if not re.fullmatch(r"[A-Za-z0-9_.-]{1,100}", run_id):
+            raise ValueError("Invalid --run-id.")
+        path = _cluster_manifest_path(run_id)
+    if not path.is_file():
+        raise ValueError(f"Cluster run manifest not found: {path}")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _cluster_save_run(manifest: dict[str, Any]) -> Path:
+    folder = _cluster_manifest_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    path = _cluster_manifest_path(manifest["run_id"])
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+    return path
+
+
+def _cluster_print_plan(cfg: dict[str, Any], tasks: list[dict[str, Any]], rid: str) -> None:
+    print(f"CLUSTER_RUN_ID={rid} TASKS={len(tasks)}")
+    for t in tasks:
+        node = cfg["nodes"][t["node"]]
+        print(f"{t['id']}: node={t['node']} host={node['host']} service={t['service']} args={shlex.join(t['args'])}")
+
+
+def _cluster_start(args: argparse.Namespace) -> int:
+    cfg = _cluster_config(args.config)
+    rid = args.run_id or _cluster_run_id()
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,100}", rid):
+        raise ValueError("Invalid --run-id.")
+    tasks = _cluster_tasks(cfg, args.profile, args)
+    _cluster_print_plan(cfg, tasks, rid)
+    if args.dry_run:
+        print("CLUSTER_DRY_RUN=PASS; no SSH commands or services launched.")
+        return 0
+
+    # Check each distinct host and each service-specific CLI before starting
+    # the first daemon; prevents stale checkouts from causing avoidable partial starts.
+    seen = set()
+    for task in tasks:
+        key = (task["node"], task["service"])
+        if key in seen:
+            continue
+        seen.add(key)
+        _cluster_preflight(cfg["nodes"][task["node"]], cfg, task["service"])
+
+    manifest = {"schema_version": 1, "run_id": rid, "profile": args.profile,
+                "config_path": cfg["_config_path"], "created_at_utc": datetime.now(timezone.utc).isoformat(), "tasks": []}
+    failed = False
+    for task in tasks:
+        node = cfg["nodes"][task["node"]]
+        try:
+            result = _cluster_invoke(node, cfg, "start", task["service"], task["args"], timeout=90)
+            detail = (result.stdout + ("\n" + result.stderr if result.stderr else "")).strip()[-3000:]
+            owned = result.returncode == 0
+            entry = {"id": task["id"], "node": task["node"], "host": node["host"],
+                     "service": task["service"], "args": task["args"],
+                     "status": "STARTED" if owned else "FAILED", "owned_by_run": owned,
+                     "return_code": result.returncode, "detail": detail}
+            manifest["tasks"].append(entry)
+            print(f"CLUSTER_TASK_STATUS={entry['status']} id={task['id']} node={task['node']} service={task['service']}")
+            if not owned:
+                failed = True
+                if not args.continue_on_error:
+                    print("STOP_ON_FIRST_ERROR=1; use --continue-on-error to attempt remaining tasks.")
+                    break
+        except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
+            failed = True
+            manifest["tasks"].append({"id": task["id"], "node": task["node"], "host": node["host"],
+                                      "service": task["service"], "args": task["args"], "status": "ERROR",
+                                      "owned_by_run": False, "detail": f"{type(exc).__name__}: {exc}"})
+            print(f"CLUSTER_TASK_STATUS=ERROR id={task['id']} node={task['node']} error={exc}", file=sys.stderr)
+            if not args.continue_on_error:
+                break
+    path = _cluster_save_run(manifest)
+    print(f"CLUSTER_RUN_ID={rid}\nCLUSTER_MANIFEST={path}")
+    return 1 if failed else 0
+
+
+def _cluster_action(args: argparse.Namespace) -> int:
+    cfg = _cluster_config(args.config)
+    manifest = _cluster_load_run(args.run_id)
+    filters = getattr(args, "service", None)
+    node_filter = getattr(args, "node", None)
+    items = manifest["tasks"]
+    if filters:
+        items = [e for e in items if e["service"] == filters]
+    if node_filter:
+        items = [e for e in items if e["node"] == node_filter]
+    if not items:
+        raise ValueError("No cluster tasks match the requested service/node filter.")
+    failed = False
+    reverse = args.action == "cluster-stop"
+    for entry in reversed(items) if reverse else items:
+        if args.action == "cluster-stop" and not entry.get("owned_by_run"):
+            print(f"{entry['id']}: SKIP (not started by this cluster run)")
+            continue
+        node = cfg["nodes"].get(entry["node"])
+        if node is None:
+            raise ValueError(f"Node {entry['node']!r} is missing from the selected config.")
+        if args.action == "cluster-status":
+            action, task_args = "status", []
+        elif args.action == "cluster-stop":
+            action, task_args = "stop", ["--grace-seconds", str(args.grace_seconds)]
+        else:
+            action, task_args = "logs", ["--tail", str(args.tail)]
+        result = _cluster_invoke(node, cfg, action, entry["service"], task_args, timeout=90)
+        if result.stdout:
+            print(f"\n===== {entry['id']} | node={entry['node']} service={entry['service']} =====")
+            print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
+        if result.stderr:
+            print(result.stderr, file=sys.stderr, end="" if result.stderr.endswith("\n") else "\n")
+        if result.returncode:
+            failed = True
+    return 1 if failed else 0
+
+
+def _cluster_profiles(args: argparse.Namespace) -> int:
+    cfg = _cluster_config(args.config)
+    for name, tasks in sorted(cfg["profiles"].items()):
+        print(f"{name}: {len(tasks)} task(s)")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--conda-root", type=Path, default=DEFAULT_CONDA_ROOT,
