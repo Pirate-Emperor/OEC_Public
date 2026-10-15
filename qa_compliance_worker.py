@@ -179,6 +179,10 @@ class QANode:
             raise RuntimeError("QA worker requires a visible CUDA GPU; refusing an accidental CPU model load.")
         if process_vision_info is None:
             raise RuntimeError("qwen-vl-utils is missing; install it through the approved environment setup before QA.")
+        if self.purge_after_load and os.environ.get("AIEROS_ALLOW_SHARED_MODEL_PURGE") != "1":
+            raise RuntimeError(
+                "Model-cache purge was requested but is not authorized. Set AIEROS_ALLOW_SHARED_MODEL_PURGE=1 explicitly."
+            )
         from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
 
         self._ensure_downloaded_robustly()
