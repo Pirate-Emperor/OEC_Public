@@ -76,6 +76,7 @@ class OECServiceManagerTests(unittest.TestCase):
     def test_supervisor_uses_no_shell_and_records_specific_scripts(self):
         source = (ROOT / "tools" / "oec_service_manager.py").read_text(encoding="utf-8")
         self.assertIn("start_new_session=True", source)
+        self.assertIn('{"AIEROS_QA_GPU": gpu, "CUDA_VISIBLE_DEVICES": gpu}', source)
         self.assertIn("_matching_members(state)", source)
         self.assertIn('os.killpg(pgid, signal.SIGTERM)', source)
         self.assertNotIn("os.system(", source)
