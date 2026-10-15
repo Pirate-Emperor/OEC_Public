@@ -108,6 +108,21 @@ class OECServiceManagerHelpTests(unittest.TestCase):
         self.assertEqual(image_mode["args"][image_mode["args"].index("--image-dir") + 1], "/tmp/oec-test-images")
         self.assertIn("--recursive", image_mode["args"])
 
+    def test_cluster_profiles_plan_and_dry_run_use_the_example_config(self):
+        for command, marker in (
+            (["cluster-profiles"], "ltx-3node"),
+            (["cluster-plan", "mixed-stack"], "flux-ui-worker2"),
+            (["cluster-start", "flux-image-once", "--dry-run"], "CLUSTER_DRY_RUN=PASS"),
+        ):
+            with self.subTest(command=command):
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT), *command, "--config", str(EXAMPLE)],
+                    cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    timeout=10, check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout)
+                self.assertIn(marker, result.stdout)
+
     def test_invalid_config_rejects_unknown_service_and_duplicate_task_ids(self):
         valid = json.loads(EXAMPLE.read_text(encoding="utf-8"))
         cases = (
