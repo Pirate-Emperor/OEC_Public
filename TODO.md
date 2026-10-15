@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-16 01:50 IST (Asia/Kolkata)
+**Last updated:** 2026-10-16 02:02 IST (Asia/Kolkata)
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 
 
@@ -206,3 +206,16 @@ Tracking only on main: model/source changes remain on review branch fix/flux-tre
 - [ ] Separate follow-up — audit qa_compliance_worker.py import/CUDA visibility order in a focused change; no QA worker or queue was modified here.
 
 Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep main source unchanged unless a code merge is explicitly authorized.
+
+
+## 2026-10-16 02:02 IST — TRELLIS-only notebook quota and scratch-output repair
+
+- [x] Traced the cell-10 exception to an unconditional quota preflight that ran before the notebook checked whether installation/build steps were needed.
+- [x] Removed that early gate, made the basic dependency and pinned `utils3d` setup conditional, and kept each genuine install/clone/build/download gated by fresh quota admission.
+- [x] Improved blocked-write guidance: `storage_policy.py` reads but does not create the snapshot. Refresh through the site's approved login-node quota-metadata job; do not hand-create a snapshot or bypass the guard.
+- [x] Added default local-scratch generation to the TRELLIS-only Gradio notebook, including a different-filesystem check against model storage, 512 MiB minimum free-space check, and refusal to overwrite existing scratch GLBs. Shared output mode remains explicitly opt-in and quota-gated.
+- [x] Updated the background pipeline guide and added regression assertions for idempotent setup and scratch-mode safety.
+- [x] Expanded the `oec-1` sync pre-check to run QA, TRELLIS notebook static, and storage-write-admission test suites using the `phase2_3d` Python interpreter before overwriting the authorized notebook.
+- [ ] **Regression result not verified:** no new Actions status or run evidence was returned for the trigger commit [`647d762`](https://github.com/Killer4K-N/OEC/commit/647d7627dca9c8c6b8816b6f5cd3c2f7f4dd0b23). Do not call the suite passed without the job logs.
+- [ ] **Live sync not verified:** verify the A100 notebook contains `AIEROS_TRELLIS_UI_OUTPUT_MODE` and the new setup helper before restarting/rerunning the notebook.
+- [ ] After sync and static tests pass, run a cache-only notebook smoke test: cached TRELLIS model load, launch Gradio on port 7862, generate one GLB to validated `/tmp`, and reopen/validate the GLB. No model download or shared-storage write should be attempted without fresh quota telemetry.
