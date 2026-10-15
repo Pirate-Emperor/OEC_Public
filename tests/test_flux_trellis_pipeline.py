@@ -149,5 +149,40 @@ class FluxTrellisPipelineTests(unittest.TestCase):
         self.assertTrue(any("STAGE_TEST=PASS" in line for line in result["tail"]))
 
 
+    def test_source_mode_defaults_to_flux_and_folder_mode_is_explicit(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as td:
+            work = Path(td) / "fresh-run"
+            defaults = pipeline.build_parser().parse_args(["--work-dir", str(work), "--python", sys.executable])
+            self.assertEqual(defaults.source_mode, "flux")
+            with self.assertRaisesRegex(SystemExit, "2"):
+                pipeline.build_parser().parse_args([
+                    "--work-dir", str(work), "--python", sys.executable,
+                    "--source-mode", "images",
+                ])
+
+    def test_combined_source_image_folder_lists_supported_files_deterministically(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "b.PNG").write_bytes(b"b")
+            (root / "a.jpg").write_bytes(b"a")
+            (root / "notes.txt").write_text("ignore")
+            nested = root / "nested"
+            nested.mkdir()
+            (nested / "c.webp").write_bytes(b"c")
+            direct = pipeline._list_source_images(root, recursive=False)
+            self.assertEqual([p.name for p in direct], ["a.jpg", "b.PNG"])
+            recursive = pipeline._list_source_images(root, recursive=True)
+            self.assertEqual([p.relative_to(root).as_posix() for p in recursive],
+                             ["a.jpg", "b.PNG", "nested/c.webp"])
+
+    def test_combined_source_folder_rejects_missing_and_empty_directories(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with self.assertRaises(NotADirectoryError):
+                pipeline._list_source_images(root / "missing")
+            with self.assertRaises(FileNotFoundError):
+                pipeline._list_source_images(root)
+
+
 if __name__ == "__main__":
     unittest.main()
