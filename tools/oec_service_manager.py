@@ -863,6 +863,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     child = service_parser("start", "Start a managed service or service bundle.",
                            "Start one local OEC service. Process groups are tracked separately; no package installs or model downloads are performed.")
+    child.epilog = ("Safety: the LTX worker is always launched with --no-purge by this supervisor. "
+                    "Model-cache downloads and package installs are not performed.")
     child.add_argument("--gpus", help="Comma-separated physical GPU IDs for LTX worker, e.g. 2,3.")
     child.add_argument("--cluster-gpus", type=int, default=11,
                        help="Expected total LTX worker GPU count across nodes; used by the worker's coordinated maintenance logic (default: 11).")
