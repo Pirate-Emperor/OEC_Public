@@ -446,8 +446,9 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                 _optional_path_args(trellis_cmd, "--repo-dir", args.trellis_repo_dir)
                 expected_glbs = []
 
+            stage_timeout = args.trellis_timeout * len(input_files) if args.source_mode == "images" else args.trellis_timeout
             report["stages"]["trellis_generate"] = {"status": "PASS", **_run_stage(
-                "trellis_generate", trellis_cmd, env_trellis, args.trellis_timeout)}
+                "trellis_generate", trellis_cmd, env_trellis, stage_timeout)}
             if args.source_mode == "flux":
                 glb_paths = [work_dir / "trellis_asset.glb"]
             else:
