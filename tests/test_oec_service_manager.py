@@ -82,5 +82,22 @@ class OECServiceManagerTests(unittest.TestCase):
         self.assertNotIn("shell=True", source)
 
 
+    def test_shutdown_escalates_to_the_managed_group_after_parent_script_exits(self):
+        state = {
+            "instance_id": "ltx-worker", "pgid": 12345,
+            "script_path": "/repo/worker_ltx_video.py",
+            "leader_start_time": 123,
+        }
+        parent = [{"pid": 12345, "cmdline": "python /repo/worker_ltx_video.py"}]
+        child = [{"pid": 12346, "cmdline": "python -c multiprocessing.spawn"}]
+        with patch.object(manager, "_matching_members", return_value=parent), \\
+             patch.object(manager, "_managed_group_members", side_effect=[child, []]), \\
+             patch.object(manager.os, "killpg") as killpg:
+            self.assertTrue(manager._stop_state(state, grace_seconds=0))
+            self.assertEqual(killpg.call_count, 2)
+            self.assertEqual(killpg.call_args_list[0].args, (12345, signal.SIGTERM))
+            self.assertEqual(killpg.call_args_list[1].args, (12345, signal.SIGKILL))
+
+
 if __name__ == "__main__":
     unittest.main()
