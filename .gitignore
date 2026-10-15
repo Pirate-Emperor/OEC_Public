@@ -63,6 +63,9 @@ gpu/
 Wan2.1/
 LTX-2/
 
+# Per-user cluster host aliases and paths; use the checked-in example.
+tools/oec_cluster_services.local.json
+
 Miniconda3-latest-Linux-x86_64.sh
 
 # System / user-home state -- never part of OEC
