@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-16 01:48 IST (Asia/Kolkata)
+**Last updated:** 2026-10-16 01:50 IST (Asia/Kolkata)
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 
 
@@ -13,7 +13,8 @@
 - [ ] **CI result not verified:** no new Actions run/check status was returned for trigger commit [`b257edc`](https://github.com/Killer4K-N/OEC/commit/b257edced2d651b9913ddf72c6ace7c26db81edb). Do not mark the branch tests or live helper sync as passed until the actual job logs confirm them.
 - [ ] Reconcile the preserved dirty A100 `qa_compliance_worker.py` with the reviewed candidate before deploying the new import of `tools.qa_checks`; do not replace the local file blindly.
 - [ ] After review and fresh storage checks, exercise QA against isolated test media and a disposable SQLite fixture on `oec-1`, then perform a cache-only QA model check. Do not use the production queue or real assets for the first test.
-- [ ] Add multi-frame video review and retain rejection metadata/queue history. The current candidate still samples one representative frame and removes the queue record/sidecar for a genuine category-1 rejection.
+- [x] Preserve genuine category-1 rejections in the queue as `REJECTED_QA`; keep the asset and sidecar, and record `qa_rejection_reason` so rejected media is excluded from upload without erasing its audit trail.
+- [ ] Add multi-frame video review; the current candidate still samples one representative frame. Test the rejection path against isolated media and a disposable SQLite fixture before runtime acceptance.
 
 ## 2026-10-16 — A100 pipeline-tool and TRELLIS entry-point synchronization
 
