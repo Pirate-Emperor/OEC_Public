@@ -184,5 +184,41 @@ class FluxTrellisPipelineTests(unittest.TestCase):
                 pipeline._list_source_images(root)
 
 
+    def test_trellis_batch_mode_parser_and_sorted_folder_selection(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "z.png").write_bytes(b"z")
+            (root / "a.jpg").write_bytes(b"a")
+            (root / "skip.txt").write_text("skip")
+            nested = root / "deep"
+            nested.mkdir()
+            (nested / "middle.webp").write_bytes(b"m")
+
+            args = trellis_cli.build_parser().parse_args([
+                "--mode", "generate-batch", "--input-dir", str(root),
+                "--output-dir", str(root / "outputs"), "--recursive", "--scratch-output",
+            ])
+            self.assertEqual(args.mode, "generate-batch")
+            self.assertTrue(args.recursive)
+            self.assertEqual([p.relative_to(root).as_posix() for p in trellis_cli.list_input_images(root, True)],
+                             ["a.jpg", "deep/middle.webp", "z.png"])
+            self.assertEqual(trellis_cli._batch_output_name(1, root / "deep" / "middle.webp", root),
+                             "0001_deep__middle.glb")
+
+    def test_trellis_batch_folder_rejects_empty_and_symlink_images(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "outside.png"
+            target.write_bytes(b"x")
+            input_dir = root / "images"
+            input_dir.mkdir()
+            try:
+                (input_dir / "alias.png").symlink_to(target)
+            except OSError:
+                self.skipTest("symlinks are unavailable on this platform")
+            with self.assertRaises(FileNotFoundError):
+                trellis_cli.list_input_images(input_dir)
+
+
 if __name__ == "__main__":
     unittest.main()
