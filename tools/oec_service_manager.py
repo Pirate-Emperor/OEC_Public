@@ -414,6 +414,42 @@ def start_service(args: argparse.Namespace) -> None:
                 conda_root, args.python, {"CUDA_VISIBLE_DEVICES": None}, {gpu},
             ))
             return
+        if service == "trellis-batch":
+            gpu = str(args.gpu)
+            if not gpu.isdigit():
+                raise ValueError("--gpu must be a non-negative physical GPU index.")
+            _assert_gpu_available({gpu})
+            if args.image_dir is None:
+                raise ValueError("--image-dir is required for trellis-batch.")
+            input_dir = args.image_dir.expanduser().resolve()
+            if not input_dir.is_dir():
+                raise NotADirectoryError(f"Image folder not found: {input_dir}")
+            run_tag = datetime.now().strftime("%Y%m%d-%H%M%S") + f"-{os.getpid()}"
+            output_dir = (args.output_dir.expanduser().resolve() if args.output_dir else
+                          Path("/tmp") / f"oec-trellis-batch-{run_tag}")
+            try:
+                output_dir.relative_to(Path("/tmp").resolve())
+            except ValueError as exc:
+                raise ValueError("trellis-batch scratch output must be under local /tmp; managed output writes require a separate fresh-quota preflight.") from exc
+            if output_dir.exists():
+                raise FileExistsError(f"Refusing to reuse existing TRELLIS batch output directory: {output_dir}")
+            cmd_args = [
+                "--mode", "generate-batch", "--offline", "--scratch-output",
+                "--gpu", gpu, "--input-dir", str(input_dir),
+                "--output-dir", str(output_dir),
+                "--max-image-size", str(args.max_image_size),
+                "--decimation-target", str(args.decimation_target),
+                "--texture-size", str(args.texture_size),
+            ]
+            if args.recursive:
+                cmd_args.append("--recursive")
+            run_state = _launch(
+                f"trellis-batch-{run_tag}", service, _script("pipeline_trellis_3d.py"), "phase2_3d",
+                cmd_args, conda_root, args.python, {"CUDA_VISIBLE_DEVICES": None}, {gpu},
+            )
+            created.append(run_state)
+            _emit(f"TRELLIS_BATCH_OUTPUT_DIR={output_dir}")
+            return
         if service == "flux-trellis":
             if args.source_mode == "images":
                 if args.image_dir is None:
@@ -502,7 +538,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="action", required=True)
     for action in ("start", "stop", "status", "logs"):
         child = sub.add_parser(action)
-        child.add_argument("service", choices=("ltx-control", "ltx-worker", "qa", "flux-image", "flux-ui", "trellis-ui", "flux-trellis"))
+        child.add_argument("service", choices=("ltx-control", "ltx-worker", "qa", "flux-image", "flux-ui", "trellis-batch", "trellis-ui", "flux-trellis"))
         if action == "start":
             child.add_argument("--gpus", help="Physical GPU IDs for an LTX worker, e.g. 1,2,3.")
             child.add_argument("--cluster-gpus", type=int, default=11)
@@ -519,6 +555,10 @@ def build_parser() -> argparse.ArgumentParser:
             child.add_argument("--steps", type=int, default=4)
             child.add_argument("--guidance-scale", type=float, default=1.0)
             child.add_argument("--output", type=Path, help="FLUX-only output PNG path (must be under /tmp).")
+            child.add_argument("--output-dir", type=Path, help="TRELLIS batch GLB directory (must be under /tmp).")
+            child.add_argument("--max-image-size", type=int, default=1024)
+            child.add_argument("--decimation-target", type=int, default=100000)
+            child.add_argument("--texture-size", type=int, default=2048)
         if action == "stop":
             child.add_argument("--grace-seconds", type=float, default=25.0)
         if action == "logs":
