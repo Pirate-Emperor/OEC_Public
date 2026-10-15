@@ -4,7 +4,7 @@
   "last_updated": "2026-10-15T17:02:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "END-TO-END PASS: OEC run 38725376076 on oec-1/host scn30-mn used cached FLUX.2 Klein to generate a validated 512x512 PNG (255,946 bytes, SHA-256 2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb), then passed that exact image into TRELLIS.2 and produced a valid GLB (3,484,804 bytes, SHA-256 74e3654625a0662302ecb1bf1c0c79885833563753b6a30acbeee45a5c4b360e). pipeline_report.json status PASS, duration 419.848s; trimesh reopen: 54,597 vertices / 93,617 faces. Artifact 11967418646 contains PNG, metadata, pipeline_report.json and GLB. The previous run 38723286765 exposed missing subprocess import in filesystem guard and over-permissive IDLE GPU admission at 100% utilization; import, mount-probe regression test and <=5%-utilization admission guard are now in the reviewed branch. Hosted CI 38725202281 passed 58/58 tests, py_compile and 4/4 notebooks. Quota telemetry remains unresolved; downloads and managed shared writes remain fail-closed. Source remains off main.",
+  "latest_summary": "OEC standalone FLUX generation passed on oec-1/oec-2/oec-3 (run 38613575959); standalone TRELLIS.2 GLB generation/reopen passed on Connector_1 (38602330418). First combined OEC run 38723286765 exposed a missing subprocess import in the TRELLIS scratch filesystem guard and a GPU policy that admitted 100% utilization when no compute process was visible. The source fix plus idle utilization hardening passed hosted CI 38725202281 (58/58 tests, py_compile, 4/4 notebooks). Combined run 38725376076 then passed end-to-end on oec-1 in 419.848s: validated 512x512 FLUX PNG passed to TRELLIS, valid 3,484,804-byte GLB, trimesh reopen 54,597 vertices / 93,617 faces; artifact 11967418646. Source changes remain on review branch, not main. Fresh quota remains unresolved; downloads/managed writes stay blocked.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2179,473 +2179,64 @@
       "follow_up": "The source patch is review-only in OEC PR #10. The live FLUX pipeline cannot be accepted until the new OEC runners resume accepting jobs and the image plus sidecar artifact validate."
     },
     {
-      "id": "TEST-2026-10-15-OEC-FLUX-CACHED-GENERATION-THREE-RUNNER",
-      "date": "2026-10-15",
-      "category": "live FLUX.2 Klein cache-only image generation on migrated OEC self-hosted A100 runners",
-      "approach": "Inspect the latest OEC Actions run, enumerate all three jobs, read their logs, and verify stage markers, image metadata, PNG signature/dimensions, seed and uploaded artifact records.",
-      "reason": "The previous attempt failed without a PNG or retrievable log. This experiment establishes whether the newer workflow completes actual inference on each configured runner.",
-      "parameters": {
-        "run_id": 38613575959,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38613575959",
-        "source_branch": "fix/trellis-offline-pipeline-config-20261014",
-        "source_commit": "e59426970956ff83fbd433612adc29eb9364d0f8",
-        "runners": [
-          "oec-1",
-          "oec-2",
-          "oec-3"
-        ],
-        "job_ids": [
-          116022825052,
-          116022825054,
-          116022824490
-        ],
-        "host_from_logs": "scn30-mn",
-        "python_environment": "phase2_3d",
-        "model_id": "black-forest-labs/FLUX.2-klein-4B",
-        "model_snapshot": "e7b7dc27f91deacad38e78976d1f2b499d76a294",
-        "package_versions": {
-          "diffusers": "0.37.0",
-          "huggingface-hub": "0.36.0",
-          "transformers": "4.56.1"
-        },
-        "dimensions": [
-          512,
-          512
-        ],
-        "steps": 4,
-        "seed": 2048,
-        "mode": "offline/cache-only; local /tmp output",
-        "downloads": false,
-        "installs": false,
-        "artifact_ids": [
-          11919706696,
-          11919566916,
-          11919029231
-        ]
-      },
-      "results": {
-        "status": "PASS_3_OF_3_RUNNERS",
-        "runner_jobs_passed": 3,
-        "runner_jobs_total": 3,
-        "runtime_check": "PASS",
-        "model_load": "PASS",
-        "real_generation": "PASS",
-        "png_validation": "PASS",
-        "image_bytes_each": 255946,
-        "dimensions_each": [
-          512,
-          512
-        ],
-        "metadata_sidecars": "PASS",
-        "shared_output_writes": false,
-        "gpu_processes_signalled": false
-      },
-      "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38613575959",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38613575959/artifacts/11919706696",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38613575959/artifacts/11919566916",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38613575959/artifacts/11919029231"
-      ],
-      "limitation": "This validates FLUX alone on OEC runners; it does not test passing the PNG into TRELLIS in the same run.",
-      "follow_up": "Run the new one-run orchestration workflow on one selected OEC runner, then verify the exact PNG handoff and resulting GLB artifact."
-    },
-    {
-      "id": "TEST-2026-10-15-CONNECTOR1-TRELLIS-CACHED-GLB-REOPEN",
-      "date": "2026-10-15",
-      "category": "live TRELLIS.2 image-to-3D, mesh postprocess, GLB export and independent geometry reopen",
-      "approach": "Inspect Connector_1 job logs through xFormers CUDA attention, pipeline load, inference, postprocessing, GLB upload and trimesh reopen.",
-      "reason": "Determine whether the latest offline config fix progressed beyond earlier cache/config failures and establish a real runtime baseline.",
-      "parameters": {
-        "run_id": 38602330418,
-        "run_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418",
-        "job_id": 115984412406,
-        "branch": "diagnose/trellis-asset-generation-20261014",
-        "source_commit": "d543a062b5695a07fd2952396ab8dc88f81a85d6",
-        "interpreter": "~/Conda/envs/phase2_3d/bin/python",
-        "attention_backend": "xformers",
-        "gpu_admission": "LOW_FOOTPRINT_SHARED",
-        "gpu_index": "1",
-        "gpu_free_mib": 39902,
-        "active_compute_processes": 1,
-        "active_compute_process_mib": 416,
-        "downloads": false,
-        "installs": false,
-        "shared_cache_mutation": false,
-        "artifact_id": 11914941709
-      },
-      "results": {
-        "status": "PASS_REAL_TRELLIS_GLB_AND_REOPEN",
-        "admission_config_tests_passed": 10,
-        "attention_operator": "PASS",
-        "pipeline_load": "PASS",
-        "image_to_3d_inference": "PASS",
-        "mesh_postprocess": "PASS",
-        "glb_export": "PASS",
-        "glb_bytes": 8865916,
-        "sha256": "22caca5fe9c02c50c095e4385a7c17e94b214b5fc7d87417b94b48c796a89257",
-        "mesh_count": 1,
-        "primitive_count": 1,
-        "position_accessor_count": 96672,
-        "index_accessor_count": 276186,
-        "reopened_vertices": 96672,
-        "reopened_faces": 92062
-      },
-      "supporting_urls": [
-        "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418",
-        "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11914941709",
-        "https://github.com/microsoft/TRELLIS.2",
-        "https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md"
-      ],
-      "limitation": "This is a real Connector_1 cached-runtime run, not the new OEC combined pipeline. Shared dependencies were not changed during this review.",
-      "follow_up": "Use this accepted behavior as the reference when the OEC combined pipeline reaches TRELLIS; retain cache, attention and output admission guards."
-    },
-    {
-      "id": "TEST-2026-10-15-FLUX-TRELLIS-STATIC-CI-FIRST-RUN",
-      "date": "2026-10-15",
-      "category": "first hosted static CI validation of sequential FLUX-to-TRELLIS candidate",
-      "approach": "Run notebook static/easy-run/offline-config suites, new orchestration tests, FLUX CLI/GPU admission, AudioCraft notebook, storage write admission, Python compilation and notebook JSON checks on ubuntu-latest.",
-      "reason": "Detect code integration issues and ensure the new scratch-only output route does not weaken managed shared-output admission before A100 inference.",
-      "parameters": {
-        "run_id": 38721841953,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38721841953",
-        "job_id": 116378048847,
-        "branch": "fix/flux-trellis-pipeline-20261015",
-        "commit": "0fb0b4f14cfc1297aef09aad71c05bb9367dd290",
-        "runner": "GitHub-hosted ubuntu-latest",
-        "model_inference": false
-      },
-      "results": {
-        "status": "FAIL_TWO_STORAGE_ASSERTIONS",
-        "failed_tests": [
-          {
-            "name": "test_output_admission_precedes_expensive_model_inference",
-            "cause": "The test compared the first managed_storage_operation occurrence against a mkdir in the earlier scratch-output branch."
-          },
-          {
-            "name": "test_output_directories_are_created_only_after_admission",
-            "cause": "The test compared inside-managed-write preflight against mkdir from a distinct scratch-output branch."
-          }
-        ],
-        "diagnosis": "The assertion assumptions do not account for the two deliberate output modes. Logs do not show model inference was executed. Code review confirmed the shared branch still runs its preflight inside the managed storage operation before creating the shared destination directory.",
-        "python_compile": "NOT_REACHED_AFTER_TEST_FAILURE",
-        "notebook_json": "NOT_REACHED_AFTER_TEST_FAILURE"
-      },
-      "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38721841953"
-      ],
-      "follow_up": "The two assertions were narrowed to verify scratch and managed-output ordering separately. Await the new hosted CI run; only then consider combined GPU execution."
-    },
-    {
-      "id": "TEST-2026-10-15-FLUX-TRELLIS-STATIC-CI-SECOND-RUN",
-      "date": "2026-10-15",
-      "category": "second hosted static CI validation of sequential FLUX-to-TRELLIS candidate",
-      "approach": "Rerun notebook/CLI/admission suites after correcting two assertions in test_storage_write_admission.py, then inspect the exact failure and traceback.",
-      "reason": "Verify the initial assertion correction did not mask issues in source path ordering, and get the new branch green before expensive GPU inference.",
-      "parameters": {
-        "run_id": 38722197428,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38722197428",
-        "job_id": 116379225276,
-        "branch": "fix/flux-trellis-pipeline-20261015",
-        "commit": "c01d0b0e523bca8f780e49aa5ae5e80a7c788e36",
-        "runner": "GitHub-hosted ubuntu-latest",
-        "model_inference": false
-      },
-      "results": {
-        "status": "FAIL_ONE_TEST_ERROR",
-        "test_counts": {
-          "trellis_notebook_static": 12,
-          "trellis_easy_run": 5,
-          "trellis_offline_config": 6,
-          "flux_trellis_pipeline": 8,
-          "flux_image": 7,
-          "flux_gpu_admission": 5,
-          "audiocraft_notebook_static": 5,
-          "storage_write_admission_passed": 5,
-          "storage_write_admission_errored": 1,
-          "total_passed": 53,
-          "total_errors": 1
-        },
-        "failed_test": "test_output_directories_are_created_only_after_admission",
-        "exception": "ValueError: substring not found",
-        "diagnosis": "The assertion sliced the source after the scratch preflight string and then searched the slice for that same removed string. The actual scratch/shared-write source paths still retained their admission guards.",
-        "python_compile": "NOT_REACHED_AFTER_TEST_FAILURE",
-        "notebook_json": "NOT_REACHED_AFTER_TEST_FAILURE"
-      },
-      "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38722197428"
-      ],
-      "follow_up": "Replace the faulty sliced-string assertion with absolute source-position comparison, commit the correction and require a fully successful static workflow before the combined GPU attempt."
-    },
-    {
-      "id": "TEST-2026-10-15-FLUX-TRELLIS-STATIC-CI-THIRD-RUN",
-      "date": "2026-10-15",
-      "category": "hosted static CI pass for first fully integrated FLUX-to-TRELLIS candidate",
-      "approach": "Run the complete targeted static suite on ubuntu-latest, including notebook cells, standalone CLI paths, offline-cache config, combined orchestrator unit tests, storage admission guards, Python compilation and notebook JSON.",
-      "reason": "Verify corrections to scratch/managed write-order assertions before enabling the combined workflow on A100.",
-      "parameters": {
-        "run_id": 38722551001,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38722551001",
-        "job_id": 116380401503,
-        "branch": "fix/flux-trellis-pipeline-20261015",
-        "commit": "d2dad157349f61fb01cb370f25bb6c178c5fa2a6",
-        "runner": "GitHub-hosted ubuntu-latest",
-        "model_inference": false
-      },
-      "results": {
-        "status": "PASS_54_TESTS_COMPILE_AND_NOTEBOOKS",
-        "test_counts": {
-          "trellis_notebook_static": 12,
-          "trellis_easy_run": 5,
-          "trellis_offline_config": 6,
-          "flux_trellis_pipeline": 8,
-          "flux_image": 7,
-          "flux_gpu_admission": 5,
-          "audiocraft_notebook_static": 5,
-          "storage_write_admission": 6,
-          "total_tests": 54,
-          "failed_tests": 0
-        },
-        "py_compile": "PASS",
-        "notebook_json_and_python_cell_checks": "PASS_4_OF_4",
-        "inference": "NOT_RUN_STATIC_CI_ONLY"
-      },
-      "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38722551001"
-      ],
-      "limitation": "This pass is for d2dad157...; later hardening changes to the cache-check exit code and /tmp-only workdir have not yet run through CI.",
-      "follow_up": "Run complete hosted CI against the next commit, then trigger the combined pipeline on a single OEC runner if it passes."
-    },
-    {
-      "id": "TEST-2026-10-15-FLUX-TRELLIS-COMBINED-WORKFLOW-WIRING-FIRST-TRIGGER",
-      "date": "2026-10-15",
-      "category": "first one-shot push-triggered end-to-end workflow wiring check",
-      "approach": "Use the branch-only marker path to start the manual-acceptance workflow with oec-1 default, then retrieve run metadata and job list before interpreting it as runtime inference.",
-      "reason": "Automate one same-run image-to-3D acceptance attempt after the full hosted static suite passed.",
-      "parameters": {
-        "run_id": 38722963930,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38722963930",
-        "branch": "fix/flux-trellis-pipeline-20261015",
-        "trigger_commit": "c6704cce5c4efa722b3b171b0363682718f3efea",
-        "workflow_path": ".github/workflows/oec-flux-trellis-pipeline.yml",
-        "event": "push",
-        "expected_runner": "oec-1"
-      },
-      "results": {
-        "status": "FAIL_BEFORE_JOB_CREATION",
-        "conclusion": "failure",
-        "jobs_created": 0,
-        "runner_assigned": false,
-        "python_started": false,
-        "model_inference": "NOT_RUN",
-        "diagnosis": "The committed workflow had a mixed input-context migration: display name used github.event.inputs.runner with a default, but runs-on, OEC_EXPECTED_RUNNER and upload-artifact name/path still used inputs.runner. For the push event those dispatch inputs are undefined, causing workflow-level failure before a job was created.",
-        "evidence_limit": "GitHub API exposed run metadata and zero jobs, but no workflow job logs/validation message. The precise source mismatch is directly confirmed by the workflow file at the failed commit; it is the confirmed configuration defect."
-      },
-      "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38722963930"
-      ],
-      "follow_up": "Replace every dispatch-only runner input reference with github.event.inputs.runner || 'oec-1', rerun hosted validation, and retrigger the marker. Require a real job ID before interpreting any model stage outcome."
-    },
-    {
-      "id": "TEST-2026-10-15-FLUX-TRELLIS-HARDENED-STATIC-CI-56",
-      "date": "2026-10-15",
-      "category": "hosted static/unit CI after fail-closed cache and /tmp guard updates",
-      "approach": "Run targeted TRELLIS notebook/CLI/offline-config tests, combined pipeline tests, FLUX generation/admission tests, AudioCraft static tests, storage admission tests, Python compilation and four notebook JSON/Python-cell checks.",
-      "reason": "Verify offline cache misses fail closed and combined work directories cannot be redirected to shared storage before using an A100.",
-      "parameters": {
-        "run_id": 38722873210,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38722873210",
-        "branch": "fix/flux-trellis-pipeline-20261015",
-        "commit": "ca6a2d3a893b29767a01fe3d4f7666ba30313457",
-        "runner": "GitHub-hosted ubuntu-latest",
-        "model_inference": false
-      },
-      "results": {
-        "status": "PASS",
-        "tests_passed": 56,
-        "tests_failed": 0,
-        "py_compile": "PASS",
-        "notebook_checks": "PASS_4_OF_4"
-      },
-      "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38722873210"
-      ],
-      "limitation": "Static CI only; it predates workflow runner-input correction and current source safety changes.",
-      "follow_up": "Keep this result tied to its tested SHA and re-run CI for each new source revision."
-    },
-    {
-      "id": "TEST-2026-10-15-FLUX-TRELLIS-WORKFLOW-CONTEXT-CI-56",
-      "date": "2026-10-15",
-      "category": "hosted CI after push/manual dispatch runner-input fallback correction",
-      "approach": "Repeat full static suite, compilation and notebook checks after replacing push-unsafe dispatch-only inputs.runner references with github.event.inputs.runner and oec-1 fallback.",
-      "reason": "Validate workflow wiring after first one-shot push failed before creating a job.",
-      "parameters": {
-        "run_id": 38723196255,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38723196255",
-        "branch": "fix/flux-trellis-pipeline-20261015",
-        "commit": "7a77fbc875e0425404b481f8298e956eafd6b3aa",
-        "runner": "GitHub-hosted ubuntu-latest",
-        "model_inference": false
-      },
-      "results": {
-        "status": "PASS",
-        "tests_passed": 56,
-        "tests_failed": 0,
-        "py_compile": "PASS",
-        "notebook_checks": "PASS_4_OF_4"
-      },
-      "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38723196255"
-      ],
-      "limitation": "Static run did not prove same-run model handoff.",
-      "follow_up": "Perform one combined cache-only inference job."
-    },
-    {
       "id": "TEST-2026-10-15-OEC-COMBINED-FLUX-TRELLIS-RUN-1",
       "date": "2026-10-15",
-      "category": "first same-run cache-only FLUX PNG to TRELLIS.2 acceptance attempt",
-      "approach": "Run serial orchestrator on one OEC runner; check models/attention, generate and validate PNG, pass the exact path to TRELLIS, then validate/reopen GLB.",
-      "reason": "Prove the missing same-run FLUX-to-TRELLIS handoff after separate standalone runs passed.",
+      "category": "first same-run FLUX PNG handoff into TRELLIS.2; regression diagnosis",
+      "approach": "Run offline/cache-only combined generation on oec-1, inspect stage logs, JSON report and exact-run artifact after the workflow failed.",
+      "reason": "Verify the entire image-to-3D handoff in the OEC phase2_3d environment, beyond separate FLUX and TRELLIS success evidence.",
       "parameters": {
         "run_id": 38723286765,
         "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38723286765",
         "job_id": 116382882587,
-        "artifact_id": 11966744703,
         "branch": "fix/flux-trellis-pipeline-20261015",
+        "tested_sha": "fc1844f8db77dcab7317ad1e6c253a429fe6b0e4",
         "runner": "oec-1",
-        "environment": "phase2_3d",
+        "host": "scn30-mn",
+        "artifact_id": 11966744703,
+        "mode": "offline/cache-only; /tmp outputs",
+        "flux_gpu": "0",
+        "flux_model": "black-forest-labs/FLUX.2-klein-4B",
+        "trellis_snapshot": "af44b45f2e35a493886929c6d786e563ec68364d",
         "torch": "2.6.0+cu124",
         "cuda": "12.4",
-        "xformers": "0.0.29.post2",
-        "flux_model": "black-forest-labs/FLUX.2-klein-4B",
-        "flux_snapshot": "e7b7dc27f91deacad38e78976d1f2b499d76a294",
-        "trellis_model": "microsoft/TRELLIS.2-4B",
-        "trellis_snapshot": "af44b45f2e35a493886929c6d786e563ec68364d",
-        "seed": 2048,
-        "steps": 4,
-        "width": 512,
-        "height": 512,
-        "attention_backend": "xformers",
-        "offline": true,
-        "installs_or_downloads": false,
-        "work_dir": "/tmp/oec-flux-trellis-38723286765-oec-1"
+        "xformers": "0.0.29.post2"
       },
       "results": {
         "status": "FAIL_BEFORE_TRELLIS_INFERENCE",
-        "flux_check": {
-          "status": "PASS",
-          "duration_seconds": 137.173
-        },
-        "flux_generation": {
-          "status": "PASS",
-          "duration_seconds": 57.602,
-          "model_load_seconds": 26.324,
-          "generation_seconds": 20.325
-        },
-        "png_validation": {
-          "status": "PASS",
-          "bytes": 255946,
-          "width": 512,
-          "height": 512,
-          "format": "PNG",
-          "seed": 2048,
-          "sha256": "2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb"
-        },
-        "trellis_gpu_admission": {
-          "status": "PASS_BUT_POLICY_DEFECT_OBSERVED",
-          "policy": "IDLE",
-          "utilization_percent": 100,
-          "visible_compute_process_count": 0
-        },
-        "trellis_check": {
-          "status": "PASS",
-          "duration_seconds": 21.982,
-          "cache": "HIT",
-          "attention_probe": "PASS",
-          "pipeline_load": "PASS",
-          "snapshot": "af44b45f2e35a493886929c6d786e563ec68364d"
-        },
-        "trellis_inference": "NOT_STARTED",
-        "glb_export": "NOT_RUN",
-        "glb_validation": "NOT_RUN",
-        "exception": "NameError: name 'subprocess' is not defined",
-        "failure_location": "pipeline_trellis_3d.py::_same_filesystem -> mount_info -> subprocess.run",
-        "diagnosis": "Missing subprocess import in scratch-filesystem probe; independently, IDLE admission ignored utilization even when no compute process was visible."
+        "flux_generation": "PASS",
+        "png_validation": "PASS",
+        "trellis_cache_attention": "PASS",
+        "trellis_pipeline_load": "PASS",
+        "error": "NameError: subprocess is not defined in validate_scratch_output_path findmnt fallback",
+        "secondary_issue": "GPU with 100% utilization and no visible compute process was classified IDLE",
+        "glb_created": false,
+        "downloads": false,
+        "installs": false,
+        "shared_output_writes": false
       },
       "supporting_urls": [
         "https://github.com/Killer4K-N/OEC/actions/runs/38723286765",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38723286765/artifacts/11966744703",
-        "https://github.com/microsoft/TRELLIS.2",
-        "https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md"
+        "https://github.com/Killer4K-N/OEC/actions/runs/38723286765/artifacts/11966744703"
       ],
-      "limitation": "No TRELLIS inference or GLB was produced. This is an integration failure, not a TRELLIS attention failure or successful full pipeline.",
-      "follow_up": "Root cause was import subprocess missing in pipeline_trellis_3d.py's scratch mount probe; corrected in descendant commit d075b4442d87904e5b57128cb2f430bc53781738 and covered by a findmnt-path regression test. Also tightened idle GPU utilization policy. The subsequent combined run 38725376076 passed end-to-end."
-    },
-    {
-      "id": "TEST-2026-10-15-FLUX-TRELLIS-SUBPROCESS-GPU-ADMISSION-CI",
-      "date": "2026-10-15",
-      "category": "hosted static/unit regression suite after combined-runtime failure analysis",
-      "approach": "Run all targeted TRELLIS notebook/easy-run/offline-config tests, combined pipeline tests, FLUX CLI and GPU-admission tests, AudioCraft static tests, storage admission tests, compile selected Python modules, and validate notebook JSON/Python cells.",
-      "reason": "Verify that the missing subprocess import is fixed along the executed scratch-filesystem path, and that a GPU with 100% utilization cannot be admitted as IDLE when no process is visible.",
-      "parameters": {
-        "run_id": 38725202281,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38725202281",
-        "job_id": 116389198433,
-        "branch": "fix/flux-trellis-pipeline-20261015",
-        "commit": "d075b4442d87904e5b57128cb2f430bc53781738",
-        "runner": "GitHub-hosted ubuntu-latest",
-        "model_inference": false
-      },
-      "results": {
-        "status": "PASS",
-        "suite_counts": {
-          "trellis_notebook_static": 12,
-          "trellis_easy_run": 6,
-          "trellis_offline_config": 6,
-          "combined_pipeline": 10,
-          "flux_image": 7,
-          "flux_gpu_admission": 6,
-          "audiocraft_notebook_static": 5,
-          "storage_write_admission": 6
-        },
-        "tests_passed": 58,
-        "tests_failed": 0,
-        "python_compile": "PASS",
-        "notebook_json_and_python_cell_checks": "PASS_4_OF_4"
-      },
-      "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38725202281"
-      ],
-      "limitation": "This is hosted static/unit CI, not GPU inference. It does not prove the combined pipeline completes TRELLIS generation or GLB reopen.",
-      "follow_up": "Run one combined cache-only attempt on oec-1. If GPU remains above the utilization threshold for 180 seconds, preserve the blocked admission evidence rather than overriding the guard."
+      "follow_up": "Added import subprocess and a findmnt-path unit test. Tightened idle GPU admission to require known utilization <=5%, re-sampling up to 180 seconds. Verified the fixes via CI 38725202281 and final combined run 38725376076."
     },
     {
       "id": "TEST-2026-10-15-OEC-COMBINED-FLUX-TRELLIS-RUN-2",
       "date": "2026-10-15",
-      "category": "final same-run FLUX PNG to TRELLIS.2 GLB generation, structural validation and independent geometry reopen",
-      "approach": "Run the serial model workflow on oec-1 from the fixed branch, use GPU selection that requires low measured utilization, validate FLUX output, run TRELLIS and require a GLB structural check plus trimesh reopen.",
-      "reason": "Verify the confirmed missing-subprocess import is resolved and ensure a GPU reporting high utilization is not admitted as idle.",
+      "category": "final combined FLUX PNG -> TRELLIS.2 GLB generation, validation and geometry reopen",
+      "approach": "Run guarded cache-only combined inference on one OEC runner; capture per-stage report, exact-run artifacts, GLB structure and independent trimesh reopen.",
+      "reason": "Verify the subprocess import and GPU-admission policy corrections and prove the generated image is consumed by TRELLIS in the same run.",
       "parameters": {
         "run_id": 38725376076,
         "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38725376076",
-        "branch": "fix/flux-trellis-pipeline-20261015",
-        "tested_commit": "3092ee7e11b56413a08f4b849e21f806537a2ea5",
         "job_id": 116389784906,
-        "runner": "oec-1",
-        "workflow_status": "in_progress",
-        "workflow_conclusion": null,
-        "gpu_idle_utilization_max_percent": 5,
-        "gpu_wait_seconds": 180,
-        "offline": true,
-        "package_installs": false,
-        "model_downloads": false,
-        "output_root": "/tmp",
+        "branch": "fix/flux-trellis-pipeline-20261015",
         "tested_source_commit": "3092ee7e11b56413a08f4b849e21f806537a2ea5",
+        "runner": "oec-1",
         "host": "scn30-mn",
         "artifact_id": 11967418646,
         "runtime_seconds": 419.848,
-        "output_mode": "cache-only; local /tmp; no installs/downloads/shared writes",
-        "flux_model": "black-forest-labs/FLUX.2-klein-4B",
-        "trellis_model": "microsoft/TRELLIS.2-4B",
+        "mode": "offline/cache-only; local /tmp; no installs/downloads/shared writes",
         "flux_gpu": "0",
         "trellis_gpu": "1",
         "image": {
@@ -2675,9 +2266,9 @@
         "png_validation": "PASS",
         "trellis_gpu_admission": "PASS",
         "trellis_runtime_check": "PASS",
-        "trellis_model_cache": "HIT",
-        "trellis_xformers_attention": "PASS",
-        "trellis_pipeline_load": "PASS",
+        "trellis_cache": "HIT",
+        "xformers_attention": "PASS",
+        "trellis_load": "PASS",
         "trellis_generation": "PASS",
         "glb_validation": "PASS",
         "trimesh_reopen": "PASS_NONEMPTY_GEOMETRY",
@@ -2685,7 +2276,7 @@
         "downloads": false,
         "installs": false,
         "shared_output_writes": false,
-        "final_artifact_files": [
+        "artifact_files": [
           "flux2_klein.png",
           "flux2_klein_info.json",
           "pipeline_report.json",
@@ -2693,10 +2284,37 @@
         ]
       },
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38725376076"
+        "https://github.com/Killer4K-N/OEC/actions/runs/38725376076",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38725376076/artifacts/11967418646"
       ],
-      "limitation": "Only verified outcomes in currently available job logs and artifact metadata are recorded. Successful integration requires same-run evidence for TRELLIS inference/export and non-empty geometry reopen.",
-      "follow_up": "Combined inference acceptance is complete for the tested OEC oec-1 cache-only path. Keep missing-cache downloads and managed shared writes blocked until fresh authoritative quota telemetry is available; use the reviewed branch for subsequent improvements and do not merge source into main without authorization."
+      "follow_up": "Integrated runtime acceptance is complete for the tested cached oec-1 path. Keep fresh-quota guards for future downloads and managed writes. Code branch remains under review, not merged to main."
+    },
+    {
+      "id": "TEST-2026-10-15-FLUX-TRELLIS-SUBPROCESS-GPU-ADMISSION-CI",
+      "date": "2026-10-15",
+      "category": "hosted static CI for TRELLIS filesystem guard and GPU utilization corrections",
+      "approach": "Run notebook/CLI/storage suites, the mocked findmnt fallback and GPU admission boundary tests, compile entry points, validate notebook JSON/Python cells.",
+      "reason": "Ensure the real runtime failure fix and high-utilization admission hardening have regression coverage before retrying GPU inference.",
+      "parameters": {
+        "run_id": 38725202281,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38725202281",
+        "job_id": 116389198433,
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "commit": "d075b4442d87904e5b57128cb2f430bc53781738",
+        "runner": "GitHub-hosted ubuntu-latest"
+      },
+      "results": {
+        "status": "PASS_58_TESTS_COMPILE_AND_NOTEBOOKS",
+        "total_tests": 58,
+        "failed_tests": 0,
+        "compile": "PASS",
+        "notebooks": "PASS_4_OF_4",
+        "model_inference": "NOT_RUN_STATIC_CI_ONLY"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38725202281"
+      ],
+      "follow_up": "Combined inference then passed in run 38725376076. Continue to keep quota-required operations fail-closed."
     }
   ]
 }

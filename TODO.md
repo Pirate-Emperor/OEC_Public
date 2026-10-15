@@ -149,82 +149,15 @@ The official Diffusers release notes list Flux2 Klein support in v0.37.0; the cu
 - [ ] **BLOCKED — runner availability / stale queue:** runs [38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955), [38613199844](https://github.com/Killer4K-N/OEC/actions/runs/38613199844) and [38613575959](https://github.com/Killer4K-N/OEC/actions/runs/38613575959) remain queued/partly failed without available runner assignments. Verify oec-1/oec-2/oec-3 are Online/Idle, cancel old queued attempts, then push `.github/flux-smoke.trigger` or use workflow dispatch for a clean run.
 - [ ] No fresh quota snapshot; do not install dependencies/download model weights until approved telemetry is available.
 
-## 2026-10-15 — FLUX runtime verified; sequential FLUX-to-TRELLIS candidate
+## 2026-10-15 — FLUX/TRELLIS integration fixed and verified on review branch
 
-This section supersedes older October 14 TODO statements that FLUX image generation had not yet passed. The earlier failures remain historical records.
+Tracking only on main: model/source changes remain on review branch fix/flux-trellis-pipeline-20261015; no code merge was made by this record update.
 
-- [x] FLUX cache-only inference on OEC runners: [run 38613575959](https://github.com/Killer4K-N/OEC/actions/runs/38613575959) completed generation and PNG/metadata validation on all three runner jobs (oec-1, oec-2, oec-3). Each produced a 512×512, 255,946-byte PNG and JSON metadata; model black-forest-labs/FLUX.2-klein-4B; four inference steps; seed 2048; diffusers 0.37.0, huggingface-hub 0.36.0, transformers 4.56.1. This was offline/cache-only and local /tmp output, without installs, downloads, shared output writes, or GPU process changes.
-- [x] TRELLIS.2 cache-only generation: [Connector_1 run 38602330418](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418) loaded the pipeline, passed the xFormers CUDA attention path, ran inference/postprocessing, exported and reopened a GLB. [Artifact 11914941709](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11914941709) is 8,865,916 bytes, SHA-256 22caca5fe9c02c50c095e4385a7c17e94b214b5fc7d87417b94b48c796a89257; independent reopen reported 96,672 vertices and 92,062 faces. This is a Connector_1 standalone result, not an OEC combined-pipeline run.
-- [x] Current source-of-truth audit: main is 99d9796d5bd5afc1731600b310ced3b5be521ee9; older candidate fix/trellis-offline-pipeline-config-20261014 is e59426970956ff83fbd433612adc29eb9364d0f8. Existing PR #10 is 14 commits ahead and 43 behind, so no wholesale branch merge was attempted.
-- [x] Created isolated branch fix/flux-trellis-pipeline-20261015 from the current main. New pipeline candidate creates a FLUX PNG, validates its metadata, then supplies that exact image path to TRELLIS in a separate subprocess. It serializes participating OEC GPU jobs with the existing /tmp/oec-flux-inference.lock and repeats GPU admission before the TRELLIS stage.
-- [x] Added explicit TRELLIS --scratch-output mode for run artifacts only. It requires a new path under local temp, at least 512 MiB measured free space and a temp filesystem distinct from configured shared model storage. The default managed output path continues requiring fresh quota and managed-storage lock checks.
-- [ ] OPEN — validate the new combined candidate: resolve write-admission assertion failures from hosted CI runs 38721841953 and 38722197428, rerun the full hosted suite, then dispatch .github/workflows/oec-flux-trellis-pipeline.yml on one selected OEC runner. Acceptance requires same-run FLUX_IMAGE_GENERATION=PASS, validated PNG+JSON, TRELLIS generation PASS, GLB 2.0/accessor checks and trimesh reopen with non-empty geometry. Add the actual run/job and artifacts before marking complete.
-- [ ] BLOCKED — managed shared-output writes and model/dependency downloads: authoritative quota telemetry remains unresolved. Do not weaken require_fresh_quota=True; combined runtime must remain cache-only and scratch-only.
-- [ ] Preserve the shared environment: no reserve-file modification, queue mutation, process termination, phase1 changes, or live-checkout sync/reset was performed.
+- [x] Reviewed OEC combined run 38723286765. FLUX generated and validated its PNG, and TRELLIS cache/attention/model loading passed, but generation stopped before inference because pipeline_trellis_3d.py used subprocess.run() without importing subprocess in its scratch-filesystem findmnt fallback.
+- [x] Added the import plus a regression test for the findmnt path. The same run showed GPU utilization 100% with no visible compute processes was incorrectly admitted as IDLE; idle admission now requires known utilization ≤5%, and the orchestrator resamples for up to 180 seconds before fail-closed denial.
+- [x] Hosted CI 38725202281 passed 58/58 tests, Python compilation, and all four notebook checks.
+- [x] End-to-end cache-only run 38725376076 passed on oec-1 / host scn30-mn. Duration 419.848s; exact-run report PASS. FLUX PNG 512×512, 255,946 bytes, SHA-256 2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb. TRELLIS exported a 3,484,804-byte GLB (SHA-256 74e3654625a0662302ecb1bf1c0c79885833563753b6a30acbeee45a5c4b360e); independent trimesh reopen passed with 54,597 vertices / 93,617 faces. Artifact 11967418646 includes PNG, sidecar, pipeline_report.json and GLB.
+- [ ] OPEN — authoritative fresh quota telemetry is still missing; keep model/dependency downloads and managed shared writes blocked. The combined run used caches and /tmp only.
+- [ ] Separate follow-up — audit qa_compliance_worker.py import/CUDA visibility order in a focused change; no QA worker or queue was modified here.
 
-
-### CI refinement — 2026-10-15
-
-The first hosted run on this branch, [38721841953](https://github.com/Killer4K-N/OEC/actions/runs/38721841953), failed two assertions in tests/test_storage_write_admission.py. They compared scratch-path directory creation to the later managed shared-write lock as though the CLI had only one output path. The source deliberately separates local-scratch and managed shared-output writes; the assertions have now been narrowed to inspect each branch independently, requiring preflight before mkdir for both. This is a test-assumption correction, not a runtime success claim. Rerun pending.
-
-
-### Second hosted CI attempt — 2026-10-15
-
-- [x] Refined the storage test following [run 38722197428](https://github.com/Killer4K-N/OEC/actions/runs/38722197428), job 116379225276. The second run reached the same storage suite: 53 tests passed and one errored because the corrected assertion sliced off the preflight marker before searching for it (ValueError: substring not found). This was still a test-only failure; no model inference ran.
-- [x] Corrected the assertion again to compare the absolute source index of _preflight_output("before scratch GLB write") with the subsequent scratch mkdir.
-- [ ] OPEN — run full hosted CI again for the latest commit (which adds fail-closed TRELLIS offline cache checking and tightens the workdir to /tmp), then trigger the combined A100 pipeline only after it passes.
-
-
-### Third hosted CI result and latest guard hardening — 2026-10-15
-
-- [x] Hosted run [38722551001](https://github.com/Killer4K-N/OEC/actions/runs/38722551001), job 116380401503, passed 54/54 tests, Python compilation and notebook JSON/Python-cell checks for 4/4 notebooks. This validated commit d2dad157349f61fb01cb370f25bb6c178c5fa2a6.
-- [x] Code review identified that TRELLIS `--mode check --offline` reported success even when no cached model snapshot was present. The CLI now returns exit code 20 with `TRELLIS_READY=BLOCKED_MODEL_CACHE_MISS` in that case, and a mocked regression test covers the fail-closed path. This change is not yet validated by CI.
-- [x] Tightened the combined orchestrator's work directory to require `/tmp` explicitly. It no longer trusts `TMPDIR` as a temp root because `core_config` may redirect temporary paths to shared model/cache storage. Added a negative regression test.
-- [ ] OPEN — validate the runner-context fix in hosted CI, then retrigger the one-run A100 workflow with local /tmp output only.
-
-
-### End-to-end workflow wiring — 2026-10-15
-
-- [x] The one-shot run [38722963930](https://github.com/Killer4K-N/OEC/actions/runs/38722963930) failed before job creation; the API returned zero jobs, so no A100 was assigned and no inference ran. Inspection of the exact committed workflow found that `runs-on`, runner identity, and artifact path still referenced dispatch-only `inputs.runner`, even though the workflow had been changed to support a push trigger.
-- [x] Updated every runner reference to use `github.event.inputs.runner || 'oec-1'`; manual dispatch can still choose a runner and a one-shot push falls back to `oec-1`. The fix has not yet passed its post-change CI/run.
-- [ ] OPEN — wait for hosted checks on the workflow correction, then create a new marker commit to start the combined pipeline on oec-1. Treat failure with zero jobs as workflow wiring; a job-level run is required before diagnosing model/runtime issues.
-
-
-## 2026-10-15 — First live combined-pipeline attempt and guard hardening
-
-- [x] Hosted static CI [run 38722873210](https://github.com/Killer4K-N/OEC/actions/runs/38722873210) passed 56/56 tests, Python compilation and notebook checks 4/4. Hosted static CI [run 38723196255](https://github.com/Killer4K-N/OEC/actions/runs/38723196255) passed the same 56 tests, compilation and four notebooks after the workflow runner-input fix.
-- [x] Combined workflow [38723286765](https://github.com/Killer4K-N/OEC/actions/runs/38723286765), job 116382882587, assigned oec-1 and passed checkout, runner identity/interpreter validation, FLUX runtime check, real image generation/PNG validation, TRELLIS runtime/cache/attention check and pipeline loading. PNG: 512×512, 255,946 bytes, SHA-256 2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb. TRELLIS cache snapshot af44b45f2e35a493886929c6d786e563ec68364d; PyTorch 2.6.0+cu124, CUDA 12.4, xFormers 0.0.29.post2, attention operator pass.
-- [x] The run then failed before TRELLIS inference in the scratch-filesystem probe: NameError because subprocess was not imported. The bug is confirmed by pipeline_report.json in [artifact 11966744703](https://github.com/Killer4K-N/OEC/actions/runs/38723286765/artifacts/11966744703). Added import subprocess and a unit test that forces the findmnt fallback.
-- [x] GPU admission logs from the same run showed utilization_percent=100 and zero visible compute processes, while the tool still returned policy IDLE. The idle predicate ignored utilization. Hardened it to require known utilization at or below 5%; the orchestrator now waits/re-samples for up to 180 seconds, then fails closed.
-- [ ] OPEN — run hosted CI on these latest code changes (including the mount-probe and high-utilization regression tests), then retrigger the combined workflow. Acceptance still requires TRELLIS inference, GLB export and independent non-empty geometry reopen.
-- [ ] OPEN — repository-wide follow-up: qa_compliance_worker.py imports torch at module import before applying its per-worker CUDA visibility override. Audit this in a separate focused change; no QA process or queue was changed.
-- [ ] BLOCKED — downloads and managed shared-output writes remain gated while fresh quota telemetry is unresolved. No admission policy was weakened; no queue, reserve-file, phase1 or shared-cache mutation occurred.
-
-
-### Latest regression CI — 2026-10-15
-
-- [x] Current source commit d075b4442d87904e5b57128cb2f430bc53781738 passed [hosted CI run 38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281), job 116389198433: 58/58 tests, Python compile, notebook JSON/Python-cell checks for 4/4 notebooks. This includes the findmnt mount-probe regression and high-utilization GPU admission regression.
-- [ ] OPEN — retry the combined one-runner workflow from the corrected source. The last integrated run generated and validated FLUX image, then failed before TRELLIS inference due to the missing subprocess import (now fixed). Do not mark complete until TRELLIS generates and a GLB reopens with non-empty geometry in the same run.
-
-
-### Combined retry 38725376076 — IN_PROGRESS_AT_LAST_CHECK
-
-- Run: https://github.com/Killer4K-N/OEC/actions/runs/38725376076
-- Tested ref: 3092ee7e11b56413a08f4b849e21f806537a2ea5; workflow status: in_progress; conclusion: not concluded; job: 116389784906 (in_progress).
-- The combined runner job remains in progress; no final log/artifact conclusion is yet available.
-- [ ] OPEN — do not mark integrated pipeline complete until the uploaded per-run report and logs demonstrate a validated FLUX PNG handoff, TRELLIS inference/export, and independent GLB geometry reopen.
-
-
-## 2026-10-15 — Final FLUX-to-TRELLIS acceptance result
-
-This final status supersedes the earlier “retry in progress” and “integrated route not yet complete” flags in earlier dated entries below.
-
-- [x] Fixed the real TRELLIS generation failure: pipeline_trellis_3d.py called subprocess.run() in its scratch-filesystem findmnt fallback without importing subprocess. Added the import and a regression test that forces this path.
-- [x] Hardened GPU admission after the first combined run reported utilization 100% with zero visible compute processes but still classified the GPU as IDLE. The idle predicate now requires known utilization at or below 5%; the orchestrator re-samples for up to 180 seconds and fails closed if no GPU qualifies.
-- [x] Verified both fixes with [hosted CI run 38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281): 58/58 tests passed, py_compile passed, and JSON/Python-cell checks passed for all four notebooks. The suites include test_trellis_same_filesystem_probe_can_use_findmnt and the high-utilization/no-visible-process GPU admission regression.
-- [x] End-to-end acceptance passed on [OEC run 38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076), job 116389784906, runner oec-1 / host scn30-mn, tested source SHA 3092ee7e11b56413a08f4b849e21f806537a2ea5. The exact-run report says PASS, total duration 419.848 seconds, cache-only, downloads disabled, package installs disabled, and managed shared-output writes disabled.
-- [x] FLUX output: 512×512 PNG, 255,946 bytes, seed 2048, SHA-256 2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb; the same path was passed to TRELLIS.
-- [x] TRELLIS output: artifact [11967418646](https://github.com/Killer4K-N/OEC/actions/runs/38725376076/artifacts/11967418646) includes pipeline_report.json, the FLUX PNG and sidecar, and trellis_asset.glb. The GLB is 3,484,804 bytes, SHA-256 74e3654625a0662302ecb1bf1c0c79885833563753b6a30acbeee45a5c4b360e, GLB 2.0; independent trimesh reopen passed with 54,597 vertices and 93,617 faces.
-- [x] Current review branch head is documentation-only commit(s) after the tested source revision; main remains at 99d9796d5bd5afc1731600b310ced3b5be521ee9 and no model/code changes have been merged.
-- [ ] OPEN — authoritative fresh quota telemetry is still unresolved. Keep package/model downloads and managed shared-output writes blocked until fresh quota is available; the accepted flow uses existing caches and local /tmp only.
-- [ ] Separate repository follow-up — audit qa_compliance_worker.py CUDA visibility/import ordering only as a separate, scoped change. No QA process/queue changes were made here.
+Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep main source unchanged unless a code merge is explicitly authorized.

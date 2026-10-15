@@ -4,11 +4,11 @@ Daily engineering records live here. Use the local Asia/Kolkata date in each fil
 
 ## Daily records
 
-- [2026-10-15 — FLUX runtime verified; sequential FLUX-to-TRELLIS candidate](CHANGELOG-2026-10-15.md)
-  - [OEC run 38613575959](https://github.com/Killer4K-N/OEC/actions/runs/38613575959) passed cache-only FLUX inference and PNG/metadata validation on all three OEC A100 runner jobs (3/3 valid outputs).
-  - [Connector_1 run 38602330418](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418) separately produced an 8,865,916-byte TRELLIS.2 GLB that reopened with non-empty geometry (96,672 vertices / 92,062 faces).
-  - Existing OEC PR #10 is 14 commits ahead and 43 behind current main; no merge was attempted. A new branch from current main adds sequential FLUX PNG → TRELLIS GLB orchestration, scratch-only outputs and GLB reopen validation. Hosted CI runs 38721841953 and 38722197428 exposed and narrowed storage-test assertion assumptions; the second had 53 tests pass and one test error, now corrected. Run 38722551001 passed 54/54 tests and the notebook/compile checks at commit d2dad157; subsequent offline-cache and local-/tmp guard refinements are awaiting another hosted CI pass. One-shot combined attempt 38722963930 failed before job creation due remaining dispatch-only runner input references; corrected source is awaiting hosted validation before retrigger. Combined runtime remains pending.
-  - Authoritative quota telemetry remains unresolved; model/dependency downloads and managed shared-output writes stay fail-closed.
+- [2026-10-15 — FLUX/TRELLIS fix validated end to end on review branch](CHANGELOG-2026-10-15.md)
+  - Hosted CI [38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281) passed 58/58 tests, Python compilation and all four notebook checks. This includes the findmnt/subprocess and high-utilization GPU-admission regressions.
+  - First combined attempt [38723286765](https://github.com/Killer4K-N/OEC/actions/runs/38723286765) found the missing subprocess import in the scratch filesystem probe and an over-permissive IDLE policy at 100% utilization. Both were corrected on the review branch.
+  - Final combined run [38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076) passed FLUX image generation, exact PNG handoff to TRELLIS.2, GLB export and independent geometry reopen (54,597 vertices / 93,617 faces). Artifact [11967418646](https://github.com/Killer4K-N/OEC/actions/runs/38725376076/artifacts/11967418646) contains image, metadata, pipeline report and GLB.
+  - Model/source changes remain on fix/flux-trellis-pipeline-20261015; main source was not merged. Fresh quota telemetry remains an open gate for future downloads and managed writes.
 
 - [2026-10-14 — TRELLIS generation verified; quota and FLUX blockers tracked](CHANGELOG-2026-10-14.md)
   - [Connector_1 run 38555689884](https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884) succeeded in producing a read-only report: the configured quota snapshot is missing and `quota_check` is unavailable on scn17-mn.
@@ -79,11 +79,3 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 - Archive: [`docs/runner_migration/connector_1_actions_runs.json`](../docs/runner_migration/connector_1_actions_runs.json).
 - Migration method and next steps: [`docs/runner_migration/README.md`](../docs/runner_migration/README.md).
 - Inventory [run 38610558599](https://github.com/Killer4K-N/OEC/actions/runs/38610558599) passed for all three new OEC labels, with per-runner reports. The first cache-only FLUX runtime [38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955) failed without a retrievable log or PNG. Follow-up attempts [38613199844](https://github.com/Killer4K-N/OEC/actions/runs/38613199844) and [38613575959](https://github.com/Killer4K-N/OEC/actions/runs/38613575959) remain queued without runner assignment. Candidate CI [38613904439](https://github.com/Killer4K-N/OEC/actions/runs/38613904439) passed 46 tests and Python/notebook static checks, but Flux runtime remains unaccepted.
-
-
-- **First OEC combined runtime attempt:** [run 38723286765](https://github.com/Killer4K-N/OEC/actions/runs/38723286765) generated a real FLUX PNG, validated its metadata, passed TRELLIS cache/attention checks and loaded the TRELLIS pipeline, then failed before inference on a missing subprocess import in the scratch-filesystem guard. Artifact [11966744703](https://github.com/Killer4K-N/OEC/actions/runs/38723286765/artifacts/11966744703) contains the image, metadata and report. This run also showed GPU admission accepting 100% utilization as IDLE when no compute process was visible; updated policy/test changes require another CI run and combined retry.
-- **Repository-wide follow-up:** qa_compliance_worker.py imports PyTorch before the per-worker CUDA visibility override (lines 15–80 on main). No QA process or queue actions were taken; track this as a separate focused change.
-
-
-- **FLUX/TRELLIS fix accepted end to end:** [combined run 38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076) passed on oec-1, generating a validated 512×512 FLUX PNG and a GLB that passed structural checks and trimesh reopen (54,597 vertices / 93,617 faces). Exact-run [artifact 11967418646](https://github.com/Killer4K-N/OEC/actions/runs/38725376076/artifacts/11967418646) contains image, sidecar, report and GLB. The prior scratch probe NameError is fixed and covered by the 58/58 passing hosted CI run 38725202281. Main remains unchanged; quota-gated operations stay blocked.
-
