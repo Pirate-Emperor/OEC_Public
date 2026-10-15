@@ -112,6 +112,7 @@ class StorageWriteAdmissionTests(unittest.TestCase):
         combined_flux_cell = dict(code_cells("pipeline_trellis_3d.ipynb"))[12]
         self.assertIn("tools/oec_service_manager.py", combined_flux_cell)
         self.assertIn('["start", "flux-ui", "--gpu", FLUX_UI_GPU', combined_flux_cell)
+        self.assertIn('"--conda-root", str(_MANAGER_CONDA_ROOT)', combined_flux_cell)
         self.assertNotIn("load_flux_pipeline(", combined_flux_cell)
         self.assertNotIn("create_gradio_demo(", combined_flux_cell)
         flux_cli = (ROOT / "pipeline_flux_image.py").read_text(encoding="utf-8")
