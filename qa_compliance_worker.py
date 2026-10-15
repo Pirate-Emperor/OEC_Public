@@ -42,6 +42,7 @@ from tools.qa_checks import (
     claim_next_qa_job,
     count_untracked_processing_jobs,
     ensure_qa_lease_schema,
+    qa_lease_schema_current,
     recover_stale_qa_jobs,
     validate_qa_analysis,
 )
@@ -311,14 +312,15 @@ class QANode:
 def sweep_stuck_jobs(db_path):
     """Recover only timestamped, expired QA leases; never reset a live claim."""
     try:
-        # Schema migration mutates the queue database under the output-storage policy.
-        with managed_storage_operation(
-            "outputs",
-            required_gb=0.01,
-            require_fresh_quota=True,
-            minimum_free_gb=float(os.environ.get("AIEROS_OUTPUT_MIN_FREE_GB", "0.05")),
-        ):
-            ensure_qa_lease_schema(db_path)
+        # Only migrate an older queue schema, and admit that small database write.
+        if not qa_lease_schema_current(db_path):
+            with managed_storage_operation(
+                "outputs",
+                required_gb=0.01,
+                require_fresh_quota=True,
+                minimum_free_gb=float(os.environ.get("AIEROS_OUTPUT_MIN_FREE_GB", "0.05")),
+            ):
+                ensure_qa_lease_schema(db_path)
         stale_after = max(30, int(os.environ.get("AIEROS_QA_STALE_MINUTES", "180")))
         recovered = recover_stale_qa_jobs(db_path, stale_after)
         if recovered:
