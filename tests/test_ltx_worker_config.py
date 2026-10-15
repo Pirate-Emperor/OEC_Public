@@ -30,6 +30,18 @@ class LTXWorkerConfigTests(unittest.TestCase):
         self.assertTrue(cluster_purge_is_enabled(11, True))
         self.assertFalse(cluster_purge_is_enabled(1, True))
 
+    def test_worker_uses_gpu_validation_and_no_purge_avoids_barrier(self):
+        source = (ROOT / "worker_ltx_video.py").read_text(encoding="utf-8")
+        self.assertIn("resolve_gpu_selection(args.gpus, get_available_gpu_ids())", source)
+        self.assertIn("if cluster_purge_is_enabled(cluster_gpus, should_purge):", source)
+        self.assertIn("args.purge and len(AVAILABLE_GPUS) > 1 and args.cluster_gpus <= 1", source)
+        self.assertIn("--no-purge active; skipping distributed purge", source)
+
+    def test_qa_worker_supports_explicit_gpu_assignment(self):
+        source = (ROOT / "qa_compliance_worker.py").read_text(encoding="utf-8")
+        self.assertIn('parser.add_argument("--gpu"', source)
+        self.assertIn("process_qa_queue(purge_after_load=args.purge, gpu_id=str(int(args.gpu)))", source)
+
 
 if __name__ == "__main__":
     unittest.main()
