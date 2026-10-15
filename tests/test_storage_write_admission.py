@@ -100,9 +100,15 @@ class StorageWriteAdmissionTests(unittest.TestCase):
                             source.index("mesh = trellis_pipe.run(input_image)[0]"))
         for name, cell in (("pipeline_flux_only.ipynb", 6),
                            ("pipeline_trellis_3d.ipynb", 12)):
-            source = dict(code_cells(name))[cell]
-            self.assertLess(source.index("FLUX generation refused before inference"),
-                            source.index("image = flux_pipe("))
+            notebook_cell = dict(code_cells(name))[cell]
+            self.assertIn("load_flux_pipeline", notebook_cell)
+            self.assertIn("create_gradio_demo", notebook_cell)
+        flux_cli = (ROOT / "pipeline_flux_image.py").read_text(encoding="utf-8")
+        generate = flux_cli.split("def generate_flux_image(", 1)[1].split("\\ndef create_gradio_demo(", 1)[0]
+        self.assertLess(generate.index("_output_preflight()"),
+                        generate.index("image = pipeline(**kwargs).images[0]"))
+        self.assertIn("validate_scratch_path(", generate)
+        self.assertIn("require_fresh_quota=True", flux_cli)
 
     def test_cli_model_download_and_glb_export_use_fresh_quota(self):
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")

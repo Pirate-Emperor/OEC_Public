@@ -4,6 +4,12 @@ Daily engineering records live here. Use the local Asia/Kolkata date in each fil
 
 ## Daily records
 
+- [2026-10-15 — FLUX runtime verified; sequential FLUX-to-TRELLIS candidate](CHANGELOG-2026-10-15.md)
+  - [OEC run 38613575959](https://github.com/Killer4K-N/OEC/actions/runs/38613575959) passed cache-only FLUX inference and PNG/metadata validation on all three OEC A100 runner jobs (3/3 valid outputs).
+  - [Connector_1 run 38602330418](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418) separately produced an 8,865,916-byte TRELLIS.2 GLB that reopened with non-empty geometry (96,672 vertices / 92,062 faces).
+  - Existing OEC PR #10 is 14 commits ahead and 43 behind current main; no merge was attempted. A new branch from current main adds sequential FLUX PNG → TRELLIS GLB orchestration, scratch-only outputs and GLB reopen validation. Hosted CI and combined runtime are still pending.
+  - Authoritative quota telemetry remains unresolved; model/dependency downloads and managed shared-output writes stay fail-closed.
+
 - [2026-10-14 — TRELLIS generation verified; quota and FLUX blockers tracked](CHANGELOG-2026-10-14.md)
   - [Connector_1 run 38555689884](https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884) succeeded in producing a read-only report: the configured quota snapshot is missing and `quota_check` is unavailable on scn17-mn.
   - Model storage is on shared Lustre with very high measured filesystem free capacity; that is not user/project quota proof, so package/model write admission remains blocked.

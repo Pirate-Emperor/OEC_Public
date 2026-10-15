@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-14T23:48:00+05:30",
+  "last_updated": "2026-10-15T16:00:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "OEC runner migration baseline: all three labels passed read-only inventory and all 677 Connector_1 Action run records are archived. Static OEC candidate CI is green at 46/46 (latest run 38613904439) with TRELLIS/FLUX notebook checks and Python compilation. FLUX live runtime run 38611186955 failed after ~11 minutes without a retrievable log or PNG; later runs 38613199844 and 38613575959 remain queued without runner assignment. The source now loads FLUX directly to CUDA with device_map='cuda', captures stage logs/status on failure, and serializes host GPU use with a /tmp lock, but no runtime image-generation PASS is claimed. Verify/reconnect oec-1/oec-2/oec-3 and clear stale queued runs before retry; authoritative quota snapshot remains missing.",
+  "latest_summary": "Fresh runtime evidence supersedes the earlier FLUX-pending summary: OEC run 38613575959 generated and validated cache-only FLUX PNGs on oec-1/oec-2/oec-3 (3/3 jobs). Connector_1 run 38602330418 separately generated and reopened a TRELLIS.2 GLB. Existing PR #10 is 14 commits ahead and 43 behind current main 99d9796; no merge was attempted. New review branch fix/flux-trellis-pipeline-20261015 adds an offline sequential orchestrator, temporary artifact handoff and strict GLB reopen validation; its CI/runtime acceptance has not yet run. Fresh quota telemetry remains missing, so shared writes/downloads remain fail-closed.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2177,6 +2177,127 @@
         "gpu_process_changes": false
       },
       "follow_up": "The source patch is review-only in OEC PR #10. The live FLUX pipeline cannot be accepted until the new OEC runners resume accepting jobs and the image plus sidecar artifact validate."
+    },
+    {
+      "id": "TEST-2026-10-15-OEC-FLUX-CACHED-GENERATION-THREE-RUNNER",
+      "date": "2026-10-15",
+      "category": "live FLUX.2 Klein cache-only image generation on migrated OEC self-hosted A100 runners",
+      "approach": "Inspect the latest OEC Actions run, enumerate all three jobs, read their logs, and verify stage markers, image metadata, PNG signature/dimensions, seed and uploaded artifact records.",
+      "reason": "The previous attempt failed without a PNG or retrievable log. This experiment establishes whether the newer workflow completes actual inference on each configured runner.",
+      "parameters": {
+        "run_id": 38613575959,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38613575959",
+        "source_branch": "fix/trellis-offline-pipeline-config-20261014",
+        "source_commit": "e59426970956ff83fbd433612adc29eb9364d0f8",
+        "runners": [
+          "oec-1",
+          "oec-2",
+          "oec-3"
+        ],
+        "job_ids": [
+          116022825052,
+          116022825054,
+          116022824490
+        ],
+        "host_from_logs": "scn30-mn",
+        "python_environment": "phase2_3d",
+        "model_id": "black-forest-labs/FLUX.2-klein-4B",
+        "model_snapshot": "e7b7dc27f91deacad38e78976d1f2b499d76a294",
+        "package_versions": {
+          "diffusers": "0.37.0",
+          "huggingface-hub": "0.36.0",
+          "transformers": "4.56.1"
+        },
+        "dimensions": [
+          512,
+          512
+        ],
+        "steps": 4,
+        "seed": 2048,
+        "mode": "offline/cache-only; local /tmp output",
+        "downloads": false,
+        "installs": false,
+        "artifact_ids": [
+          11919706696,
+          11919566916,
+          11919029231
+        ]
+      },
+      "results": {
+        "status": "PASS_3_OF_3_RUNNERS",
+        "runner_jobs_passed": 3,
+        "runner_jobs_total": 3,
+        "runtime_check": "PASS",
+        "model_load": "PASS",
+        "real_generation": "PASS",
+        "png_validation": "PASS",
+        "image_bytes_each": 255946,
+        "dimensions_each": [
+          512,
+          512
+        ],
+        "metadata_sidecars": "PASS",
+        "shared_output_writes": false,
+        "gpu_processes_signalled": false
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38613575959",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38613575959/artifacts/11919706696",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38613575959/artifacts/11919566916",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38613575959/artifacts/11919029231"
+      ],
+      "limitation": "This validates FLUX alone on OEC runners; it does not test passing the PNG into TRELLIS in the same run.",
+      "follow_up": "Run the new one-run orchestration workflow on one selected OEC runner, then verify the exact PNG handoff and resulting GLB artifact."
+    },
+    {
+      "id": "TEST-2026-10-15-CONNECTOR1-TRELLIS-CACHED-GLB-REOPEN",
+      "date": "2026-10-15",
+      "category": "live TRELLIS.2 image-to-3D, mesh postprocess, GLB export and independent geometry reopen",
+      "approach": "Inspect Connector_1 job logs through xFormers CUDA attention, pipeline load, inference, postprocessing, GLB upload and trimesh reopen.",
+      "reason": "Determine whether the latest offline config fix progressed beyond earlier cache/config failures and establish a real runtime baseline.",
+      "parameters": {
+        "run_id": 38602330418,
+        "run_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418",
+        "job_id": 115984412406,
+        "branch": "diagnose/trellis-asset-generation-20261014",
+        "source_commit": "d543a062b5695a07fd2952396ab8dc88f81a85d6",
+        "interpreter": "~/Conda/envs/phase2_3d/bin/python",
+        "attention_backend": "xformers",
+        "gpu_admission": "LOW_FOOTPRINT_SHARED",
+        "gpu_index": "1",
+        "gpu_free_mib": 39902,
+        "active_compute_processes": 1,
+        "active_compute_process_mib": 416,
+        "downloads": false,
+        "installs": false,
+        "shared_cache_mutation": false,
+        "artifact_id": 11914941709
+      },
+      "results": {
+        "status": "PASS_REAL_TRELLIS_GLB_AND_REOPEN",
+        "admission_config_tests_passed": 10,
+        "attention_operator": "PASS",
+        "pipeline_load": "PASS",
+        "image_to_3d_inference": "PASS",
+        "mesh_postprocess": "PASS",
+        "glb_export": "PASS",
+        "glb_bytes": 8865916,
+        "sha256": "22caca5fe9c02c50c095e4385a7c17e94b214b5fc7d87417b94b48c796a89257",
+        "mesh_count": 1,
+        "primitive_count": 1,
+        "position_accessor_count": 96672,
+        "index_accessor_count": 276186,
+        "reopened_vertices": 96672,
+        "reopened_faces": 92062
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418",
+        "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11914941709",
+        "https://github.com/microsoft/TRELLIS.2",
+        "https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md"
+      ],
+      "limitation": "This is a real Connector_1 cached-runtime run, not the new OEC combined pipeline. Shared dependencies were not changed during this review.",
+      "follow_up": "Use this accepted behavior as the reference when the OEC combined pipeline reaches TRELLIS; retain cache, attention and output admission guards."
     }
   ]
 }

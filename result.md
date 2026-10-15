@@ -1,12 +1,14 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-14 23:48 IST (Asia/Kolkata)  
-**Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
+**Last updated:** 2026-10-15 16:00 IST (Asia/Kolkata)  
+**Branch:** fix/flux-trellis-pipeline-20261015 (review-only, created from main at 99d9796d5bd5afc1731600b310ced3b5be521ee9; no changes merged into main)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
 ## Current status
 
-**TRELLIS cache-only image-to-3D runtime is now accepted on Connector_1; the OEC CLI/notebook source patch remains in review.** Final run [38602330418](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418) used the configured `phase2_3d` interpreter, passed all 10 admission/config regression tests and the real xFormers CUDA operator check, loaded the pinned local pipeline config, ran inference and uploaded an exact-run GLB. The 8,865,916-byte output (SHA-256 `22caca5fe9c02c50c095e4385a7c17e94b214b5fc7d87417b94b48c796a89257`) passed GLB 2.0/length/JSON/mesh checks and `trimesh` reopen (96,672 vertices, 92,062 faces). The CLI and both notebooks are updated on candidate PR [#10](https://github.com/Killer4K-N/OEC/pull/10), but that code is not merged into `main` and its entrypoint path has static—not runtime—validation. FLUX image generation remains unverified; the latest cache-only FLUX run created no PNG due GPU admission. The quota snapshot is still missing and `quota_check` is unavailable, so do not download/install missing models or dependencies. This TRELLIS pass used cached files and `/tmp` only; no shared-cache writes, process termination or quota bypass occurred.
+Both standalone model stages now have fresh successful runtime evidence; the combined pipeline is the remaining acceptance gate. OEC run [38613575959](https://github.com/Killer4K-N/OEC/actions/runs/38613575959) generated and validated real 512×512 PNGs on all three OEC runners (three of three jobs, 255,946 bytes each, seed 2048, offline/cache-only). Connector_1 run [38602330418](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418) separately generated and reopened a TRELLIS.2 GLB (8,865,916 bytes; SHA-256 22caca5fe9c02c50c095e4385a7c17e94b214b5fc7d87417b94b48c796a89257; 96,672 vertices / 92,062 faces). Neither result alone proves same-run FLUX-to-TRELLIS handoff.
+
+A review-only branch, fix/flux-trellis-pipeline-20261015, based on current main 99d9796d5bd5afc1731600b310ced3b5be521ee9, adds a sequential subprocess orchestrator, stage logs, repeated GPU admission, PNG/JSON handoff validation, GLB structural checks, and an independent trimesh reopen. The modified-branch hosted CI and real combined GPU run are not yet verified. Authoritative quota telemetry remains unresolved; downloads and managed shared-output writes stay fail-closed, while scratch artifacts are allowed only after filesystem separation and free-capacity checks.
 
 ## Material fixes delivered in the feature branch
 
@@ -266,3 +268,9 @@ The cache-only FLUX generation workflow is running on the same three OEC labels,
 The initial OEC-runner image generation attempt, [run 38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955), must be classified FAIL/INCOMPLETE: the oec-1 job returned failure after approximately 11 minutes, its log download returned BlobNotFound, step metadata still reported inference in progress, and the run uploaded no artifact. Exact failure cause is not known. The other two jobs remained queued. Two newer workflow attempts, [38613199844](https://github.com/Killer4K-N/OEC/actions/runs/38613199844) and [38613575959](https://github.com/Killer4K-N/OEC/actions/runs/38613575959), also remained queued without runner assignment.
 
 The candidate source mitigation loads via `Flux2KleinPipeline.from_pretrained(..., device_map="cuda")` to avoid a CPU-resident model copy, writes stage/exit status into a diagnostic artifact and serializes host-local GPU work with `flock`. Static CI [38613904439](https://github.com/Killer4K-N/OEC/actions/runs/38613904439) passed 46 tests and the compilation/notebook checks. This is not proof of image generation: no PNG is available yet. Before a clean runtime retry, confirm the three runner services are online and cancel the stale queued jobs in Actions UI. The runtime workflow is restricted to an explicit marker or workflow dispatch to prevent routine source commits from piling up more inference attempts.
+
+## 2026-10-15 — Sequential pipeline acceptance gate
+
+The prior candidate has independent live evidence for both parts: OEC FLUX run 38613575959 passed on oec-1/oec-2/oec-3, and Connector_1 TRELLIS run 38602330418 exported and reopened a valid GLB. The new review branch adds the missing same-run path: a generated FLUX PNG is validated and passed by exact file path into a separate TRELLIS subprocess, then the exported GLB is parsed and reopened with trimesh.
+
+No merged-to-main claim is made. Static CI for the new commit and the one-run combined workflow remain pending and are the acceptance criteria. No shared environment, reserve file, queue, package set, or existing process was modified as part of this code/log investigation.

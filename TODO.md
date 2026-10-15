@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-14 23:48 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 16:00 IST (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 ## 2026-10-14 — quota telemetry and live-checkout diagnosis
 - [x] Verified GitHub state: OEC `main` is `82346c0753e139b92240f53734eb48d2113ed9ad`; `fix/trellis-gradio-notebooks-20261011` is `2543b26d2888e667c6443c984259f84ac5b6c142` (111 ahead, 0 behind). No main-branch change or merge.
@@ -148,3 +148,16 @@ The official Diffusers release notes list Flux2 Klein support in v0.37.0; the cu
 - [x] Changed FLUX model loading to `device_map="cuda"` in candidate commit [e594269](https://github.com/Killer4K-N/OEC/commit/e59426970956ff83fbd433612adc29eb9364d0f8) to avoid CPU-load-then-GPU-copy peak memory; candidate CI [38613904439](https://github.com/Killer4K-N/OEC/actions/runs/38613904439) passed 46/46 tests and all static checks.
 - [ ] **BLOCKED — runner availability / stale queue:** runs [38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955), [38613199844](https://github.com/Killer4K-N/OEC/actions/runs/38613199844) and [38613575959](https://github.com/Killer4K-N/OEC/actions/runs/38613575959) remain queued/partly failed without available runner assignments. Verify oec-1/oec-2/oec-3 are Online/Idle, cancel old queued attempts, then push `.github/flux-smoke.trigger` or use workflow dispatch for a clean run.
 - [ ] No fresh quota snapshot; do not install dependencies/download model weights until approved telemetry is available.
+
+## 2026-10-15 — FLUX runtime verified; sequential FLUX-to-TRELLIS candidate
+
+This section supersedes older October 14 TODO statements that FLUX image generation had not yet passed. The earlier failures remain historical records.
+
+- [x] FLUX cache-only inference on OEC runners: [run 38613575959](https://github.com/Killer4K-N/OEC/actions/runs/38613575959) completed generation and PNG/metadata validation on all three runner jobs (oec-1, oec-2, oec-3). Each produced a 512×512, 255,946-byte PNG and JSON metadata; model black-forest-labs/FLUX.2-klein-4B; four inference steps; seed 2048; diffusers 0.37.0, huggingface-hub 0.36.0, transformers 4.56.1. This was offline/cache-only and local /tmp output, without installs, downloads, shared output writes, or GPU process changes.
+- [x] TRELLIS.2 cache-only generation: [Connector_1 run 38602330418](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418) loaded the pipeline, passed the xFormers CUDA attention path, ran inference/postprocessing, exported and reopened a GLB. [Artifact 11914941709](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11914941709) is 8,865,916 bytes, SHA-256 22caca5fe9c02c50c095e4385a7c17e94b214b5fc7d87417b94b48c796a89257; independent reopen reported 96,672 vertices and 92,062 faces. This is a Connector_1 standalone result, not an OEC combined-pipeline run.
+- [x] Current source-of-truth audit: main is 99d9796d5bd5afc1731600b310ced3b5be521ee9; older candidate fix/trellis-offline-pipeline-config-20261014 is e59426970956ff83fbd433612adc29eb9364d0f8. Existing PR #10 is 14 commits ahead and 43 behind, so no wholesale branch merge was attempted.
+- [x] Created isolated branch fix/flux-trellis-pipeline-20261015 from the current main. New pipeline candidate creates a FLUX PNG, validates its metadata, then supplies that exact image path to TRELLIS in a separate subprocess. It serializes participating OEC GPU jobs with the existing /tmp/oec-flux-inference.lock and repeats GPU admission before the TRELLIS stage.
+- [x] Added explicit TRELLIS --scratch-output mode for run artifacts only. It requires a new path under local temp, at least 512 MiB measured free space and a temp filesystem distinct from configured shared model storage. The default managed output path continues requiring fresh quota and managed-storage lock checks.
+- [ ] OPEN — validate the new combined candidate: pass the new hosted static CI, then dispatch .github/workflows/oec-flux-trellis-pipeline.yml on one selected OEC runner. Acceptance requires same-run FLUX_IMAGE_GENERATION=PASS, validated PNG+JSON, TRELLIS generation PASS, GLB 2.0/accessor checks and trimesh reopen with non-empty geometry. Add the actual run/job and artifacts before marking complete.
+- [ ] BLOCKED — managed shared-output writes and model/dependency downloads: authoritative quota telemetry remains unresolved. Do not weaken require_fresh_quota=True; combined runtime must remain cache-only and scratch-only.
+- [ ] Preserve the shared environment: no reserve-file modification, queue mutation, process termination, phase1 changes, or live-checkout sync/reset was performed.
