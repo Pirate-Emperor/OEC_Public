@@ -205,3 +205,11 @@ The first hosted run on this branch, [38721841953](https://github.com/Killer4K-N
 
 - [x] Current source commit d075b4442d87904e5b57128cb2f430bc53781738 passed [hosted CI run 38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281), job 116389198433: 58/58 tests, Python compile, notebook JSON/Python-cell checks for 4/4 notebooks. This includes the findmnt mount-probe regression and high-utilization GPU admission regression.
 - [ ] OPEN — retry the combined one-runner workflow from the corrected source. The last integrated run generated and validated FLUX image, then failed before TRELLIS inference due to the missing subprocess import (now fixed). Do not mark complete until TRELLIS generates and a GLB reopens with non-empty geometry in the same run.
+
+
+### Combined retry 38725376076 — IN_PROGRESS_AT_LAST_CHECK
+
+- Run: https://github.com/Killer4K-N/OEC/actions/runs/38725376076
+- Tested ref: 3092ee7e11b56413a08f4b849e21f806537a2ea5; workflow status: in_progress; conclusion: not concluded; job: 116389784906 (in_progress).
+- The combined runner job remains in progress; no final log/artifact conclusion is yet available.
+- [ ] OPEN — do not mark integrated pipeline complete until the uploaded per-run report and logs demonstrate a validated FLUX PNG handoff, TRELLIS inference/export, and independent GLB geometry reopen.

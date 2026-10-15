@@ -311,3 +311,8 @@ The exact-run artifact from [OEC run 38723286765](https://github.com/Killer4K-N/
 ## 2026-10-15 — Current source passes hardened static CI
 
 The code revision d075b4442d87904e5b57128cb2f430bc53781738 passed [OEC hosted CI run 38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281), job 116389198433: 58/58 tests, Python compilation, and notebook JSON/Python-cell checks for all four notebooks. The expanded suites include a test that forces the TRELLIS scratch filesystem guard through the findmnt/subprocess code path and a GPU-admission regression that rejects 100% utilization when no compute process is visible. This is static/unit verification; the combined runtime retry remains the next acceptance gate.
+
+
+## 2026-10-15 — Combined retry 38725376076: IN_PROGRESS_AT_LAST_CHECK
+
+Run: https://github.com/Killer4K-N/OEC/actions/runs/38725376076. Tested SHA: 3092ee7e11b56413a08f4b849e21f806537a2ea5; status in_progress; conclusion not concluded; job 116389784906 (in_progress). The combined runner job remains in progress; no final log/artifact conclusion is yet available.

@@ -135,3 +135,12 @@ Run [OEC Actions 38723286765](https://github.com/Killer4K-N/OEC/actions/runs/387
 ## Latest regression CI — pass
 
 Hosted review-branch run [38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281), job 116389198433, tested commit d075b4442d87904e5b57128cb2f430bc53781738. All 58 targeted unit/static tests passed; Python compilation passed; notebook JSON/Python-cell validation passed for 4/4 notebooks. Suite counts: TRELLIS notebook static 12, TRELLIS CLI/easy-run 6, offline config 6, combined pipeline 10, FLUX image 7, GPU admission 6, AudioCraft static 5, storage admission 6. This includes the forced findmnt/subprocess path test and the no-visible-process/high-utilization denial test. Hosted runner only; this does not prove model inference. Next action: rerun the combined pipeline on oec-1.
+
+
+## Combined retry 38725376076 — IN_PROGRESS_AT_LAST_CHECK
+
+- Run URL: https://github.com/Killer4K-N/OEC/actions/runs/38725376076
+- Tested revision: 3092ee7e11b56413a08f4b849e21f806537a2ea5; workflow status in_progress; conclusion not concluded; job 116389784906 (in_progress).
+- The combined runner job remains in progress; no final log/artifact conclusion is yet available.
+- Artifact metadata: []
+- Relevant log lines: No final job log lines were available at the time of this update.

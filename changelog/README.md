@@ -86,3 +86,6 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 
 
 - **Latest combined-pipeline guard CI:** [run 38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281) passed 58/58 tests, compilation and four notebook checks at commit d075b4442d87904e5b57128cb2f430bc53781738. It verifies the missing subprocess import path and rejects the previously observed 100%-utilization/zero-visible-process IDLE state; actual integrated TRELLIS inference remains pending.
+
+
+- **Combined retry 38725376076: IN_PROGRESS_AT_LAST_CHECK.** [Run link](https://github.com/Killer4K-N/OEC/actions/runs/38725376076). The combined runner job remains in progress; no final log/artifact conclusion is yet available.

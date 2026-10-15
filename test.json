@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-15T16:42:00+05:30",
+  "last_updated": "2026-10-15T16:45:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "OEC standalone FLUX run 38613575959 passed on 3/3 OEC runners; Connector_1 standalone TRELLIS run 38602330418 produced/reopened a valid GLB. Combined run 38723286765 validated a real FLUX PNG, TRELLIS attention/cache check and pipeline load but failed before inference due missing subprocess import; current source fixes it and hardens idle GPU admission when utilization is high. Hosted CI run 38725202281 passed 58/58 tests, compile and notebook checks on commit d075b4442d87904e5b57128cb2f430bc53781738. The combined runtime must now be retried and pass TRELLIS inference/export/geometry reopen before completion.",
+  "latest_summary": "OEC standalone FLUX run 38613575959 passed on 3/3 OEC runners; Connector_1 standalone TRELLIS run 38602330418 produced/reopened a valid GLB. Combined run 38723286765 validated a real FLUX PNG, TRELLIS attention/cache check and pipeline load but failed before inference due missing subprocess import; current source fixes it and hardens idle GPU admission when utilization is high. Hosted CI run 38725202281 passed 58/58 tests, compile and notebook checks on commit d075b4442d87904e5b57128cb2f430bc53781738. The combined runtime must now be retried and pass TRELLIS inference/export/geometry reopen before completion. Latest combined retry 38725376076 currently recorded as IN_PROGRESS_AT_LAST_CHECK (workflow status in_progress, conclusion not concluded). The combined runner job remains in progress; no final log/artifact conclusion is yet available.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2617,6 +2617,40 @@
       ],
       "limitation": "This is hosted static/unit CI, not GPU inference. It does not prove the combined pipeline completes TRELLIS generation or GLB reopen.",
       "follow_up": "Run one combined cache-only attempt on oec-1. If GPU remains above the utilization threshold for 180 seconds, preserve the blocked admission evidence rather than overriding the guard."
+    },
+    {
+      "id": "TEST-2026-10-15-OEC-COMBINED-FLUX-TRELLIS-RUN-2",
+      "date": "2026-10-15",
+      "category": "same-run cache-only FLUX PNG to TRELLIS.2 acceptance retry after scratch-probe and GPU-admission hardening",
+      "approach": "Run the serial model workflow on oec-1 from the fixed branch, use GPU selection that requires low measured utilization, validate FLUX output, run TRELLIS and require a GLB structural check plus trimesh reopen.",
+      "reason": "Verify the confirmed missing-subprocess import is resolved and ensure a GPU reporting high utilization is not admitted as idle.",
+      "parameters": {
+        "run_id": 38725376076,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38725376076",
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "tested_commit": "3092ee7e11b56413a08f4b849e21f806537a2ea5",
+        "job_id": 116389784906,
+        "runner": "oec-1",
+        "workflow_status": "in_progress",
+        "workflow_conclusion": null,
+        "gpu_idle_utilization_max_percent": 5,
+        "gpu_wait_seconds": 180,
+        "offline": true,
+        "package_installs": false,
+        "model_downloads": false,
+        "output_root": "/tmp"
+      },
+      "results": {
+        "status": "IN_PROGRESS_AT_LAST_CHECK",
+        "finding": "The combined runner job remains in progress; no final log/artifact conclusion is yet available.",
+        "completed_artifacts": [],
+        "log_excerpt": []
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38725376076"
+      ],
+      "limitation": "Only verified outcomes in currently available job logs and artifact metadata are recorded. Successful integration requires same-run evidence for TRELLIS inference/export and non-empty geometry reopen.",
+      "follow_up": "If still running, inspect final job logs and pipeline_report.json. If blocked, retain the GPU admission evidence and do not override the utilization threshold. If failed, fix the specific stage and repeat only after static CI passes."
     }
   ]
 }
