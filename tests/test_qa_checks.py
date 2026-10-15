@@ -155,5 +155,29 @@ class QAQueueLeaseTests(unittest.TestCase):
             recover_stale_qa_jobs(self.db_path, 0)
 
 
+class QAWorkerIntegrationTests(unittest.TestCase):
+    WORKER = Path(__file__).resolve().parents[1] / "qa_compliance_worker.py"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.source = cls.WORKER.read_text(encoding="utf-8")
+
+    def test_worker_uses_fail_closed_output_validation_and_atomic_claims(self):
+        self.assertIn("return validate_qa_analysis(json.loads(clean_json))", self.source)
+        self.assertIn("claim_next_qa_job(QUEUE_DB_PATH, worker_id)", self.source)
+        self.assertIn("qa_started_at = NULL, qa_worker_id = NULL", self.source)
+        self.assertIn("FAILED_QA_RUNTIME", self.source)
+        self.assertNotIn(
+            "UPDATE assets SET status = 'PENDING_QA' WHERE status = 'PROCESSING_QA'",
+            self.source,
+        )
+
+    def test_model_cache_is_retained_and_downloads_are_opt_in(self):
+        self.assertIn("parser.set_defaults(purge=False)", self.source)
+        self.assertIn("AIEROS_ALLOW_SHARED_MODEL_PURGE", self.source)
+        self.assertIn("AIEROS_QA_ALLOW_MODEL_DOWNLOAD", self.source)
+        self.assertIn("refusing an accidental CPU model load", self.source)
+
+
 if __name__ == "__main__":
     unittest.main()
