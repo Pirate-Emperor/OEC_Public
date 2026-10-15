@@ -12,6 +12,21 @@ import shutil
 import glob
 import signal
 import argparse
+
+# CUDA visibility must be selected before importing PyTorch. Parse only --gpu
+# here; the main argparse parser below remains responsible for full CLI help
+# and argument validation.
+_qa_gpu_bootstrap = argparse.ArgumentParser(add_help=False)
+_qa_gpu_default = os.environ.get(
+    "AIEROS_QA_GPU", os.environ.get("CUDA_VISIBLE_DEVICES", "0").split(",")[0].strip()
+)
+_qa_gpu_bootstrap.add_argument("--gpu", default=_qa_gpu_default)
+_qa_gpu_args, _qa_gpu_unknown = _qa_gpu_bootstrap.parse_known_args()
+if not str(_qa_gpu_args.gpu).isdigit():
+    raise SystemExit(f"QA GPU must be a non-negative integer, got {_qa_gpu_args.gpu!r}")
+os.environ["AIEROS_QA_GPU"] = str(_qa_gpu_args.gpu)
+os.environ["CUDA_VISIBLE_DEVICES"] = str(_qa_gpu_args.gpu)
+
 import torch
 import traceback
 import random
