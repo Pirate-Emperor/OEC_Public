@@ -255,19 +255,53 @@ class QANode:
             }
 
     def extract_evaluation_frame(self, media_path):
-        """Extracts a frame if video, otherwise returns the image path directly."""
-        if media_path.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-            return media_path, False
-            
-        frame_path = media_path.replace(".mp4", "_qa_frame.jpg")
+        """Extract a representative frame safely from a video or reuse a still image."""
+        source = Path(media_path)
+        if source.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+            try:
+                with Image.open(source) as image:
+                    image.verify()
+                return str(source), False
+            except Exception as e:
+                print(f"[QA-NODE] Source image failed validation: {type(e).__name__}: {e}")
+                return None, False
+
+        frame_path = str(
+            source.with_name(f"{source.stem}_qa_frame_{time.time_ns()}.jpg")
+        )
         try:
-            subprocess.run([
-                "ffmpeg", "-y", "-ss", "00:00:02", "-i", media_path, 
-                "-vframes", "1", "-q:v", "2", frame_path
-            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+            duration_result = subprocess.run(
+                [
+                    "ffprobe", "-v", "error", "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1", str(source),
+                ],
+                check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, timeout=10,
+            )
+            duration = float(duration_result.stdout.strip())
+            if duration <= 0:
+                raise ValueError(f"Invalid video duration: {duration!r}")
+            sample_time = min(2.0, duration * 0.5)
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-ss", str(sample_time), "-i", str(source),
+                    "-frames:v", "1", "-q:v", "2", frame_path,
+                ],
+                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=20,
+            )
+            if not os.path.isfile(frame_path) or os.path.getsize(frame_path) <= 0:
+                raise RuntimeError("FFmpeg returned success but produced no evaluation frame.")
+            with Image.open(frame_path) as image:
+                image.verify()
             return frame_path, True
         except Exception as e:
-            print(f"[QA-NODE] Frame extraction failed: {e}")
+            try:
+                if os.path.isfile(frame_path):
+                    os.remove(frame_path)
+            except OSError:
+                pass
+            print(f"[QA-NODE] Frame extraction failed: {type(e).__name__}: {e}")
             return None, False
 
     def improve_and_standardize_video(self, raw_vid_path, target_path):
