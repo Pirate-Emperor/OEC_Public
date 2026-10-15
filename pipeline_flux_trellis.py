@@ -467,7 +467,6 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
             if args.source_mode == "flux":
                 report["stages"]["glb_validation"].update(glb_infos[0])
             _emit("glb_validation_pass", count=len(glb_infos), glbs=report["result_artifacts"]["glbs"])
-            _emit("glb_validation_pass", **glb_info)
         report["status"] = "PASS"
         report["completed_at_utc"] = datetime.now(timezone.utc).isoformat()
         report["duration_seconds"] = round(time.monotonic() - started, 3)
