@@ -391,7 +391,7 @@ def start_service(args: argparse.Namespace) -> None:
             state = _launch(
                 "qa-worker", service, _script("qa_compliance_worker.py"), "phase1_ltx",
                 ["--gpu", gpu, "--no-purge"], conda_root, args.python,
-                {"AIEROS_QA_GPU": gpu, "CUDA_VISIBLE_DEVICES": None}, {gpu},
+                {"AIEROS_QA_GPU": gpu, "CUDA_VISIBLE_DEVICES": gpu}, {gpu},
             )
             created.append(state)
             return
