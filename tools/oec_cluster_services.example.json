@@ -1,28 +1,28 @@
 {
   "schema_version": 1,
-  "description": "Example only. Copy to oec_cluster_services.local.json, replace SSH aliases and input folders, and confirm each node is running this OEC branch.",
+  "description": "Example only. Copy to oec_cluster_services.local.json, replace SSH aliases and input folders, and confirm each node is running this OEC branch. The original node command `source Conda/bin/activate` implies a repository-local Conda root at ~/OEC/Conda; adjust these paths if your installation is elsewhere.",
   "conda_root": "~/Conda",
   "manager_env": "phase1_ltx",
   "nodes": {
     "control": {
       "host": "local",
       "project_dir": "~/OEC",
-      "conda_activate": "~/Conda/bin/activate",
-      "conda_root": "~/Conda",
+      "conda_activate": "~/OEC/Conda/bin/activate",
+      "conda_root": "~/OEC/Conda",
       "manager_env": "phase1_ltx"
     },
     "worker2": {
       "host": "oec-worker-2",
       "project_dir": "~/OEC",
-      "conda_activate": "~/Conda/bin/activate",
-      "conda_root": "~/Conda",
+      "conda_activate": "~/OEC/Conda/bin/activate",
+      "conda_root": "~/OEC/Conda",
       "manager_env": "phase1_ltx"
     },
     "worker3": {
       "host": "oec-worker-3",
       "project_dir": "~/OEC",
-      "conda_activate": "~/Conda/bin/activate",
-      "conda_root": "~/Conda",
+      "conda_activate": "~/OEC/Conda/bin/activate",
+      "conda_root": "~/OEC/Conda",
       "manager_env": "phase1_ltx"
     }
   },
