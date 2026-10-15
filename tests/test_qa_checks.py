@@ -193,8 +193,12 @@ class QAWorkerIntegrationTests(unittest.TestCase):
         self.assertIn("FAILED_QA_OUTPUT", self.source)
         self.assertIn("without rejecting the media", self.source)
         self.assertIn('"ffprobe"', self.source)
-        self.assertIn("source.stem}_qa_frame_{time.time_ns()", self.source)
+        self.assertIn('Path("/tmp")', self.source)
+        self.assertIn("oec-qa-frame-{os.getpid()}-{time.time_ns()", self.source)
         self.assertNotIn('media_path.replace(".mp4", "_qa_frame.jpg")', self.source)
+        self.assertIn("REJECTED_QA", self.source)
+        self.assertIn("qa_rejection_reason", self.source)
+        self.assertNotIn('DELETE FROM assets WHERE id = ?', self.source)
         self.assertNotIn(
             "UPDATE assets SET status = 'PENDING_QA' WHERE status = 'PROCESSING_QA'",
             self.source,
