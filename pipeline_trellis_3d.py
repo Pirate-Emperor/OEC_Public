@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import gc
 import os
+import re
 import subprocess
 import shutil
 import sys
@@ -26,10 +27,12 @@ def build_parser() -> argparse.ArgumentParser:
         description="Run TRELLIS.2 as a Gradio 3D viewer or generate a GLB from an image."
     )
     parser.add_argument(
-        "--mode", choices=("gradio", "generate", "check"), default="gradio",
-        help="gradio launches the UI (default); generate processes --input; check validates runtime without loading model weights.",
+        "--mode", choices=("gradio", "generate", "generate-batch", "check"), default="gradio",
+        help="gradio launches the UI; generate processes --input; generate-batch reuses one loaded model for a folder; check validates the runtime.",
     )
     parser.add_argument("--input", type=Path, help="Input image for --mode generate.")
+    parser.add_argument("--input-dir", type=Path, help="Input image folder for --mode generate-batch.")
+    parser.add_argument("--recursive", action="store_true", help="Search --input-dir recursively for supported image files.")
     parser.add_argument("--output", type=Path, help="Exact GLB output path for --mode generate.")
     parser.add_argument("--output-dir", type=Path, help="Output folder; defaults to SYSTEM_DIRS outputs/3d_models.")
     parser.add_argument("--model-id", default="microsoft/TRELLIS.2-4B", help="Hugging Face model repository ID.")
@@ -38,7 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--gpu", default=os.environ.get("AIEROS_TRELLIS_GPU"), help="GPU index to expose before importing torch. Leaves CUDA_VISIBLE_DEVICES unchanged when omitted.")
     parser.add_argument("--attention-backend", choices=("xformers", "flash_attn"), default=os.environ.get("AIEROS_TRELLIS_ATTN_BACKEND", "xformers"))
     parser.add_argument("--offline", action="store_true", help="Do not download a missing model snapshot.")
-    parser.add_argument("--scratch-output", action="store_true", help="Write one GLB to verified local temporary storage without touching shared outputs. Requires --output.")
+    parser.add_argument("--scratch-output", action="store_true", help="Write GLB output(s) to verified local temporary storage without touching shared outputs. Requires --output for generate or --output-dir for generate-batch.")
     parser.add_argument("--port", type=int, default=int(os.environ.get("AIEROS_TRELLIS_PORT", "7862")), help="Gradio port.")
     parser.add_argument("--server-name", default=os.environ.get("AIEROS_TRELLIS_SERVER_NAME", "0.0.0.0"), help="Interface to bind; use an SSH tunnel and keep share disabled on shared nodes.")
     parser.add_argument("--share", action="store_true", help="Explicitly enable a public Gradio share URL. Not recommended on shared compute.")
@@ -47,6 +50,38 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--decimation-target", type=int, default=100_000, help="Target triangle count for GLB mesh processing.")
     parser.add_argument("--texture-size", type=int, default=2048, help="GLB texture size; 2048 is a VRAM/time-conscious default.")
     return parser
+
+
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
+
+
+def list_input_images(input_dir: str | Path, recursive: bool = False) -> list[Path]:
+    """Return deterministically ordered regular images; never follow input symlinks."""
+    root = Path(input_dir).expanduser().resolve()
+    if not root.is_dir():
+        raise NotADirectoryError(f"Input image directory does not exist: {root}")
+    candidates = root.rglob("*") if recursive else root.iterdir()
+    images = []
+    for candidate in candidates:
+        try:
+            if candidate.is_symlink() or not candidate.is_file():
+                continue
+        except OSError:
+            continue
+        if candidate.suffix.lower() in IMAGE_EXTENSIONS:
+            images.append(candidate.resolve())
+    images.sort(key=lambda item: item.relative_to(root).as_posix().casefold())
+    if not images:
+        raise FileNotFoundError(
+            f"No supported image files ({', '.join(sorted(IMAGE_EXTENSIONS))}) in {root}"
+        )
+    return images
+
+
+def _batch_output_name(index: int, image_path: Path, input_root: Path) -> str:
+    relative = image_path.relative_to(input_root).with_suffix("").as_posix().replace("/", "__")
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", relative).strip("._") or "image"
+    return f"{index:04d}_{safe}.glb"
 
 
 def _prepare_environment(args: argparse.Namespace) -> None:
@@ -468,12 +503,21 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.mode == "generate" and args.input is None:
         build_parser().error("--input is required when --mode generate")
-    if args.mode == "generate" and not args.input.is_file():
-        build_parser().error(f"input file does not exist: {args.input}")
-    if args.scratch_output and args.mode != "generate":
-        build_parser().error("--scratch-output is supported only with --mode generate")
-    if args.scratch_output and args.output is None:
-        build_parser().error("--scratch-output requires --output")
+    if args.mode == "generate" and (not args.input.is_file() or args.input.is_symlink()):
+        build_parser().error(f"input file does not exist or is a symlink: {args.input}")
+    if args.mode == "generate-batch" and args.input_dir is None:
+        build_parser().error("--input-dir is required when --mode generate-batch")
+    if args.mode == "generate-batch":
+        try:
+            list_input_images(args.input_dir, args.recursive)
+        except (NotADirectoryError, FileNotFoundError, OSError) as exc:
+            build_parser().error(str(exc))
+    if args.scratch_output and args.mode not in ("generate", "generate-batch"):
+        build_parser().error("--scratch-output is supported only with --mode generate or generate-batch")
+    if args.scratch_output and args.mode == "generate" and args.output is None:
+        build_parser().error("--scratch-output requires --output for --mode generate")
+    if args.scratch_output and args.mode == "generate-batch" and args.output_dir is None:
+        build_parser().error("--scratch-output requires --output-dir for --mode generate-batch")
     if args.port < 1 or args.port > 65535:
         build_parser().error("--port must be between 1 and 65535")
 
@@ -512,6 +556,54 @@ def main(argv: list[str] | None = None) -> int:
             scratch_output=args.scratch_output,
         )
         print(f"TRELLIS_GENERATION=PASS output={result}")
+        return 0
+
+    if args.mode == "generate-batch":
+        from PIL import Image
+
+        input_root = args.input_dir.expanduser().resolve()
+        input_files = list_input_images(input_root, args.recursive)
+        if args.output_dir is not None:
+            batch_output_dir = args.output_dir.expanduser().resolve()
+        elif args.scratch_output:
+            build_parser().error("--scratch-output requires --output-dir for --mode generate-batch")
+        else:
+            batch_output_dir = Path(runtime["system_dirs"]["outputs"]).expanduser().resolve() / "3d_models"
+
+        if args.scratch_output:
+            allowed_roots = [Path("/tmp").resolve()]
+            for env_name in ("RUNNER_TEMP", "TMPDIR"):
+                if os.environ.get(env_name):
+                    allowed_roots.append(Path(os.environ[env_name]).expanduser().resolve())
+            if not any(_path_is_within(batch_output_dir, root) for root in allowed_roots):
+                raise RuntimeError("BLOCKED_SCRATCH_OUTPUT: batch output directory must be on approved local temporary storage.")
+            batch_output_dir.mkdir(parents=True, exist_ok=True)
+
+        results = []
+        for index, image_path in enumerate(input_files, start=1):
+            destination = batch_output_dir / _batch_output_name(index, image_path, input_root)
+            if destination.exists():
+                raise FileExistsError(f"Refusing to overwrite batch output: {destination}")
+            print(f"TRELLIS_BATCH_ITEM_START index={index}/{len(input_files)} input={image_path}", flush=True)
+            with Image.open(image_path) as opened:
+                image = opened.copy()
+            result = generate_glb(
+                image=image,
+                pipeline=pipeline,
+                o_voxel=runtime["o_voxel"],
+                system_dirs=runtime["system_dirs"],
+                output_dir=batch_output_dir,
+                output_path=destination,
+                max_image_size=args.max_image_size,
+                decimation_target=args.decimation_target,
+                texture_size=args.texture_size,
+                scratch_output=args.scratch_output,
+            )
+            results.append({"input": str(image_path), "output": result, "bytes": Path(result).stat().st_size})
+            print("TRELLIS_BATCH_ITEM_PASS=" + json.dumps(results[-1], sort_keys=True), flush=True)
+
+        print("TRELLIS_BATCH_SUMMARY=" + json.dumps({"count": len(results), "items": results}, sort_keys=True), flush=True)
+        print(f"TRELLIS_BATCH_GENERATION=PASS count={len(results)} output_dir={batch_output_dir}", flush=True)
         return 0
 
     import gradio as gr
