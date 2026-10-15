@@ -170,9 +170,11 @@ class QAQueueLeaseTests(unittest.TestCase):
             status = conn.execute("SELECT status FROM assets WHERE id=3").fetchone()[0]
         self.assertEqual(status, "PROCESSING_QA")
 
-    def test_rejects_non_positive_stale_lease(self):
-        with self.assertRaises(ValueError):
-            recover_stale_qa_jobs(self.db_path, 0)
+    def test_rejects_invalid_stale_lease_timeout(self):
+        for value in (0, True, 1.5, "180"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    recover_stale_qa_jobs(self.db_path, value)
 
 
 class QAWorkerIntegrationTests(unittest.TestCase):
