@@ -95,7 +95,7 @@ class FluxImageTests(unittest.TestCase):
         self.assertIn("different physical GPUs", combined_studio)
         self.assertNotIn("load_flux_pipeline(", combined_studio)
         self.assertNotIn("demo_flux.launch(", combined_studio)
-        self.assertIn("share=False", combined_studio)
+        self.assertIn("share=False", studio)
 
     def test_runner_inventory_source_is_read_only(self):
         source = (ROOT / "tools" / "oec_runner_probe.py").read_text(encoding="utf-8")
