@@ -69,6 +69,14 @@ class StorageWriteAdmissionTests(unittest.TestCase):
             self.assertIn("is_git_clone", setup)
             self.assertIn('with managed_storage_operation(\n        "models"', setup)
             self.assertGreaterEqual(setup.count("_trellis_setup_storage_admission()"), 2)
+            self_only = name == "pipeline_trellis_3d_only.ipynb"
+            if self_only:
+                self.assertLess(
+                    setup.index("def _trellis_setup_storage_admission"),
+                    setup.index("ok, reason = storage_preflight_path("),
+                )
+                self.assertIn("_missing_basic_packages", setup)
+                self.assertIn("if not is_installed(\"utils3d\")", setup)
 
     def test_output_directories_are_created_only_after_admission(self):
         for name in ("pipeline_trellis_3d.ipynb", "pipeline_trellis_3d_only.ipynb"):
