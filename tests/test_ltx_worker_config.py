@@ -22,7 +22,7 @@ class LTXWorkerConfigTests(unittest.TestCase):
             resolve_gpu_selection("1,01", ["0", "1", "2"])
         with self.assertRaisesRegex(ValueError, "Invalid"):
             resolve_gpu_selection("x", ["0", "1"])
-        with self.assertRaisesRegex(ValueError, "unavailable"):
+        with self.assertRaisesRegex(ValueError, "Requested GPU IDs"):
             resolve_gpu_selection("5", ["0", "1"])
 
     def test_no_purge_disables_cluster_purge_and_synchronization_gate(self):
