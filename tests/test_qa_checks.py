@@ -192,6 +192,9 @@ class QAWorkerIntegrationTests(unittest.TestCase):
         self.assertIn('"category": None', self.source)
         self.assertIn("FAILED_QA_OUTPUT", self.source)
         self.assertIn("without rejecting the media", self.source)
+        self.assertIn('"ffprobe"', self.source)
+        self.assertIn("source.stem}_qa_frame_{time.time_ns()", self.source)
+        self.assertNotIn('media_path.replace(".mp4", "_qa_frame.jpg")', self.source)
         self.assertNotIn(
             "UPDATE assets SET status = 'PENDING_QA' WHERE status = 'PROCESSING_QA'",
             self.source,
