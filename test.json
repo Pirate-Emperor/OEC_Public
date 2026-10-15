@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-15T19:15:00+05:30",
+  "last_updated": "2026-10-15T20:29:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Background generation source remains on open PR #11, not merged to main. Final current-head CI run 38744924124 passed all 78 tests, py_compile and JSON/Python-cell checks for all four notebooks after one additional hardening: the QA supervisor now sets CUDA_VISIBLE_DEVICES in the child environment before Python imports Torch. The candidate adds supervised LTX control/worker/QA, offline FLUX-only generation/UI, TRELLIS folder batch/UI, and combined FLUX-by-default or explicit existing-image-folder routing. Live LTX startup, browser/Gradio submissions and new folder-mode GPU inference remain untested; prior single-image FLUX→TRELLIS proof is run 38725376076. Fresh quota remains unavailable; cache misses and managed shared writes stay blocked.",
+  "latest_summary": "Review PR #11 now contains detailed service-manager --help surfaces, a three-node cluster coordinator and profile template, FLUX/TRELLIS image folder paths, and combined notebook GPU separation. Latest CI run 38760561720 passed 86/86 tests, Python compilation and JSON/Python-cell checks for four notebooks; cluster plan and dry-run commands are exercised. The actual three-node cluster, live LTX/QA runtime, browser/Gradio requests and folder-backed TRELLIS GPU inference remain NOT_RUN. The earlier single-image cache-only FLUX→TRELLIS run 38725376076 is separate runtime evidence. Fresh quota remains unavailable; keep missing-cache downloads and managed shared writes blocked. Source changes remain unmerged on PR #11.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2444,6 +2444,83 @@
         "https://github.com/Killer4K-N/OEC/pull/11"
       ],
       "follow_up": "Proceed with a separately authorized cache-only live smoke on an identified compute host: check nvidia-smi for unmanaged processes first, start/stop QA/LTX services through the supervisor, submit a small request to each Gradio UI over approved SSH tunnels, then run a small folder-mode TRELLIS batch and validate every GLB. Do not start duplicate daemons beside existing manually launched background processes. No model downloads or managed shared-output writes until fresh quota admission passes."
+    },
+    {
+      "id": "TEST-2026-10-15-OEC-CLUSTER-CLI-NOTEBOOK-GPU-ISOLATION-CI",
+      "date": "2026-10-15",
+      "category": "multi-node service manager CLI, three-node launch profiles, FLUX/TRELLIS combined notebook GPU isolation and end-to-end static CI",
+      "approach": "Added detailed argparse help for every local action/service and cluster action. Tested each help path in subprocesses, validated the three-node example config, exercised cluster-profiles, cluster-plan and cluster-start --dry-run, checked four distinct FLUX GPU one-shot assignments, and updated combined notebook expectations so TRELLIS remains in the notebook kernel while FLUX runs as a separate manager-supervised child process on a different GPU. Reran the complete repository static/CLI CI suite and inspected the actual Actions job logs.",
+      "reason": "Provide one command to manage background services over three existing nodes, expose each command's real arguments through --help, prevent combined notebook inference from placing both full model pipelines on one GPU, and detect stale test expectations before claiming the notebook is usable.",
+      "parameters": {
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "pr": 11,
+        "tested_commit": "3d89941d6d5054eee74725e5e744b16e4e5a9c82",
+        "run_id": 38760561720,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38760561720",
+        "job_id": 116510408236,
+        "runner": "GitHub-hosted ubuntu-latest",
+        "test_suites": {
+          "notebook_static": 13,
+          "trellis_cli": 6,
+          "trellis_offline_config": 6,
+          "flux_trellis_pipeline": 16,
+          "flux_image": 7,
+          "gpu_admission": 6,
+          "audiocraft_notebook_static": 5,
+          "storage_write_admission": 6,
+          "service_manager": 8,
+          "service_manager_help_and_cluster_dry_run": 7,
+          "ltx_worker_config": 6,
+          "total": 86
+        },
+        "cluster_profiles": [
+          "ltx-3node",
+          "mixed-stack",
+          "flux-image-once",
+          "flux-trellis",
+          "trellis-folder"
+        ],
+        "notebook_validation": {
+          "pipeline_trellis_3d.ipynb": 16,
+          "pipeline_trellis_3d_only.ipynb": 15,
+          "pipeline_flux_only.ipynb": 10,
+          "pipeline_audiocraft.ipynb": 6
+        },
+        "combined_notebook_gpu_map": {
+          "trellis_default_physical_gpu": 0,
+          "flux_default_physical_gpu": 1,
+          "trellis_port": 7862,
+          "flux_port": 7863
+        },
+        "quota_telemetry": "MISSING"
+      },
+      "results": {
+        "status": "PASS_86_TESTS_COMPILE_AND_4_NOTEBOOKS",
+        "total_tests": 86,
+        "failed_tests": 0,
+        "service_help": "PASS_FOR_ALL_LOCAL_ACTIONS_SERVICES_AND_CLUSTER_ACTIONS",
+        "cluster_config_validation": "PASS",
+        "cluster_plan": "PASS",
+        "cluster_start_dry_run": "PASS_NO_SERVICES_STARTED",
+        "compilation": "PASS",
+        "notebooks": "PASS_4_OF_4_JSON_AND_PYTHON_CELL_PARSE",
+        "live_three_node_cluster_start": "NOT_RUN",
+        "live_ltx_qa_runtime": "NOT_RUN",
+        "live_gradio_browser_submission": "NOT_RUN",
+        "trellis_folder_gpu_inference": "NOT_RUN",
+        "quota_telemetry": "MISSING",
+        "main_source_merge": "NOT_PERFORMED"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38760561720",
+        "https://github.com/Killer4K-N/OEC/pull/11",
+        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tools/oec_service_manager.py",
+        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tools/oec_cluster_services.example.json",
+        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_trellis_3d.ipynb",
+        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_trellis_3d_only.ipynb",
+        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_flux_only.ipynb"
+      ],
+      "follow_up": "Do not start the cluster profile until the user-configured SSH aliases/project and Conda paths are checked, every node has the same reviewed branch and environment, and existing manually launched jobs have been inventoried. Then perform an authorized cache-only live smoke of service startup/status/stop and Gradio submissions. Folder-mode TRELLIS batch inference still needs a small real GPU batch with GLB reopen validation. Do not perform model/package downloads or managed shared-output writes until fresh quota admission succeeds."
     }
   ]
 }
