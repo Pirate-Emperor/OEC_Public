@@ -1,6 +1,6 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-15 18:50 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 19:15 IST (Asia/Kolkata)  
 **Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
@@ -284,7 +284,7 @@ PR [#11](https://github.com/Killer4K-N/OEC/pull/11) adds `tools/oec_service_mana
 
 ### Test evidence
 
-Hosted CI [run 38743800209](https://github.com/Killer4K-N/OEC/actions/runs/38743800209) passed 78 tests: notebook static 13; TRELLIS CLI 6; TRELLIS offline-config 6; combined pipeline 15; FLUX image 7; GPU admission 6; AudioCraft notebook static 5; storage-write admission 6; LTX routing/purge 6; service manager 8. Python compilation passed for the modified entry points and helpers. The workflow parsed all code cells and validated JSON for `pipeline_trellis_3d.ipynb` (16 cells), `pipeline_trellis_3d_only.ipynb` (15), `pipeline_flux_only.ipynb` (10), and `pipeline_audiocraft.ipynb` (6).
+Hosted CI [run 38743800209](https://github.com/Killer4K-N/OEC/actions/runs/38743800209) passed 78 tests; final current-head CI [run 38744924124](https://github.com/Killer4K-N/OEC/actions/runs/38744924124) passed the same 78-test suite after QA GPU-isolation hardening. The supervisor now sets `CUDA_VISIBLE_DEVICES` in the QA child's environment before Python starts, rather than relying on the worker's later environment assignment. Suite counts are notebook static 13; TRELLIS CLI 6; TRELLIS offline-config 6; combined pipeline 15; FLUX image 7; GPU admission 6; AudioCraft notebook static 5; storage-write admission 6; LTX routing/purge 6; service manager 8. Python compilation passed for the modified entry points and helpers. The workflow parsed all code cells and validated JSON for `pipeline_trellis_3d.ipynb` (16 cells), `pipeline_trellis_3d_only.ipynb` (15), `pipeline_flux_only.ipynb` (10), and `pipeline_audiocraft.ipynb` (6).
 
 Two earlier CI results were inspected and documented, not hidden: [38743502455](https://github.com/Killer4K-N/OEC/actions/runs/38743502455) exposed an outdated TRELLIS mode assertion; [38743634536](https://github.com/Killer4K-N/OEC/actions/runs/38743634536) exposed a syntax error in the new supervisor regression. Both were corrected before the successful 78-test result.
 
@@ -298,3 +298,8 @@ Two earlier CI results were inspected and documented, not hidden: [38743502455](
 - Prompt/profitability rules in `brain_config.json` were not changed: no measured QA yield, generation-cost or conversion experiment was available to support a claim that new prompts would improve profitability.
 
 Open follow-ups are in `TODO.md`; per-run results and experiment details are in `test.json` and `changelog/CHANGELOG-2026-10-15.md`.
+
+
+### Final launch-safety follow-through
+
+CI [run 38744924124](https://github.com/Killer4K-N/OEC/actions/runs/38744924124) is the current-head revalidation after the QA GPU-visibility fix and passed all 78 tests, compilation and four notebook JSON/Python-cell checks. Before rollout, first inventory any existing manually launched background jobs on each node. The supervisor cannot adopt them; do not start duplicate daemon/worker instances or use broad kill patterns. Stop only exact owned legacy PIDs after inspecting them, then use the supervisor's per-service status/logs/stop controls. No user host or running process was touched in this task.

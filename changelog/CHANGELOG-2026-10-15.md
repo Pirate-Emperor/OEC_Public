@@ -87,3 +87,13 @@ Code and workflow changes for this section are on review branch `fix/flux-trelli
 - The service manager does not inspect every external or notebook process; manually launched Jupyter/other services require a read-only `nvidia-smi` check before assigning GPU IDs.
 - `brain_config.json` prompt/decision rules were read as project context but not changed: a claimed quality/profitability improvement requires controlled comparisons using acceptance rate, QA rejection, cost/time and downstream conversion results; no such result was measured in this task.
 - No live process, QA queue, `.storage_reserve.bin`, shared model-cache content or `phase1_ltx` packages were modified. Source changes remain in PR #11, unmerged.
+
+
+## 2026-10-15 final source review — QA GPU isolation verified
+
+A final code review of the launch contract found that `qa_compliance_worker.py` imports Torch at module scope and sets `CUDA_VISIBLE_DEVICES` later inside `QANode`. To avoid relying on lazy CUDA initialization semantics, the supervisor now supplies `CUDA_VISIBLE_DEVICES=<selected physical GPU>` in the child's environment before Python starts. Added a focused regression assertion.
+
+- Earlier complete 78-test pass: [run 38743800209](https://github.com/Killer4K-N/OEC/actions/runs/38743800209). Subsequent change is a testable GPU-visibility-before-import hardening, not an inference-code change.
+- Final current-head CI: [run 38744924124](https://github.com/Killer4K-N/OEC/actions/runs/38744924124) — **PASS**, all 78 tests, `py_compile` and 4/4 notebook JSON/Python-cell checks. Suite counts remain 13 notebook-static, 6 TRELLIS CLI, 6 offline TRELLIS config, 15 combined pipeline, 7 FLUX CLI, 6 GPU admission, 5 AudioCraft notebook, 6 storage admission, 6 LTX configuration and 8 supervisor tests.
+- Branch sync: source candidate now includes the exact main-branch tracking file versions through merge commit [3183d51](https://github.com/Killer4K-N/OEC/commit/3183d51435168b1a7b83f735d4a6d4106399526a), and the final QA isolation change is in the subsequent feature commits. PR #11 remains open and unmerged.
+- Runtime caveat unchanged: this is hosted static/CLI regression CI. No live QA, LTX worker, Gradio browser request or folder-backed TRELLIS inference was executed. The successful prior single-image FLUX→TRELLIS run [38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076) remains separate evidence only.

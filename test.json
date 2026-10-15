@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-15T18:50:00+05:30",
+  "last_updated": "2026-10-15T19:15:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Background-generation additions are on open PR #11, not merged to main. CI run 38743800209 passed 78 tests, Python compilation, and JSON/Python-cell checks for all four notebooks. New service manager covers LTX control/worker/QA, offline FLUX-only generation/UI, TRELLIS image-folder batch/UI, and combined FLUX-by-default or explicit existing-image-folder mode. Two preceding CI failures (38743502455 stale TRELLIS mode assertion; 38743634536 supervisor-test syntax error) were inspected in logs and fixed before the green run. Static validation is green, but live LTX startup and browser/Gradio request tests for the three notebooks remain open. Previously accepted end-to-end FLUX→TRELLIS inference remains run 38725376076. Fresh quota remains unavailable; cache misses and managed shared writes stay blocked.",
+  "latest_summary": "Background generation source remains on open PR #11, not merged to main. Final current-head CI run 38744924124 passed all 78 tests, py_compile and JSON/Python-cell checks for all four notebooks after one additional hardening: the QA supervisor now sets CUDA_VISIBLE_DEVICES in the child environment before Python imports Torch. The candidate adds supervised LTX control/worker/QA, offline FLUX-only generation/UI, TRELLIS folder batch/UI, and combined FLUX-by-default or explicit existing-image-folder routing. Live LTX startup, browser/Gradio submissions and new folder-mode GPU inference remain untested; prior single-image FLUX→TRELLIS proof is run 38725376076. Fresh quota remains unavailable; cache misses and managed shared writes stay blocked.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2394,6 +2394,56 @@
         "https://github.com/Killer4K-N/OEC/actions/runs/38725376076"
       ],
       "follow_up": "Deploy PR branch on selected test host; verify physical GPUs with nvidia-smi; live-smoke the LTX control/worker and QA as separate managed services; open FLUX, TRELLIS and combined Gradio ports through approved SSH tunnels and submit one small generation in each UI; run TRELLIS batch on a small existing-image folder and inspect every GLB. Do not download missing weights/packages or write managed shared outputs unless fresh quota admission passes. Evaluate brain_config.json changes only through controlled metrics-backed experiments."
+    },
+    {
+      "id": "TEST-2026-10-15-OEC-QA-GPU-ISOLATION-CI",
+      "date": "2026-10-15",
+      "category": "QA physical-GPU visibility before Torch import; final background-pipeline CI revalidation",
+      "approach": "Reviewed qa_compliance_worker.py import order and adjusted the service supervisor to launch QA with CUDA_VISIBLE_DEVICES set in the child process environment before the Python interpreter starts. Added an explicit test assertion and reran the full candidate CI suite.",
+      "reason": "Avoid depending on whether a module-level Torch import has initialized CUDA before QANode changes CUDA_VISIBLE_DEVICES. Validate the final launch contract again after that hardening.",
+      "parameters": {
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "pr": 11,
+        "tested_commit": "7741b80d7e830c78e264042f6821391e15fdaf7c",
+        "run_id": 38744924124,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38744924124",
+        "prior_full_pass_run_id": 38743800209,
+        "prior_full_pass_run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38743800209",
+        "qa_environment": {
+          "AIEROS_QA_GPU": "selected physical GPU",
+          "CUDA_VISIBLE_DEVICES": "selected physical GPU before interpreter startup"
+        },
+        "suites": {
+          "notebook_static": 13,
+          "trellis_cli": 6,
+          "trellis_offline_config": 6,
+          "combined_flux_trellis": 15,
+          "flux_image": 7,
+          "gpu_admission": 6,
+          "audiocraft_notebook_static": 5,
+          "storage_write_admission": 6,
+          "ltx_gpu_purge_config": 6,
+          "service_manager": 8,
+          "total": 78
+        }
+      },
+      "results": {
+        "status": "PASS_78_TESTS_COMPILE_AND_NOTEBOOK_JSON",
+        "total_tests": 78,
+        "failed_tests": 0,
+        "qa_gpu_isolation_regression": "PASS",
+        "compile": "PASS",
+        "notebooks": "PASS_4_OF_4_JSON_AND_PYTHON_CELL_PARSE",
+        "live_qa_runtime": "NOT_RUN",
+        "live_gradio_browser_submission": "NOT_RUN",
+        "trellis_folder_gpu_inference": "NOT_RUN",
+        "quota_telemetry": "MISSING"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38744924124",
+        "https://github.com/Killer4K-N/OEC/pull/11"
+      ],
+      "follow_up": "Proceed with a separately authorized cache-only live smoke on an identified compute host: check nvidia-smi for unmanaged processes first, start/stop QA/LTX services through the supervisor, submit a small request to each Gradio UI over approved SSH tunnels, then run a small folder-mode TRELLIS batch and validate every GLB. Do not start duplicate daemons beside existing manually launched background processes. No model downloads or managed shared-output writes until fresh quota admission passes."
     }
   ]
 }
