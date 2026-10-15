@@ -1,6 +1,6 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-16 01:50 IST (Asia/Kolkata)
+**Last updated:** 2026-10-16 02:02 IST (Asia/Kolkata)
 **Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
@@ -323,3 +323,14 @@ A new helper and 15-test CPU-only suite were added, and the A100 synchronization
 The persistent A100 `qa_compliance_worker.py` is locally modified and was intentionally preserved. No QA model was loaded, no production queue or media was touched, and no GPU QA service was tested. The QA candidate remains unmerged in [PR #11](https://github.com/Killer4K-N/OEC/pull/11). Before acceptance, the dirty live worker must be reconciled safely, its import of `tools.qa_checks` verified, and isolated cache-only runtime checks completed. Multi-frame video review and an audit-preserving rejection path remain open improvements.
 
 - Additional safety follow-through: malformed model responses now become `FAILED_QA_OUTPUT`, not content rejection; clip frames are written to unique local `/tmp` files only after a free-space check; genuine `REJECTED_QA` assets keep the media, sidecar, queue row and rejection reason instead of deleting the audit trail. These paths still require an isolated fixture/runtime test.
+
+
+## 2026-10-16 — TRELLIS-only notebook quota guard repair (runtime not accepted)
+
+The reported cell-10 failure exposed a real notebook-flow issue: it demanded a fresh quota snapshot before checking installed packages or whether a source/build change was needed. The snapshot failure itself is the expected fail-closed policy response for a storage write, but the early check prevented a read-only inspection of an already prepared environment.
+
+The review branch now removes that unconditional first gate, checks package versions and the pinned `utils3d` availability before requesting installs, and keeps every real package install/clone/extension build/model download behind fresh quota admission. The setup error now explains where the quota snapshot is normally read from and that the site-approved login-node metadata job must refresh it.
+
+The TRELLIS-only Gradio notebook now defaults to local scratch output for cached-model testing, provided `/tmp` is on a different filesystem from model storage and at least 512 MiB is free. Shared-output mode remains explicit and still requires fresh quota telemetry. The quick-start guide and static regression tests were updated; the A100 sync workflow now runs those tests before replacing the live notebook.
+
+The notebook JSON was re-read successfully, but no Actions test result or A100 sync confirmation was returned for [trigger commit `647d762`](https://github.com/Killer4K-N/OEC/commit/647d7627dca9c8c6b8816b6f5cd3c2f7f4dd0b23). No actual notebook code-cell execution, Gradio launch, model inference, package installation or shared-output write was performed. Do not mark the fix as deployed until the A100 source is verified; `main` remains unchanged.
