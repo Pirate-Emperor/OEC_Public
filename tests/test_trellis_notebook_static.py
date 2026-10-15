@@ -208,5 +208,31 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertIn("TRELLIS_IMAGE_TO_3D_SMOKE=PASS", self.runtime)
 
 
+    def test_all_three_notebooks_keep_gradio_ports_private_and_outputs_fresh(self):
+        expected = (
+            (self.flux_only_nb, self.flux_only, "7864", "demo_flux.launch("),
+            (self.only_nb, self.only, "7862", "demo.launch("),
+            (self.combined_nb, self.combined, "7862", "demo_trellis.launch("),
+        )
+        for notebook, cells, port, launch_marker in expected:
+            code = "\n".join(source for source in cells if source.strip())
+            self.assertIn(launch_marker, code)
+            self.assertIn(port, code)
+            self.assertIn("share=False", code)
+            for cell in notebook["cells"]:
+                if cell.get("cell_type") == "code":
+                    self.assertIsNone(cell.get("execution_count"))
+                    self.assertEqual(cell.get("outputs", []), [])
+
+        combined_all = "\n".join(self.combined)
+        self.assertIn('FLUX_SERVER_PORT = int(os.environ.get("AIEROS_FLUX_GRADIO_PORT", "7863"))', combined_all)
+        self.assertIn("demo_flux.launch(", combined_all)
+        self.assertIn("server_port=FLUX_SERVER_PORT", combined_all)
+        self.assertIn("share=False", combined_all)
+        trellis_all = "\n".join(self.only)
+        self.assertIn("server_port=7862", trellis_all)
+        self.assertIn("share=False", trellis_all)
+
+
 if __name__ == "__main__":
     unittest.main()
