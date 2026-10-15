@@ -837,38 +837,108 @@ def _cluster_profiles(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        epilog=("Examples:\n"
+                "  python tools/oec_service_manager.py start ltx-control --help\n"
+                "  python tools/oec_service_manager.py start ltx-worker --gpus 2,3 --cluster-gpus 10\n"
+                "  python tools/oec_service_manager.py start qa --gpu 1\n"
+                "  python tools/oec_service_manager.py start flux-ui --gpu 0 --port 7864\n"
+                "  python tools/oec_service_manager.py start trellis-ui --gpu 0 --port 7862\n"
+                "  python tools/oec_service_manager.py start trellis-batch --gpu 0 --image-dir /data/images\n"
+                "  python tools/oec_service_manager.py start flux-trellis --source-mode images --image-dir /data/images --recursive\n"
+                "  python tools/oec_service_manager.py cluster-start ltx-3node --config tools/oec_cluster_services.local.json\n"
+                "Every action, including each service-specific start, has its own --help page."),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--conda-root", type=Path, default=DEFAULT_CONDA_ROOT,
-                        help="Conda root (default: $CONDA_ROOT or ~/Conda).")
-    parser.add_argument("--python", help="Optional explicit Python executable override for smoke tests or custom environments.")
+                        help="Conda root (default: CONDA_ROOT or ~/Conda). Must precede the action.")
+    parser.add_argument("--python", help="Optional explicit Python executable override for local smoke tests or custom environments.")
     sub = parser.add_subparsers(dest="action", required=True)
-    for action in ("start", "stop", "status", "logs"):
-        child = sub.add_parser(action)
-        child.add_argument("service", choices=("ltx-control", "ltx-worker", "qa", "flux-image", "flux-ui", "trellis-batch", "trellis-ui", "flux-trellis"))
-        if action == "start":
-            child.add_argument("--gpus", help="Physical GPU IDs for an LTX worker, e.g. 1,2,3.")
-            child.add_argument("--cluster-gpus", type=int, default=11)
-            child.add_argument("--gpu", default="0", help="Single physical GPU for QA/FLUX/TRELLIS Gradio.")
-            child.add_argument("--port", type=int, default=7864, help="Gradio port (FLUX default 7864; override TRELLIS to 7862).")
-            child.add_argument("--source-mode", choices=("flux", "images"), default="flux",
-                               help="Combined pipeline input source; defaults to FLUX, or existing image folder.")
-            child.add_argument("--image-dir", type=Path, help="Image folder used when --source-mode images.")
-            child.add_argument("--recursive", action="store_true", help="Use nested input images in folder mode.")
-            child.add_argument("--prompt", default="A polished red ceramic tea kettle on a quiet studio table, soft natural window light, realistic product photography.")
-            child.add_argument("--seed", type=int, default=2048)
-            child.add_argument("--width", type=int, default=512)
-            child.add_argument("--height", type=int, default=512)
-            child.add_argument("--steps", type=int, default=4)
-            child.add_argument("--guidance-scale", type=float, default=1.0)
-            child.add_argument("--output", type=Path, help="FLUX-only output PNG path (must be under /tmp).")
-            child.add_argument("--output-dir", type=Path, help="TRELLIS batch GLB directory (must be under /tmp).")
-            child.add_argument("--max-image-size", type=int, default=1024)
-            child.add_argument("--decimation-target", type=int, default=100000)
-            child.add_argument("--texture-size", type=int, default=2048)
-        if action == "stop":
-            child.add_argument("--grace-seconds", type=float, default=25.0)
-        if action == "logs":
-            child.add_argument("--tail", type=int, default=60)
+    services = ("ltx-control", "ltx-worker", "qa", "flux-image", "flux-ui", "trellis-batch", "trellis-ui", "flux-trellis")
+
+    def service_parser(action: str, help_text: str, description: str):
+        child = sub.add_parser(action, help=help_text, description=description)
+        child.add_argument("service", choices=services, help="Service or service bundle.")
+        return child
+
+    child = service_parser("start", "Start a managed service or service bundle.",
+                           "Start one local OEC service. Process groups are tracked separately; no package installs or model downloads are performed.")
+    child.add_argument("--gpus", help="Comma-separated physical GPU IDs for LTX worker, e.g. 2,3.")
+    child.add_argument("--cluster-gpus", type=int, default=11,
+                       help="Expected total LTX worker GPU count across nodes; used by the worker's coordinated maintenance logic (default: 11).")
+    child.add_argument("--gpu", default="0", help="Single physical GPU for QA, FLUX, TRELLIS; reserved GPUs are checked against managed services.")
+    child.add_argument("--port", type=int, default=7864, help="Gradio port (FLUX default 7864; use 7862 for TRELLIS).")
+    child.add_argument("--source-mode", choices=("flux", "images"), default="flux",
+                       help="Combined FLUX→TRELLIS input mode: generate with FLUX (default) or use existing images.")
+    child.add_argument("--image-dir", type=Path, help="Image folder for source-mode images or TRELLIS batch.")
+    child.add_argument("--recursive", action="store_true", help="Include supported images in nested folders.")
+    child.add_argument("--prompt", default="A polished red ceramic tea kettle on a quiet studio table, soft natural window light, realistic product photography.")
+    child.add_argument("--seed", type=int, default=2048)
+    child.add_argument("--width", type=int, default=512)
+    child.add_argument("--height", type=int, default=512)
+    child.add_argument("--steps", type=int, default=4)
+    child.add_argument("--guidance-scale", type=float, default=1.0)
+    child.add_argument("--output", type=Path, help="FLUX-only PNG output; must be under /tmp.")
+    child.add_argument("--output-dir", type=Path, help="TRELLIS batch GLB directory; must be under /tmp and not already exist.")
+    child.add_argument("--max-image-size", type=int, default=1024)
+    child.add_argument("--decimation-target", type=int, default=100000)
+    child.add_argument("--texture-size", type=int, default=2048)
+
+    child = service_parser("stop", "Stop a previously started managed service.",
+                           "Stop the recorded service's isolated process group after verifying the specific script identity.")
+    child.add_argument("--grace-seconds", type=float, default=25.0,
+                       help="Graceful shutdown window before a verified managed process group may be force-stopped (default: 25).")
+
+    service_parser("status", "Show service status and recorded GPU/log details.",
+                   "Read-only status report for a service bundle or one managed instance.")
+    child = service_parser("logs", "Show service logs.",
+                           "Print the tail of the log files associated with a service bundle or one managed instance.")
+    child.add_argument("--tail", type=int, default=60, help="Number of trailing log lines (default: 60).")
+
+    def cluster_config_arg(child):
+        child.add_argument("--config", type=Path, default=CLUSTER_CONFIG_DEFAULT,
+                           help=f"Cluster JSON config (default: {CLUSTER_CONFIG_DEFAULT}).")
+
+    child = sub.add_parser("cluster-profiles", help="List configured multi-node profiles.",
+                           description="List cluster profiles from the selected JSON config.")
+    cluster_config_arg(child)
+
+    child = sub.add_parser("cluster-plan", help="Print a multi-node launch plan without contacting nodes.",
+                           description="Expand a cluster profile and show all node/service assignments without SSH or GPU work.")
+    child.add_argument("profile", help="Profile name from the cluster config.")
+    child.add_argument("--run-id", help="Run ID used in temporary output paths; generated if omitted.")
+    child.add_argument("--source-mode", choices=("flux", "images"), help="Override source mode for flux-trellis tasks.")
+    child.add_argument("--image-dir", type=Path, help="Existing image folder passed to flux-trellis image mode.")
+    child.add_argument("--recursive", action="store_true", help="Include nested images in folder mode.")
+    cluster_config_arg(child)
+
+    child = sub.add_parser("cluster-start", help="Launch a multi-node profile with one command.",
+                           description="Preflight node connectivity and service-specific CLI help, then start the configured services over local execution/SSH.")
+    child.add_argument("profile", help="Profile name from the cluster config, e.g. ltx-3node or mixed-stack.")
+    child.add_argument("--run-id", help="Optional run ID; generated otherwise.")
+    child.add_argument("--dry-run", action="store_true", help="Print the profile only; do not connect to nodes or start processes.")
+    child.add_argument("--continue-on-error", action="store_true", help="Attempt later services after a launch failure.")
+    child.add_argument("--source-mode", choices=("flux", "images"), help="Override source mode for flux-trellis tasks.")
+    child.add_argument("--image-dir", type=Path, help="Existing image folder passed to flux-trellis image mode.")
+    child.add_argument("--recursive", action="store_true", help="Include nested images in folder mode.")
+    cluster_config_arg(child)
+
+    for action, help_text, desc in (
+        ("cluster-status", "Check services for a cluster run.", "Query each recorded service on its owning node."),
+        ("cluster-stop", "Stop services launched by a cluster run.", "Stop only services marked as started by the selected cluster run, in reverse startup order."),
+        ("cluster-logs", "Read logs for a cluster run.", "Fetch service logs from the appropriate local/SSH node."),
+    ):
+        child = sub.add_parser(action, help=help_text, description=desc)
+        child.add_argument("--run-id", help="Cluster run ID; defaults to the latest run recorded on this control node.")
+        child.add_argument("--service", choices=services, help="Limit operation to one service type.")
+        child.add_argument("--node", help="Limit operation to a configured node key.")
+        cluster_config_arg(child)
+        if action == "cluster-stop":
+            child.add_argument("--grace-seconds", type=float, default=25.0,
+                               help="Grace period before existing manager's verified escalation (default: 25).")
+        if action == "cluster-logs":
+            child.add_argument("--tail", type=int, default=60, help="Number of trailing log lines (default: 60).")
     return parser
 
 
@@ -877,13 +947,29 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.action == "start":
             start_service(args)
-        elif args.action == "stop":
+            return 0
+        if args.action == "stop":
             stop_service(args.service, args.grace_seconds)
-        elif args.action == "status":
+            return 0
+        if args.action == "status":
             print_status(args.service)
-        elif args.action == "logs":
+            return 0
+        if args.action == "logs":
             show_logs(args.service, args.tail)
-        return 0
+            return 0
+        if args.action == "cluster-profiles":
+            return _cluster_profiles(args)
+        if args.action in {"cluster-plan", "cluster-start"}:
+            cfg = _cluster_config(args.config)
+            if args.action == "cluster-plan":
+                rid = args.run_id or _cluster_run_id()
+                tasks = _cluster_tasks(cfg, args.profile, args)
+                _cluster_print_plan(cfg, tasks, rid)
+                return 0
+            return _cluster_start(args)
+        if args.action in {"cluster-status", "cluster-stop", "cluster-logs"}:
+            return _cluster_action(args)
+        raise ValueError(f"Unsupported action: {args.action}")
     except Exception as exc:
         _emit(f"ERROR {type(exc).__name__}: {exc}")
         return 2
