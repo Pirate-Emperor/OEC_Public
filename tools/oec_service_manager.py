@@ -367,6 +367,31 @@ def start_service(args: argparse.Namespace) -> None:
             )
             created.append(state)
             return
+        if service == "flux-image":
+            gpu = str(args.gpu)
+            if not gpu.isdigit():
+                raise ValueError("--gpu must be a non-negative physical GPU index.")
+            _assert_gpu_available({gpu})
+            run_tag = datetime.now().strftime("%Y%m%d-%H%M%S") + f"-{os.getpid()}"
+            output_path = (args.output.expanduser().resolve() if args.output else Path("/tmp") / f"oec-flux-{run_tag}.png")
+            try:
+                output_path.relative_to(Path("/tmp").resolve())
+            except ValueError as exc:
+                raise ValueError("flux-image scratch output must be under local /tmp; managed shared-output writes require a separate fresh-quota preflight.") from exc
+            if output_path.exists() or output_path.with_name(output_path.stem + "_info.json").exists():
+                raise FileExistsError(f"Refusing to overwrite FLUX scratch output: {output_path}")
+            cmd_args = [
+                "--mode", "generate", "--offline", "--scratch-output", "--gpu", gpu,
+                "--output", str(output_path), "--prompt", args.prompt, "--seed", str(args.seed),
+                "--width", str(args.width), "--height", str(args.height), "--steps", str(args.steps),
+                "--guidance-scale", str(args.guidance_scale),
+            ]
+            created.append(_launch(
+                f"flux-image-{run_tag}", service, _script("pipeline_flux_image.py"), "phase2_3d",
+                cmd_args, conda_root, args.python, {"CUDA_VISIBLE_DEVICES": None}, {gpu},
+            ))
+            _emit(f"FLUX_IMAGE_OUTPUT={output_path}")
+            return
         if service == "flux-ui":
             gpu = str(args.gpu)
             if not gpu.isdigit():
@@ -477,7 +502,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="action", required=True)
     for action in ("start", "stop", "status", "logs"):
         child = sub.add_parser(action)
-        child.add_argument("service", choices=("ltx-control", "ltx-worker", "qa", "flux-ui", "trellis-ui", "flux-trellis"))
+        child.add_argument("service", choices=("ltx-control", "ltx-worker", "qa", "flux-image", "flux-ui", "trellis-ui", "flux-trellis"))
         if action == "start":
             child.add_argument("--gpus", help="Physical GPU IDs for an LTX worker, e.g. 1,2,3.")
             child.add_argument("--cluster-gpus", type=int, default=11)
@@ -487,6 +512,13 @@ def build_parser() -> argparse.ArgumentParser:
                                help="Combined pipeline input source; defaults to FLUX, or existing image folder.")
             child.add_argument("--image-dir", type=Path, help="Image folder used when --source-mode images.")
             child.add_argument("--recursive", action="store_true", help="Use nested input images in folder mode.")
+            child.add_argument("--prompt", default="A polished red ceramic tea kettle on a quiet studio table, soft natural window light, realistic product photography.")
+            child.add_argument("--seed", type=int, default=2048)
+            child.add_argument("--width", type=int, default=512)
+            child.add_argument("--height", type=int, default=512)
+            child.add_argument("--steps", type=int, default=4)
+            child.add_argument("--guidance-scale", type=float, default=1.0)
+            child.add_argument("--output", type=Path, help="FLUX-only output PNG path (must be under /tmp).")
         if action == "stop":
             child.add_argument("--grace-seconds", type=float, default=25.0)
         if action == "logs":
