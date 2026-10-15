@@ -145,12 +145,14 @@ Stopping a one-shot generation service after it has already finished simply repo
 Open notebooks from `~/OEC` with the `phase2_3d` kernel and run their cells top-to-bottom:
 
 - `pipeline_flux_only.ipynb`: FLUX Gradio, port 7864.
-- `pipeline_trellis_3d_only.ipynb`: TRELLIS Gradio, port 7862.
+- `pipeline_trellis_3d_only.ipynb`: TRELLIS Gradio, port 7862. Its setup checks installed packages first and requires fresh quota telemetry only if it must install packages, clone source, or build extensions. The interactive UI defaults to verified local `/tmp` output so cached-model tests do not write to shared output storage.
 - `pipeline_trellis_3d.ipynb`: combined notebook with TRELLIS (port 7862) and FLUX (port 7863). TRELLIS stays in the notebook kernel; FLUX is launched as a separately supervised Gradio process so the two model weights do not compete for one GPU.
+
+For TRELLIS-only testing, output mode defaults to scratch: `AIEROS_TRELLIS_UI_OUTPUT_MODE=scratch`. The notebook verifies that `/tmp` is a different filesystem from model storage and has at least 512 MiB free before it generates or writes a GLB. The files are temporary and are not automatically archived. Set `AIEROS_TRELLIS_UI_OUTPUT_MODE=shared` before running its studio cell only when you intend to write to the shared outputs directory; fresh quota telemetry is required for each such output operation.
 
 For the combined notebook, select two distinct free physical GPUs: `AIEROS_TRELLIS_UI_GPU=0` and `AIEROS_FLUX_UI_GPU=1` are the defaults. If these IDs are already occupied, choose two other distinct IDs before running the first cell. The first cell verifies that the IDs differ; the FLUX cell uses `tools/oec_service_manager.py` and the FLUX model runs in its own `phase2_3d` process. This is still a two-GPU workflow, not a way to make both models fit on one 40-GB GPU.
 
-All have public sharing disabled by default. Use separate SSH tunnels for each port. To stop the separately managed FLUX UI from the notebook/control terminal, run `python tools/oec_service_manager.py stop flux-ui`; the TRELLIS studio inside the notebook kernel can be closed with `demo_trellis.close()` or by restarting that notebook kernel.
+All have public sharing disabled by default. Use separate SSH tunnels for each port. To stop the separately managed FLUX UI from the notebook/control terminal, run `python tools/oec_service_manager.py stop flux-ui`; the TRELLIS studio inside the notebook kernel can be closed with `demo.close()` or by restarting that notebook kernel.
 
 Static CI validates notebook JSON and parses every Python code cell, plus checks critical cache, storage and Gradio behavior. These static checks do not replace an actual browser interaction on the target compute node; each deployed kernel still needs a live cache/CUDA check before generation.
 
