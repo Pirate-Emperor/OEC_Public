@@ -116,8 +116,16 @@ class QANode:
             )
             print(f"[QA-NODE-GPU{self.gpu_id}] Model verified in local HF cache.")
             return
-        except Exception:
-            pass
+        except Exception as cache_error:
+            if os.environ.get("AIEROS_QA_ALLOW_MODEL_DOWNLOAD") != "1":
+                raise RuntimeError(
+                    "QA model is not complete in the local cache. Downloads are disabled by default; "
+                    "set AIEROS_QA_ALLOW_MODEL_DOWNLOAD=1 only after checking fresh storage admission."
+                ) from cache_error
+            if os.environ.get("HF_HUB_OFFLINE", "0").strip().lower() in {"1", "true", "yes"}:
+                raise RuntimeError(
+                    "HF_HUB_OFFLINE is enabled. Explicitly unset it before an approved QA model download."
+                ) from cache_error
 
         print(f"[QA-NODE-GPU{self.gpu_id}] Model missing or incomplete. Estimating required download size...")
         required_gb = estimate_hf_repo_bytes(self.repo_id) / BYTES_PER_GB
@@ -167,8 +175,12 @@ class QANode:
 
     def load_vlm(self):
         print(f"[QA-NODE-GPU{self.gpu_id}] Initializing Qwen2-VL-7B-Instruct for Strict Compliance Checking...")
+        if not torch.cuda.is_available():
+            raise RuntimeError("QA worker requires a visible CUDA GPU; refusing an accidental CPU model load.")
+        if process_vision_info is None:
+            raise RuntimeError("qwen-vl-utils is missing; install it through the approved environment setup before QA.")
         from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
-        
+
         self._ensure_downloaded_robustly()
         
         print(f"[QA-NODE-GPU{self.gpu_id}] Pushing weights into VRAM...")
