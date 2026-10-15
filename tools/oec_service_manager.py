@@ -587,7 +587,7 @@ def _cluster_config(path: Path) -> dict[str, Any]:
     for name, tasks in cfg["profiles"].items():
         if not isinstance(tasks, list) or not tasks:
             raise ValueError(f"profiles.{name} must be a non-empty array.")
-        ids, seen_node_services = set(), set()
+        ids = set()
         for i, task in enumerate(tasks):
             where = f"profiles.{name}[{i}]"
             if not isinstance(task, dict) or not task.get("id") or not task.get("node") or not task.get("service"):
@@ -599,10 +599,9 @@ def _cluster_config(path: Path) -> dict[str, Any]:
                 raise ValueError(f"{where}.node does not exist in nodes.")
             if task["service"] not in CLUSTER_SERVICES:
                 raise ValueError(f"{where}.service {task['service']!r} is not supported.")
-            key = (task["node"], task["service"])
-            if key in seen_node_services:
-                raise ValueError(f"{where}: a profile may invoke each service at most once per node.")
-            seen_node_services.add(key)
+            # Repeated service kinds on a node are allowed for independent GPU jobs,
+            # e.g. several FLUX one-shot jobs. The local supervisor reserves GPUs and
+            # enforces its stable-ID restrictions (UI/worker services remain singletons).
             if not isinstance(task.get("args", []), list) or not all(isinstance(a, str) for a in task.get("args", [])):
                 raise ValueError(f"{where}.args must be an array of strings.")
     cfg["_config_path"] = str(path.expanduser().resolve())
