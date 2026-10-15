@@ -1,11 +1,12 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-15 17:05 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 18:50 IST (Asia/Kolkata)  
 **Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
 ## Current status
 
+**The latest review candidate adds supervised background launch/stop workflows and explicit TRELLIS existing-image-folder mode; hosted validation is green (78/78 tests), but new live LTX/Gradio/folder-inference acceptance is still pending.** PR [#11](https://github.com/Killer4K-N/OEC/pull/11) is open and not merged. Source code/workflow/notebook changes remain isolated on `fix/flux-trellis-pipeline-20261015`; main is tracking-only.
 **OEC now has standalone FLUX and TRELLIS runtime evidence and a successful combined FLUX → TRELLIS.2 run on a review branch.** The FLUX stage generated and validated a 512×512 PNG (255,946 bytes; SHA-256 2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb), which was passed as the exact TRELLIS input. OEC run [38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076), job 116389784906, ended with report status PASS after 419.848s on oec-1 / host scn30-mn. TRELLIS exported [artifact 11967418646](https://github.com/Killer4K-N/OEC/actions/runs/38725376076/artifacts/11967418646): a 3,484,804-byte GLB (SHA-256 74e3654625a0662302ecb1bf1c0c79885833563753b6a30acbeee45a5c4b360e). Independent trimesh reopen passed with 54,597 vertices and 93,617 faces.
 
 The preceding failed combined run [38723286765](https://github.com/Killer4K-N/OEC/actions/runs/38723286765) exposed a missing subprocess import in the TRELLIS scratch-filesystem findmnt guard and an over-permissive GPU IDLE predicate (100% utilization with no visible compute process). The import and forced-findmnt regression test were added; the idle GPU predicate now requires known utilization at or below 5%, with re-sampling for up to 180 seconds. Guarded hosted CI [38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281) passed 58/58 tests, Python compilation and all four notebook checks.
@@ -273,3 +274,27 @@ The candidate source mitigation loads via `Flux2KleinPipeline.from_pretrained(..
 ## 2026-10-15 — Combined FLUX/TRELLIS fix verified on review branch
 
 The final report and exact-run artifact establish that the integrated cached route now passes: FLUX PNG → TRELLIS input → GLB export → independent geometry reopen. The source branch fixes the missing subprocess import and rejects GPU admission when utilization is high despite no visible process. CI passed 58/58 tests and four notebook checks. See changelog/CHANGELOG-2026-10-15.md and experiment entries TEST-2026-10-15-OEC-COMBINED-FLUX-TRELLIS-RUN-1/RUN-2 in test.json. These records do not merge source code to main; fresh quota telemetry remains an open blocker for downloads and managed shared writes.
+
+
+## 2026-10-15 evening — Background launch/stop pipelines and Gradio notebook source validation
+
+### Review candidate
+
+PR [#11](https://github.com/Killer4K-N/OEC/pull/11) adds `tools/oec_service_manager.py` and `docs/background-pipelines.md` along with source changes to LTX worker GPU/purge control, QA GPU selection, TRELLIS folder generation, and explicit existing-image input for the combined pipeline. The PR remains open/unmerged. Main was updated only for tracking/results.
+
+### Test evidence
+
+Hosted CI [run 38743800209](https://github.com/Killer4K-N/OEC/actions/runs/38743800209) passed 78 tests: notebook static 13; TRELLIS CLI 6; TRELLIS offline-config 6; combined pipeline 15; FLUX image 7; GPU admission 6; AudioCraft notebook static 5; storage-write admission 6; LTX routing/purge 6; service manager 8. Python compilation passed for the modified entry points and helpers. The workflow parsed all code cells and validated JSON for `pipeline_trellis_3d.ipynb` (16 cells), `pipeline_trellis_3d_only.ipynb` (15), `pipeline_flux_only.ipynb` (10), and `pipeline_audiocraft.ipynb` (6).
+
+Two earlier CI results were inspected and documented, not hidden: [38743502455](https://github.com/Killer4K-N/OEC/actions/runs/38743502455) exposed an outdated TRELLIS mode assertion; [38743634536](https://github.com/Killer4K-N/OEC/actions/runs/38743634536) exposed a syntax error in the new supervisor regression. Both were corrected before the successful 78-test result.
+
+### Operational semantics and limits
+
+- LTX manager service keeps storage, upload and Brain separate and intentionally does not co-start QA onto the same GPU. Brain is confined to GPU 0; QA accepts a selected GPU. LTX worker's `--no-purge` now controls cluster purge/synchronization behavior too.
+- TRELLIS has a single-model-load batch mode for PNG/JPEG/WEBP/BMP/TIFF folders; recursive traversal is opt-in. Combined pipeline still defaults to FLUX, while `--source-mode images --image-dir ... [--recursive]` skips FLUX. FLUX-only background image generation and FLUX/TRELLIS Gradio entry points are managed as separate services.
+- Gradio source/ports/privacy are statically validated and stale saved notebook outputs were cleared. There is no claim that the live browser UIs accepted a generation request in this task. Likewise, no live LTX daemon/worker startup, live TRELLIS batch inference on a folder, or live GPU runtime for the newly added paths was run.
+- Previously accepted same-run inference remains [run 38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076), a cache-only FLUX 512×512 PNG handed to TRELLIS and a valid GLB independently reopened by `trimesh`. It verifies the pre-existing single-image combined inference path, not the new batch or Gradio paths.
+- Fresh authoritative quota telemetry remains missing. Missing model/dependency downloads and managed shared output writes stay blocked. No live processes, QA queue, `.storage_reserve.bin`, model cache or phase1 package state were mutated here.
+- Prompt/profitability rules in `brain_config.json` were not changed: no measured QA yield, generation-cost or conversion experiment was available to support a claim that new prompts would improve profitability.
+
+Open follow-ups are in `TODO.md`; per-run results and experiment details are in `test.json` and `changelog/CHANGELOG-2026-10-15.md`.
