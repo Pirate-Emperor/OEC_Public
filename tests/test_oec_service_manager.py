@@ -61,6 +61,26 @@ class OECServiceManagerTests(unittest.TestCase):
         self.assertEqual(args.image_dir, Path("/tmp/images"))
         self.assertTrue(args.recursive)
 
+        batch = manager.build_parser().parse_args([
+            "start", "trellis-batch", "--gpu", "2", "--image-dir", "/tmp/images",
+            "--output-dir", "/tmp/new-trellis-output",
+        ])
+        self.assertEqual(batch.service, "trellis-batch")
+        self.assertEqual(batch.gpu, "2")
+        flux = manager.build_parser().parse_args([
+            "start", "flux-image", "--gpu", "1", "--prompt", "A ceramic vase",
+        ])
+        self.assertEqual(flux.service, "flux-image")
+        self.assertEqual(flux.prompt, "A ceramic vase")
+
+    def test_supervisor_uses_no_shell_and_records_specific_scripts(self):
+        source = (ROOT / "tools" / "oec_service_manager.py").read_text(encoding="utf-8")
+        self.assertIn("start_new_session=True", source)
+        self.assertIn("_matching_members(state)", source)
+        self.assertIn('os.killpg(pgid, signal.SIGTERM)', source)
+        self.assertNotIn("os.system(", source)
+        self.assertNotIn("shell=True", source)
+
 
 if __name__ == "__main__":
     unittest.main()
