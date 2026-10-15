@@ -153,3 +153,110 @@ All have public sharing disabled by default. Use separate SSH tunnels for each p
 ## Quota/cache guardrails
 
 The reviewed runtime is intentionally offline by default. Do not bypass storage admission if models or packages are missing; the present quota telemetry remains a known blocker for downloads and managed shared-output writes. Cache-only inference and local scratch should be used for validation. Do not alter `.storage_reserve.bin` to work around admission checks.
+
+
+## One-command three-node operation
+
+The supervisor also supports a **cluster coordinator**. Run the manager from the control node, configure the two SSH aliases, and start a whole profile with one command. All three hosts must have the same reviewed OEC checkout/branch and compatible Conda environments; the coordinator intentionally does not sync or mutate remote working trees.
+
+### Setup
+
+```bash
+cd ~/OEC
+cp tools/oec_cluster_services.example.json tools/oec_cluster_services.local.json
+```
+
+Edit `tools/oec_cluster_services.local.json`. In `nodes`, change `oec-worker-2` and `oec-worker-3` to the actual SSH host aliases from `~/.ssh/config` (or put direct SSH hostnames there), and correct `project_dir`, `conda_activate`, `conda_root`, and `manager_env` for each node. Confirm passwordless/batch-mode SSH is already configured:
+
+```bash
+ssh oec-worker-2 'hostname; nvidia-smi -L; test -f ~/OEC/tools/oec_service_manager.py'
+ssh oec-worker-3 'hostname; nvidia-smi -L; test -f ~/OEC/tools/oec_service_manager.py'
+python tools/oec_service_manager.py cluster-profiles --config tools/oec_cluster_services.local.json
+python tools/oec_service_manager.py cluster-plan ltx-3node --config tools/oec_cluster_services.local.json
+```
+
+The checked-in JSON is only a template. It is deliberately separate from your local file so private hostnames and per-node paths are not committed.
+
+### Profile A: LTX assembly line across three 4-GPU nodes
+
+The included `ltx-3node` profile uses 10 GPUs for LTX while keeping the Brain and QA on separate control-node GPUs:
+
+- Control node: GPU 0 for `brain.py`, GPU 1 for QA, GPUs 2 and 3 for the LTX worker.
+- Worker 2: GPUs 0–3 for LTX.
+- Worker 3: GPUs 0–3 for LTX.
+- The profile sets `--cluster-gpus 10` on each LTX worker and launches all control daemons. The supervisor forces `--no-purge` for workers.
+
+After editing aliases/paths and verifying the plan, the single start command is:
+
+```bash
+python tools/oec_service_manager.py cluster-start ltx-3node --config tools/oec_cluster_services.local.json
+```
+
+The command first checks remote access and each service-specific `--help` path, then starts the service tasks. It prints and records a `CLUSTER_RUN_ID`. Check or stop that exact run:
+
+```bash
+python tools/oec_service_manager.py cluster-status --config tools/oec_cluster_services.local.json
+python tools/oec_service_manager.py cluster-logs --service ltx-worker --tail 120 --config tools/oec_cluster_services.local.json
+python tools/oec_service_manager.py cluster-stop --config tools/oec_cluster_services.local.json
+```
+
+The coordinator tracks which commands it successfully started. A failed start is not treated as an owned service; cluster stop skips such tasks. The manifest is local to the control node, while each per-host supervisor keeps its own PID/process-group state and log files.
+
+### Profile B: mixed FLUX + TRELLIS + LTX
+
+The `mixed-stack` profile starts the same control services/QA arrangement, assigns LTX to control GPUs 2–3, starts a FLUX Gradio UI on worker 2 GPU 0 (port 7864), and a TRELLIS Gradio UI on worker 3 GPU 0 (port 7862). This intentionally leaves the other six GPUs available for separate jobs rather than silently loading duplicate model instances onto every device.
+
+```bash
+python tools/oec_service_manager.py cluster-plan mixed-stack --config tools/oec_cluster_services.local.json
+python tools/oec_service_manager.py cluster-start mixed-stack --config tools/oec_cluster_services.local.json
+```
+
+To run four independent FLUX one-shot generations on worker 2, one per 40-GB GPU, use the included `flux-image-once` profile. Each job writes a unique PNG plus JSON sidecar under `/tmp`; after generation completes, copy/archive results only through an approved storage path and quota admission:
+
+```bash
+python tools/oec_service_manager.py cluster-start flux-image-once --config tools/oec_cluster_services.local.json
+```
+
+To run the combined FLUX→TRELLIS pipeline in background with its default prompt-generated image:
+
+```bash
+python tools/oec_service_manager.py cluster-start flux-trellis --config tools/oec_cluster_services.local.json
+```
+
+To use a folder of existing images instead, override the source mode and specify the path visible on the worker node:
+
+```bash
+python tools/oec_service_manager.py cluster-start flux-trellis \\
+  --source-mode images --image-dir /path/visible/on/worker2/images --recursive \\
+  --config tools/oec_cluster_services.local.json
+```
+
+The combined pipeline does not automatically copy files between nodes. In image mode, `--image-dir` must resolve on the node running that task. This profile uses worker 2 by default.
+
+### CLI help: every action and every service
+
+The CLI uses `argparse`; help does not start any service. Examples:
+
+```bash
+python tools/oec_service_manager.py --help
+python tools/oec_service_manager.py start --help
+python tools/oec_service_manager.py start ltx-control --help
+python tools/oec_service_manager.py start ltx-worker --help
+python tools/oec_service_manager.py start qa --help
+python tools/oec_service_manager.py start flux-image --help
+python tools/oec_service_manager.py start flux-ui --help
+python tools/oec_service_manager.py start trellis-batch --help
+python tools/oec_service_manager.py start trellis-ui --help
+python tools/oec_service_manager.py start flux-trellis --help
+python tools/oec_service_manager.py stop --help
+python tools/oec_service_manager.py status --help
+python tools/oec_service_manager.py logs --help
+python tools/oec_service_manager.py cluster-profiles --help
+python tools/oec_service_manager.py cluster-plan --help
+python tools/oec_service_manager.py cluster-start --help
+python tools/oec_service_manager.py cluster-status --help
+python tools/oec_service_manager.py cluster-stop --help
+python tools/oec_service_manager.py cluster-logs --help
+```
+
+`--help` for a service is written as `ACTION SERVICE --help`; global `--conda-root` goes before the action, for example `python tools/oec_service_manager.py --conda-root "$HOME/Conda" start ltx-worker --help`.
