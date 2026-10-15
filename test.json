@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-15T16:36:00+05:30",
+  "last_updated": "2026-10-15T16:42:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Standalone FLUX run 38613575959 passed on all three OEC runners; standalone TRELLIS GLB export/reopen passed on Connector_1 run 38602330418. Static review-branch runs 38722873210 and 38723196255 each passed 56 tests, compilation and 4/4 notebook checks. Combined OEC run 38723286765 passed FLUX generation/PNG validation, TRELLIS offline cache/attention check and pipeline load, then failed before TRELLIS inference due NameError: subprocess not imported in the scratch mount probe. Artifact 11966744703 contains pipeline_report.json and the generated PNG. The run also showed the GPU admission tool accepted 100% utilization as IDLE when no compute process was visible. Current candidate fixes add subprocess import and regression coverage, require idle GPU utilization <=5%, and wait/re-sample up to 180s; hosted CI and retry pending. Quota telemetry remains unresolved; installs/downloads/managed writes remain blocked.",
+  "latest_summary": "OEC standalone FLUX run 38613575959 passed on 3/3 OEC runners; Connector_1 standalone TRELLIS run 38602330418 produced/reopened a valid GLB. Combined run 38723286765 validated a real FLUX PNG, TRELLIS attention/cache check and pipeline load but failed before inference due missing subprocess import; current source fixes it and hardens idle GPU admission when utilization is high. Hosted CI run 38725202281 passed 58/58 tests, compile and notebook checks on commit d075b4442d87904e5b57128cb2f430bc53781738. The combined runtime must now be retried and pass TRELLIS inference/export/geometry reopen before completion.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2579,6 +2579,44 @@
       ],
       "limitation": "No TRELLIS inference or GLB was produced. This is an integration failure, not a TRELLIS attention failure or successful full pipeline.",
       "follow_up": "Add missing subprocess import and a test that executes the mount fallback; require idle GPU utilization <=5% and wait/re-sample for up to 180 seconds; run CI and retry."
+    },
+    {
+      "id": "TEST-2026-10-15-FLUX-TRELLIS-SUBPROCESS-GPU-ADMISSION-CI",
+      "date": "2026-10-15",
+      "category": "hosted static/unit regression suite after combined-runtime failure analysis",
+      "approach": "Run all targeted TRELLIS notebook/easy-run/offline-config tests, combined pipeline tests, FLUX CLI and GPU-admission tests, AudioCraft static tests, storage admission tests, compile selected Python modules, and validate notebook JSON/Python cells.",
+      "reason": "Verify that the missing subprocess import is fixed along the executed scratch-filesystem path, and that a GPU with 100% utilization cannot be admitted as IDLE when no process is visible.",
+      "parameters": {
+        "run_id": 38725202281,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38725202281",
+        "job_id": 116389198433,
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "commit": "d075b4442d87904e5b57128cb2f430bc53781738",
+        "runner": "GitHub-hosted ubuntu-latest",
+        "model_inference": false
+      },
+      "results": {
+        "status": "PASS",
+        "suite_counts": {
+          "trellis_notebook_static": 12,
+          "trellis_easy_run": 6,
+          "trellis_offline_config": 6,
+          "combined_pipeline": 10,
+          "flux_image": 7,
+          "flux_gpu_admission": 6,
+          "audiocraft_notebook_static": 5,
+          "storage_write_admission": 6
+        },
+        "tests_passed": 58,
+        "tests_failed": 0,
+        "python_compile": "PASS",
+        "notebook_json_and_python_cell_checks": "PASS_4_OF_4"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38725202281"
+      ],
+      "limitation": "This is hosted static/unit CI, not GPU inference. It does not prove the combined pipeline completes TRELLIS generation or GLB reopen.",
+      "follow_up": "Run one combined cache-only attempt on oec-1. If GPU remains above the utilization threshold for 180 seconds, preserve the blocked admission evidence rather than overriding the guard."
     }
   ]
 }

@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-15 16:36 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 16:42 IST (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 ## 2026-10-14 — quota telemetry and live-checkout diagnosis
 - [x] Verified GitHub state: OEC `main` is `82346c0753e139b92240f53734eb48d2113ed9ad`; `fix/trellis-gradio-notebooks-20261011` is `2543b26d2888e667c6443c984259f84ac5b6c142` (111 ahead, 0 behind). No main-branch change or merge.
@@ -199,3 +199,9 @@ The first hosted run on this branch, [38721841953](https://github.com/Killer4K-N
 - [ ] OPEN — run hosted CI on these latest code changes (including the mount-probe and high-utilization regression tests), then retrigger the combined workflow. Acceptance still requires TRELLIS inference, GLB export and independent non-empty geometry reopen.
 - [ ] OPEN — repository-wide follow-up: qa_compliance_worker.py imports torch at module import before applying its per-worker CUDA visibility override. Audit this in a separate focused change; no QA process or queue was changed.
 - [ ] BLOCKED — downloads and managed shared-output writes remain gated while fresh quota telemetry is unresolved. No admission policy was weakened; no queue, reserve-file, phase1 or shared-cache mutation occurred.
+
+
+### Latest regression CI — 2026-10-15
+
+- [x] Current source commit d075b4442d87904e5b57128cb2f430bc53781738 passed [hosted CI run 38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281), job 116389198433: 58/58 tests, Python compile, notebook JSON/Python-cell checks for 4/4 notebooks. This includes the findmnt mount-probe regression and high-utilization GPU admission regression.
+- [ ] OPEN — retry the combined one-runner workflow from the corrected source. The last integrated run generated and validated FLUX image, then failed before TRELLIS inference due to the missing subprocess import (now fixed). Do not mark complete until TRELLIS generates and a GLB reopens with non-empty geometry in the same run.

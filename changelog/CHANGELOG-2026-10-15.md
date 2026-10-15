@@ -130,3 +130,8 @@ Run [OEC Actions 38723286765](https://github.com/Killer4K-N/OEC/actions/runs/387
 - Candidate fix added import subprocess and a regression test that forces the findmnt fallback, plus a high-utilization/no-visible-process admission regression test. Latest CI and retry are pending; no claim of full pipeline success until TRELLIS inference, export and trimesh geometry reopen succeed.
 - No download, install, shared output write, process signal, QA queue mutation, reserve-file change or phase1 edit occurred.
 
+
+
+## Latest regression CI — pass
+
+Hosted review-branch run [38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281), job 116389198433, tested commit d075b4442d87904e5b57128cb2f430bc53781738. All 58 targeted unit/static tests passed; Python compilation passed; notebook JSON/Python-cell validation passed for 4/4 notebooks. Suite counts: TRELLIS notebook static 12, TRELLIS CLI/easy-run 6, offline config 6, combined pipeline 10, FLUX image 7, GPU admission 6, AudioCraft static 5, storage admission 6. This includes the forced findmnt/subprocess path test and the no-visible-process/high-utilization denial test. Hosted runner only; this does not prove model inference. Next action: rerun the combined pipeline on oec-1.

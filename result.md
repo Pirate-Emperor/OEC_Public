@@ -1,6 +1,6 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-15 16:36 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 16:42 IST (Asia/Kolkata)  
 **Branch:** fix/flux-trellis-pipeline-20261015 (review-only, created from main at 99d9796d5bd5afc1731600b310ced3b5be521ee9; no changes merged into main)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
@@ -306,3 +306,8 @@ The exact-run artifact from [OEC run 38723286765](https://github.com/Killer4K-N/
 - The same run's admission log selected GPU 0 as IDLE despite 100% utilization and zero visible compute processes. Idle admission now requires known utilization at or below 5%; orchestration re-samples for at most 180 seconds and then fails closed if no eligible GPU appears.
 - Added the missing import and a regression test that exercises the findmnt fallback. New source/tests still require hosted CI and a fresh combined-run attempt.
 - No model/dependency download, install, shared-output write, process signal, QA queue mutation, reserve-file change, or phase1 change occurred.
+
+
+## 2026-10-15 — Current source passes hardened static CI
+
+The code revision d075b4442d87904e5b57128cb2f430bc53781738 passed [OEC hosted CI run 38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281), job 116389198433: 58/58 tests, Python compilation, and notebook JSON/Python-cell checks for all four notebooks. The expanded suites include a test that forces the TRELLIS scratch filesystem guard through the findmnt/subprocess code path and a GPU-admission regression that rejects 100% utilization when no compute process is visible. This is static/unit verification; the combined runtime retry remains the next acceptance gate.
