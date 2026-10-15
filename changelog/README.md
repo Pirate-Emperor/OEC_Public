@@ -4,6 +4,12 @@ Daily engineering records live here. Use the local Asia/Kolkata date in each fil
 
 ## Daily records
 
+- [2026-10-15 — FLUX/TRELLIS fix validated end to end on review branch](CHANGELOG-2026-10-15.md)
+  - Hosted CI [38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281) passed 58/58 tests, Python compilation and all four notebook checks. This includes the findmnt/subprocess and high-utilization GPU-admission regressions.
+  - First combined attempt [38723286765](https://github.com/Killer4K-N/OEC/actions/runs/38723286765) found the missing subprocess import in the scratch filesystem probe and an over-permissive IDLE policy at 100% utilization. Both were corrected on the review branch.
+  - Final combined run [38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076) passed FLUX image generation, exact PNG handoff to TRELLIS.2, GLB export and independent geometry reopen (54,597 vertices / 93,617 faces). Artifact [11967418646](https://github.com/Killer4K-N/OEC/actions/runs/38725376076/artifacts/11967418646) contains image, metadata, pipeline report and GLB.
+  - Model/source changes remain on fix/flux-trellis-pipeline-20261015; main source was not merged. Fresh quota telemetry remains an open gate for future downloads and managed writes.
+
 - [2026-10-14 — TRELLIS generation verified; quota and FLUX blockers tracked](CHANGELOG-2026-10-14.md)
   - [Connector_1 run 38555689884](https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884) succeeded in producing a read-only report: the configured quota snapshot is missing and `quota_check` is unavailable on scn17-mn.
   - Model storage is on shared Lustre with very high measured filesystem free capacity; that is not user/project quota proof, so package/model write admission remains blocked.

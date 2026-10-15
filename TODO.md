@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-14 23:48 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 17:02 IST (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 ## 2026-10-14 — quota telemetry and live-checkout diagnosis
 - [x] Verified GitHub state: OEC `main` is `82346c0753e139b92240f53734eb48d2113ed9ad`; `fix/trellis-gradio-notebooks-20261011` is `2543b26d2888e667c6443c984259f84ac5b6c142` (111 ahead, 0 behind). No main-branch change or merge.
@@ -148,3 +148,16 @@ The official Diffusers release notes list Flux2 Klein support in v0.37.0; the cu
 - [x] Changed FLUX model loading to `device_map="cuda"` in candidate commit [e594269](https://github.com/Killer4K-N/OEC/commit/e59426970956ff83fbd433612adc29eb9364d0f8) to avoid CPU-load-then-GPU-copy peak memory; candidate CI [38613904439](https://github.com/Killer4K-N/OEC/actions/runs/38613904439) passed 46/46 tests and all static checks.
 - [ ] **BLOCKED — runner availability / stale queue:** runs [38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955), [38613199844](https://github.com/Killer4K-N/OEC/actions/runs/38613199844) and [38613575959](https://github.com/Killer4K-N/OEC/actions/runs/38613575959) remain queued/partly failed without available runner assignments. Verify oec-1/oec-2/oec-3 are Online/Idle, cancel old queued attempts, then push `.github/flux-smoke.trigger` or use workflow dispatch for a clean run.
 - [ ] No fresh quota snapshot; do not install dependencies/download model weights until approved telemetry is available.
+
+## 2026-10-15 — FLUX/TRELLIS integration fixed and verified on review branch
+
+Tracking only on main: model/source changes remain on review branch fix/flux-trellis-pipeline-20261015; no code merge was made by this record update.
+
+- [x] Reviewed OEC combined run 38723286765. FLUX generated and validated its PNG, and TRELLIS cache/attention/model loading passed, but generation stopped before inference because pipeline_trellis_3d.py used subprocess.run() without importing subprocess in its scratch-filesystem findmnt fallback.
+- [x] Added the import plus a regression test for the findmnt path. The same run showed GPU utilization 100% with no visible compute processes was incorrectly admitted as IDLE; idle admission now requires known utilization ≤5%, and the orchestrator resamples for up to 180 seconds before fail-closed denial.
+- [x] Hosted CI 38725202281 passed 58/58 tests, Python compilation, and all four notebook checks.
+- [x] End-to-end cache-only run 38725376076 passed on oec-1 / host scn30-mn. Duration 419.848s; exact-run report PASS. FLUX PNG 512×512, 255,946 bytes, SHA-256 2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb. TRELLIS exported a 3,484,804-byte GLB (SHA-256 74e3654625a0662302ecb1bf1c0c79885833563753b6a30acbeee45a5c4b360e); independent trimesh reopen passed with 54,597 vertices / 93,617 faces. Artifact 11967418646 includes PNG, sidecar, pipeline_report.json and GLB.
+- [ ] OPEN — authoritative fresh quota telemetry is still missing; keep model/dependency downloads and managed shared writes blocked. The combined run used caches and /tmp only.
+- [ ] Separate follow-up — audit qa_compliance_worker.py import/CUDA visibility order in a focused change; no QA worker or queue was modified here.
+
+Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep main source unchanged unless a code merge is explicitly authorized.
