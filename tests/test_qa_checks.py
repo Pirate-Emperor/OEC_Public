@@ -12,6 +12,7 @@ from tools.qa_checks import (
     count_untracked_processing_jobs,
     ensure_qa_lease_schema,
     recover_stale_qa_jobs,
+    qa_lease_schema_current,
     validate_qa_analysis,
 )
 
@@ -109,6 +110,25 @@ class QAQueueLeaseTests(unittest.TestCase):
 
     def tearDown(self):
         self.tempdir.cleanup()
+
+    def test_schema_check_is_read_only_and_detects_legacy_queue(self):
+        self.assertTrue(qa_lease_schema_current(self.db_path))
+        legacy_db = str(Path(self.tempdir.name) / "legacy.db")
+        with sqlite3.connect(legacy_db) as conn:
+            conn.execute(
+                """CREATE TABLE assets (
+                    id INTEGER PRIMARY KEY,
+                    asset_path TEXT NOT NULL,
+                    json_path TEXT NOT NULL,
+                    total_size_bytes INTEGER NOT NULL,
+                    status TEXT DEFAULT 'PENDING'
+                )"""
+            )
+        self.assertFalse(qa_lease_schema_current(legacy_db))
+        with sqlite3.connect(legacy_db) as conn:
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(assets)")}
+        self.assertNotIn("qa_started_at", cols)
+        self.assertNotIn("qa_worker_id", cols)
 
     def test_claims_oldest_pending_job_and_records_worker_lease(self):
         first = claim_next_qa_job(self.db_path, "worker-a")
