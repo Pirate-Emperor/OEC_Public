@@ -250,8 +250,8 @@ class QANode:
         except (json.JSONDecodeError, QAValidationError, TypeError, ValueError) as e:
             print(f"[QA-NODE] VLM response failed JSON/schema validation: {e}\nRaw Output: {output_text}")
             return {
-                "category": 1,
-                "rejection_reason": f"VLM response failed QA schema validation ({type(e).__name__}).",
+                "category": None,
+                "qa_error": f"VLM response failed QA schema validation ({type(e).__name__}).",
             }
 
     def extract_evaluation_frame(self, media_path):
@@ -390,8 +390,17 @@ def process_qa_queue(purge_after_load=False, gpu_id=0):
                 if is_extracted:
                     os.remove(frame_path) 
                 
-                category = analysis.get("category", 1)
-                
+                category = analysis.get("category")
+                if type(category) is not int or category not in (1, 2, 3):
+                    reason = analysis.get("qa_error", "VLM response did not contain a valid QA category.")
+                    print(f"[QA-NODE] QA output invalid for asset {record_id}; recording failure without rejecting the media: {reason}")
+                    with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
+                        conn.execute(
+                            "UPDATE assets SET status = 'FAILED_QA_OUTPUT', qa_started_at = NULL, qa_worker_id = NULL WHERE id = ?",
+                            (record_id,),
+                        )
+                    continue
+
                 if category == 1:
                     reason = analysis.get("rejection_reason", "Failed Adobe Stock Guidelines")
                     print(f"[QA-NODE] ❌ REJECTED: {reason}. Moving to trash.")
