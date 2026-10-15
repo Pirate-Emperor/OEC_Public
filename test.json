@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T01:48:49+05:30",
+  "last_updated": "2026-10-16T01:50:14+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "On 2026-10-16 Asia/Kolkata, the review branch was hardened for QA response validation, safe SQLite job claims/leases, video-frame extraction, and opt-in model-cache/download behavior. A new 15-test CPU-only QA suite and pre-sync gate were added. Seven earlier scratch helper-behavior checks passed, but no Actions run/check status was returned for trigger commit b257edced2d651b9913ddf72c6ace7c26db81edb. The locally dirty A100 QA worker was not overwritten; helper synchronization and GPU/model runtime remain unverified. PR #11 remains open and unmerged.",
+  "latest_summary": "On 2026-10-16 Asia/Kolkata, the OEC review branch now has QA schema validation, failure handling, atomic SQLite claims and leases, safer video-frame extraction, opt-in model downloads/purge, admitted output writes, and audit-preserving REJECTED_QA records. A 15-test CPU-only regression suite and pre-sync compile/test gate are configured on oec-1; seven earlier scratch helper checks passed, but no Actions run/check status was returned for latest trigger commit 58423b39e8bcaa2239300324e4d5e31c72ea564a. The dirty live QA worker was not overwritten; helper sync and real QA model runtime remain unverified. PR #11 remains open and unmerged.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2624,11 +2624,11 @@
       "id": "TEST-2026-10-16-OEC-QA-VALIDATION-LEASES",
       "date": "2026-10-16",
       "category": "QA worker response validation, concurrency, cache safety, and video-frame handling",
-      "approach": "Added a pure-Python QA helper for validating VLM response fields, atomically claiming queue rows, recording worker leases, and recovering only expired timestamped leases. Updated the review-branch QA worker to fail closed on malformed model output, record failures instead of treating parser errors as content violations, extract validated frames to unique paths using probed video duration, default to retaining model cache, require explicit model-download opt-in and fresh storage admission, and validate normalized-video/sidecar writes. Added 15 CPU-only regression tests and a pre-sync workflow gate.",
+      "approach": "Added a pure-Python QA helper for validating VLM response fields, atomically claiming queue rows, recording worker leases, and recovering only expired timestamped leases. Updated the review-branch QA worker to fail closed on malformed model output, record failures instead of treating parser errors as content violations, extract validated frames to unique paths using probed video duration, default to retaining model cache, require explicit model-download opt-in and fresh storage admission, and validate normalized-video/sidecar writes. Added 15 CPU-only regression tests and a pre-sync workflow gate. Genuine category-1 rejections now retain the asset, sidecar and queue record with REJECTED_QA status and a reason; failed video frames are written only under local /tmp after a free-space check.",
       "reason": "The earlier QA worker could accept malformed model output, classify schema errors as content violations, let multiple workers race over the same queue item, reset live processing rows, and mishandle frame paths for non-MP4 videos. Missing QA dependencies could also lead to unintended CPU loading or cache downloads/purge.",
       "parameters": {
         "branch": "fix/flux-trellis-pipeline-20261015",
-        "source_commit": "b257edced2d651b9913ddf72c6ace7c26db81edb",
+        "source_commit": "58423b39e8bcaa2239300324e4d5e31c72ea564a",
         "runner_for_regression_gate": "oec-1 (intended; result not returned)",
         "live_root": "/nlsasfs/home/lmedge/rahkus/OEC",
         "test_suite": "tests/test_qa_checks.py",
@@ -2647,7 +2647,10 @@
         "live_qa_worker": "DIRTY_CONFLICT_PRESERVED_NOT_OVERWRITTEN",
         "real_qa_model_runtime": "NOT_RUN",
         "production_queue_or_media": "NOT_TOUCHED",
-        "storage_reserve": "NOT_ACCESSED"
+        "storage_reserve": "NOT_ACCESSED",
+        "rejection_audit": "SOURCE_UPDATED; needs isolated fixture/runtime test",
+        "frame_extraction": "SOURCE_UPDATED; not GPU/runtime tested",
+        "follow_up": "Verify oec-1 logs and helper hash, test rejection and video paths with isolated media/SQLite fixtures, reconcile dirty live worker, and add multi-frame evaluation."
       },
       "supporting_urls": [
         "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tools/qa_checks.py",
