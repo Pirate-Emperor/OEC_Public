@@ -4,6 +4,7 @@ on:
   push:
     paths-ignore:
       - 'TODO.md'
+      - '.github/flux-trellis.trigger'
       - 'result.md'
       - 'test.json'
       - 'changelog/**'

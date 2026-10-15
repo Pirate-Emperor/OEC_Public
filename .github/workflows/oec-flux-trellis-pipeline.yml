@@ -1,6 +1,11 @@
 name: OEC end-to-end FLUX-to-TRELLIS pipeline
 
 on:
+  push:
+    branches:
+      - fix/flux-trellis-pipeline-20261015
+    paths:
+      - .github/flux-trellis.trigger
   workflow_dispatch:
     inputs:
       runner:
@@ -23,7 +28,7 @@ permissions:
 
 jobs:
   flux-to-trellis:
-    name: FLUX image to TRELLIS GLB on ${{ inputs.runner }}
+    name: FLUX image to TRELLIS GLB on ${{ github.event.inputs.runner || 'oec-1' }}
     runs-on: [self-hosted, linux, x64, gpu, a100, "${{ inputs.runner }}"]
     timeout-minutes: 50
     env:
@@ -60,7 +65,7 @@ jobs:
       - name: Generate FLUX PNG, feed it into TRELLIS, and validate GLB
         shell: bash
         env:
-          OEC_PIPELINE_PROMPT: ${{ inputs.prompt }}
+          OEC_PIPELINE_PROMPT: ${{ github.event.inputs.prompt || 'A polished red ceramic tea kettle on a quiet studio table, soft natural window light, realistic product photography' }}
         run: |
           set -Eeuo pipefail
           PYTHON="${OEC_PYTHON:-$HOME/Conda/envs/phase2_3d/bin/python}"

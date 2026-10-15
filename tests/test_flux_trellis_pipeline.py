@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -94,6 +95,15 @@ class FluxTrellisPipelineTests(unittest.TestCase):
                 target.write_bytes(b"occupied")
                 with self.assertRaises(FileExistsError):
                     trellis_cli.validate_scratch_output_path(target, Path(td) / "models")
+
+    def test_pipeline_workdir_must_be_under_local_tmp_even_if_tmpdir_is_redirected(self):
+        args = pipeline.build_parser().parse_args([
+            "--work-dir", "/var/tmp/oec-outside-local-tmp",
+            "--python", sys.executable,
+        ])
+        with patch.dict("os.environ", {"TMPDIR": "/var/tmp"}):
+            with self.assertRaisesRegex(RuntimeError, "must remain under local /tmp"):
+                pipeline.run_pipeline(args)
 
     def test_report_and_output_names_are_run_scoped(self):
         source = (ROOT / "pipeline_flux_trellis.py").read_text(encoding="utf-8")

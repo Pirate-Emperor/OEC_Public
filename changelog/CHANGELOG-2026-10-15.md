@@ -98,3 +98,11 @@ No package/model download, install, quota telemetry write, reserve-file modifica
 ## Second static CI attempt and refined correction
 
 Hosted run [38722197428](https://github.com/Killer4K-N/OEC/actions/runs/38722197428), job 116379225276, failed on a single test error in test_output_directories_are_created_only_after_admission. The run passed 53 tests; the error was ValueError: substring not found because the assertion split its source string at the scratch preflight marker and then tried to find the removed marker within the remainder. This was a test-harness issue, not a model runtime result. The assertion has now been changed to compare the absolute source index of that preflight with the scratch mkdir index. Rerun pending.
+
+
+## Third hosted CI pass and preflight improvements
+
+- Hosted run [38722551001](https://github.com/Killer4K-N/OEC/actions/runs/38722551001), job 116380401503, passed 54/54 tests, Python compilation and notebook JSON/Python-cell checks for 4/4 notebooks. Tested commit d2dad157349f61fb01cb370f25bb6c178c5fa2a6. It did not run GPU inference.
+- A final code review found that the TRELLIS check-only command treated an offline model cache miss as exit-success. The CLI is now changed to return 20 and print TRELLIS_READY=BLOCKED_MODEL_CACHE_MISS whenever --mode check and --offline are both selected but the model cache is missing; a regression test covers this behavior.
+- Tightened pipeline work-directory policy to explicit /tmp rather than trusting TMPDIR or tempfile.gettempdir(), because project setup can redirect TMPDIR to shared model/cache storage. A regression test rejects /var/tmp even if TMPDIR points there.
+- These latest changes require a fresh CI pass; no combined A100 result is yet claimed.

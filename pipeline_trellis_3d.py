@@ -483,9 +483,13 @@ def main(argv: list[str] | None = None) -> int:
         print("TRELLIS_RUNTIME_CHECK=PASS")
         if runtime["cache_available"]:
             print("TRELLIS_READY=PASS")
-        else:
-            print("TRELLIS_READY=DEPENDENCY_CHECK_PASS_MODEL_CACHE_MISS")
-            print("A guarded model download is required before inference unless run with a pre-populated cache.")
+            return 0
+        if args.offline:
+            print("TRELLIS_READY=BLOCKED_MODEL_CACHE_MISS")
+            print("Offline mode forbids downloading missing model weights; populate the cache through the approved storage-admission route.")
+            return 20
+        print("TRELLIS_READY=DEPENDENCY_CHECK_PASS_MODEL_CACHE_MISS")
+        print("A guarded model download is required before inference unless run with a pre-populated cache.")
         return 0
 
     pipeline = _load_pipeline(args, runtime)

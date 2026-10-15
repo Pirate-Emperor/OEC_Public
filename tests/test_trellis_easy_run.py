@@ -7,9 +7,12 @@ from pathlib import Path
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+import pipeline_trellis_3d as trellis_cli
 
 
 def cell_sources(path: Path) -> list[str]:
@@ -37,6 +40,12 @@ class TrellisEasyRunTests(unittest.TestCase):
         for option in ("--mode", "gradio", "generate", "check", "--gpu", "--port", "--offline"):
             self.assertIn(option, result.stdout)
         self.assertNotIn("Traceback", result.stdout)
+
+    @patch.object(trellis_cli, "_prepare_environment")
+    @patch.object(trellis_cli, "_imports_and_probe", return_value={"cache_available": False})
+    def test_offline_check_fails_closed_when_trellis_model_cache_is_missing(self, _probe, _prepare):
+        result = trellis_cli.main(["--mode", "check", "--offline"])
+        self.assertEqual(result, 20)
 
     def test_standalone_entrypoint_is_quota_guarded_and_has_optional_gradio(self):
         source = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")

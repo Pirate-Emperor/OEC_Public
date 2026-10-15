@@ -284,3 +284,8 @@ The first hosted CI run on the sequential pipeline branch failed exactly two sto
 ## 2026-10-15 — Second hosted CI regression result
 
 Review-branch hosted run [38722197428](https://github.com/Killer4K-N/OEC/actions/runs/38722197428), job 116379225276, reached the final storage-write-admission suite. The preceding suites passed (48 tests); the storage suite had five passes and one error, for 53 passed / 1 error overall. The single error was a ValueError: substring not found in the newly corrected scratch-output ordering assertion: its slice excluded the preflight marker. The test is now changed to compare absolute source positions. No GPU inference was run. The next static run is required before any combined A100 dispatch.
+
+
+## 2026-10-15 — Hosted static CI passed before final preflight refinements
+
+OEC review-branch [run 38722551001](https://github.com/Killer4K-N/OEC/actions/runs/38722551001), job 116380401503, passed 54/54 unit/static tests, py_compile for the selected Python entry points, and JSON/Python-cell validation for 4/4 notebooks. This run tested commit d2dad157349f61fb01cb370f25bb6c178c5fa2a6; later code changes make offline TRELLIS cache absence return a blocked exit code and restrict the combined work directory to /tmp. Therefore the pass is evidence for the prior candidate commit, not the latest source; another full CI pass remains required before the GPU run.

@@ -20,7 +20,6 @@ import socket
 import struct
 import subprocess
 import sys
-import tempfile
 import time
 import traceback
 from datetime import datetime, timezone
@@ -304,12 +303,12 @@ def _stage_commands(args: argparse.Namespace, work_dir: Path, gpu: str) -> dict[
 def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
     python = str(Path(args.python).expanduser().resolve())
     work_dir = args.work_dir.expanduser().resolve()
-    temp_roots = {Path("/tmp").resolve(), Path(tempfile.gettempdir()).resolve()}
-    for env_name in ("RUNNER_TEMP", "TMPDIR"):
-        if os.environ.get(env_name):
-            temp_roots.add(Path(os.environ[env_name]).expanduser().resolve())
-    if not any(_is_relative_to(work_dir, root) for root in temp_roots):
-        raise RuntimeError("BLOCKED_WORKDIR: combined pipeline artifacts must remain in local temporary storage.")
+    # Keep all combined-run artifacts on the explicit local /tmp filesystem.
+    # TMPDIR can be redirected by core_config to shared model/cache storage and
+    # must not be trusted as an output root for this pipeline.
+    temp_root = Path("/tmp").resolve()
+    if not _is_relative_to(work_dir, temp_root):
+        raise RuntimeError("BLOCKED_WORKDIR: combined pipeline artifacts must remain under local /tmp.")
     if work_dir.exists():
         raise FileExistsError(f"Refusing to reuse an existing run directory: {work_dir}")
     work_dir.mkdir(parents=True, mode=0o700)

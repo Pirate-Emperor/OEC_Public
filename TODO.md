@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-15 16:18 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 16:22 IST (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 ## 2026-10-14 — quota telemetry and live-checkout diagnosis
 - [x] Verified GitHub state: OEC `main` is `82346c0753e139b92240f53734eb48d2113ed9ad`; `fix/trellis-gradio-notebooks-20261011` is `2543b26d2888e667c6443c984259f84ac5b6c142` (111 ahead, 0 behind). No main-branch change or merge.
@@ -172,4 +172,12 @@ The first hosted run on this branch, [38721841953](https://github.com/Killer4K-N
 
 - [x] Refined the storage test following [run 38722197428](https://github.com/Killer4K-N/OEC/actions/runs/38722197428), job 116379225276. The second run reached the same storage suite: 53 tests passed and one errored because the corrected assertion sliced off the preflight marker before searching for it (ValueError: substring not found). This was still a test-only failure; no model inference ran.
 - [x] Corrected the assertion again to compare the absolute source index of _preflight_output("before scratch GLB write") with the subsequent scratch mkdir.
-- [ ] OPEN — third hosted CI run must pass all suites and Python/notebook checks before triggering the A100 combined pipeline.
+- [ ] OPEN — run full hosted CI again for the latest commit (which adds fail-closed TRELLIS offline cache checking and tightens the workdir to /tmp), then trigger the combined A100 pipeline only after it passes.
+
+
+### Third hosted CI result and latest guard hardening — 2026-10-15
+
+- [x] Hosted run [38722551001](https://github.com/Killer4K-N/OEC/actions/runs/38722551001), job 116380401503, passed 54/54 tests, Python compilation and notebook JSON/Python-cell checks for 4/4 notebooks. This validated commit d2dad157349f61fb01cb370f25bb6c178c5fa2a6.
+- [x] Code review identified that TRELLIS `--mode check --offline` reported success even when no cached model snapshot was present. The CLI now returns exit code 20 with `TRELLIS_READY=BLOCKED_MODEL_CACHE_MISS` in that case, and a mocked regression test covers the fail-closed path. This change is not yet validated by CI.
+- [x] Tightened the combined orchestrator's work directory to require `/tmp` explicitly. It no longer trusts `TMPDIR` as a temp root because `core_config` may redirect temporary paths to shared model/cache storage. Added a negative regression test.
+- [ ] OPEN — validate this latest source commit in hosted CI, then use the one-run A100 workflow with local /tmp output only.
