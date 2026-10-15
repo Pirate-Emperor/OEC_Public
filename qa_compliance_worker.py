@@ -412,7 +412,9 @@ def process_qa_queue(purge_after_load=False, gpu_id=0):
                 metadata["qa_passed"] = True
             
                 raw_path = Path(raw_vid_path)
-                improved_path = raw_path.with_name(f"{raw_path.stem}_qa_improved_{record_id}.mp4")
+                improved_path = raw_path.with_name(
+                    f"{raw_path.stem}_qa_improved_{record_id}_{time.time_ns()}.mp4"
+                )
                 improved_vid_path = str(improved_path)
                 success = qa.improve_and_standardize_video(raw_vid_path, improved_vid_path)
 
@@ -434,8 +436,15 @@ def process_qa_queue(purge_after_load=False, gpu_id=0):
                             final_asset_path = str(normalized_path)
                             metadata["qa_original_asset_path"] = raw_vid_path
 
-                    with open(json_path, "w", encoding="utf-8") as f:
-                        json.dump(metadata, f, indent=4)
+                    sidecar_size_gb = os.path.getsize(json_path) / BYTES_PER_GB
+                    with managed_storage_operation(
+                        "outputs",
+                        required_gb=max(0.001, sidecar_size_gb * 1.25),
+                        require_fresh_quota=True,
+                        minimum_free_gb=float(os.environ.get("AIEROS_OUTPUT_MIN_FREE_GB", "0.05")),
+                    ):
+                        with open(json_path, "w", encoding="utf-8") as f:
+                            json.dump(metadata, f, indent=4)
 
                     new_size = os.path.getsize(final_asset_path) + os.path.getsize(json_path)
                     with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
