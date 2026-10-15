@@ -69,6 +69,13 @@ def validate_qa_analysis(payload: Any) -> dict[str, Any]:
     }
 
 
+def qa_lease_schema_current(db_path: str) -> bool:
+    """Return whether the existing queue already has lease fields, without mutating it."""
+    with sqlite3.connect(db_path, timeout=30) as conn:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(assets)")}
+    return bool(columns) and {"qa_started_at", "qa_worker_id"}.issubset(columns)
+
+
 def ensure_qa_lease_schema(db_path: str) -> None:
     """Add minimal lease fields to an existing assets table without data loss."""
     with sqlite3.connect(db_path, timeout=30) as conn:
