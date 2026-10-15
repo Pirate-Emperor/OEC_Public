@@ -1,0 +1,96 @@
+name: OEC end-to-end FLUX-to-TRELLIS pipeline
+
+on:
+  push:
+    branches:
+      - fix/flux-trellis-pipeline-20261015
+    paths:
+      - .github/flux-trellis.trigger
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: Self-hosted OEC A100 runner for this serial pipeline
+        required: true
+        type: choice
+        options:
+          - oec-1
+          - oec-2
+          - oec-3
+        default: oec-1
+      prompt:
+        description: Text prompt used by FLUX.2 Klein
+        required: true
+        type: string
+        default: "A polished red ceramic tea kettle on a quiet studio table, soft natural window light, realistic product photography"
+
+permissions:
+  contents: read
+
+jobs:
+  flux-to-trellis:
+    name: FLUX image to TRELLIS GLB on ${{ github.event.inputs.runner || 'oec-1' }}
+    runs-on: [self-hosted, linux, x64, gpu, a100, "${{ github.event.inputs.runner || 'oec-1' }}"]
+    timeout-minutes: 50
+    env:
+      OEC_EXPECTED_RUNNER: ${{ github.event.inputs.runner || 'oec-1' }}
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout selected review branch
+        uses: actions/checkout@v4
+
+      - name: Verify runner identity and phase2_3d interpreter
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo "OEC_PIPELINE_RUN_ID=$GITHUB_RUN_ID"
+          echo "OEC_PIPELINE_REF=$GITHUB_REF"
+          echo "OEC_PIPELINE_SHA=$GITHUB_SHA"
+          echo "OEC_PIPELINE_RUNNER_NAME=${RUNNER_NAME:-unknown}"
+          if [ "${RUNNER_NAME:-unknown}" != "$OEC_EXPECTED_RUNNER" ]; then
+            echo "OEC_PIPELINE=BLOCKED_RUNNER_IDENTITY expected=$OEC_EXPECTED_RUNNER actual=${RUNNER_NAME:-unknown}"
+            exit 21
+          fi
+          PYTHON="${OEC_PYTHON:-$HOME/Conda/envs/phase2_3d/bin/python}"
+          if [ ! -x "$PYTHON" ]; then
+            echo "OEC_PIPELINE=BLOCKED_PHASE2_3D_PYTHON_MISSING path=$PYTHON"
+            exit 20
+          fi
+          "$PYTHON" --version
+          "$PYTHON" -m py_compile pipeline_flux_image.py pipeline_trellis_3d.py pipeline_flux_trellis.py tools/flux_gpu_admission.py tools/trellis_offline.py
+
+      - name: Generate FLUX PNG, feed it into TRELLIS, and validate GLB
+        shell: bash
+        env:
+          OEC_PIPELINE_PROMPT: ${{ github.event.inputs.prompt || 'A polished red ceramic tea kettle on a quiet studio table, soft natural window light, realistic product photography' }}
+        run: |
+          set -Eeuo pipefail
+          PYTHON="${OEC_PYTHON:-$HOME/Conda/envs/phase2_3d/bin/python}"
+          WORK_DIR="/tmp/oec-flux-trellis-$GITHUB_RUN_ID-$OEC_EXPECTED_RUNNER"
+          echo "OEC_PIPELINE_WORK_DIR=$WORK_DIR"
+          "$PYTHON" -u pipeline_flux_trellis.py \
+            --python "$PYTHON" \
+            --work-dir "$WORK_DIR" \
+            --prompt "$OEC_PIPELINE_PROMPT" \
+            --seed 2048 \
+            --width 512 --height 512 --steps 4 --guidance-scale 1.0 \
+            --attention-backend xformers \
+            --max-image-size 1024 \
+            --decimation-target 100000 \
+            --texture-size 2048 \
+            --lock-file /tmp/oec-flux-inference.lock \
+            --lock-timeout 1500 \
+            --flux-timeout 840 \
+            --trellis-timeout 1800
+
+      - name: Upload exact-run outputs and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-flux-trellis-${{ github.event.inputs.runner || 'oec-1' }}-${{ github.run_id }}
+          path: /tmp/oec-flux-trellis-${{ github.run_id }}-${{ github.event.inputs.runner || 'oec-1' }}/*
+          if-no-files-found: warn
+          retention-days: 30

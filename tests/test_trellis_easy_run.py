@@ -7,9 +7,12 @@ from pathlib import Path
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+import pipeline_trellis_3d as trellis_cli
 
 
 def cell_sources(path: Path) -> list[str]:
@@ -38,6 +41,12 @@ class TrellisEasyRunTests(unittest.TestCase):
             self.assertIn(option, result.stdout)
         self.assertNotIn("Traceback", result.stdout)
 
+    @patch.object(trellis_cli, "_prepare_environment")
+    @patch.object(trellis_cli, "_imports_and_probe", return_value={"cache_available": False})
+    def test_offline_check_fails_closed_when_trellis_model_cache_is_missing(self, _probe, _prepare):
+        result = trellis_cli.main(["--mode", "check", "--offline"])
+        self.assertEqual(result, 20)
+
     def test_standalone_entrypoint_is_quota_guarded_and_has_optional_gradio(self):
         source = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
         compile(source, "pipeline_trellis_3d.py", "exec")
@@ -45,7 +54,11 @@ class TrellisEasyRunTests(unittest.TestCase):
         self.assertIn("managed_storage_operation(", source)
         self.assertIn("snapshot_download(", source)
         self.assertIn("local_files_only=True", source)
-        self.assertIn('choices=("gradio", "generate", "check")', source)
+        self.assertIn("prepare_local_trellis_snapshot(", source)
+        self.assertIn("with offline_hub_mode(", source)
+        self.assertIn('choices=("gradio", "generate", "generate-batch", "check")', source)
+        self.assertIn('--input-dir', source)
+        self.assertIn('def list_input_images(', source)
         self.assertIn("demo.launch(", source)
         self.assertIn("share=args.share", source)
         self.assertIn("CUDA_VISIBLE_DEVICES", source)
@@ -81,7 +94,13 @@ class TrellisEasyRunTests(unittest.TestCase):
         combined = (ROOT / "pipeline_trellis_3d.ipynb").read_text(encoding="utf-8")
         only = (ROOT / "pipeline_trellis_3d_only.ipynb").read_text(encoding="utf-8")
         self.assertIn("server_port=7862", combined)
-        self.assertIn("server_port=7863", combined)
+        self.assertIn("FLUX_SERVER_PORT = int(os.environ.get", combined)
+        self.assertIn("7863", combined)
+        # This file is inspected as JSON text here, so quotes in code-cell
+        # source are escaped. Check stable unescaped tokens independently.
+        self.assertIn("--port", combined)
+        self.assertIn("str(FLUX_SERVER_PORT)", combined)
+        self.assertIn("flux-ui", combined)
         self.assertIn("server_port=7862", only)
         self.assertIn("inline=False", combined)
         self.assertIn("inline=False", only)

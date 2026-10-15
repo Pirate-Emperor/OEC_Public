@@ -1,0 +1,179 @@
+name: Sync reviewed OEC pipeline support files to the A100 checkout
+
+on:
+  push:
+    branches:
+      - fix/flux-trellis-pipeline-20261015
+    paths:
+      - .github/a100-pipeline-tools-sync.trigger
+
+permissions:
+  contents: read
+
+jobs:
+  sync-pipeline-tools:
+    name: Create or safely update the reviewed OEC pipeline tools on oec-1
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 10
+    steps:
+      - name: Check out the reviewed source revision
+        uses: actions/checkout@v4
+
+      - name: Back up and synchronize only the pipeline support files
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          printf 'A100_TOOL_SYNC_RUN_ID=%s\n' "$GITHUB_RUN_ID"
+          printf 'A100_TOOL_SYNC_SOURCE_SHA=%s\n' "$GITHUB_SHA"
+          printf 'A100_TOOL_SYNC_RUNNER=%s\n' "${RUNNER_NAME:-unknown}"
+          test "${RUNNER_NAME:-unknown}" = "oec-1" || { echo 'A100_TOOL_SYNC=BLOCKED_WRONG_RUNNER'; exit 21; }
+
+          LIVE_ROOT="${OEC_LIVE_REPO:-$HOME/OEC}"
+          test -d "$LIVE_ROOT/.git" || { echo "A100_TOOL_SYNC=BLOCKED_LIVE_REPO_NOT_FOUND path=$LIVE_ROOT"; exit 22; }
+          LIVE_ROOT="$(realpath "$LIVE_ROOT")"
+          WORKSPACE="$(realpath "$GITHUB_WORKSPACE")"
+          test "$LIVE_ROOT" != "$WORKSPACE" || { echo 'A100_TOOL_SYNC=BLOCKED_TARGET_IS_ACTIONS_WORKSPACE'; exit 23; }
+          REMOTE="$(git -C "$LIVE_ROOT" remote get-url origin)"
+          NORMALIZED_REMOTE="${REMOTE%.git}"
+          case "$NORMALIZED_REMOTE" in
+            https://github.com/Killer4K-N/OEC|git@github.com:Killer4K-N/OEC|ssh://git@github.com/Killer4K-N/OEC) ;;
+            *) echo "A100_TOOL_SYNC=BLOCKED_UNEXPECTED_ORIGIN origin=$REMOTE"; exit 24 ;;
+          esac
+          test -d "$LIVE_ROOT/tools" || { echo 'A100_TOOL_SYNC=BLOCKED_TOOLS_DIRECTORY_MISSING'; exit 25; }
+
+          printf 'A100_TOOL_SYNC_LIVE_ROOT=%s\n' "$LIVE_ROOT"
+          printf 'A100_TOOL_SYNC_LIVE_BRANCH=%s\n' "$(git -C "$LIVE_ROOT" branch --show-current || true)"
+          printf 'A100_TOOL_SYNC_LIVE_COMMIT=%s\n' "$(git -C "$LIVE_ROOT" rev-parse HEAD)"
+          printf 'A100_TOOL_SYNC_LIVE_DIRTY_PATH_COUNT=%s\n' "$(git -C "$LIVE_ROOT" status --short | wc -l | tr -d ' ')"
+          printf 'A100_TOOL_SYNC_TARGET_PATH=%s\n' "$LIVE_ROOT/tools"
+
+          BACKUP_ROOT="${OEC_SYNC_BACKUP_ROOT:-$HOME/.local/state/oec-live-sync-backups}/$GITHUB_RUN_ID"
+          umask 077
+          mkdir -p "$BACKUP_ROOT"
+          # Required snapshot is taken before any notebook/entry-point synchronization.
+          python3 - "$LIVE_ROOT" "$BACKUP_ROOT" <<'PY'
+          from pathlib import Path
+          import hashlib, shutil, sys
+          root, backup_root = Path(sys.argv[1]), Path(sys.argv[2])
+          source = root / "requirements.txt"
+          if not source.is_file():
+              print("A100_TOOL_SYNC_REQUIREMENTS_TXT=ABSENT path=" + str(source))
+          else:
+              destination = backup_root / "requirements.txt"
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              if destination.exists():
+                  raise SystemExit("Refusing to overwrite existing requirements backup: " + str(destination))
+              original = source.read_bytes()
+              shutil.copy2(source, destination)
+              copied = destination.read_bytes()
+              if copied != original:
+                  raise SystemExit("requirements.txt backup verification failed")
+              digest = hashlib.sha256(original).hexdigest()
+              print(f"A100_TOOL_SYNC_REQUIREMENTS_TXT_BACKUP=PASS path={destination} bytes={len(original)} sha256={digest}")
+          PY
+
+          files=(
+            tools/flux_gpu_admission.py
+            tools/ltx_worker_config.py
+            tools/oec_cluster_services.example.json
+            tools/oec_runner_probe.py
+            tools/oec_service_manager.py
+            tools/trellis2_pipeline.json
+            tools/trellis_offline.py
+            pipeline_flux_image.py
+            pipeline_flux_trellis.py
+            pipeline_trellis_3d.py
+            pipeline_flux_only.ipynb
+            pipeline_trellis_3d.ipynb
+            pipeline_trellis_3d_only.ipynb
+            worker_ltx_video.py
+            qa_compliance_worker.py
+            docs/background-pipelines.md
+          )
+          created=0
+          updated=0
+          unchanged=0
+          conflicts=0
+          authorized_trellis_overwrite=(
+            pipeline_trellis_3d.py
+            pipeline_trellis_3d.ipynb
+            pipeline_trellis_3d_only.ipynb
+          )
+          for rel in "${files[@]}"; do
+            src="$GITHUB_WORKSPACE/$rel"
+            dest="$LIVE_ROOT/$rel"
+            test -f "$src" || { echo "A100_TOOL_SYNC=BLOCKED_SOURCE_MISSING file=$rel"; exit 26; }
+            if [ -f "$dest" ] && cmp -s "$src" "$dest"; then
+              echo "A100_TOOL_SYNC_FILE=UNCHANGED path=$rel sha256=$(sha256sum "$dest" | awk '{print $1}')"
+              unchanged=$((unchanged+1))
+              continue
+            fi
+            status="$(git -C "$LIVE_ROOT" status --porcelain -- "$rel" 2>/dev/null || true)"
+            if [ -e "$dest" ] && [ -n "$status" ]; then
+              case "$rel" in
+                pipeline_trellis_3d.py|pipeline_trellis_3d.ipynb|pipeline_trellis_3d_only.ipynb)
+                  backup="$BACKUP_ROOT/$rel"
+                  mkdir -p "$(dirname "$backup")"
+                  cp -p "$dest" "$backup"
+                  cmp -s "$dest" "$backup" || { echo "A100_TOOL_SYNC=FAIL_BACKUP_MISMATCH file=$rel"; exit 27; }
+                  echo "A100_TOOL_SYNC_BACKUP_VERIFIED=$backup"
+                  cp -p "$src" "$dest"
+                  cmp -s "$src" "$dest" || { echo "A100_TOOL_SYNC=FAIL_VERIFY_MISMATCH file=$rel"; exit 27; }
+                  updated=$((updated+1))
+                  echo "A100_TOOL_SYNC_FILE=UPDATED_AFTER_VERIFIED_BACKUP path=$rel sha256=$(sha256sum "$dest" | awk '{print $1}')"
+                  continue
+                  ;;
+                *)
+                  echo "A100_TOOL_SYNC_FILE=CONFLICT_PRESERVED path=$rel git_status=$(printf '%s' "$status" | tr '\n' ' ')"
+                  conflicts=$((conflicts+1))
+                  continue
+                  ;;
+              esac
+            fi
+            mkdir -p "$(dirname "$dest")"
+            if [ -e "$dest" ]; then
+              backup="$BACKUP_ROOT/$rel"
+              mkdir -p "$(dirname "$backup")"
+              cp -p "$dest" "$backup"
+              cmp -s "$dest" "$backup" || { echo "A100_TOOL_SYNC=FAIL_BACKUP_MISMATCH file=$rel"; exit 27; }
+              echo "A100_TOOL_SYNC_BACKUP_VERIFIED=$backup"
+              cp -p "$src" "$dest"
+              updated=$((updated+1))
+              outcome=UPDATED
+            else
+              cp -p "$src" "$dest"
+              created=$((created+1))
+              outcome=CREATED
+            fi
+            cmp -s "$src" "$dest" || { echo "A100_TOOL_SYNC=FAIL_VERIFY_MISMATCH file=$rel"; exit 27; }
+            echo "A100_TOOL_SYNC_FILE=$outcome path=$rel sha256=$(sha256sum "$dest" | awk '{print $1}')"
+          done
+
+          python3 - "$LIVE_ROOT" <<'PY'
+          import ast, json, sys
+          from pathlib import Path
+          root = Path(sys.argv[1])
+          python_files = [
+              'tools/flux_gpu_admission.py', 'tools/ltx_worker_config.py',
+              'tools/oec_runner_probe.py', 'tools/oec_service_manager.py',
+              'tools/trellis_offline.py', 'pipeline_flux_image.py',
+              'pipeline_flux_trellis.py', 'pipeline_trellis_3d.py',
+              'worker_ltx_video.py', 'qa_compliance_worker.py',
+          ]
+          for relative in python_files:
+              ast.parse((root / relative).read_text(encoding='utf-8'), filename=relative)
+          for relative in ['tools/oec_cluster_services.example.json', 'tools/trellis2_pipeline.json']:
+              json.loads((root / relative).read_text(encoding='utf-8'))
+          notebooks = ['pipeline_flux_only.ipynb', 'pipeline_trellis_3d.ipynb', 'pipeline_trellis_3d_only.ipynb']
+          for relative in notebooks:
+              json.loads((root / relative).read_text(encoding='utf-8'))
+          print('A100_TOOL_SYNC_STATIC_VALIDATION=PASS python_files=10 json_files=2 notebooks=3')
+          PY
+          python3 "$LIVE_ROOT/tools/oec_service_manager.py" --help >/dev/null
+          echo 'A100_TOOL_SYNC_SERVICE_MANAGER_HELP=PASS'
+          printf 'A100_TOOL_SYNC_SUMMARY created=%s updated=%s unchanged=%s conflicts_preserved=%s backup_root=%s\n' "$created" "$updated" "$unchanged" "$conflicts" "$BACKUP_ROOT"
+          if [ "$conflicts" -gt 0 ]; then
+            echo 'A100_TOOL_SYNC=PASS_WITH_UNRELATED_CONFLICTS_PRESERVED'
+          else
+            echo 'A100_TOOL_SYNC=PASS'
+          fi

@@ -81,16 +81,21 @@ class StorageWriteAdmissionTests(unittest.TestCase):
         self.assertLess(audio.rindex("Storage admission denied inside managed write"),
                         audio.index("AUDIOGEN_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)"))
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
-        self.assertLess(cli.index('_preflight_output("inside managed write")'),
-                        cli.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
+        shared_write = cli.split('    else:\n        with managed_storage_operation(', 1)[1]
+        self.assertLess(shared_write.index('_preflight_output("inside managed write")'),
+                        shared_write.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
+        scratch_preflight = cli.index('_preflight_output("before scratch GLB write")')
+        scratch_mkdir = cli.index("destination_dir.mkdir(parents=True, exist_ok=True)", scratch_preflight)
+        self.assertLess(scratch_preflight, scratch_mkdir)
 
     def test_output_admission_precedes_expensive_model_inference(self):
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
         generate = cli.split("def generate_glb(", 1)[1].split("\\ndef main(", 1)[0]
         self.assertLess(generate.index('_preflight_output("before TRELLIS inference")'),
                         generate.index("meshes = pipeline.run(prepared)"))
-        self.assertLess(generate.index("with managed_storage_operation("),
-                        generate.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
+        shared_write = generate.split("    else:\n        with managed_storage_operation(", 1)[1]
+        self.assertLess(shared_write.index('_preflight_output("inside managed write")'),
+                        shared_write.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
         self.assertIn("GLB JSON chunk is invalid", generate)
         self.assertIn("no non-empty mesh geometry", generate)
         for name, cell in (("pipeline_trellis_3d.ipynb", 10),
@@ -98,11 +103,24 @@ class StorageWriteAdmissionTests(unittest.TestCase):
             source = dict(code_cells(name))[cell]
             self.assertLess(source.index("TRELLIS generation refused before inference"),
                             source.index("mesh = trellis_pipe.run(input_image)[0]"))
-        for name, cell in (("pipeline_flux_only.ipynb", 6),
-                           ("pipeline_trellis_3d.ipynb", 12)):
-            source = dict(code_cells(name))[cell]
-            self.assertLess(source.index("FLUX generation refused before inference"),
-                            source.index("image = flux_pipe("))
+        # The FLUX-only notebook loads its own pipeline directly. In the
+        # combined notebook, FLUX is a separate supervised process/GPU so it
+        # cannot overlap TRELLIS weights in the notebook kernel.
+        flux_only_cell = dict(code_cells("pipeline_flux_only.ipynb"))[6]
+        self.assertIn("load_flux_pipeline", flux_only_cell)
+        self.assertIn("create_gradio_demo", flux_only_cell)
+        combined_flux_cell = dict(code_cells("pipeline_trellis_3d.ipynb"))[12]
+        self.assertIn("tools/oec_service_manager.py", combined_flux_cell)
+        self.assertIn('["start", "flux-ui", "--gpu", FLUX_UI_GPU', combined_flux_cell)
+        self.assertIn('"--conda-root", str(_MANAGER_CONDA_ROOT)', combined_flux_cell)
+        self.assertNotIn("load_flux_pipeline(", combined_flux_cell)
+        self.assertNotIn("create_gradio_demo(", combined_flux_cell)
+        flux_cli = (ROOT / "pipeline_flux_image.py").read_text(encoding="utf-8")
+        generate = flux_cli.split("def generate_flux_image(", 1)[1].split("\\ndef create_gradio_demo(", 1)[0]
+        self.assertLess(generate.index("_output_preflight()"),
+                        generate.index("image = pipeline(**kwargs).images[0]"))
+        self.assertIn("validate_scratch_path(", generate)
+        self.assertIn("require_fresh_quota=True", flux_cli)
 
     def test_cli_model_download_and_glb_export_use_fresh_quota(self):
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")

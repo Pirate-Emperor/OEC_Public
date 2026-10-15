@@ -66,6 +66,9 @@ class TrellisNotebookStaticTests(unittest.TestCase):
             self.assertIn("local_files_only=True", studio)
             self.assertIn("LocalEntryNotFoundError", studio)
             self.assertIn("Trellis2ImageTo3DPipeline.from_pretrained(local_model_dir)", studio)
+            self.assertIn("prepare_local_trellis_snapshot(", studio)
+            self.assertIn("with offline_hub_mode(", studio)
+            self.assertIn("TRELLIS_SNAPSHOT_OVERLAY_TEMP", studio)
             self.assertNotRegex(studio, r"from_pretrained\([^)]*local_files_only")
             self.assertIn('os.path.join(SYSTEM_DIRS["models"], "hub")', studio)
             self.assertIn("storage_preflight(", studio)
@@ -155,7 +158,7 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertNotIn("Compilation & DependenciesThis cell", setup_markdown)
 
     def test_flux_only_notebook_is_safe_and_storage_gated(self):
-        all_source = "\n".join(self.flux_only)
+        all_source = "\\n".join(self.flux_only)
         self.assertNotIn("kill 9 2386856", all_source)
         self.assertNotIn("pip install --upgrade jupyter", all_source)
         self.assertNotIn("git+https://github.com/huggingface/diffusers.git", all_source)
@@ -177,13 +180,23 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertIn("storage_preflight(", setup)
         self.assertIn("require_fresh_quota=True", setup)
         self.assertIn("managed_storage_operation(", setup)
-        model = self.find(self.flux_only, "def load_flux_pipeline()")
-        self.assertIn("snapshot_download(", model)
-        self.assertIn("local_files_only=True", model)
-        self.assertIn("LocalEntryNotFoundError", model)
-        self.assertIn("FLUX_MODEL_STORAGE_ADMISSION=", model)
-        self.assertIn("local_files_only=False", model)
-        self.assertIn("FLUX_SHARED_MODEL_CACHE=RETAINED", model)
+        studio = self.find(self.flux_only, "FLUX_PIPELINE_READY=PASS")
+        self.assertIn("from pipeline_flux_image import load_flux_pipeline, create_gradio_demo", studio)
+        self.assertIn("load_flux_pipeline(", studio)
+        self.assertIn("offline=True", studio)
+        self.assertIn("demo_flux.launch(", studio)
+        self.assertIn("server_port=FLUX_SERVER_PORT", studio)
+        self.assertIn("share=False", studio)
+        helper = (self.ROOT / "pipeline_flux_image.py").read_text(encoding="utf-8")
+        self.assertIn("find_cached_snapshot(", helper)
+        self.assertIn("FLUX_CACHE=HIT", helper)
+        self.assertIn("snapshot_download(", helper)
+        self.assertIn("local_files_only=True", helper)
+        self.assertIn("local_files_only=False", helper)
+        self.assertIn("require_fresh_quota=True", helper)
+        self.assertIn("managed_storage_operation(", helper)
+        self.assertIn("validate_png_file(", helper)
+        self.assertIn("FLUX_IMAGE_GENERATION=PASS", helper)
 
     def test_runtime_smoke_probes_xformers_and_reopens_export(self):
         self.assertIn("XFORMERS_CUDA_ATTENTION=PASS", self.runtime)
@@ -193,6 +206,36 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertIn("TRELLIS_GLB_REOPEN_VERTICES", self.runtime)
         self.assertIn("TRELLIS_GLB_REOPEN_FACES", self.runtime)
         self.assertIn("TRELLIS_IMAGE_TO_3D_SMOKE=PASS", self.runtime)
+
+
+    def test_all_three_notebooks_keep_gradio_ports_private_and_outputs_fresh(self):
+        expected = (
+            (self.flux_only_nb, self.flux_only, "7864", "demo_flux.launch("),
+            (self.only_nb, self.only, "7862", "demo.launch("),
+            (self.combined_nb, self.combined, "7862", "demo_trellis.launch("),
+        )
+        for notebook, cells, port, launch_marker in expected:
+            code = "\n".join(source for source in cells if source.strip())
+            self.assertIn(launch_marker, code)
+            self.assertIn(port, code)
+            self.assertIn("share=False", code)
+            for cell in notebook["cells"]:
+                if cell.get("cell_type") == "code":
+                    self.assertIsNone(cell.get("execution_count"))
+                    self.assertEqual(cell.get("outputs", []), [])
+
+        combined_all = "\\n".join(self.combined)
+        self.assertIn('FLUX_SERVER_PORT = int(os.environ.get("AIEROS_FLUX_GRADIO_PORT", "7863"))', combined_all)
+        self.assertIn("tools/oec_service_manager.py", combined_all)
+        self.assertIn('["start", "flux-ui", "--gpu", FLUX_UI_GPU, "--port", str(FLUX_SERVER_PORT)]', combined_all)
+        self.assertIn("_MANAGER_CONDA_ROOT", combined_all)
+        self.assertIn('"--conda-root", str(_MANAGER_CONDA_ROOT)', combined_all)
+        self.assertIn('os.environ["CUDA_VISIBLE_DEVICES"] = TRELLIS_UI_GPU', combined_all)
+        self.assertIn('if FLUX_UI_GPU == TRELLIS_UI_GPU:', combined_all)
+        self.assertIn("share=False", combined_all)
+        trellis_all = "\n".join(self.only)
+        self.assertIn("server_port=7862", trellis_all)
+        self.assertIn("share=False", trellis_all)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,163 @@
+name: OEC FLUX.2 Klein cache-only image generation
+run-name: "oec-flux-cache-generation-${{ github.run_id }}"
+
+on:
+  push:
+    branches:
+      - fix/trellis-offline-pipeline-config-20261014
+    paths:
+      - ".github/flux-smoke.trigger"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flux-image:
+    name: Generate and validate one FLUX PNG on ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        runner: [oec-1, oec-2, oec-3]
+    runs-on: [self-hosted, linux, x64, gpu, a100, "${{ matrix.runner }}"]
+    timeout-minutes: 40
+    steps:
+      - name: Checkout isolated OEC candidate
+        uses: actions/checkout@v4
+
+      - name: Generate one cache-only FLUX.2 Klein image on an admitted GPU
+        shell: bash
+        env:
+          OEC_EXPECTED_RUNNER: ${{ matrix.runner }}
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          HF_HUB_DISABLE_TELEMETRY: "1"
+          PYTHONDONTWRITEBYTECODE: "1"
+          PYTHONUNBUFFERED: "1"
+        run: |
+          set -Eeuo pipefail
+          PYTHON="${OEC_PYTHON:-$HOME/Conda/envs/phase2_3d/bin/python}"
+          LOG="$RUNNER_TEMP/oec-flux-run-$GITHUB_RUN_ID-$OEC_EXPECTED_RUNNER.log"
+          STATUS="$RUNNER_TEMP/oec-flux-run-$GITHUB_RUN_ID-$OEC_EXPECTED_RUNNER-status.json"
+          CURRENT_STAGE="initialization"
+
+          exec > >(tee -a "$LOG") 2>&1
+
+          write_status() {
+            local code="$1"
+            /usr/bin/python3 - "$STATUS" "$CURRENT_STAGE" "$code" <<'PY'
+          import json, os, socket, sys
+          from datetime import datetime, timezone
+          target, stage, raw_code = sys.argv[1:4]
+          report = {
+              "created_at_utc": datetime.now(timezone.utc).isoformat(),
+              "runner_name": os.environ.get("RUNNER_NAME", "unknown"),
+              "expected_runner": os.environ.get("OEC_EXPECTED_RUNNER"),
+              "host": socket.gethostname(),
+              "stage": stage,
+              "exit_code": int(raw_code),
+              "selected_gpu": os.environ.get("AIEROS_GPU"),
+              "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
+              "network_downloads_allowed": False,
+              "package_install_allowed": False,
+              "mode": "cache_only_offline"
+          }
+          with open(target, "w", encoding="utf-8") as handle:
+              json.dump(report, handle, indent=2, sort_keys=True)
+              handle.write("\n")
+          print("FLUX_DIAGNOSTIC_STATUS=" + json.dumps(report, sort_keys=True), flush=True)
+          PY
+          }
+
+          on_exit() {
+            rc=$?
+            trap - EXIT
+            write_status "$rc" || true
+            echo "FLUX_WORKFLOW_STEP_EXIT stage=$CURRENT_STAGE code=$rc host=$(hostname)"
+            exit "$rc"
+          }
+          trap on_exit EXIT
+
+          echo "FLUX_STAGE=runner_identity started_at=$(date -Is) expected=$OEC_EXPECTED_RUNNER actual=${RUNNER_NAME:-unknown}"
+          if [ ! -x "$PYTHON" ]; then
+            CURRENT_STAGE="python_missing"
+            echo "FLUX_GENERATION=BLOCKED_PHASE2_3D_PYTHON_MISSING path=$PYTHON"
+            exit 20
+          fi
+          RUNNER_NAME_ACTUAL="${RUNNER_NAME:-unknown}"
+          if [ "$RUNNER_NAME_ACTUAL" != "$OEC_EXPECTED_RUNNER" ]; then
+            CURRENT_STAGE="runner_identity"
+            echo "FLUX_GENERATION=FAIL_RUNNER_IDENTITY expected=$OEC_EXPECTED_RUNNER actual=$RUNNER_NAME_ACTUAL"
+            exit 21
+          fi
+
+          CURRENT_STAGE="gpu_lock"
+          LOCK_FILE="/tmp/oec-flux-inference.lock"
+          exec 9>"$LOCK_FILE"
+          echo "FLUX_STAGE=gpu_lock waiting_at=$(date -Is) lock=$LOCK_FILE"
+          if ! flock -x -w 1500 9; then
+            echo "FLUX_GENERATION=BLOCKED_GPU_LOCK_TIMEOUT wait_seconds=1500"
+            exit 23
+          fi
+          echo "FLUX_GPU_LOCK=ACQUIRED at=$(date -Is)"
+
+          CURRENT_STAGE="gpu_admission"
+          echo "FLUX_STAGE=gpu_admission started_at=$(date -Is)"
+          GPU="$("$PYTHON" -u tools/flux_gpu_admission.py --print-index-only)"
+          echo "FLUX_SELECTED_PHYSICAL_GPU=$GPU"
+          export CUDA_VISIBLE_DEVICES="$GPU"
+          export AIEROS_GPU="$GPU"
+
+          OUTPUT_DIR="/tmp/oec-flux-image-$GITHUB_RUN_ID-$RUNNER_NAME_ACTUAL"
+          if [ -e "$OUTPUT_DIR" ]; then
+            CURRENT_STAGE="refuse_existing_output"
+            echo "FLUX_GENERATION=BLOCKED_REFUSING_EXISTING_TEMP_DIR path=$OUTPUT_DIR"
+            exit 22
+          fi
+          mkdir -m 700 -p "$OUTPUT_DIR"
+
+          CURRENT_STAGE="runtime_check"
+          echo "FLUX_STAGE=runtime_check started_at=$(date -Is)"
+          "$PYTHON" -u pipeline_flux_image.py --mode check --offline --gpu "$GPU"
+
+          CURRENT_STAGE="pipeline_load_and_inference"
+          echo "FLUX_STAGE=pipeline_load_and_inference started_at=$(date -Is) image=512x512 steps=4"
+          timeout --signal=TERM --kill-after=30s 14m "$PYTHON" -u pipeline_flux_image.py \
+            --mode generate --offline --scratch-output --gpu "$GPU" \
+            --output "$OUTPUT_DIR/flux2_klein.png" \
+            --prompt "A polished red ceramic tea kettle on a quiet studio table, soft natural window light, realistic product photography" \
+            --seed 2048 --width 512 --height 512 --steps 4 --guidance-scale 1.0
+
+          CURRENT_STAGE="artifact_validation"
+          echo "FLUX_STAGE=artifact_validation started_at=$(date -Is)"
+          "$PYTHON" - "$OUTPUT_DIR/flux2_klein.png" "$OUTPUT_DIR/flux2_klein_info.json" <<'PY'
+          import json, sys
+          from pathlib import Path
+          from pipeline_flux_image import validate_png_file
+          image, metadata = Path(sys.argv[1]), Path(sys.argv[2])
+          info = validate_png_file(image)
+          payload = json.loads(metadata.read_text(encoding="utf-8"))
+          assert payload["image_path"] == str(image)
+          assert payload["image_bytes"] == info["bytes"]
+          assert payload["seed"] == 2048
+          assert (payload["width"], payload["height"]) == (512, 512)
+          print("FLUX_ARTIFACT_VALIDATION=PASS " + json.dumps({
+              "path": str(image), "bytes": info["bytes"], "metadata_path": str(metadata),
+              "width": payload["width"], "height": payload["height"], "seed": payload["seed"],
+              "generation_seconds": payload["generation_seconds"], "host": payload["host"],
+          }, sort_keys=True), flush=True)
+          PY
+          echo "FLUX_STAGE=complete finished_at=$(date -Is)"
+
+      - name: Upload exact-run PNG, metadata, and failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-flux-image-${{ matrix.runner }}-${{ github.run_id }}
+          path: |
+            /tmp/oec-flux-image-${{ github.run_id }}-${{ matrix.runner }}/flux2_klein*
+            ${{ runner.temp }}/oec-flux-run-${{ github.run_id }}-${{ matrix.runner }}.log
+            ${{ runner.temp }}/oec-flux-run-${{ github.run_id }}-${{ matrix.runner }}-status.json
+          if-no-files-found: warn
+          retention-days: 30

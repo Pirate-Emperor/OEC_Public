@@ -10,8 +10,13 @@ from __future__ import annotations
 
 import argparse
 import gc
+import json
 import os
+import re
+import subprocess
+import shutil
 import sys
+import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -23,10 +28,12 @@ def build_parser() -> argparse.ArgumentParser:
         description="Run TRELLIS.2 as a Gradio 3D viewer or generate a GLB from an image."
     )
     parser.add_argument(
-        "--mode", choices=("gradio", "generate", "check"), default="gradio",
-        help="gradio launches the UI (default); generate processes --input; check validates runtime without loading model weights.",
+        "--mode", choices=("gradio", "generate", "generate-batch", "check"), default="gradio",
+        help="gradio launches the UI; generate processes --input; generate-batch reuses one loaded model for a folder; check validates the runtime.",
     )
     parser.add_argument("--input", type=Path, help="Input image for --mode generate.")
+    parser.add_argument("--input-dir", type=Path, help="Input image folder for --mode generate-batch.")
+    parser.add_argument("--recursive", action="store_true", help="Search --input-dir recursively for supported image files.")
     parser.add_argument("--output", type=Path, help="Exact GLB output path for --mode generate.")
     parser.add_argument("--output-dir", type=Path, help="Output folder; defaults to SYSTEM_DIRS outputs/3d_models.")
     parser.add_argument("--model-id", default="microsoft/TRELLIS.2-4B", help="Hugging Face model repository ID.")
@@ -35,6 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--gpu", default=os.environ.get("AIEROS_TRELLIS_GPU"), help="GPU index to expose before importing torch. Leaves CUDA_VISIBLE_DEVICES unchanged when omitted.")
     parser.add_argument("--attention-backend", choices=("xformers", "flash_attn"), default=os.environ.get("AIEROS_TRELLIS_ATTN_BACKEND", "xformers"))
     parser.add_argument("--offline", action="store_true", help="Do not download a missing model snapshot.")
+    parser.add_argument("--scratch-output", action="store_true", help="Write GLB output(s) to verified local temporary storage without touching shared outputs. Requires --output for generate or --output-dir for generate-batch.")
     parser.add_argument("--port", type=int, default=int(os.environ.get("AIEROS_TRELLIS_PORT", "7862")), help="Gradio port.")
     parser.add_argument("--server-name", default=os.environ.get("AIEROS_TRELLIS_SERVER_NAME", "0.0.0.0"), help="Interface to bind; use an SSH tunnel and keep share disabled on shared nodes.")
     parser.add_argument("--share", action="store_true", help="Explicitly enable a public Gradio share URL. Not recommended on shared compute.")
@@ -43,6 +51,38 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--decimation-target", type=int, default=100_000, help="Target triangle count for GLB mesh processing.")
     parser.add_argument("--texture-size", type=int, default=2048, help="GLB texture size; 2048 is a VRAM/time-conscious default.")
     return parser
+
+
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
+
+
+def list_input_images(input_dir: str | Path, recursive: bool = False) -> list[Path]:
+    """Return deterministically ordered regular images; never follow input symlinks."""
+    root = Path(input_dir).expanduser().resolve()
+    if not root.is_dir():
+        raise NotADirectoryError(f"Input image directory does not exist: {root}")
+    candidates = root.rglob("*") if recursive else root.iterdir()
+    images = []
+    for candidate in candidates:
+        try:
+            if candidate.is_symlink() or not candidate.is_file():
+                continue
+        except OSError:
+            continue
+        if candidate.suffix.lower() in IMAGE_EXTENSIONS:
+            images.append(candidate.resolve())
+    images.sort(key=lambda item: item.relative_to(root).as_posix().casefold())
+    if not images:
+        raise FileNotFoundError(
+            f"No supported image files ({', '.join(sorted(IMAGE_EXTENSIONS))}) in {root}"
+        )
+    return images
+
+
+def _batch_output_name(index: int, image_path: Path, input_root: Path) -> str:
+    relative = image_path.relative_to(input_root).with_suffix("").as_posix().replace("/", "__")
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", relative).strip("._") or "image"
+    return f"{index:04d}_{safe}.glb"
 
 
 def _prepare_environment(args: argparse.Namespace) -> None:
@@ -121,8 +161,9 @@ def _imports_and_probe(args: argparse.Namespace) -> dict[str, Any]:
     except ImportError:
         from huggingface_hub.utils import LocalEntryNotFoundError
 
+    models_root = Path(SYSTEM_DIRS["models"]).expanduser().resolve()
     cache_dir = Path(
-        args.model_cache or (Path(SYSTEM_DIRS["models"]) / "hub")
+        args.model_cache or (models_root / "hub")
     ).expanduser().resolve()
     try:
         snapshot = snapshot_download(
@@ -137,9 +178,24 @@ def _imports_and_probe(args: argparse.Namespace) -> dict[str, Any]:
         # invisible to snapshot_download when repository marker/ref files are absent.
         # Reuse it offline before declaring a cache miss and requiring a download.
         repo_cache_name = f"models--{args.model_id.replace('/', '--')}"
-        snapshot_root = cache_dir / repo_cache_name / "snapshots"
+        search_roots = [cache_dir, models_root, models_root / "hub",
+                        Path.home() / ".cache" / "huggingface" / "hub"]
+        for env_name in ("HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE", "TRANSFORMERS_CACHE"):
+            if os.environ.get(env_name):
+                search_roots.append(Path(os.environ[env_name]).expanduser())
         weight_candidates = []
-        if snapshot_root.is_dir():
+        seen_roots = set()
+        for search_root in search_roots:
+            try:
+                search_root = search_root.expanduser().resolve()
+            except OSError:
+                continue
+            if search_root in seen_roots:
+                continue
+            seen_roots.add(search_root)
+            snapshot_root = search_root / repo_cache_name / "snapshots"
+            if not snapshot_root.is_dir():
+                continue
             for entry in snapshot_root.iterdir():
                 if not entry.is_dir():
                     continue
@@ -224,8 +280,25 @@ def _resolve_snapshot(args: argparse.Namespace, runtime: dict[str, Any]) -> Path
 
 
 def _load_pipeline(args: argparse.Namespace, runtime: dict[str, Any]) -> Any:
+    from tools.trellis_offline import offline_hub_mode, prepare_local_trellis_snapshot
+
     snapshot = _resolve_snapshot(args, runtime)
-    pipeline = runtime["pipeline_class"].from_pretrained(str(snapshot))
+    cache_roots = [
+        runtime["cache_dir"],
+        runtime["system_dirs"]["models"],
+        Path.home() / ".cache" / "huggingface" / "hub",
+    ]
+    for cache_env_name in ("HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE", "TRANSFORMERS_CACHE"):
+        cache_env_value = os.environ.get(cache_env_name)
+        if cache_env_value:
+            cache_roots.append(Path(cache_env_value))
+    local_snapshot, overlay_owner = prepare_local_trellis_snapshot(
+        snapshot, repo_id=args.model_id, cache_roots=tuple(cache_roots)
+    )
+    # Keep /tmp overlay/cache links alive while the UI or generate call uses pipeline.
+    runtime["snapshot_overlay_tempdir"] = overlay_owner
+    with offline_hub_mode(overlay_owner):
+        pipeline = runtime["pipeline_class"].from_pretrained(local_snapshot)
     pipeline.cuda()
     print(f"TRELLIS_PIPELINE_LOAD=PASS model={args.model_id}")
     return pipeline
@@ -252,6 +325,68 @@ def _prepare_image(image: Any, max_size: int) -> Any:
     return square
 
 
+
+def _path_is_within(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.expanduser().resolve())
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def _same_filesystem(path_a: Path, path_b: Path) -> bool:
+    def nearest_existing(path: Path) -> Path:
+        current = path.expanduser().resolve()
+        while not current.exists() and current.parent != current:
+            current = current.parent
+        return current
+    a, b = nearest_existing(path_a), nearest_existing(path_b)
+    try:
+        if a.stat().st_dev == b.stat().st_dev:
+            return True
+    except OSError:
+        return True
+    findmnt = shutil.which("findmnt")
+    if findmnt:
+        def mount_info(path: Path):
+            p = subprocess.run([findmnt, "-T", str(path), "-n", "-o", "TARGET,SOURCE"],
+                               text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               timeout=10, check=False)
+            parts = p.stdout.strip().split()
+            return (parts[0], parts[1]) if p.returncode == 0 and len(parts) >= 2 else None
+        ma, mb = mount_info(a), mount_info(b)
+        if ma and mb and (ma[0] == mb[0] or ma[1] == mb[1]):
+            return True
+    return False
+
+
+def validate_scratch_output_path(output_path: str | Path, models_root: str | Path) -> Path:
+    """Require a new temporary output on storage distinct from the shared model cache."""
+    target = Path(output_path).expanduser().resolve()
+    roots = [Path("/tmp"), Path(tempfile.gettempdir())]
+    for key in ("RUNNER_TEMP", "TMPDIR"):
+        if os.environ.get(key):
+            roots.append(Path(os.environ[key]).expanduser())
+    if not any(_path_is_within(target, root) for root in roots):
+        raise RuntimeError("BLOCKED_SCRATCH_OUTPUT: use local temporary storage under /tmp or runner temp.")
+    if target.exists():
+        raise FileExistsError(f"Refusing to overwrite a scratch GLB: {target}")
+    if target.parent.exists() and not target.parent.is_dir():
+        raise RuntimeError(f"BLOCKED_SCRATCH_OUTPUT: parent is not a directory: {target.parent}")
+    if _same_filesystem(target.parent, Path(models_root)):
+        raise RuntimeError("BLOCKED_SCRATCH_OUTPUT: temporary output filesystem is not distinct from shared model storage.")
+    probe = target.parent
+    while not probe.exists() and probe.parent != probe:
+        probe = probe.parent
+    try:
+        free_bytes = shutil.disk_usage(probe).free
+    except OSError as exc:
+        raise RuntimeError(f"BLOCKED_SCRATCH_OUTPUT: cannot measure temporary storage capacity: {exc}") from exc
+    if free_bytes < 512 * 1024 * 1024:
+        raise RuntimeError(f"BLOCKED_SCRATCH_OUTPUT: temporary filesystem has only {free_bytes} free bytes; need at least 512 MiB.")
+    return target
+
+
 def generate_glb(
     image: Any,
     pipeline: Any,
@@ -262,6 +397,7 @@ def generate_glb(
     max_image_size: int,
     decimation_target: int,
     texture_size: int,
+    scratch_output: bool = False,
 ) -> str:
     from storage_manager import managed_storage_operation, storage_preflight, storage_preflight_path
     import json
@@ -291,6 +427,11 @@ def generate_glb(
         )
 
     def _preflight_output(stage: str):
+        if scratch_output:
+            # Run artifacts may use scratch only if it is outside shared storage and
+            # there is independently measured local headroom.
+            validate_scratch_output_path(destination, system_dirs["models"])
+            return
         ok, reason = storage_preflight(
             "outputs", required_gb=0.20, require_fresh_quota=True, minimum_free_gb=0.05,
         )
@@ -317,12 +458,18 @@ def generate_glb(
         decimation_target=int(decimation_target), texture_size=int(texture_size),
         remesh=True, remesh_band=1, remesh_project=0, verbose=False,
     )
-    with managed_storage_operation(
-        "outputs", required_gb=0.20, require_fresh_quota=True, minimum_free_gb=0.05,
-    ):
-        _preflight_output("inside managed write")
+    if scratch_output:
+        _preflight_output("before scratch GLB write")
         destination_dir.mkdir(parents=True, exist_ok=True)
         glb.export(str(destination), extension_webp=True)
+        print(f"TRELLIS_OUTPUT_MODE=local_scratch_only path={destination}")
+    else:
+        with managed_storage_operation(
+            "outputs", required_gb=0.20, require_fresh_quota=True, minimum_free_gb=0.05,
+        ):
+            _preflight_output("inside managed write")
+            destination_dir.mkdir(parents=True, exist_ok=True)
+            glb.export(str(destination), extension_webp=True)
 
     if not destination.is_file() or destination.stat().st_size <= 20:
         raise RuntimeError(f"GLB export did not create a non-empty file: {destination}")
@@ -357,8 +504,21 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.mode == "generate" and args.input is None:
         build_parser().error("--input is required when --mode generate")
-    if args.mode == "generate" and not args.input.is_file():
-        build_parser().error(f"input file does not exist: {args.input}")
+    if args.mode == "generate" and (not args.input.is_file() or args.input.is_symlink()):
+        build_parser().error(f"input file does not exist or is a symlink: {args.input}")
+    if args.mode == "generate-batch" and args.input_dir is None:
+        build_parser().error("--input-dir is required when --mode generate-batch")
+    if args.mode == "generate-batch":
+        try:
+            list_input_images(args.input_dir, args.recursive)
+        except (NotADirectoryError, FileNotFoundError, OSError) as exc:
+            build_parser().error(str(exc))
+    if args.scratch_output and args.mode not in ("generate", "generate-batch"):
+        build_parser().error("--scratch-output is supported only with --mode generate or generate-batch")
+    if args.scratch_output and args.mode == "generate" and args.output is None:
+        build_parser().error("--scratch-output requires --output for --mode generate")
+    if args.scratch_output and args.mode == "generate-batch" and args.output_dir is None:
+        build_parser().error("--scratch-output requires --output-dir for --mode generate-batch")
     if args.port < 1 or args.port > 65535:
         build_parser().error("--port must be between 1 and 65535")
 
@@ -369,9 +529,13 @@ def main(argv: list[str] | None = None) -> int:
         print("TRELLIS_RUNTIME_CHECK=PASS")
         if runtime["cache_available"]:
             print("TRELLIS_READY=PASS")
-        else:
-            print("TRELLIS_READY=DEPENDENCY_CHECK_PASS_MODEL_CACHE_MISS")
-            print("A guarded model download is required before inference unless run with a pre-populated cache.")
+            return 0
+        if args.offline:
+            print("TRELLIS_READY=BLOCKED_MODEL_CACHE_MISS")
+            print("Offline mode forbids downloading missing model weights; populate the cache through the approved storage-admission route.")
+            return 20
+        print("TRELLIS_READY=DEPENDENCY_CHECK_PASS_MODEL_CACHE_MISS")
+        print("A guarded model download is required before inference unless run with a pre-populated cache.")
         return 0
 
     pipeline = _load_pipeline(args, runtime)
@@ -390,8 +554,57 @@ def main(argv: list[str] | None = None) -> int:
             max_image_size=args.max_image_size,
             decimation_target=args.decimation_target,
             texture_size=args.texture_size,
+            scratch_output=args.scratch_output,
         )
         print(f"TRELLIS_GENERATION=PASS output={result}")
+        return 0
+
+    if args.mode == "generate-batch":
+        from PIL import Image
+
+        input_root = args.input_dir.expanduser().resolve()
+        input_files = list_input_images(input_root, args.recursive)
+        if args.output_dir is not None:
+            batch_output_dir = args.output_dir.expanduser().resolve()
+        elif args.scratch_output:
+            build_parser().error("--scratch-output requires --output-dir for --mode generate-batch")
+        else:
+            batch_output_dir = Path(runtime["system_dirs"]["outputs"]).expanduser().resolve() / "3d_models"
+
+        if args.scratch_output:
+            allowed_roots = [Path("/tmp").resolve()]
+            for env_name in ("RUNNER_TEMP", "TMPDIR"):
+                if os.environ.get(env_name):
+                    allowed_roots.append(Path(os.environ[env_name]).expanduser().resolve())
+            if not any(_path_is_within(batch_output_dir, root) for root in allowed_roots):
+                raise RuntimeError("BLOCKED_SCRATCH_OUTPUT: batch output directory must be on approved local temporary storage.")
+            batch_output_dir.mkdir(parents=True, exist_ok=True)
+
+        results = []
+        for index, image_path in enumerate(input_files, start=1):
+            destination = batch_output_dir / _batch_output_name(index, image_path, input_root)
+            if destination.exists():
+                raise FileExistsError(f"Refusing to overwrite batch output: {destination}")
+            print(f"TRELLIS_BATCH_ITEM_START index={index}/{len(input_files)} input={image_path}", flush=True)
+            with Image.open(image_path) as opened:
+                image = opened.copy()
+            result = generate_glb(
+                image=image,
+                pipeline=pipeline,
+                o_voxel=runtime["o_voxel"],
+                system_dirs=runtime["system_dirs"],
+                output_dir=batch_output_dir,
+                output_path=destination,
+                max_image_size=args.max_image_size,
+                decimation_target=args.decimation_target,
+                texture_size=args.texture_size,
+                scratch_output=args.scratch_output,
+            )
+            results.append({"input": str(image_path), "output": result, "bytes": Path(result).stat().st_size})
+            print("TRELLIS_BATCH_ITEM_PASS=" + json.dumps(results[-1], sort_keys=True), flush=True)
+
+        print("TRELLIS_BATCH_SUMMARY=" + json.dumps({"count": len(results), "items": results}, sort_keys=True), flush=True)
+        print(f"TRELLIS_BATCH_GENERATION=PASS count={len(results)} output_dir={batch_output_dir}", flush=True)
         return 0
 
     import gradio as gr
@@ -413,6 +626,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_image_size=int(max_image_size),
                 decimation_target=int(decimation_target),
                 texture_size=int(texture_size),
+                scratch_output=False,
             )
             return result, result
         except Exception as exc:

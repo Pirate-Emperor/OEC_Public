@@ -12,6 +12,21 @@ import shutil
 import glob
 import signal
 import argparse
+
+# CUDA visibility must be selected before importing PyTorch. Parse only --gpu
+# here; the main argparse parser below remains responsible for full CLI help
+# and argument validation.
+_qa_gpu_bootstrap = argparse.ArgumentParser(add_help=False)
+_qa_gpu_default = os.environ.get(
+    "AIEROS_QA_GPU", os.environ.get("CUDA_VISIBLE_DEVICES", "0").split(",")[0].strip()
+)
+_qa_gpu_bootstrap.add_argument("--gpu", default=_qa_gpu_default)
+_qa_gpu_args, _qa_gpu_unknown = _qa_gpu_bootstrap.parse_known_args()
+if not str(_qa_gpu_args.gpu).isdigit():
+    raise SystemExit(f"QA GPU must be a non-negative integer, got {_qa_gpu_args.gpu!r}")
+os.environ["AIEROS_QA_GPU"] = str(_qa_gpu_args.gpu)
+os.environ["CUDA_VISIBLE_DEVICES"] = str(_qa_gpu_args.gpu)
+
 import torch
 import traceback
 import random
@@ -277,8 +292,8 @@ def sweep_stuck_jobs(db_path):
     except Exception as e:
         print(f"[QA-NODE] Failed to sweep DB: {e}")
 
-def process_qa_queue(purge_after_load=True):
-    qa = QANode(gpu_id=0, purge_after_load=purge_after_load)
+def process_qa_queue(purge_after_load=True, gpu_id=0):
+    qa = QANode(gpu_id=gpu_id, purge_after_load=purge_after_load)
     
     sweep_stuck_jobs(QUEUE_DB_PATH)
     
@@ -383,8 +398,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="QA & Compliance Worker Node")
     parser.add_argument("--purge", action="store_true", help="Purge model from disk after loading into VRAM (Default)")
     parser.add_argument("--no-purge", dest="purge", action="store_false", help="Keep model on disk after loading")
+    parser.add_argument("--gpu", default=os.environ.get("AIEROS_QA_GPU", "0"),
+                        help="Physical GPU index to expose before loading the QA model (default: 0).")
     parser.set_defaults(purge=True)
     args = parser.parse_args()
+    if not str(args.gpu).isdigit():
+        parser.error("--gpu must be a non-negative physical GPU index.")
     
-    print("[SYSTEM] Starting QA Compliance Worker...")
-    process_qa_queue(purge_after_load=args.purge)
+    print(f"[SYSTEM] Starting QA Compliance Worker on physical GPU {args.gpu}...")
+    process_qa_queue(purge_after_load=args.purge, gpu_id=str(int(args.gpu)))

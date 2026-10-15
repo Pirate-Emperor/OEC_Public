@@ -21,6 +21,11 @@ import numpy as np
 from purge_manager import DiskPurgeManager, ClusterPurgeManager
 from storage_manager import managed_storage_operation
 from storage_policy import BYTES_PER_GB, estimate_hf_repo_bytes
+from tools.ltx_worker_config import (
+    cluster_purge_is_enabled,
+    get_available_gpu_ids,
+    resolve_gpu_selection,
+)
 
 os.environ["TORCH_COMPILE_DISABLE"] = "1"
 os.environ["TORCHDYNAMO_DISABLE"] = "1"
@@ -435,7 +440,7 @@ def worker_process(gpu_id, sync_barrier=None, master_gpu="0", should_purge=True,
     
     # ---------------------------------------------------------
     # MULTI-GPU SYNCHRONIZATION & PURGE MECHANIC
-    if cluster_gpus > 1:
+    if cluster_purge_is_enabled(cluster_gpus, should_purge):
         print(f"[GPU {gpu_id}] Executing Distributed Cluster Purge...")
         ClusterPurgeManager.sync_and_purge(
             "Lightricks/LTX-2.3", cluster_gpus, f"GPU {gpu_id}"
@@ -443,6 +448,8 @@ def worker_process(gpu_id, sync_barrier=None, master_gpu="0", should_purge=True,
         ClusterPurgeManager.sync_and_purge(
             "google/gemma-3-12b-it-qat-q4_0-unquantized", cluster_gpus, f"GPU {gpu_id}"
         )
+    elif cluster_gpus > 1:
+        print(f"[GPU {gpu_id}] --no-purge active; skipping distributed purge and cluster synchronization.")
     elif sync_barrier:
         print(f"[GPU {gpu_id}] VRAM loaded. Waiting for local node synchronization...")
         sync_barrier.wait() 
@@ -543,7 +550,7 @@ def worker_process(gpu_id, sync_barrier=None, master_gpu="0", should_purge=True,
 # ==============================================================================
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="LTX-2.3 Multi-GPU Worker")
-    parser.add_argument("--gpus", type=str, default="1,2,3", help="Comma-separated list of GPUs to use (e.g., 1,2,3)")
+    parser.add_argument("--gpus", type=str, default=None, help="Comma-separated physical GPU IDs; default reserves GPU 0 when other GPUs exist")
     parser.add_argument("--mode", type=str, default="WORKER_PARALLEL", choices=["WORKER_PARALLEL", "WORKER_SINGLE", "GRADIO"])
     parser.add_argument("--purge", action="store_true", default=True, help="Safely purge models from NVMe disk after loading into VRAM")
     parser.add_argument("--no-purge", dest="purge", action="store_false", help="Keep models on disk")
@@ -551,7 +558,13 @@ if __name__ == "__main__":
     parser.add_argument("--cluster-gpus", type=int, default=0, help="Total expected GPUs across ALL nodes for distributed purge sync (e.g., 11)")
     args = parser.parse_args()
 
-    AVAILABLE_GPUS = [g.strip() for g in args.gpus.split(",") if g.strip()]
+    try:
+        AVAILABLE_GPUS = (
+            resolve_gpu_selection(args.gpus, get_available_gpu_ids())
+            if args.mode == "WORKER_PARALLEL" else []
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
     
     if args.clean_state:
         print("\n[SYSTEM] --clean-state triggered. Wiping existing Hugging Face caches for LTX and Gemma...")
@@ -637,7 +650,7 @@ if __name__ == "__main__":
             if args.mode == "WORKER_PARALLEL":
                 print(f"[SYSTEM] Launching {len(AVAILABLE_GPUS)} concurrent GPU workers...")
                 
-                sync_barrier = mp.Barrier(len(AVAILABLE_GPUS)) if (len(AVAILABLE_GPUS) > 1 and args.cluster_gpus <= 1) else None
+                sync_barrier = mp.Barrier(len(AVAILABLE_GPUS)) if (args.purge and len(AVAILABLE_GPUS) > 1 and args.cluster_gpus <= 1) else None
                 master_gpu = AVAILABLE_GPUS[0] if AVAILABLE_GPUS else "0"
                 
                 for gpu in AVAILABLE_GPUS:
