@@ -43,6 +43,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--trellis-model-cache", type=Path, help="Optional TRELLIS Hub-cache root.")
     parser.add_argument("--trellis-repo-dir", type=Path, help="Optional TRELLIS.2 source checkout.")
     parser.add_argument("--attention-backend", choices=("xformers", "flash_attn"), default="xformers")
+    parser.add_argument("--source-mode", choices=("flux", "images"), default="flux",
+                        help="flux (default) generates an image first; images sends a folder of existing images straight to TRELLIS.")
+    parser.add_argument("--image-dir", type=Path, help="Input image folder when --source-mode images is selected.")
+    parser.add_argument("--recursive", action="store_true", help="Include supported images in nested folders when --source-mode images.")
     parser.add_argument("--prompt", default="A polished red ceramic tea kettle on a quiet studio table, soft natural window light, realistic product photography")
     parser.add_argument("--seed", type=int, default=2048)
     parser.add_argument("--width", type=int, default=512)
@@ -57,6 +61,31 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--flux-timeout", type=int, default=840)
     parser.add_argument("--trellis-timeout", type=int, default=1800)
     return parser
+
+
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
+
+
+def _list_source_images(image_dir: Path | None, recursive: bool = False) -> list[Path]:
+    if image_dir is None:
+        raise ValueError("--image-dir is required with --source-mode images.")
+    root = image_dir.expanduser().resolve()
+    if not root.is_dir():
+        raise NotADirectoryError(f"Input image directory does not exist: {root}")
+    candidates = root.rglob("*") if recursive else root.iterdir()
+    images = []
+    for candidate in candidates:
+        try:
+            if candidate.is_symlink() or not candidate.is_file():
+                continue
+        except OSError:
+            continue
+        if candidate.suffix.lower() in IMAGE_EXTENSIONS:
+            images.append(candidate.resolve())
+    images.sort(key=lambda item: item.relative_to(root).as_posix().casefold())
+    if not images:
+        raise FileNotFoundError(f"No supported image files in {root}; supported: {', '.join(sorted(IMAGE_EXTENSIONS))}")
+    return images
 
 
 def _emit(event: str, **fields: Any) -> None:
@@ -332,10 +361,15 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
         "shared_output_writes_allowed": False,
         "stages": {},
     }
+    report["source_mode"] = args.source_mode
     report["result_artifacts"] = {
-        "png": str(work_dir / "flux2_klein.png"),
-        "png_metadata": str(work_dir / "flux2_klein_info.json"),
-        "glb": str(work_dir / "trellis_asset.glb"),
+        "source_mode": args.source_mode,
+        "input_dir": str(args.image_dir.expanduser().resolve()) if args.source_mode == "images" and args.image_dir else None,
+        "png": str(work_dir / "flux2_klein.png") if args.source_mode == "flux" else None,
+        "png_metadata": str(work_dir / "flux2_klein_info.json") if args.source_mode == "flux" else None,
+        "glb": str(work_dir / "trellis_asset.glb") if args.source_mode == "flux" else None,
+        "glb_dir": str(work_dir / "trellis_outputs") if args.source_mode == "images" else None,
+        "glbs": [],
         "report": str(report_path),
     }
     env = os.environ.copy()
@@ -348,20 +382,31 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
     })
     try:
         with _gpu_lock(args.lock_file.expanduser(), args.lock_timeout):
-            flux_gpu = _select_gpu(python, env, "flux_gpu_admission")
-            report["stages"]["flux_gpu_admission"] = {"status": "PASS", "gpu": flux_gpu}
-            env_flux = env | {"CUDA_VISIBLE_DEVICES": flux_gpu, "AIEROS_GPU": flux_gpu}
-            flux_check = [python, str(FLUX_SCRIPT), "--mode", "check", "--offline", "--gpu", flux_gpu]
-            _optional_path_args(flux_check, "--model-cache", args.model_cache)
-            report["stages"]["flux_check"] = {"status": "PASS", **_run_stage("flux_check", flux_check, env_flux, 300)}
-            cmds = _stage_commands(args, work_dir, flux_gpu)
-            report["stages"]["flux_generate"] = {"status": "PASS", **_run_stage(
-                "flux_generate", cmds["flux_generate"], env_flux, args.flux_timeout)}
-            png_info = _validate_png(work_dir / "flux2_klein.png", work_dir / "flux2_klein_info.json")
-            report["stages"]["png_validation"] = {"status": "PASS", **png_info}
-            _emit("png_validation_pass", **png_info)
+            if args.source_mode == "flux":
+                flux_gpu = _select_gpu(python, env, "flux_gpu_admission")
+                report["stages"]["flux_gpu_admission"] = {"status": "PASS", "gpu": flux_gpu}
+                env_flux = env | {"CUDA_VISIBLE_DEVICES": flux_gpu, "AIEROS_GPU": flux_gpu}
+                flux_check = [python, str(FLUX_SCRIPT), "--mode", "check", "--offline", "--gpu", flux_gpu]
+                _optional_path_args(flux_check, "--model-cache", args.model_cache)
+                report["stages"]["flux_check"] = {"status": "PASS", **_run_stage("flux_check", flux_check, env_flux, 300)}
+                cmds = _stage_commands(args, work_dir, flux_gpu)
+                report["stages"]["flux_generate"] = {"status": "PASS", **_run_stage(
+                    "flux_generate", cmds["flux_generate"], env_flux, args.flux_timeout)}
+                png_info = _validate_png(work_dir / "flux2_klein.png", work_dir / "flux2_klein_info.json")
+                report["stages"]["png_validation"] = {"status": "PASS", **png_info}
+                _emit("png_validation_pass", **png_info)
+                input_files = [work_dir / "flux2_klein.png"]
+            else:
+                input_files = _list_source_images(args.image_dir, args.recursive)
+                report["stages"]["input_folder_validation"] = {
+                    "status": "PASS", "count": len(input_files),
+                    "files": [str(item) for item in input_files],
+                    "recursive": bool(args.recursive),
+                }
+                _emit("input_folder_validation_pass", count=len(input_files), recursive=bool(args.recursive))
 
-            # FLUX process has exited; re-sample GPU state before loading TRELLIS.
+            # FLUX must be fully exited before TRELLIS is admitted. In folder mode,
+            # only TRELLIS is run and no FLUX model is loaded.
             trellis_gpu = _select_gpu(python, env, "trellis_gpu_admission")
             report["stages"]["trellis_gpu_admission"] = {"status": "PASS", "gpu": trellis_gpu}
             env_trellis = env | {
@@ -376,12 +421,51 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
             _optional_path_args(trellis_check, "--repo-dir", args.trellis_repo_dir)
             report["stages"]["trellis_check"] = {"status": "PASS", **_run_stage(
                 "trellis_check", trellis_check, env_trellis, 300)}
-            # The final generation process performs its own attention and cache preflight again.
-            cmds = _stage_commands(args, work_dir, trellis_gpu)
+
+            # The final generation command rechecks attention and cached weights itself.
+            if args.source_mode == "flux":
+                cmds = _stage_commands(args, work_dir, trellis_gpu)
+                trellis_cmd = cmds["trellis_generate"]
+                output_dir = work_dir
+                expected_glbs = [work_dir / "trellis_asset.glb"]
+            else:
+                output_dir = work_dir / "trellis_outputs"
+                output_dir.mkdir(parents=True, exist_ok=False)
+                trellis_cmd = [
+                    python, str(TRELLIS_SCRIPT), "--mode", "generate-batch", "--offline",
+                    "--scratch-output", "--input-dir", str(args.image_dir.expanduser().resolve()),
+                    "--output-dir", str(output_dir), "--gpu", trellis_gpu,
+                    "--attention-backend", args.attention_backend,
+                    "--max-image-size", str(args.max_image_size),
+                    "--decimation-target", str(args.decimation_target),
+                    "--texture-size", str(args.texture_size),
+                ]
+                if args.recursive:
+                    trellis_cmd.append("--recursive")
+                _optional_path_args(trellis_cmd, "--model-cache", args.trellis_model_cache)
+                _optional_path_args(trellis_cmd, "--repo-dir", args.trellis_repo_dir)
+                expected_glbs = []
+
             report["stages"]["trellis_generate"] = {"status": "PASS", **_run_stage(
-                "trellis_generate", cmds["trellis_generate"], env_trellis, args.trellis_timeout)}
-            glb_info = _validate_glb(work_dir / "trellis_asset.glb")
-            report["stages"]["glb_validation"] = {"status": "PASS", **glb_info}
+                "trellis_generate", trellis_cmd, env_trellis, args.trellis_timeout)}
+            if args.source_mode == "flux":
+                glb_paths = [work_dir / "trellis_asset.glb"]
+            else:
+                glb_paths = sorted(output_dir.glob("*.glb"))
+                if len(glb_paths) != len(input_files):
+                    raise RuntimeError(
+                        f"TRELLIS batch output count mismatch: expected {len(input_files)}, found {len(glb_paths)}"
+                    )
+            glb_infos = []
+            for glb_path in glb_paths:
+                glb_infos.append(_validate_glb(glb_path))
+            report["result_artifacts"]["glbs"] = [str(p) for p in glb_paths]
+            report["stages"]["glb_validation"] = {
+                "status": "PASS", "count": len(glb_infos), "items": glb_infos,
+            }
+            if args.source_mode == "flux":
+                report["stages"]["glb_validation"].update(glb_infos[0])
+            _emit("glb_validation_pass", count=len(glb_infos), glbs=report["result_artifacts"]["glbs"])
             _emit("glb_validation_pass", **glb_info)
         report["status"] = "PASS"
         report["completed_at_utc"] = datetime.now(timezone.utc).isoformat()
@@ -421,6 +505,13 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if not Path(args.python).expanduser().is_file():
         build_parser().error(f"--python is not a file: {args.python}")
+    if args.source_mode == "images":
+        try:
+            _list_source_images(args.image_dir, args.recursive)
+        except (ValueError, NotADirectoryError, FileNotFoundError, OSError) as exc:
+            build_parser().error(str(exc))
+    elif args.image_dir is not None or args.recursive:
+        build_parser().error("--image-dir/--recursive require --source-mode images.")
     for name, value, minimum, maximum in (
         ("width", args.width, 256, 1024), ("height", args.height, 256, 1024),
         ("steps", args.steps, 1, 12), ("max-image-size", args.max_image_size, 64, 4096),
