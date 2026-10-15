@@ -228,6 +228,8 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertIn('FLUX_SERVER_PORT = int(os.environ.get("AIEROS_FLUX_GRADIO_PORT", "7863"))', combined_all)
         self.assertIn("tools/oec_service_manager.py", combined_all)
         self.assertIn('["start", "flux-ui", "--gpu", FLUX_UI_GPU, "--port", str(FLUX_SERVER_PORT)]', combined_all)
+        self.assertIn("_MANAGER_CONDA_ROOT", combined_all)
+        self.assertIn('"--conda-root", str(_MANAGER_CONDA_ROOT)', combined_all)
         self.assertIn('os.environ["CUDA_VISIBLE_DEVICES"] = TRELLIS_UI_GPU', combined_all)
         self.assertIn('if FLUX_UI_GPU == TRELLIS_UI_GPU:', combined_all)
         self.assertIn("share=False", combined_all)
