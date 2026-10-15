@@ -12,6 +12,7 @@ import shutil
 import glob
 import signal
 import argparse
+import socket
 
 # CUDA visibility must be selected before importing PyTorch. Parse only --gpu
 # here; the main argparse parser below remains responsible for full CLI help
@@ -29,7 +30,6 @@ os.environ["CUDA_VISIBLE_DEVICES"] = str(_qa_gpu_args.gpu)
 
 import torch
 import traceback
-import random
 from pathlib import Path
 from PIL import Image
 
@@ -37,6 +37,14 @@ from PIL import Image
 from purge_manager import DiskPurgeManager
 from storage_manager import managed_storage_operation
 from storage_policy import BYTES_PER_GB, estimate_hf_repo_bytes
+from tools.qa_checks import (
+    QAValidationError,
+    claim_next_qa_job,
+    count_untracked_processing_jobs,
+    ensure_qa_lease_schema,
+    recover_stale_qa_jobs,
+    validate_qa_analysis,
+)
 
 # ==============================================================================
 # 2. GLOBAL LOGGING & CRASH CATCHER (Must be defined first)
@@ -88,7 +96,7 @@ except ImportError:
     print("[QA-NODE] qwen-vl-utils is not installed; VLM QA cannot run until the dependency is installed.")
 
 class QANode:
-    def __init__(self, gpu_id=0, purge_after_load=True):
+    def __init__(self, gpu_id=0, purge_after_load=False):
         self.gpu_id = str(gpu_id)
         self.purge_after_load = purge_after_load
         os.environ["CUDA_VISIBLE_DEVICES"] = self.gpu_id
@@ -179,12 +187,18 @@ class QANode:
         print(f"[QA-NODE-GPU{self.gpu_id}] VLM Fully Loaded into VRAM.")
         
         if self.purge_after_load:
+            if os.environ.get("AIEROS_ALLOW_SHARED_MODEL_PURGE") != "1":
+                raise RuntimeError(
+                    "Model-cache purge is disabled unless AIEROS_ALLOW_SHARED_MODEL_PURGE=1 is set explicitly."
+                )
             DiskPurgeManager.purge_hf_model(self.repo_id)
 
     def analyze_and_tag(self, image_path):
         if not self.model: self.load_vlm()
         
-        image = Image.open(image_path)
+        with Image.open(image_path) as source_image:
+            source_image.load()
+            image = source_image.convert("RGB")
         
         prompt = (
             "You are an elite QA reviewer for Adobe Stock. Analyze this frame strictly.\n"
@@ -219,10 +233,13 @@ class QANode:
         
         try:
             clean_json = output_text.replace("```json", "").replace("```", "").strip()
-            return json.loads(clean_json)
-        except Exception as e:
-            print(f"[QA-NODE] Failed to parse VLM output: {e}\nRaw Output: {output_text}")
-            return {"category": 1, "rejection_reason": "VLM parsing failure"}
+            return validate_qa_analysis(json.loads(clean_json))
+        except (json.JSONDecodeError, QAValidationError, TypeError, ValueError) as e:
+            print(f"[QA-NODE] VLM response failed JSON/schema validation: {e}\nRaw Output: {output_text}")
+            return {
+                "category": 1,
+                "rejection_reason": f"VLM response failed QA schema validation ({type(e).__name__}).",
+            }
 
     def extract_evaluation_frame(self, media_path):
         """Extracts a frame if video, otherwise returns the image path directly."""
@@ -278,21 +295,24 @@ class QANode:
             return False
 
 def sweep_stuck_jobs(db_path):
-    """Recovers crashed jobs."""
+    """Recover only timestamped, expired QA leases; never reset a live claim."""
     try:
-        # FIX: Reverted the cross-queue extraction hack.
-        # Now strictly isolated to recovering its own processing crashes to maintain safe linear pipeline flow.
-        with sqlite3.connect(db_path, timeout=30) as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute("UPDATE assets SET status = 'PENDING_QA' WHERE status = 'PROCESSING_QA'")
-            if cursor.rowcount > 0:
-                print(f"[QA-NODE] 🧹 Recovered {cursor.rowcount} crashed jobs back to PENDING_QA.")
-            conn.commit()
+        ensure_qa_lease_schema(db_path)
+        stale_after = max(30, int(os.environ.get("AIEROS_QA_STALE_MINUTES", "180")))
+        recovered = recover_stale_qa_jobs(db_path, stale_after)
+        if recovered:
+            print(f"[QA-NODE] Recovered {recovered} expired QA lease(s) after {stale_after} minutes.")
+        untracked = count_untracked_processing_jobs(db_path)
+        if untracked:
+            print(
+                f"[QA-NODE] WARNING: {untracked} legacy PROCESSING_QA row(s) have no lease timestamp; "
+                "left unchanged to avoid duplicate work. Review them explicitly."
+            )
     except Exception as e:
-        print(f"[QA-NODE] Failed to sweep DB: {e}")
+        print(f"[QA-NODE] Failed to initialize/recover QA queue leases: {e}")
+        raise
 
-def process_qa_queue(purge_after_load=True, gpu_id=0):
+def process_qa_queue(purge_after_load=False, gpu_id=0):
     qa = QANode(gpu_id=gpu_id, purge_after_load=purge_after_load)
     
     sweep_stuck_jobs(QUEUE_DB_PATH)
@@ -308,34 +328,38 @@ def process_qa_queue(purge_after_load=True, gpu_id=0):
     signal.signal(signal.SIGINT, handle_sig)
     signal.signal(signal.SIGTERM, handle_sig)
 
+    worker_id = f"{socket.gethostname()}:{os.getpid()}"
     while is_running:
+        record_id = None
         try:
-            with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT id, asset_path, json_path FROM assets WHERE status = 'PENDING_QA' LIMIT 1")
-                row = cursor.fetchone()
-                
+            row = claim_next_qa_job(QUEUE_DB_PATH, worker_id)
             if not row:
                 time.sleep(5)
-                if random.random() < 0.1:
-                    sweep_stuck_jobs(QUEUE_DB_PATH)
                 continue
-                
+
             record_id, raw_vid_path, json_path = row
-            
-            with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                conn.execute("UPDATE assets SET status = 'PROCESSING_QA' WHERE id = ?", (record_id,))
-                
+
             print(f"\n[QA-NODE] Evaluating Asset ID: {record_id} | {os.path.basename(raw_vid_path)}")
             
             if not os.path.exists(raw_vid_path) or not os.path.exists(json_path):
-                print(f"[QA-NODE] Files missing from disk. Deleting record.")
+                print(f"[QA-NODE] Files missing from disk; retaining queue record for diagnosis.")
                 with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                    conn.execute("DELETE FROM assets WHERE id = ?", (record_id,))
+                    conn.execute(
+                        "UPDATE assets SET status = 'FAILED_MISSING_FILE', qa_started_at = NULL, qa_worker_id = NULL WHERE id = ?",
+                        (record_id,),
+                    )
                 continue
             
-            with open(json_path, 'r') as f:
+            with open(json_path, 'r', encoding='utf-8') as f:
                 metadata = json.load(f)
+            if not isinstance(metadata, dict):
+                print(f"[QA-NODE] Invalid metadata JSON object for asset {record_id}; marking failed.")
+                with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
+                    conn.execute(
+                        "UPDATE assets SET status = 'FAILED_QA_METADATA', qa_started_at = NULL, qa_worker_id = NULL WHERE id = ?",
+                        (record_id,),
+                    )
+                continue
                 
             frame_path, is_extracted = qa.extract_evaluation_frame(raw_vid_path)
             if frame_path:
@@ -364,7 +388,9 @@ def process_qa_queue(purge_after_load=True, gpu_id=0):
                 metadata["seo_keywords"] = analysis.get("keywords", [])
                 metadata["qa_passed"] = True
             
-                improved_vid_path = raw_vid_path.replace(".mp4", "_improved.mp4")
+                raw_path = Path(raw_vid_path)
+                improved_path = raw_path.with_name(f"{raw_path.stem}_qa_improved_{record_id}.mp4")
+                improved_vid_path = str(improved_path)
                 success = qa.improve_and_standardize_video(raw_vid_path, improved_vid_path)
                 
                 if success:
@@ -377,30 +403,40 @@ def process_qa_queue(purge_after_load=True, gpu_id=0):
                     new_size = os.path.getsize(raw_vid_path) + os.path.getsize(json_path)
                     with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
                         conn.execute(
-                            "UPDATE assets SET status = 'PENDING_UPLOAD', total_size_bytes = ? WHERE id = ?", 
+                            "UPDATE assets SET status = 'PENDING_UPLOAD', total_size_bytes = ?, qa_started_at = NULL, qa_worker_id = NULL WHERE id = ?", 
                             (new_size, record_id)
                         )
                     print(f"[QA-NODE] QA Complete. Asset handed over to HF Upload Daemon.")
                 else:
                     print(f"[QA-NODE] Quality Improver failed. Rejecting asset.")
                     with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                        conn.execute("UPDATE assets SET status = 'FAILED_IMPROVER' WHERE id = ?", (record_id,))
+                        conn.execute("UPDATE assets SET status = 'FAILED_IMPROVER', qa_started_at = NULL, qa_worker_id = NULL WHERE id = ?", (record_id,))
             else:
                  print(f"[QA-NODE] QA Extraction failed. Check if FFmpeg is installed/working.")
                  with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                        conn.execute("UPDATE assets SET status = 'FAILED_QA_EXTRACTION' WHERE id = ?", (record_id,))
+                        conn.execute("UPDATE assets SET status = 'FAILED_QA_EXTRACTION', qa_started_at = NULL, qa_worker_id = NULL WHERE id = ?", (record_id,))
                         
         except Exception as e:
-            print(f"[QA-NODE] Fatal error in QA loop: {e}")
-            time.sleep(10)
+            print(f"[QA-NODE] Fatal error in QA loop: {type(e).__name__}: {e}")
+            if record_id is not None:
+                try:
+                    with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
+                        conn.execute(
+                            "UPDATE assets SET status = 'FAILED_QA_RUNTIME', qa_started_at = NULL, qa_worker_id = NULL "
+                            "WHERE id = ? AND status = 'PROCESSING_QA'",
+                            (record_id,),
+                        )
+                except Exception as state_error:
+                    print(f"[QA-NODE] Failed to record runtime failure for asset {record_id}: {state_error}")
+            time.sleep(5)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="QA & Compliance Worker Node")
-    parser.add_argument("--purge", action="store_true", help="Purge model from disk after loading into VRAM (Default)")
+    parser.add_argument("--purge", action="store_true", help="Explicitly purge the model cache after loading; requires AIEROS_ALLOW_SHARED_MODEL_PURGE=1")
     parser.add_argument("--no-purge", dest="purge", action="store_false", help="Keep model on disk after loading")
     parser.add_argument("--gpu", default=os.environ.get("AIEROS_QA_GPU", "0"),
                         help="Physical GPU index to expose before loading the QA model (default: 0).")
-    parser.set_defaults(purge=True)
+    parser.set_defaults(purge=False)
     args = parser.parse_args()
     if not str(args.gpu).isdigit():
         parser.error("--gpu must be a non-negative physical GPU index.")
