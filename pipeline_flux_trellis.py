@@ -89,11 +89,12 @@ def _gpu_lock(path: Path, timeout: int) -> Iterator[None]:
 
 
 def _select_gpu(python: str, env: dict[str, str], stage: str) -> str:
-    cmd = [python, str(GPU_ADMISSION_SCRIPT), "--print-index-only"]
-    _emit("stage_start", stage=stage, command=cmd)
+    cmd = [python, str(GPU_ADMISSION_SCRIPT), "--print-index-only",
+           "--wait-seconds", "180", "--poll-interval", "5"]
+    _emit("stage_start", stage=stage, command=cmd, admission_wait_seconds=180)
     proc = subprocess.run(cmd, cwd=REPO_ROOT, env=env, text=True,
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                          timeout=30, check=False)
+                          timeout=240, check=False)
     output = proc.stdout or ""
     for line in output.splitlines():
         print(f"[{stage}] {line}", flush=True)

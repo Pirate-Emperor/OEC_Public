@@ -111,3 +111,22 @@ Hosted run [38722197428](https://github.com/Killer4K-N/OEC/actions/runs/38722197
 ## Combined workflow wiring attempt — no job created
 
 The one-shot marker push triggered [run 38722963930](https://github.com/Killer4K-N/OEC/actions/runs/38722963930), but GitHub reported failure with zero jobs and no job logs; the Python command never started and no GPU was assigned. Source inspection at commit c6704cce5c4efa722b3b171b0363682718f3efea revealed the remaining `inputs.runner` references in `runs-on`, `OEC_EXPECTED_RUNNER`, and artifact name/path. Only the job name had been updated to default using `github.event.inputs.runner || 'oec-1'`. The workflow is now corrected to use the same fallback for all runner references. The exact GitHub workflow-validation message was not exposed by the available run/job endpoints, so the diagnosis is based on the confirmed mismatch and zero-job result. No model inference, install, download or shared write occurred.
+
+
+## Latest hosted CI before first combined runtime
+
+- [Run 38722873210](https://github.com/Killer4K-N/OEC/actions/runs/38722873210): 56/56 tests passed, Python compile passed, notebook JSON/Python checks passed for 4/4 notebooks. Hosted CPU/static CI, not inference.
+- [Run 38723196255](https://github.com/Killer4K-N/OEC/actions/runs/38723196255): 56/56 tests, compile checks and four notebook checks passed after the workflow runner-input fallback fix. It did not execute either model.
+
+## First actual same-run FLUX to TRELLIS attempt
+
+Run [OEC Actions 38723286765](https://github.com/Killer4K-N/OEC/actions/runs/38723286765), job 116382882587, on oec-1, produced exact-run [artifact 11966744703](https://github.com/Killer4K-N/OEC/actions/runs/38723286765/artifacts/11966744703). Artifact contents were downloaded and pipeline_report.json parsed.
+
+- Purpose: verify the generated FLUX PNG can pass by exact path into TRELLIS and produce a valid GLB in one run.
+- FLUX: check PASS (137.173 s); pipeline load PASS; generation PASS (57.602 s stage total; 20.325 s inference); PNG validation PASS. Output 512×512, 255,946 bytes, seed 2048, SHA-256 2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb.
+- TRELLIS preflight: check PASS in 21.982 s; cache snapshot af44b45f2e35a493886929c6d786e563ec68364d; torch 2.6.0+cu124, CUDA12.4, xformers0.0.29.post2, attention probe PASS and model pipeline load PASS.
+- Failure: trellis_generate exited 1 before image-to-3D inference. The temp filesystem guard called subprocess.run but pipeline_trellis_3d.py lacked import subprocess. This confirmed source bug is recorded in pipeline_report.json. No GLB was produced.
+- Additional finding: GPU admission chose device 0 as IDLE at reported 100% utilization and zero visible compute processes, because the idle predicate did not consider utilization. It now requires known utilization at or below 5%, and orchestration waits/re-samples up to 180 seconds before fail-closed denial.
+- Candidate fix added import subprocess and a regression test that forces the findmnt fallback, plus a high-utilization/no-visible-process admission regression test. Latest CI and retry are pending; no claim of full pipeline success until TRELLIS inference, export and trimesh geometry reopen succeed.
+- No download, install, shared output write, process signal, QA queue mutation, reserve-file change or phase1 edit occurred.
+

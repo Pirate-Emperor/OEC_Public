@@ -1,14 +1,14 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-15 16:00 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 16:36 IST (Asia/Kolkata)  
 **Branch:** fix/flux-trellis-pipeline-20261015 (review-only, created from main at 99d9796d5bd5afc1731600b310ced3b5be521ee9; no changes merged into main)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
 ## Current status
 
-Both standalone model stages now have fresh successful runtime evidence; the combined pipeline is the remaining acceptance gate. OEC run [38613575959](https://github.com/Killer4K-N/OEC/actions/runs/38613575959) generated and validated real 512×512 PNGs on all three OEC runners (three of three jobs, 255,946 bytes each, seed 2048, offline/cache-only). Connector_1 run [38602330418](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418) separately generated and reopened a TRELLIS.2 GLB (8,865,916 bytes; SHA-256 22caca5fe9c02c50c095e4385a7c17e94b214b5fc7d87417b94b48c796a89257; 96,672 vertices / 92,062 faces). Neither result alone proves same-run FLUX-to-TRELLIS handoff.
+Both standalone model stages have fresh successful runtime evidence, and a real combined run now confirms the FLUX-to-PNG-to-TRELLIS-load handoff, but the integrated route is not yet complete. OEC run [38613575959](https://github.com/Killer4K-N/OEC/actions/runs/38613575959) generated validated 512×512 PNGs on oec-1/oec-2/oec-3. Connector_1 run [38602330418](https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418) separately exported and reopened a valid TRELLIS.2 GLB. OEC combined run [38723286765](https://github.com/Killer4K-N/OEC/actions/runs/38723286765), job 116382882587, passed FLUX generation, PNG validation, TRELLIS cache/attention checks and model loading, then failed before TRELLIS inference because the scratch-filesystem probe lacked import subprocess (NameError). The code fix is prepared on the review branch with a regression test. The same report exposed a GPU-admission policy issue: 100% reported utilization was still classified as IDLE when no compute process was visible.
 
-A review-only branch, fix/flux-trellis-pipeline-20261015, based on current main 99d9796d5bd5afc1731600b310ced3b5be521ee9, adds a sequential subprocess orchestrator, stage logs, repeated GPU admission, PNG/JSON handoff validation, GLB structural checks, and an independent trimesh reopen. The first modified-branch hosted CI run, [38721841953](https://github.com/Killer4K-N/OEC/actions/runs/38721841953), failed two assertions in the storage-write-admission suite because the tests compared the newly added scratch path with the separate managed-output path. The assertions were revised to check each path independently; a clean rerun is not yet verified. The real combined GPU run is also pending. Authoritative quota telemetry remains unresolved; downloads and managed shared-output writes stay fail-closed, while scratch artifacts are allowed only after filesystem separation and free-capacity checks.
+Hosted static runs [38722873210](https://github.com/Killer4K-N/OEC/actions/runs/38722873210) and [38723196255](https://github.com/Killer4K-N/OEC/actions/runs/38723196255) passed 56/56 tests plus compilation and four notebook checks on earlier revisions. The next revision adds tests for the subprocess mount probe and GPU-utilization fail-closed rule; its CI is pending. No GLB was produced by combined run 38723286765. Authoritative quota telemetry remains unresolved; managed writes/downloads stay fail-closed and combined artifacts remain under local /tmp.
 
 ## Material fixes delivered in the feature branch
 
@@ -294,3 +294,15 @@ OEC review-branch [run 38722551001](https://github.com/Killer4K-N/OEC/actions/ru
 ## 2026-10-15 — First combined workflow dispatch failed before runner assignment
 
 The one-shot marker push created run [38722963930](https://github.com/Killer4K-N/OEC/actions/runs/38722963930), but its Actions job endpoint returned zero jobs and no runner was assigned. It therefore did not execute the Python entry point and is not a FLUX/TRELLIS inference result. Inspection of the workflow at that commit showed the run-on selector, expected runner identity and upload path still referenced `inputs.runner`; only the job display name had been changed to use `github.event.inputs.runner || 'oec-1'`. Those remaining dispatch-only references are now changed to the same event-input fallback. Post-fix CI and a new one-run acceptance attempt remain required.
+
+
+## 2026-10-15 — Combined run result and second guard issue
+
+The exact-run artifact from [OEC run 38723286765](https://github.com/Killer4K-N/OEC/actions/runs/38723286765), [artifact 11966744703](https://github.com/Killer4K-N/OEC/actions/runs/38723286765/artifacts/11966744703), contains the real FLUX PNG, metadata and pipeline_report.json.
+
+- FLUX runtime check PASS (137.173 s), generation PASS (57.602 s total; model load 26.324 s; generation 20.325 s), PNG validation PASS (512×512, 255,946 bytes, seed 2048, SHA-256 2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb).
+- TRELLIS runtime check PASS (21.982 s), cache hit snapshot af44b45f2e35a493886929c6d786e563ec68364d, torch 2.6.0+cu124, CUDA 12.4, xformers 0.0.29.post2, attention operator PASS, model pipeline load PASS.
+- TRELLIS generation did not reach image-to-3D inference. It failed inside the output filesystem guard because subprocess was not imported. No GLB was produced. This is a confirmed source/helper defect, not an attention or model API failure.
+- The same run's admission log selected GPU 0 as IDLE despite 100% utilization and zero visible compute processes. Idle admission now requires known utilization at or below 5%; orchestration re-samples for at most 180 seconds and then fails closed if no eligible GPU appears.
+- Added the missing import and a regression test that exercises the findmnt fallback. New source/tests still require hosted CI and a fresh combined-run attempt.
+- No model/dependency download, install, shared-output write, process signal, QA queue mutation, reserve-file change, or phase1 change occurred.

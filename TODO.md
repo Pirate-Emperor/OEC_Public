@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-15 16:26 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-15 16:36 IST (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 ## 2026-10-14 — quota telemetry and live-checkout diagnosis
 - [x] Verified GitHub state: OEC `main` is `82346c0753e139b92240f53734eb48d2113ed9ad`; `fix/trellis-gradio-notebooks-20261011` is `2543b26d2888e667c6443c984259f84ac5b6c142` (111 ahead, 0 behind). No main-branch change or merge.
@@ -188,3 +188,14 @@ The first hosted run on this branch, [38721841953](https://github.com/Killer4K-N
 - [x] The one-shot run [38722963930](https://github.com/Killer4K-N/OEC/actions/runs/38722963930) failed before job creation; the API returned zero jobs, so no A100 was assigned and no inference ran. Inspection of the exact committed workflow found that `runs-on`, runner identity, and artifact path still referenced dispatch-only `inputs.runner`, even though the workflow had been changed to support a push trigger.
 - [x] Updated every runner reference to use `github.event.inputs.runner || 'oec-1'`; manual dispatch can still choose a runner and a one-shot push falls back to `oec-1`. The fix has not yet passed its post-change CI/run.
 - [ ] OPEN — wait for hosted checks on the workflow correction, then create a new marker commit to start the combined pipeline on oec-1. Treat failure with zero jobs as workflow wiring; a job-level run is required before diagnosing model/runtime issues.
+
+
+## 2026-10-15 — First live combined-pipeline attempt and guard hardening
+
+- [x] Hosted static CI [run 38722873210](https://github.com/Killer4K-N/OEC/actions/runs/38722873210) passed 56/56 tests, Python compilation and notebook checks 4/4. Hosted static CI [run 38723196255](https://github.com/Killer4K-N/OEC/actions/runs/38723196255) passed the same 56 tests, compilation and four notebooks after the workflow runner-input fix.
+- [x] Combined workflow [38723286765](https://github.com/Killer4K-N/OEC/actions/runs/38723286765), job 116382882587, assigned oec-1 and passed checkout, runner identity/interpreter validation, FLUX runtime check, real image generation/PNG validation, TRELLIS runtime/cache/attention check and pipeline loading. PNG: 512×512, 255,946 bytes, SHA-256 2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb. TRELLIS cache snapshot af44b45f2e35a493886929c6d786e563ec68364d; PyTorch 2.6.0+cu124, CUDA 12.4, xFormers 0.0.29.post2, attention operator pass.
+- [x] The run then failed before TRELLIS inference in the scratch-filesystem probe: NameError because subprocess was not imported. The bug is confirmed by pipeline_report.json in [artifact 11966744703](https://github.com/Killer4K-N/OEC/actions/runs/38723286765/artifacts/11966744703). Added import subprocess and a unit test that forces the findmnt fallback.
+- [x] GPU admission logs from the same run showed utilization_percent=100 and zero visible compute processes, while the tool still returned policy IDLE. The idle predicate ignored utilization. Hardened it to require known utilization at or below 5%; the orchestrator now waits/re-samples for up to 180 seconds, then fails closed.
+- [ ] OPEN — run hosted CI on these latest code changes (including the mount-probe and high-utilization regression tests), then retrigger the combined workflow. Acceptance still requires TRELLIS inference, GLB export and independent non-empty geometry reopen.
+- [ ] OPEN — repository-wide follow-up: qa_compliance_worker.py imports torch at module import before applying its per-worker CUDA visibility override. Audit this in a separate focused change; no QA process or queue was changed.
+- [ ] BLOCKED — downloads and managed shared-output writes remain gated while fresh quota telemetry is unresolved. No admission policy was weakened; no queue, reserve-file, phase1 or shared-cache mutation occurred.

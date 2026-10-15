@@ -4,11 +4,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import struct
+from types import SimpleNamespace
 import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -104,6 +104,30 @@ class FluxTrellisPipelineTests(unittest.TestCase):
         with patch.dict("os.environ", {"TMPDIR": "/var/tmp"}):
             with self.assertRaisesRegex(RuntimeError, "must remain under local /tmp"):
                 pipeline.run_pipeline(args)
+
+    def test_trellis_same_filesystem_probe_can_use_findmnt(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as td:
+            root = Path(td)
+            left = root / "scratch"
+            right = root / "models"
+            left.mkdir()
+            right.mkdir()
+            original_stat = Path.stat
+
+            def fake_stat(path, *args, **kwargs):
+                real = original_stat(path, *args, **kwargs)
+                if path.name == "scratch":
+                    return SimpleNamespace(st_dev=1, st_mode=real.st_mode)
+                if path.name == "models":
+                    return SimpleNamespace(st_dev=2, st_mode=real.st_mode)
+                return real
+
+            probe_result = SimpleNamespace(returncode=0, stdout="/tmp /dev/shared-device")
+            with patch.object(Path, "stat", fake_stat), \
+                 patch.object(trellis_cli.shutil, "which", return_value="/usr/bin/findmnt"), \
+                 patch.object(trellis_cli.subprocess, "run", return_value=probe_result) as run:
+                self.assertTrue(trellis_cli._same_filesystem(left, right))
+                self.assertEqual(run.call_count, 2)
 
     def test_report_and_output_names_are_run_scoped(self):
         source = (ROOT / "pipeline_flux_trellis.py").read_text(encoding="utf-8")

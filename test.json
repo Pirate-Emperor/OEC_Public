@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-15T16:26:00+05:30",
+  "last_updated": "2026-10-15T16:36:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Standalone FLUX generation passes on all three OEC runners (38613575959); standalone TRELLIS GLB export/reopen passes on Connector_1 (38602330418). The combined orchestrator branch's hosted static CI passed 56/56 tests, py_compile and 4/4 notebook checks at commit ca6a2d3a893b29767a01fe3d4f7666ba30313457 (run 38722873210). The first one-shot combined workflow run 38722963930 failed before creating any jobs because its runner selector and artifact path still used dispatch-only inputs.runner; these references have been fixed but a rerun and actual combined GPU inference remain pending. Shared output/download admission remains fail-closed; pipeline only uses cached models and /tmp outputs.",
+  "latest_summary": "Standalone FLUX run 38613575959 passed on all three OEC runners; standalone TRELLIS GLB export/reopen passed on Connector_1 run 38602330418. Static review-branch runs 38722873210 and 38723196255 each passed 56 tests, compilation and 4/4 notebook checks. Combined OEC run 38723286765 passed FLUX generation/PNG validation, TRELLIS offline cache/attention check and pipeline load, then failed before TRELLIS inference due NameError: subprocess not imported in the scratch mount probe. Artifact 11966744703 contains pipeline_report.json and the generated PNG. The run also showed the GPU admission tool accepted 100% utilization as IDLE when no compute process was visible. Current candidate fixes add subprocess import and regression coverage, require idle GPU utilization <=5%, and wait/re-sample up to 180s; hosted CI and retry pending. Quota telemetry remains unresolved; installs/downloads/managed writes remain blocked.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2444,6 +2444,141 @@
         "https://github.com/Killer4K-N/OEC/actions/runs/38722963930"
       ],
       "follow_up": "Replace every dispatch-only runner input reference with github.event.inputs.runner || 'oec-1', rerun hosted validation, and retrigger the marker. Require a real job ID before interpreting any model stage outcome."
+    },
+    {
+      "id": "TEST-2026-10-15-FLUX-TRELLIS-HARDENED-STATIC-CI-56",
+      "date": "2026-10-15",
+      "category": "hosted static/unit CI after fail-closed cache and /tmp guard updates",
+      "approach": "Run targeted TRELLIS notebook/CLI/offline-config tests, combined pipeline tests, FLUX generation/admission tests, AudioCraft static tests, storage admission tests, Python compilation and four notebook JSON/Python-cell checks.",
+      "reason": "Verify offline cache misses fail closed and combined work directories cannot be redirected to shared storage before using an A100.",
+      "parameters": {
+        "run_id": 38722873210,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38722873210",
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "commit": "ca6a2d3a893b29767a01fe3d4f7666ba30313457",
+        "runner": "GitHub-hosted ubuntu-latest",
+        "model_inference": false
+      },
+      "results": {
+        "status": "PASS",
+        "tests_passed": 56,
+        "tests_failed": 0,
+        "py_compile": "PASS",
+        "notebook_checks": "PASS_4_OF_4"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38722873210"
+      ],
+      "limitation": "Static CI only; it predates workflow runner-input correction and current source safety changes.",
+      "follow_up": "Keep this result tied to its tested SHA and re-run CI for each new source revision."
+    },
+    {
+      "id": "TEST-2026-10-15-FLUX-TRELLIS-WORKFLOW-CONTEXT-CI-56",
+      "date": "2026-10-15",
+      "category": "hosted CI after push/manual dispatch runner-input fallback correction",
+      "approach": "Repeat full static suite, compilation and notebook checks after replacing push-unsafe dispatch-only inputs.runner references with github.event.inputs.runner and oec-1 fallback.",
+      "reason": "Validate workflow wiring after first one-shot push failed before creating a job.",
+      "parameters": {
+        "run_id": 38723196255,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38723196255",
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "commit": "7a77fbc875e0425404b481f8298e956eafd6b3aa",
+        "runner": "GitHub-hosted ubuntu-latest",
+        "model_inference": false
+      },
+      "results": {
+        "status": "PASS",
+        "tests_passed": 56,
+        "tests_failed": 0,
+        "py_compile": "PASS",
+        "notebook_checks": "PASS_4_OF_4"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38723196255"
+      ],
+      "limitation": "Static run did not prove same-run model handoff.",
+      "follow_up": "Perform one combined cache-only inference job."
+    },
+    {
+      "id": "TEST-2026-10-15-OEC-COMBINED-FLUX-TRELLIS-RUN-1",
+      "date": "2026-10-15",
+      "category": "first same-run cache-only FLUX PNG to TRELLIS.2 acceptance attempt",
+      "approach": "Run serial orchestrator on one OEC runner; check models/attention, generate and validate PNG, pass the exact path to TRELLIS, then validate/reopen GLB.",
+      "reason": "Prove the missing same-run FLUX-to-TRELLIS handoff after separate standalone runs passed.",
+      "parameters": {
+        "run_id": 38723286765,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38723286765",
+        "job_id": 116382882587,
+        "artifact_id": 11966744703,
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "runner": "oec-1",
+        "environment": "phase2_3d",
+        "torch": "2.6.0+cu124",
+        "cuda": "12.4",
+        "xformers": "0.0.29.post2",
+        "flux_model": "black-forest-labs/FLUX.2-klein-4B",
+        "flux_snapshot": "e7b7dc27f91deacad38e78976d1f2b499d76a294",
+        "trellis_model": "microsoft/TRELLIS.2-4B",
+        "trellis_snapshot": "af44b45f2e35a493886929c6d786e563ec68364d",
+        "seed": 2048,
+        "steps": 4,
+        "width": 512,
+        "height": 512,
+        "attention_backend": "xformers",
+        "offline": true,
+        "installs_or_downloads": false,
+        "work_dir": "/tmp/oec-flux-trellis-38723286765-oec-1"
+      },
+      "results": {
+        "status": "FAIL_BEFORE_TRELLIS_INFERENCE",
+        "flux_check": {
+          "status": "PASS",
+          "duration_seconds": 137.173
+        },
+        "flux_generation": {
+          "status": "PASS",
+          "duration_seconds": 57.602,
+          "model_load_seconds": 26.324,
+          "generation_seconds": 20.325
+        },
+        "png_validation": {
+          "status": "PASS",
+          "bytes": 255946,
+          "width": 512,
+          "height": 512,
+          "format": "PNG",
+          "seed": 2048,
+          "sha256": "2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb"
+        },
+        "trellis_gpu_admission": {
+          "status": "PASS_BUT_POLICY_DEFECT_OBSERVED",
+          "policy": "IDLE",
+          "utilization_percent": 100,
+          "visible_compute_process_count": 0
+        },
+        "trellis_check": {
+          "status": "PASS",
+          "duration_seconds": 21.982,
+          "cache": "HIT",
+          "attention_probe": "PASS",
+          "pipeline_load": "PASS",
+          "snapshot": "af44b45f2e35a493886929c6d786e563ec68364d"
+        },
+        "trellis_inference": "NOT_STARTED",
+        "glb_export": "NOT_RUN",
+        "glb_validation": "NOT_RUN",
+        "exception": "NameError: name 'subprocess' is not defined",
+        "failure_location": "pipeline_trellis_3d.py::_same_filesystem -> mount_info -> subprocess.run",
+        "diagnosis": "Missing subprocess import in scratch-filesystem probe; independently, IDLE admission ignored utilization even when no compute process was visible."
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38723286765",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38723286765/artifacts/11966744703",
+        "https://github.com/microsoft/TRELLIS.2",
+        "https://github.com/facebookresearch/xformers/blob/main/CHANGELOG.md"
+      ],
+      "limitation": "No TRELLIS inference or GLB was produced. This is an integration failure, not a TRELLIS attention failure or successful full pipeline.",
+      "follow_up": "Add missing subprocess import and a test that executes the mount fallback; require idle GPU utilization <=5% and wait/re-sample for up to 180 seconds; run CI and retry."
     }
   ]
 }

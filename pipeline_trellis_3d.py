@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import gc
 import os
+import subprocess
 import shutil
 import sys
 import tempfile

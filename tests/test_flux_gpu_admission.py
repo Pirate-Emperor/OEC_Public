@@ -47,6 +47,11 @@ class FluxGpuAdmissionTests(unittest.TestCase):
         self.assertIsNone(selected)
         self.assertEqual(policy, "NO_ELIGIBLE_GPU")
 
+    def test_rejects_high_gpu_utilization_when_no_compute_process_is_visible(self):
+        selected, policy = select_gpu([device(0, 40000, 100, 0, True, 0)])
+        self.assertIsNone(selected)
+        self.assertEqual(policy, "NO_ELIGIBLE_GPU")
+
     def test_source_never_signals_processes(self):
         source = (ROOT / "tools" / "flux_gpu_admission.py").read_text(encoding="utf-8")
         self.assertNotIn("os.kill(", source)
