@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T01:26:19+05:30",
+  "last_updated": "2026-10-16T01:48:49+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "On 2026-10-16 Asia/Kolkata, three OEC A100 sync runs used oec-1 to populate the persistent checkout. Run 38796743755 created and validated all seven pipeline tools under OEC/tools. Run 38797010011 partially synced root entry points and correctly preserved dirty conflicts (overall failure due conflict guard). Follow-up run 38797414327 backed up and synchronized pipeline_trellis_3d.py and both TRELLIS notebooks, passed static checks, and left the dirty FLUX-only notebook and QA worker untouched. No package installs, model downloads, or new inference occurred. PR #11 remains open/unmerged.",
+  "latest_summary": "On 2026-10-16 Asia/Kolkata, the review branch was hardened for QA response validation, safe SQLite job claims/leases, video-frame extraction, and opt-in model-cache/download behavior. A new 15-test CPU-only QA suite and pre-sync gate were added. Seven earlier scratch helper-behavior checks passed, but no Actions run/check status was returned for trigger commit b257edced2d651b9913ddf72c6ace7c26db81edb. The locally dirty A100 QA worker was not overwritten; helper synchronization and GPU/model runtime remain unverified. PR #11 remains open and unmerged.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2619,6 +2619,45 @@
         "https://github.com/Killer4K-N/OEC/actions/runs/38796743755"
       ],
       "follow_up": "Review the still-dirty FLUX-only notebook and QA worker before updating them; then perform cache-only GPU smoke checks when idle hardware and required cached models/dependencies are confirmed."
+    },
+    {
+      "id": "TEST-2026-10-16-OEC-QA-VALIDATION-LEASES",
+      "date": "2026-10-16",
+      "category": "QA worker response validation, concurrency, cache safety, and video-frame handling",
+      "approach": "Added a pure-Python QA helper for validating VLM response fields, atomically claiming queue rows, recording worker leases, and recovering only expired timestamped leases. Updated the review-branch QA worker to fail closed on malformed model output, record failures instead of treating parser errors as content violations, extract validated frames to unique paths using probed video duration, default to retaining model cache, require explicit model-download opt-in and fresh storage admission, and validate normalized-video/sidecar writes. Added 15 CPU-only regression tests and a pre-sync workflow gate.",
+      "reason": "The earlier QA worker could accept malformed model output, classify schema errors as content violations, let multiple workers race over the same queue item, reset live processing rows, and mishandle frame paths for non-MP4 videos. Missing QA dependencies could also lead to unintended CPU loading or cache downloads/purge.",
+      "parameters": {
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "source_commit": "b257edced2d651b9913ddf72c6ace7c26db81edb",
+        "runner_for_regression_gate": "oec-1 (intended; result not returned)",
+        "live_root": "/nlsasfs/home/lmedge/rahkus/OEC",
+        "test_suite": "tests/test_qa_checks.py",
+        "test_count": 15,
+        "model_loading_in_tests": false,
+        "production_queue_used": false,
+        "model_download": false,
+        "inference": false
+      },
+      "results": {
+        "status": "SOURCE_HARDENED_CI_AND_LIVE_DEPLOYMENT_UNVERIFIED",
+        "scratch_helper_logic_checks": "PASS (7 behavior checks against a temporary local helper copy; not the complete branch suite)",
+        "branch_test_suite": "NOT_VERIFIED",
+        "action_status": "NO_RUN_OR_CHECK_STATUS_RETURNED_FOR_LATEST_TRIGGER_COMMIT",
+        "helper_sync_to_a100": "NOT_VERIFIED",
+        "live_qa_worker": "DIRTY_CONFLICT_PRESERVED_NOT_OVERWRITTEN",
+        "real_qa_model_runtime": "NOT_RUN",
+        "production_queue_or_media": "NOT_TOUCHED",
+        "storage_reserve": "NOT_ACCESSED"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tools/qa_checks.py",
+        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tests/test_qa_checks.py",
+        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/qa_compliance_worker.py",
+        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/.github/workflows/sync-a100-pipeline-tools.yml",
+        "https://github.com/Killer4K-N/OEC/commit/b257edced2d651b9913ddf72c6ace7c26db81edb",
+        "https://github.com/Killer4K-N/OEC/pull/11"
+      ],
+      "follow_up": "Verify the actual oec-1 workflow logs and helper hash. Reconcile the dirty live QA worker without overwriting it, then run isolated cache-only QA tests. Add multi-frame video evaluation and rejection audit retention before full QA acceptance."
     }
   ]
 }
