@@ -50,6 +50,28 @@ jobs:
           BACKUP_ROOT="${OEC_SYNC_BACKUP_ROOT:-$HOME/.local/state/oec-live-sync-backups}/$GITHUB_RUN_ID"
           umask 077
           mkdir -p "$BACKUP_ROOT"
+          # Required snapshot is taken before any notebook/entry-point synchronization.
+          python3 - "$LIVE_ROOT" "$BACKUP_ROOT" <<'PY'
+          from pathlib import Path
+          import hashlib, shutil, sys
+          root, backup_root = Path(sys.argv[1]), Path(sys.argv[2])
+          source = root / "requirements.txt"
+          if not source.is_file():
+              print("A100_TOOL_SYNC_REQUIREMENTS_TXT=ABSENT path=" + str(source))
+          else:
+              destination = backup_root / "requirements.txt"
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              if destination.exists():
+                  raise SystemExit("Refusing to overwrite existing requirements backup: " + str(destination))
+              original = source.read_bytes()
+              shutil.copy2(source, destination)
+              copied = destination.read_bytes()
+              if copied != original:
+                  raise SystemExit("requirements.txt backup verification failed")
+              digest = hashlib.sha256(original).hexdigest()
+              print(f"A100_TOOL_SYNC_REQUIREMENTS_TXT_BACKUP=PASS path={destination} bytes={len(original)} sha256={digest}")
+          PY
+
           files=(
             tools/flux_gpu_admission.py
             tools/ltx_worker_config.py
@@ -58,6 +80,15 @@ jobs:
             tools/oec_service_manager.py
             tools/trellis2_pipeline.json
             tools/trellis_offline.py
+            pipeline_flux_image.py
+            pipeline_flux_trellis.py
+            pipeline_trellis_3d.py
+            pipeline_flux_only.ipynb
+            pipeline_trellis_3d.ipynb
+            pipeline_trellis_3d_only.ipynb
+            worker_ltx_video.py
+            qa_compliance_worker.py
+            docs/background-pipelines.md
           )
           created=0
           updated=0
@@ -103,13 +134,18 @@ jobs:
           python_files = [
               'tools/flux_gpu_admission.py', 'tools/ltx_worker_config.py',
               'tools/oec_runner_probe.py', 'tools/oec_service_manager.py',
-              'tools/trellis_offline.py',
+              'tools/trellis_offline.py', 'pipeline_flux_image.py',
+              'pipeline_flux_trellis.py', 'pipeline_trellis_3d.py',
+              'worker_ltx_video.py', 'qa_compliance_worker.py',
           ]
           for relative in python_files:
               ast.parse((root / relative).read_text(encoding='utf-8'), filename=relative)
           for relative in ['tools/oec_cluster_services.example.json', 'tools/trellis2_pipeline.json']:
               json.loads((root / relative).read_text(encoding='utf-8'))
-          print('A100_TOOL_SYNC_STATIC_VALIDATION=PASS python_files=5 json_files=2')
+          notebooks = ['pipeline_flux_only.ipynb', 'pipeline_trellis_3d.ipynb', 'pipeline_trellis_3d_only.ipynb']
+          for relative in notebooks:
+              json.loads((root / relative).read_text(encoding='utf-8'))
+          print('A100_TOOL_SYNC_STATIC_VALIDATION=PASS python_files=10 json_files=2 notebooks=3')
           PY
           python3 "$LIVE_ROOT/tools/oec_service_manager.py" --help >/dev/null
           echo 'A100_TOOL_SYNC_SERVICE_MANAGER_HELP=PASS'
