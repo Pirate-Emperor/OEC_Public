@@ -367,3 +367,13 @@ The FLUX notebook final cell is now runtime-verified in the exact-cell harness. 
 - [Static regressions after source-path correction](https://github.com/Killer4K-N/OEC/actions/runs/38906566860)
 - [Guarded A100 sync and FLUX smoke](https://github.com/Killer4K-N/OEC/actions/runs/38906567047)
 - [Corrected exact-cell acceptance, in progress](https://github.com/Killer4K-N/OEC/actions/runs/38906567419)
+
+
+## 2026-10-16 — TRELLIS notebook client-upload validation fix
+
+The source-checkout issue was fixed and synchronized; the subsequent exact-cell run [38906567419](https://github.com/Killer4K-N/OEC/actions/runs/38906567419) reached the TRELLIS-only Gradio API successfully:
+- The Trellis final-cell child loaded without the prior ModuleNotFoundError: trellis2.
+- Gradio loopback health returned HTTP 200 at port 23419.
+- The test request was rejected before inference by Gradio's input validator because the harness passed the bare local PNG path as a string where the installed client schema expects an ImageData / uploaded-file payload. Exact report: AppError: 1 validation error for ImageData; artifact [12049150146](https://github.com/Killer4K-N/OEC/actions/runs/38906567419/artifacts/12049150146). This is test-harness argument serialization, not evidence that TRELLIS inference failed; however this request did not generate or validate a new GLB, so that acceptance remains open.
+- Corrected in review commit [f3e1942](https://github.com/Killer4K-N/OEC/commit/f3e1942bff4e6e492d2bf30417a4f5a6abc18d84): the harness now calls client.predict(handle_file(path), 100000, api_name="/generate_3d"), following the official [Gradio Python Client file-input documentation](https://gradio.app/docs/python-client/version-1-release). Added regression assertions for this wrapper; no notebook model code or storage policy was weakened.
+- Latest hosted regression [38907508496](https://github.com/Killer4K-N/OEC/actions/runs/38907508496) passed. The new exact-cell live run [38907508493](https://github.com/Killer4K-N/OEC/actions/runs/38907508493) is in progress on oec-1. Await its actual GLB geometry and combined notebook startup evidence before closing Trellis acceptance.

@@ -311,3 +311,10 @@ Source remains on review PR [#11](https://github.com/Killer4K-N/OEC/pull/11); do
 - [ ] **IN PROGRESS — exact notebook final-cell retest:** [run 38906567419](https://github.com/Killer4K-N/OEC/actions/runs/38906567419). Must pass TRELLIS-only `/generate_3d` and GLB geometry reopen, plus combined notebook themed Gradio startup. Don't mark TRELLIS cells accepted without the exact-run logs/artifact.
 
 The source remains on review PR [#11](https://github.com/Killer4K-N/OEC/pull/11); do not merge to `main`.
+
+
+### Latest exact-cell follow-up
+
+- [x] Source checkout is now resolved from the actual TRELLIS notebook final cell and its UI reaches HTTP 200 in the live exact-cell test.
+- [x] Fixed the test harness /generate_3d argument serialization: use the official gradio_client.handle_file(...) helper for the local image instead of a bare string. Static tests passed in [run 38907508496](https://github.com/Killer4K-N/OEC/actions/runs/38907508496).
+- [ ] IN PROGRESS — retest with file payload: [run 38907508493](https://github.com/Killer4K-N/OEC/actions/runs/38907508493). Require an actual generated GLB, successful independent geometry reopen, and combined notebook themed UI start before marking Trellis Jupyter acceptance complete.

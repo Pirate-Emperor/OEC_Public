@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T18:50:00+05:30",
+  "last_updated": "2026-10-16T18:54:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Review branch commit 441049f adds a read-only TRELLIS source-checkout resolver before the package import in both Trellis notebook final cells. Latest static run 38906566860 passed 108 tests and four notebook JSON checks. Guarded sync 38906567047 safely updated both Trellis notebooks on oec-1 (2 updated, 14 unchanged, 2 unrelated dirty conflicts preserved) and its post-sync FLUX smoke passed with artifact 12047654363. Exact final-cell run 38905014913 proved the FLUX notebook final cell and valid PNG/sidecar (artifact 12048435966) but then failed the Trellis-only cell with ModuleNotFoundError: trellis2. That source-path issue is patched and synced; exact-cell retest 38906567419 remains in progress to verify TRELLIS-only /generate_3d, GLB geometry reopen, and combined themed Gradio startup. main unchanged.",
+  "latest_summary": "Review branch commit 441049f fixes missing TRELLIS source path in both notebook final cells; static 108-test run 38906566860 passed and guarded sync 38906567047 backed up/synced both notebooks, preserving unrelated dirty files. Exact-cell run 38905014913 fully passed the FLUX final cell with a valid 512x512 PNG/sidecar but then failed the Trellis source-path check. After that fix, run 38906567419 showed TRELLIS Gradio HTTP 200 but the harness supplied a raw image path and was rejected by ImageData validation before inference; artifact 12049150146. Harness commit f3e1942 wraps this local file with gradio_client.handle_file; static suite run 38907508496 passed. Exact-cell retest 38907508493 is in progress to validate real /generate_3d, GLB geometry reopen, and combined themed UI. main unchanged.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -3139,11 +3139,20 @@
         "path_fix": "Both TRELLIS final cells now resolve SYSTEM_DIRS['models']/TRELLIS.2, check trellis2/pipelines, then add that existing root to sys.path; fail with setup instructions when absent",
         "corrected_sync_run": 38906567047,
         "corrected_notebook_cell_run": 38906567419,
-        "corrected_notebook_cell_status": "IN_PROGRESS_AT_RECORD_TIME"
+        "corrected_notebook_cell_status": "IN_PROGRESS_AT_RECORD_TIME",
+        "handle_file_fix_commit": "f3e1942bff4e6e492d2bf30417a4f5a6abc18d84",
+        "gradio_client_api_failure_run": 38906567419,
+        "gradio_client_api_failure_job": 116991500341,
+        "gradio_client_api_failure_artifact": 12049150146,
+        "gradio_client_api_failure": "AppError: 1 validation error for ImageData; test passed a raw local image path where gradio_client expects handle_file(path)",
+        "client_fix": "from gradio_client import Client, handle_file; client.predict(handle_file(str(input_image_path)), 100000, api_name=\"/generate_3d\")",
+        "handle_file_fix_static_run": 38907508496,
+        "corrected_exact_cell_run": 38907508493,
+        "corrected_exact_cell_status": "IN_PROGRESS_AT_RECORD_TIME"
       },
       "expected": "FLUX final cell starts Gradio and /generate returns a valid 512x512 PNG+sidecar; TRELLIS-only final cell starts and /generate_3d returns a valid GLB with nonempty geometry after reopen; combined notebook themed TRELLIS UI starts and returns HTTP 200; artifacts contain reports/logs/validated outputs.",
       "results": {
-        "status": "FLUX_EXACT_CELL_PASS_TRELLIS_SOURCE_PATH_FIX_SYNCED_EXACT_CELL_RETEST_IN_PROGRESS",
+        "status": "FLUX_EXACT_CELL_PASS_TRELLIS_HTTP_PASS_API_HARNESS_PAYLOAD_FIX_LIVE_RETEST_IN_PROGRESS",
         "first_attempt_status": "FAIL",
         "failure_scope": "Harness output-path lookup after API call; output validation not completed",
         "hosted_regression_run": 38905014952,
@@ -3168,7 +3177,11 @@
         "actual_combined_trellis_cell": "PENDING; newest exact run 38906567419",
         "main_modified": false,
         "corrected_source_static_tests": 108,
-        "source_sync": "PASS; run 38906567047; 2 Trellis notebooks updated, 14 unchanged, 2 unrelated dirty paths preserved"
+        "source_sync": "PASS; run 38906567047; 2 Trellis notebooks updated, 14 unchanged, 2 unrelated dirty paths preserved",
+        "trellis_only_http": 200,
+        "trellis_only_generate_request": "REJECTED_BY_CLIENT_SCHEMA_BEFORE_MODEL_INFERENCE; raw path was not wrapped as handle_file",
+        "trellis_only_glb_geometry": "NOT_PRODUCED_IN_RUN_38906567419",
+        "corrected_exact_cell_run": "38907508493"
       },
       "supporting_urls": [
         "https://github.com/Killer4K-N/OEC/actions/runs/38905014952",
@@ -3177,7 +3190,7 @@
         "https://github.com/Killer4K-N/OEC/actions/runs/38905014913",
         "https://gradio.app/guides/gradio-6-migration-guide"
       ],
-      "follow_up": "Inspect run 38906567419 and its exact-run artifact. Require successful TRELLIS-only /generate_3d + geometry reopen and combined notebook themed UI startup; if either fails, record exact traceback and correct only that path before acceptance."
+      "follow_up": "Inspect run 38907508493 and its artifact. Confirm handle_file payload reaches TRELLIS inference, produces and independently reopens a non-empty GLB, and combined notebook themed UI startup passes. No pass should be inferred from HTTP 200 alone."
     }
   ]
 }
