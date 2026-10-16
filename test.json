@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T18:38:00+05:30",
+  "last_updated": "2026-10-16T18:50:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Review branch eb63fbb hardened the actual Jupyter final UI cells with model-load/launch diagnostics, reentrant Gradio launch and an A100 harness for FLUX /generate, TRELLIS /generate_3d + GLB geometry reopen, and combined notebook themed UI startup. Hosted regression 38905014952 passed 107 tests plus four notebook JSON checks. Standalone CLI TRELLIS runtime 38902874800 passed real cache-only generation/export/reopen (52,640 vertices, 97,897 faces) and Gradio HTTP 200. Guarded sync 38904725642 backed up and synced all three notebooks, preserving two unrelated conflicts; cached FLUX /generate passed with a valid 512x512 PNG/sidecar in artifact 12047507280. The first exact-cell attempt 38904725697 failed on the harness parent reading a child-only FLUX scratch environment variable; corrected code in eb63fbb derives the same path from run_root. Corrected exact-cell run 38905014913 is queued and must pass before claiming Jupyter final-cell acceptance. main unchanged.",
+  "latest_summary": "Review branch commit 441049f adds a read-only TRELLIS source-checkout resolver before the package import in both Trellis notebook final cells. Latest static run 38906566860 passed 108 tests and four notebook JSON checks. Guarded sync 38906567047 safely updated both Trellis notebooks on oec-1 (2 updated, 14 unchanged, 2 unrelated dirty conflicts preserved) and its post-sync FLUX smoke passed with artifact 12047654363. Exact final-cell run 38905014913 proved the FLUX notebook final cell and valid PNG/sidecar (artifact 12048435966) but then failed the Trellis-only cell with ModuleNotFoundError: trellis2. That source-path issue is patched and synced; exact-cell retest 38906567419 remains in progress to verify TRELLIS-only /generate_3d, GLB geometry reopen, and combined themed Gradio startup. main unchanged.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2938,7 +2938,7 @@
       "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38896204476",
       "expected": "New launch/file-serving regression passes; existing configured static suites, Python compilation and all four notebook JSON checks pass; no runtime status inferred.",
       "results": {
-        "status": "STATIC_PASS_AND_STANDALONE_CLI_RUNTIME_PASS; EXACT_NOTEBOOK_CELL_PENDING",
+        "status": "STATIC_PASS_CLI_RUNTIME_PASS_FLUX_EXACT_CELL_PASS_TRELLIS_NOTEBOOK_PATH_FIX_SYNCED_FINAL_CELL_RETEST_PENDING",
         "conclusion": "success",
         "tests_by_suite": {
           "qa": 15,
@@ -2983,7 +2983,10 @@
           "artifact_id": 12046639503,
           "artifact_url": "https://github.com/Killer4K-N/OEC/actions/runs/38902874800/artifacts/12046639503"
         },
-        "trellis_notebook_exact_cell": "PENDING; corrected live workflow 38905014913 queued"
+        "trellis_notebook_exact_cell": "PENDING; corrected live workflow 38905014913 queued",
+        "notebook_import_failure": "Prior exact-cell run 38905014913 failed at Trellis import because a clean child did not inherit setup-cell sys.path; source fix 441049f adds the existing source checkout before import without install/download.",
+        "notebook_path_fix_sync_run": 38906567047,
+        "notebook_path_fix_retest_run": 38906567419
       },
       "supporting_urls": [
         "https://github.com/Killer4K-N/OEC/commit/f10f2660193751351705b5fd601b0947a2e8e045",
@@ -2993,7 +2996,7 @@
         "https://github.com/Killer4K-N/OEC/actions/runs/38859218039",
         "https://github.com/Killer4K-N/OEC/actions/runs/38859218039/artifacts/12028935755"
       ],
-      "follow_up": "Inspect the corrected exact notebook final-cell run 38905014913 and artifact. Require FLUX PNG/sidecar validation, TRELLIS notebook /generate_3d GLB geometry reopen, and the combined notebook's theme-configured Gradio startup. Standalone CLI success is not a replacement for exact notebook cell acceptance."
+      "follow_up": "Treat CLI Trellis PASS and FLUX notebook exact-cell PASS as distinct evidence; close the Trellis notebook criterion only after run 38906567419 proves its own GLB generation/geometry and combined UI launch."
     },
     {
       "id": "TEST-2026-10-16-OEC-A100-SYNC-TRELLIS-AND-FLUX-LIVE-RETEST",
@@ -3127,11 +3130,20 @@
           "trellis-combined"
         ],
         "intended_env": "oec-1 / phase2_3d",
-        "offline_cache_only": true
+        "offline_cache_only": true,
+        "source_path_fix_commit": "441049f23d5ce946d99c346f2c932228e296cd44",
+        "failed_attempt_run": 38905014913,
+        "failed_attempt_job": 116986281689,
+        "failed_attempt_error": "ModuleNotFoundError: No module named 'trellis2' in TRELLIS-only notebook final cell after FLUX final cell passed",
+        "failed_attempt_artifact_id": 12048435966,
+        "path_fix": "Both TRELLIS final cells now resolve SYSTEM_DIRS['models']/TRELLIS.2, check trellis2/pipelines, then add that existing root to sys.path; fail with setup instructions when absent",
+        "corrected_sync_run": 38906567047,
+        "corrected_notebook_cell_run": 38906567419,
+        "corrected_notebook_cell_status": "IN_PROGRESS_AT_RECORD_TIME"
       },
       "expected": "FLUX final cell starts Gradio and /generate returns a valid 512x512 PNG+sidecar; TRELLIS-only final cell starts and /generate_3d returns a valid GLB with nonempty geometry after reopen; combined notebook themed TRELLIS UI starts and returns HTTP 200; artifacts contain reports/logs/validated outputs.",
       "results": {
-        "status": "IN_PROGRESS_CORRECTED_ATTEMPT_QUEUED",
+        "status": "FLUX_EXACT_CELL_PASS_TRELLIS_SOURCE_PATH_FIX_SYNCED_EXACT_CELL_RETEST_IN_PROGRESS",
         "first_attempt_status": "FAIL",
         "failure_scope": "Harness output-path lookup after API call; output validation not completed",
         "hosted_regression_run": 38905014952,
@@ -3139,10 +3151,24 @@
         "static_test": "PASS",
         "json_checks": "PASS for four notebooks",
         "source_synchronized_on_oec_1": "PASS via run 38904725642",
-        "actual_flux_notebook_cell": "PENDING_ACCEPTANCE",
-        "actual_trellis_only_notebook_cell": "PENDING_ACCEPTANCE",
-        "actual_combined_trellis_cell": "PENDING_ACCEPTANCE",
-        "main_modified": false
+        "actual_flux_notebook_cell": {
+          "status": "PASS",
+          "run_id": 38905014913,
+          "http": 200,
+          "api": "/generate",
+          "png_bytes": 196376,
+          "width": 512,
+          "height": 512,
+          "seed": 2048,
+          "steps": 4,
+          "generation_seconds": 1.198,
+          "artifact_id": 12048435966
+        },
+        "actual_trellis_only_notebook_cell": "FAILED_ON_PRIOR_RUN; sys.path fix commit 441049f synced; new exact run 38906567419 pending",
+        "actual_combined_trellis_cell": "PENDING; newest exact run 38906567419",
+        "main_modified": false,
+        "corrected_source_static_tests": 108,
+        "source_sync": "PASS; run 38906567047; 2 Trellis notebooks updated, 14 unchanged, 2 unrelated dirty paths preserved"
       },
       "supporting_urls": [
         "https://github.com/Killer4K-N/OEC/actions/runs/38905014952",
@@ -3151,7 +3177,7 @@
         "https://github.com/Killer4K-N/OEC/actions/runs/38905014913",
         "https://gradio.app/guides/gradio-6-migration-guide"
       ],
-      "follow_up": "Inspect corrected exact-cell run 38905014913 and its artifact. Fix any real callback/final-cell errors, record actual output evidence, and only mark the notebook paths accepted when all three modes pass."
+      "follow_up": "Inspect run 38906567419 and its exact-run artifact. Require successful TRELLIS-only /generate_3d + geometry reopen and combined notebook themed UI startup; if either fails, record exact traceback and correct only that path before acceptance."
     }
   ]
 }

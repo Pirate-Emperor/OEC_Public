@@ -300,3 +300,14 @@ Current reviewed source is on [PR #11](https://github.com/Killer4K-N/OEC/pull/11
 - [ ] OPEN — actual user-browser session: the A100 harness executes exact final cell source in clean child/kernel-like processes, not the user's already-running browser/kernel session. If that session still errors after server-side acceptance, inspect its exact current traceback separately.
 
 Source remains on review PR [#11](https://github.com/Killer4K-N/OEC/pull/11); don't merge into main.
+
+
+## 2026-10-16 — Latest exact-cell status after TRELLIS import-path correction
+
+- [x] **FLUX notebook final cell PASS in a clean kernel-like process:** run [38905014913](https://github.com/Killer4K-N/OEC/actions/runs/38905014913) returned Gradio HTTP 200, actual `/generate`, and a validated 512×512 PNG + metadata sidecar (196,376 bytes; seed 2048; four steps).
+- [x] **Diagnosed prior TRELLIS final-cell failure:** the isolated child did not inherit the setup cell's `sys.path` entry, so `from trellis2.pipelines ...` raised `ModuleNotFoundError`. This was distinct from the standalone CLI runtime, which already passed real GLB generation/export/reopen on the A100.
+- [x] **Read-only source path fix synced:** commit [441049f](https://github.com/Killer4K-N/OEC/commit/441049f23d5ce946d99c346f2c932228e296cd44) makes both TRELLIS final cells validate and add the existing `SYSTEM_DIRS["models"]/TRELLIS.2` checkout before the import; no clone/install/download.
+- [x] Static gate [38906566860](https://github.com/Killer4K-N/OEC/actions/runs/38906566860) passed 108 configured tests and four notebook JSON checks; A100 sync [38906567047](https://github.com/Killer4K-N/OEC/actions/runs/38906567047) updated both TRELLIS notebooks after verified backups (2 updated, 14 unchanged, 2 unrelated conflicts preserved) and passed another live FLUX generation. Artifact [12047654363](https://github.com/Killer4K-N/OEC/actions/runs/38906567047/artifacts/12047654363).
+- [ ] **IN PROGRESS — exact notebook final-cell retest:** [run 38906567419](https://github.com/Killer4K-N/OEC/actions/runs/38906567419). Must pass TRELLIS-only `/generate_3d` and GLB geometry reopen, plus combined notebook themed Gradio startup. Don't mark TRELLIS cells accepted without the exact-run logs/artifact.
+
+The source remains on review PR [#11](https://github.com/Killer4K-N/OEC/pull/11); do not merge to `main`.

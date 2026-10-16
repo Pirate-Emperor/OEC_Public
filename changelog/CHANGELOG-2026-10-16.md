@@ -337,3 +337,33 @@ Rechecked run [38897009792](https://github.com/Killer4K-N/OEC/actions/runs/38897
 - Guarded notebook sync + FLUX test: https://github.com/Killer4K-N/OEC/actions/runs/38904725642
 - Exact notebook final-cell test, first attempt: https://github.com/Killer4K-N/OEC/actions/runs/38904725697
 - Exact notebook final-cell test with corrected harness, queued: https://github.com/Killer4K-N/OEC/actions/runs/38905014913
+
+
+## 2026-10-16 — TRELLIS notebook source-path correction and renewed final-cell acceptance
+
+### What the latest exact-cell run proved
+
+- [Exact-cell run 38905014913](https://github.com/Killer4K-N/OEC/actions/runs/38905014913), job [116986281689](https://github.com/Killer4K-N/OEC/actions/runs/38905014913/job/116986281689), executed on `oec-1` / `scn30-mn` / `phase2_3d` / A100 GPU 0.
+- **FLUX final cell PASS** in that same notebook-specific workflow: local Gradio returned HTTP 200 at port 17864; the actual `/generate` endpoint returned four expected values; output validation passed for a 512×512 RGB PNG of 196,376 bytes and its metadata sidecar (seed 2048, four steps, 1.198 s generation call). The exact notebook-cell report recorded `status=PASS`.
+- **TRELLIS-only final cell FAIL** at `from trellis2.pipelines import Trellis2ImageTo3DPipeline`, with `ModuleNotFoundError: No module named 'trellis2'`. The test harness uses a fresh child process to execute the exact last cell; unlike a live Jupyter kernel that has previously executed the TRELLIS setup cell, that fresh process had not inherited the setup cell's `sys.path` modification. This exposed a genuine missing robustness guard for running or re-running the last cell after a kernel/session reset, not a model cache miss or a CUDA-attention error. Artifact [12048435966](https://github.com/Killer4K-N/OEC/actions/runs/38905014913/artifacts/12048435966) preserves the exact failed run's evidence.
+- The earlier standalone CLI runtime is independently green: [run 38902874800](https://github.com/Killer4K-N/OEC/actions/runs/38902874800) loaded cached TRELLIS, generated/exported a GLB, reopened its geometry (52,640 vertices / 97,897 faces), and reached Gradio HTTP 200 after 141 seconds. Artifact [12046639503](https://github.com/Killer4K-N/OEC/actions/runs/38902874800/artifacts/12046639503). This confirms the installed model/API path but does not overrule the exact notebook failure above.
+
+### Source correction now synchronized for retest
+
+- Candidate commit [441049f23d5ce946d99c346f2c932228e296cd44](https://github.com/Killer4K-N/OEC/commit/441049f23d5ce946d99c346f2c932228e296cd44) adds a read-only checkout resolver in the TRELLIS-only and combined notebook final cells. Before importing `trellis2`, the cell checks `SYSTEM_DIRS["models"]/TRELLIS.2/trellis2/pipelines` exists; if so it adds that existing source checkout to `sys.path`, and if not it raises an actionable message telling the user to run the approved setup cell. It does not clone, install or download anything.
+- Candidate regression [run 38906566860](https://github.com/Killer4K-N/OEC/actions/runs/38906566860) passed 108 configured tests (including the new path-resolution regression) and notebook JSON checks for all four notebooks.
+- Guarded live sync [run 38906567047](https://github.com/Killer4K-N/OEC/actions/runs/38906567047), job [116991498534](https://github.com/Killer4K-N/OEC/actions/runs/38906567047/job/116991498534), completed successfully on `oec-1`. It backup-verified and updated the two changed TRELLIS notebook files; the FLUX notebook was unchanged. Backup root: `/nlsasfs/home/lmedge/rahkus/.local/state/oec-live-sync-backups/38906567047`. Post-sync live FLUX smoke again passed HTTP 200, `/generate`, and PNG/sidecar validation. Artifact [12047654363](https://github.com/Killer4K-N/OEC/actions/runs/38906567047/artifacts/12047654363). Sync stats: two updated, 14 unchanged, two unrelated dirty paths preserved.
+- Corrected exact notebook acceptance run [38906567419](https://github.com/Killer4K-N/OEC/actions/runs/38906567419) is in progress on `oec-1`. It will retest FLUX, run TRELLIS-only `/generate_3d` and reopen the exported GLB, then start the combined notebook's theme-configured TRELLIS UI. No result is claimed until logs and artifact are available.
+
+### Current conclusion and remaining gate
+
+The FLUX notebook final cell is now runtime-verified in the exact-cell harness. The TRELLIS notebook import-path failure has a targeted, read-only fix and that source fix has reached the live checkout. The remaining acceptance criterion is the newest exact-cell run: TRELLIS-only generation + geometry reopen and combined notebook themed UI startup must pass before declaring the two Trellis final cells accepted. No package installation, model download, shared output write, cache purge, reserve-file access, QA mutation or unrelated-process termination occurred. `main` remains unchanged.
+
+### References
+
+- [Gradio 6 migration guide](https://gradio.app/guides/gradio-6-migration-guide)
+- [TRELLIS notebook/CLI review branch](https://github.com/Killer4K-N/OEC/tree/441049f23d5ce946d99c346f2c932228e296cd44)
+- [Exact notebook final-cell result with FLUX PASS / TRELLIS import failure](https://github.com/Killer4K-N/OEC/actions/runs/38905014913)
+- [Static regressions after source-path correction](https://github.com/Killer4K-N/OEC/actions/runs/38906566860)
+- [Guarded A100 sync and FLUX smoke](https://github.com/Killer4K-N/OEC/actions/runs/38906567047)
+- [Corrected exact-cell acceptance, in progress](https://github.com/Killer4K-N/OEC/actions/runs/38906567419)
