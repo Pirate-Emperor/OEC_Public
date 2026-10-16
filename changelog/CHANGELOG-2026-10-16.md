@@ -216,3 +216,20 @@ Only mark the FLUX notebook fully working after the queued run confirms localhos
 - [Smoke workflow](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/.github/workflows/sync-a100-pipeline-tools.yml)
 - [Hosted regression](https://github.com/Killer4K-N/OEC/actions/runs/38859218054)
 - [Latest queued live test](https://github.com/Killer4K-N/OEC/actions/runs/38859218039)
+
+
+## Final FLUX-only Jupyter / Gradio verification — PASS
+
+[Live A100 run 38859218039](https://github.com/Killer4K-N/OEC/actions/runs/38859218039) completed successfully on runner oec-1, host scn30-mn, physical GPU 0 (NVIDIA A100-SXM4-40GB). The corrected files were synchronized only after the phase2_3d Python compile and QA/TRELLIS/FLUX/storage regression gate passed. The live sync backed up and hash-verified pipeline_flux_image.py and pipeline_flux_only.ipynb before updating them; core_config.py had already been backed up, hash-verified and synchronized in the prior pass. Unrelated dirty paths, including qa_compliance_worker.py, remain protected.
+
+The exact-run smoke established:
+- Runtime PASS: PyTorch 2.6.0+cu124, CUDA 12.4, diffusers 0.37.0, huggingface-hub 0.36.0, transformers 4.56.1; the FLUX model was a local cache hit. Model pipeline loaded in 12.112 seconds.
+- Local proxy bypass PASS for localhost, 127.0.0.1 and ::1.
+- Gradio HTTP PASS with status 200 on the local test port 17864.
+- Actual Gradio /generate API PASS; the client received all four expected response values.
+- PNG and metadata PASS: 512×512 RGB PNG, 196,376 bytes, seed 2048, 4 inference steps, output_mode=local_scratch_only. Generation metadata reports 1.145 seconds for the final request.
+- Artifact PASS: [workflow artifact 12028935755](https://github.com/Killer4K-N/OEC/actions/runs/38859218039#artifacts) includes the smoke report, PNG and metadata JSON. I downloaded the exact ZIP and independently opened/verified the PNG and read the JSON/summary; the artifact contains three files.
+
+The final hosted regression [run 38859218054](https://github.com/Killer4K-N/OEC/actions/runs/38859218054) also passed. Its configured suites total 104 tests, and all four notebook JSON checks, Python compilation and CLI help checks passed. This closes the FLUX-only notebook's live Gradio acceptance gate on this exact A100 environment and branch revision.
+
+The test was cache-only: no model download, package installation, shared-output write, broad reset/clean, cache purge, or storage-reserve access occurred. Generated test output was under local /tmp and uploaded as a workflow artifact. Source changes remain on review branch `fix/flux-trellis-pipeline-20261015`; PR #11 is still open and main remains unchanged.
