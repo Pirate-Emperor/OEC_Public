@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-16 02:02 IST (Asia/Kolkata)
+**Last updated:** 2026-10-16 11:23 IST (Asia/Kolkata)
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 
 
@@ -219,3 +219,16 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - [ ] **Regression result not verified:** no new Actions status or run evidence was returned for the trigger commit [`647d762`](https://github.com/Killer4K-N/OEC/commit/647d7627dca9c8c6b8816b6f5cd3c2f7f4dd0b23). Do not call the suite passed without the job logs.
 - [ ] **Live sync not verified:** verify the A100 notebook contains `AIEROS_TRELLIS_UI_OUTPUT_MODE` and the new setup helper before restarting/rerunning the notebook.
 - [ ] After sync and static tests pass, run a cache-only notebook smoke test: cached TRELLIS model load, launch Gradio on port 7862, generate one GLB to validated `/tmp`, and reopen/validate the GLB. No model download or shared-storage write should be attempted without fresh quota telemetry.
+
+
+## 2026-10-16 11:23 IST — FLUX-only notebook final-cell repair
+
+- [x] Found that the final Gradio cell launched a UI whose Generate callback used shared outputs/images by default; this required fresh quota telemetry and could fail with cached weights.
+- [x] Made FLUX Gradio default to validated local /tmp scratch output with a different-filesystem check, 512 MiB headroom minimum, no-overwrite behavior, and an explicit shared-output opt-in.
+- [x] Updated the FLUX notebook final active cell to pass scratch/shared mode and cache location, and to emit FLUX_GRADIO_LAUNCH=FAIL with port/mode/exception details on launch errors.
+- [x] Added a stable /generate API route and eight FLUX-specific regression tests.
+- [x] Hosted regression [run 38857928846](https://github.com/Killer4K-N/OEC/actions/runs/38857928846) passed all 104 configured tests, notebook JSON checks, compilation, and CLI help checks.
+- [ ] Live verification pending: A100 sync/Gradio [run 38857928677](https://github.com/Killer4K-N/OEC/actions/runs/38857928677) remains queued without a runner assignment. The live notebook/helper sync, GPU model load, Gradio HTTP health and actual /generate request are not yet verified.
+- [ ] After run 38857928677 completes, inspect the job logs and artifact. Require FLUX_GRADIO_SMOKE=PASS, a valid 512×512 PNG and JSON sidecar before calling the FLUX Jupyter UI working.
+- [ ] If the A100 job remains queued or fails GPU/cache admission, report the actual blocker; do not claim a runtime pass based on hosted static CI.
+
