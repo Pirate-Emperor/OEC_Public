@@ -1,10 +1,15 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-15 20:29 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-16T21:15:20.823+05:30 (Asia/Kolkata)
 **Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
 ## Current status
+
+**Latest notebook acceptance (16 October 2026):** OEC run [38912593770](https://github.com/Killer4K-N/OEC/actions/runs/38912593770) on review branch \`fix/flux-trellis-pipeline-20261015\` passed FLUX-only generation, TRELLIS-only GLB generation, combined-notebook FLUX generation and combined TRELLIS UI startup. The standalone TRELLIS GLB was 5,457,384 bytes (SHA-256 \`7db7600e9dd9de6c1549eaf06f08cd687a55e8d62465754b426c521501ed9183\`), with 51,658 vertices and 97,935 faces in 337.646 s. The combined notebook's TRELLIS check was startup-only; no end-to-end combined image-to-mesh transaction was tested. All four modes were cache-only and used local scratch; code changes remain on the development branch and have not been merged into main.
+
+**Frozen-weight readiness remains blocked:** read-only audit [38924202279](https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38924202279) finished successfully as a diagnostic job but set semantic status \`BLOCKED\` because PEFT is missing, a fresh quota snapshot is unavailable, managed models storage is in WARNING / group soft-quota overage, model/license/task approvals are incomplete, and dataset provenance/schema/group-safe splits are unverified. Audit flags explicitly say no training and no downloads started. No fine-tuning improvement can be claimed.
+
 
 **The latest review candidate adds supervised local/multi-node background services, detailed CLI help, TRELLIS existing-image-folder mode, and separate-GPU combined Gradio services; hosted validation is green (86/86 tests), while live three-node launch, browser/Gradio and folder-inference acceptance are still pending.** PR [#11](https://github.com/Killer4K-N/OEC/pull/11) is open and not merged. Source code/workflow/notebook changes remain isolated on `fix/flux-trellis-pipeline-20261015`; main is tracking-only.
 **OEC now has standalone FLUX and TRELLIS runtime evidence and a successful combined FLUX → TRELLIS.2 run on a review branch.** The FLUX stage generated and validated a 512×512 PNG (255,946 bytes; SHA-256 2b05b417eb928a93511c88ee2d45b21357419720c31917a8e5129434eed6afbb), which was passed as the exact TRELLIS input. OEC run [38725376076](https://github.com/Killer4K-N/OEC/actions/runs/38725376076), job 116389784906, ended with report status PASS after 419.848s on oec-1 / host scn30-mn. TRELLIS exported [artifact 11967418646](https://github.com/Killer4K-N/OEC/actions/runs/38725376076/artifacts/11967418646): a 3,484,804-byte GLB (SHA-256 74e3654625a0662302ecb1bf1c0c79885833563753b6a30acbeee45a5c4b360e). Independent trimesh reopen passed with 54,597 vertices and 93,617 faces.
@@ -322,3 +327,10 @@ The isolated branch [fix/lustre-soft-hard-quota-snapshot-20261016](https://githu
 
 The first validation [run 38903339731](https://github.com/Killer4K-N/OEC/actions/runs/38903339731) correctly exposed a hard-quota test fixture missing required schema-v2 identity/source. The fixture was corrected, preserving the failure in history. Final [run 38903458777](https://github.com/Killer4K-N/OEC/actions/runs/38903458777) / [job 116981112079](https://github.com/Killer4K-N/OEC/actions/runs/38903458777/job/116981112079) passed **47/47 tests**, Python compilation and all four notebook JSON/Python-cell checks. Review [PR #12](https://github.com/Killer4K-N/OEC/pull/12) is draft and unmerged. No quota snapshot was written/refreshed; no reserve/shared filesystem mutation, package install, model/data download, or training occurred. Storage admission remains blocked pending fresh authoritative quota and explicit review/deployment of the new schema/policy.
 
+
+
+## 2026-10-16 — later notebook-cell acceptance and frozen-weight readiness
+
+The latest actual-cell acceptance results, detailed above, supersede earlier statements that the FLUX and TRELLIS notebook final UI cells were still untested. The result is component-level: the standalone TRELLIS cell generated a GLB and the combined app ran a FLUX generate request, but combined TRELLIS was only started and was not asked to generate a mesh. Do not merge or describe this as the complete OEC world-generation path.
+
+The frozen-weight audit is a diagnostic PASS / semantic BLOCKED, not a PEFT/training pass. Continue to fail closed until storage manager and fresh numeric quota checks are cleared, model/license/task and dataset provenance/schema/split approvals are approved, PEFT is available in the dedicated environment, and a real-model frozen parameter/gradient/checkpoint/held-out evaluation is executed. Do not access the storage reserve file or run training/downloads to bypass these gates.
