@@ -29,7 +29,7 @@ jobs:
             echo "A100_TOOL_SYNC=BLOCKED_PHASE2_3D_TEST_PYTHON_MISSING path=$PYTHON"
             exit 20
           fi
-          "$PYTHON" -m py_compile qa_compliance_worker.py tools/qa_checks.py pipeline_flux_image.py
+          "$PYTHON" -m py_compile qa_compliance_worker.py tools/qa_checks.py pipeline_flux_image.py core_config.py
           "$PYTHON" -m unittest discover -s tests -p 'test_qa_checks.py' -v
           "$PYTHON" -m unittest discover -s tests -p 'test_trellis_notebook_static.py' -v
           "$PYTHON" -m unittest discover -s tests -p 'test_flux_image.py' -v
@@ -113,6 +113,7 @@ jobs:
           conflicts=0
           # User-requested notebook repair is authorized only after a verified backup.
           authorized_notebook_overwrite=(
+            core_config.py
             pipeline_flux_image.py
             pipeline_flux_only.ipynb
             pipeline_trellis_3d.py
@@ -131,7 +132,7 @@ jobs:
             status="$(git -C "$LIVE_ROOT" status --porcelain -- "$rel" 2>/dev/null || true)"
             if [ -e "$dest" ] && [ -n "$status" ]; then
               case "$rel" in
-                pipeline_flux_image.py|pipeline_flux_only.ipynb|pipeline_trellis_3d.py|pipeline_trellis_3d.ipynb|pipeline_trellis_3d_only.ipynb)
+                core_config.py|pipeline_flux_image.py|pipeline_flux_only.ipynb|pipeline_trellis_3d.py|pipeline_trellis_3d.ipynb|pipeline_trellis_3d_only.ipynb)
                   backup="$BACKUP_ROOT/$rel"
                   mkdir -p "$(dirname "$backup")"
                   cp -p "$dest" "$backup"
@@ -176,7 +177,7 @@ jobs:
           python_files = [
               'tools/flux_gpu_admission.py', 'tools/ltx_worker_config.py',
               'tools/oec_runner_probe.py', 'tools/oec_service_manager.py',
-              'tools/qa_checks.py', 'tools/trellis_offline.py', 'pipeline_flux_image.py',
+              'tools/qa_checks.py', 'tools/trellis_offline.py', 'core_config.py', 'pipeline_flux_image.py',
               'pipeline_flux_trellis.py', 'pipeline_trellis_3d.py',
               'worker_ltx_video.py', 'qa_compliance_worker.py',
           ]
