@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-16 11:23 IST (Asia/Kolkata)
+**Last updated:** 2026-10-16 11:36 IST (Asia/Kolkata)
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 
 
@@ -232,3 +232,13 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - [ ] After run 38857928677 completes, inspect the job logs and artifact. Require FLUX_GRADIO_SMOKE=PASS, a valid 512×512 PNG and JSON sidecar before calling the FLUX Jupyter UI working.
 - [ ] If the A100 job remains queued or fails GPU/cache admission, report the actual blocker; do not claim a runtime pass based on hosted static CI.
 
+
+
+## 2026-10-16 11:36 IST — FLUX Gradio live verification and file-serving fix
+
+- [x] Live A100 run 38857928677 pinpointed Gradio incompatibility: the installed phase2_3d Gradio raises TypeError for the theme argument. Removed that optional theme argument.
+- [x] Live A100 run 38858591217 showed HTTP 503 on /gradio_api/startup-events. Fixed localhost proxy bypass in core_config.py and corrected the workflow's actual copy list after discovering the file was validated/authorized but not included in the sync list.
+- [x] Live run 38858984764 verified NO_PROXY handling for localhost, loaded cached FLUX on A100, got Gradio HTTP 200 and generated a valid 512×512 PNG (196,376 bytes) plus sidecar in 20.944 seconds.
+- [x] Identified the remaining UI failure: Gradio rejected returning the PNG/sidecar from a custom /tmp directory not included in allowed_paths. The helper now exposes its exact output directory; notebook and live smoke add only that directory to Gradio's allowlist.
+- [x] Latest hosted regression [run 38859218054](https://github.com/Killer4K-N/OEC/actions/runs/38859218054) passed.
+- [ ] Final live acceptance pending: run 38859218039 (https://github.com/Killer4K-N/OEC/actions/runs/38859218039) is queued without a runner assignment. Require the actual /generate response to return successfully and a validated PNG/sidecar artifact before marking the notebook fully working.
