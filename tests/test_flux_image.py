@@ -49,6 +49,13 @@ class FluxImageTests(unittest.TestCase):
         self.assertIn("FLUX_UI_OUTPUT_MODE=scratch", source)
         self.assertIn('choices=("check", "generate", "gradio")', source)
 
+    def test_hpc_proxy_preserves_localhost_bypass_for_gradio(self):
+        source = (ROOT / "core_config.py").read_text(encoding="utf-8")
+        self.assertIn('os.environ["NO_PROXY"] = no_proxy_value', source)
+        self.assertIn('os.environ["no_proxy"] = no_proxy_value', source)
+        for host in ("localhost", "127.0.0.1", "::1"):
+            self.assertIn(f'"{host}"', source)
+
     def test_flux_gradio_scratch_mode_is_guarded_and_generates_a_stable_api_route(self):
         source = (ROOT / "pipeline_flux_image.py").read_text(encoding="utf-8")
         self.assertIn('api_name="generate"', source)
