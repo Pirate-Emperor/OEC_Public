@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-16 11:36 IST (Asia/Kolkata)
+**Last updated:** 2026-10-16 11:39 IST (Asia/Kolkata)
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 
 
@@ -241,4 +241,16 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - [x] Live run 38858984764 verified NO_PROXY handling for localhost, loaded cached FLUX on A100, got Gradio HTTP 200 and generated a valid 512×512 PNG (196,376 bytes) plus sidecar in 20.944 seconds.
 - [x] Identified the remaining UI failure: Gradio rejected returning the PNG/sidecar from a custom /tmp directory not included in allowed_paths. The helper now exposes its exact output directory; notebook and live smoke add only that directory to Gradio's allowlist.
 - [x] Latest hosted regression [run 38859218054](https://github.com/Killer4K-N/OEC/actions/runs/38859218054) passed.
-- [ ] Final live acceptance pending: run 38859218039 (https://github.com/Killer4K-N/OEC/actions/runs/38859218039) is queued without a runner assignment. Require the actual /generate response to return successfully and a validated PNG/sidecar artifact before marking the notebook fully working.
+- [x] Final live acceptance passed: [run 38859218039](https://github.com/Killer4K-N/OEC/actions/runs/38859218039) succeeded on oec-1 / scn30-mn / A100 GPU 0. Local proxy bypass and Gradio HTTP 200 passed, the actual /generate endpoint returned normally, and a valid 512×512 PNG plus metadata sidecar were uploaded in artifact 12028935755. The exact ZIP was downloaded and the PNG/JSON verified.
+
+
+## 2026-10-16 11:39 IST — FLUX-only Jupyter acceptance closed
+
+- [x] Fixed the live Gradio API compatibility error by removing the unsupported theme argument.
+- [x] Fixed localhost proxy routing in core_config.py and verified the updated file was actually synchronized after a verified backup.
+- [x] Fixed Gradio's generated-file response handling by allowing only the exact selected local scratch output directory.
+- [x] Final live A100 smoke [run 38859218039](https://github.com/Killer4K-N/OEC/actions/runs/38859218039) passed: cached model load, localhost bypass, Gradio HTTP 200, actual /generate API result, and PNG/metadata validation.
+- [x] Verified artifact 12028935755 (smoke report, PNG and sidecar); independently opened the PNG and parsed its metadata after downloading the exact artifact ZIP.
+- [x] Hosted regression [run 38859218054](https://github.com/Killer4K-N/OEC/actions/runs/38859218054) passed all 104 configured tests plus notebook JSON/compilation/CLI checks.
+- [x] No model download, dependency install, shared-output write, cache purge, reserve-file access, or source merge to main.
+- [ ] Follow up with a live browser-driven Jupyter session test on the user's own forwarded port if user experience outside the API smoke differs; the server-side Gradio UI and exact Generate callback are verified.
