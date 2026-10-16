@@ -322,7 +322,8 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertIn('if FLUX_UI_GPU == TRELLIS_UI_GPU:', combined_all)
         self.assertIn("share=False", combined_all)
         trellis_all = "\n".join(self.only)
-        self.assertIn("server_port=7862", trellis_all)
+        self.assertIn('TRELLIS_GRADIO_PORT = int(os.environ.get("AIEROS_TRELLIS_GRADIO_PORT", "7862"))', trellis_all)
+        self.assertIn("server_port=TRELLIS_GRADIO_PORT", trellis_all)
         self.assertIn("share=False", trellis_all)
 
 
