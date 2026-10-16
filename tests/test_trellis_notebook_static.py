@@ -249,6 +249,13 @@ class TrellisNotebookStaticTests(unittest.TestCase):
                 self.assertIn('os.environ.get("AIEROS_TRELLIS_UI_OUTPUT_MODE", "scratch")', source)
                 self.assertIn("TRELLIS_OUTPUT_MODE=local_scratch_only", source)
 
+        flux = self.find(self.flux_only, "FLUX_PIPELINE_READY=PASS")
+        self.assertIn("demo_flux.launch(", flux)
+        self.assertIn("allowed_paths=[demo_flux.oec_output_dir]", flux)
+        self.assertIn("FLUX_GRADIO_LAUNCH=FAIL", flux)
+        self.assertNotRegex(flux, r"gr\\.Blocks\\([^\\n]*theme=")
+        self.assertIn("scratch_output=(FLUX_UI_OUTPUT_MODE == \"scratch\")", flux)
+
         cli = (self.ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
         block_lines = [line.strip() for line in cli.splitlines() if "gr.Blocks(" in line]
         self.assertTrue(block_lines, "standalone TRELLIS CLI")

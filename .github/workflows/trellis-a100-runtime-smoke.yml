@@ -14,7 +14,7 @@ jobs:
   trellis-live-acceptance:
     name: Cache-only TRELLIS image-to-GLB and Gradio launch on oec-1
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - name: Check out the reviewed candidate
         uses: actions/checkout@v4
@@ -117,22 +117,44 @@ jobs:
           export AIEROS_TRELLIS_PORT="$UI_PORT"
           "$PYTHON" -u "$GITHUB_WORKSPACE/pipeline_trellis_3d.py" --mode gradio --offline --gpu "$GPU" --port "$UI_PORT" --server-name 127.0.0.1 --output-dir "$UI_OUTPUT" > "$GITHUB_WORKSPACE/trellis-gradio-launch.log" 2>&1 &
           SERVER_PID=$!
+          export TRELLIS_GRADIO_PID="$SERVER_PID"
+          export TRELLIS_GRADIO_LOG="$GITHUB_WORKSPACE/trellis-gradio-launch.log"
+          export TRELLIS_GRADIO_START_TIMEOUT_SECONDS=420
           trap 'if kill -0 "$SERVER_PID" 2>/dev/null; then kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true; fi' EXIT
           "$PYTHON" - <<'PY'
           import os, time, urllib.request
+          from pathlib import Path
+
           port = int(os.environ["AIEROS_TRELLIS_PORT"])
+          pid = int(os.environ["TRELLIS_GRADIO_PID"])
+          log_path = Path(os.environ["TRELLIS_GRADIO_LOG"])
+          timeout_seconds = int(os.environ.get("TRELLIS_GRADIO_START_TIMEOUT_SECONDS", "420"))
           opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
           last_error = None
-          for _ in range(90):
+          deadline = time.monotonic() + timeout_seconds
+
+          while time.monotonic() < deadline:
+              try:
+                  os.kill(pid, 0)
+              except ProcessLookupError:
+                  tail = "\\n".join(log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-80:])
+                  print("TRELLIS_GRADIO_LAUNCH_LOG_TAIL_BEGIN\\n" + tail + "\\nTRELLIS_GRADIO_LAUNCH_LOG_TAIL_END", flush=True)
+                  raise SystemExit(f"TRELLIS_GRADIO_HTTP=FAIL server_process_exited pid={pid}")
               try:
                   with opener.open(f"http://127.0.0.1:{port}/", timeout=3) as response:
                       if response.status == 200:
-                          print(f"TRELLIS_GRADIO_HTTP=PASS port={port} status=200", flush=True)
+                          print(f"TRELLIS_GRADIO_HTTP=PASS port={port} status=200 startup_wait_seconds={int(timeout_seconds - max(0, deadline - time.monotonic()))}", flush=True)
                           raise SystemExit(0)
               except Exception as exc:
                   last_error = exc
                   time.sleep(1)
-          raise SystemExit(f"TRELLIS_GRADIO_HTTP=FAIL port={port} last_error={last_error!r}")
+
+          tail = "\\n".join(log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-100:])
+          print("TRELLIS_GRADIO_LAUNCH_LOG_TAIL_BEGIN\\n" + tail + "\\nTRELLIS_GRADIO_LAUNCH_LOG_TAIL_END", flush=True)
+          raise SystemExit(
+              f"TRELLIS_GRADIO_HTTP=FAIL port={port} timeout_seconds={timeout_seconds} "
+              f"last_error={last_error!r}"
+          )
           PY
           kill "$SERVER_PID" 2>/dev/null || true
           wait "$SERVER_PID" 2>/dev/null || true
