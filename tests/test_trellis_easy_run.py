@@ -93,7 +93,8 @@ class TrellisEasyRunTests(unittest.TestCase):
     def test_notebook_gradio_ports_match_tunnel_instructions(self):
         combined = (ROOT / "pipeline_trellis_3d.ipynb").read_text(encoding="utf-8")
         only = (ROOT / "pipeline_trellis_3d_only.ipynb").read_text(encoding="utf-8")
-        self.assertIn("server_port=7862", combined)
+        self.assertIn("TRELLIS_GRADIO_PORT = int(os.environ.get", combined)
+        self.assertIn("server_port=TRELLIS_GRADIO_PORT", combined)
         self.assertIn("FLUX_SERVER_PORT = int(os.environ.get", combined)
         self.assertIn("7863", combined)
         # This file is inspected as JSON text here, so quotes in code-cell
@@ -101,7 +102,8 @@ class TrellisEasyRunTests(unittest.TestCase):
         self.assertIn("--port", combined)
         self.assertIn("str(FLUX_SERVER_PORT)", combined)
         self.assertIn("flux-ui", combined)
-        self.assertIn("server_port=7862", only)
+        self.assertIn("TRELLIS_GRADIO_PORT = int(os.environ.get", only)
+        self.assertIn("server_port=TRELLIS_GRADIO_PORT", only)
         self.assertIn("inline=False", combined)
         self.assertIn("inline=False", only)
 
