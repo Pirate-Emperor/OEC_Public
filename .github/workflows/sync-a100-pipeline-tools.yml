@@ -190,6 +190,12 @@ jobs:
           PY
           python3 "$LIVE_ROOT/tools/oec_service_manager.py" --help >/dev/null
           echo 'A100_TOOL_SYNC_SERVICE_MANAGER_HELP=PASS'
+          printf 'A100_TOOL_SYNC_SUMMARY created=%s updated=%s unchanged=%s conflicts_preserved=%s backup_root=%s\n' "$created" "$updated" "$unchanged" "$conflicts" "$BACKUP_ROOT"
+          if [ "$conflicts" -gt 0 ]; then
+            echo 'A100_TOOL_SYNC=PASS_WITH_UNRELATED_CONFLICTS_PRESERVED'
+          else
+            echo 'A100_TOOL_SYNC=PASS'
+          fi
 
       - name: Run live cache-only FLUX Gradio generation smoke on oec-1
         shell: bash
@@ -328,9 +334,3 @@ jobs:
             oec-flux-gradio-smoke/**
           if-no-files-found: warn
           retention-days: 30
-          printf 'A100_TOOL_SYNC_SUMMARY created=%s updated=%s unchanged=%s conflicts_preserved=%s backup_root=%s\n' "$created" "$updated" "$unchanged" "$conflicts" "$BACKUP_ROOT"
-          if [ "$conflicts" -gt 0 ]; then
-            echo 'A100_TOOL_SYNC=PASS_WITH_UNRELATED_CONFLICTS_PRESERVED'
-          else
-            echo 'A100_TOOL_SYNC=PASS'
-          fi
