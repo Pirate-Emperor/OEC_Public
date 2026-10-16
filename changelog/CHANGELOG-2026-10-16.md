@@ -233,3 +233,35 @@ The exact-run smoke established:
 The final hosted regression [run 38859218054](https://github.com/Killer4K-N/OEC/actions/runs/38859218054) also passed. Its configured suites total 105 tests, and all four notebook JSON checks, Python compilation and CLI help checks passed. This closes the FLUX-only notebook's live Gradio acceptance gate on this exact A100 environment and branch revision.
 
 The test was cache-only: no model download, package installation, shared-output write, broad reset/clean, cache purge, or storage-reserve access occurred. Generated test output was under local /tmp and uploaded as a workflow artifact. Source changes remain on review branch `fix/flux-trellis-pipeline-20261015`; PR #11 is still open and main remains unchanged.
+
+
+## 2026-10-16 17:18 IST — TRELLIS Gradio final-cell compatibility and file-serving repair
+
+### Current branch / Actions state
+
+- Review branch: `fix/flux-trellis-pipeline-20261015`; source change commit: [`f10f2660193751351705b5fd601b0947a2e8e045`](https://github.com/Killer4K-N/OEC/commit/f10f2660193751351705b5fd601b0947a2e8e045). PR [#11](https://github.com/Killer4K-N/OEC/pull/11) remains open and unmerged; no source change was made to `main`.
+- Candidate regression run [38896204476](https://github.com/Killer4K-N/OEC/actions/runs/38896204476), job [116957159772](https://github.com/Killer4K-N/OEC/actions/runs/38896204476/job/116957159772): success. The added `test_trellis_gradio_launch_allows_output_files_and_uses_gradio6_theme_api` passed.
+- Configured suites passed 106 tests total: QA 15, TRELLIS notebook static 16, TRELLIS easy-run 6, TRELLIS offline config 6, combined FLUX/TRELLIS pipeline 16, FLUX helper 9, FLUX GPU admission 6, AudioCraft notebook 5, storage write-admission 6, service manager 8, service-manager help 7, and LTX worker config 6. Python compilation and JSON parsing of all four notebooks also passed. These results establish static/regression correctness only.
+- The latest live FLUX-only Gradio acceptance remains [run 38859218039](https://github.com/Killer4K-N/OEC/actions/runs/38859218039), job [116837449364](https://github.com/Killer4K-N/OEC/actions/runs/38859218039/job/116837449364), on `oec-1` / `scn30-mn` / NVIDIA A100-SXM4-40GB, with the PNG/metadata artifact [12028935755](https://github.com/Killer4K-N/OEC/actions/runs/38859218039/artifacts/12028935755). Cached FLUX loaded; local Gradio returned HTTP 200; the actual `/generate` request passed and returned a validated 512×512 RGB PNG (196,376 bytes) plus metadata. No package install or model download occurred.
+- No new live Trellis Gradio launch or inference has been run for commit `f10f266` as of this record. Trellis live synchronization and end-to-end confirmation remain open; do not infer success from the static run.
+
+### Failure analysis and change
+
+The review compared all three notebooks, the standalone entry point, and the current run logs. The installed `phase2_3d` Gradio build had already shown that passing a `theme` keyword to `gr.Blocks(...)` raises a runtime `TypeError`; FLUX fixed its path by removing that constructor argument. The combined TRELLIS notebook and standalone TRELLIS CLI still used that rejected form. Separately, the TRELLIS-only and combined notebook UIs generate a GLB below a custom `/tmp/oec-trellis-ui-...` output directory but did not add that precise directory to Gradio's allowed file paths. Gradio can therefore fail to transfer the generated model to `Model3D` even when generation/export itself succeeds.
+
+Applied on the review branch only:
+
+- `pipeline_trellis_3d.ipynb`: moved the Monochrome theme argument from the `Blocks` constructor to `launch()`; added default per-kernel local scratch output under `/tmp`, checks for filesystem separation from shared model storage, at least 512 MiB of measured free space, and refusal to overwrite output; preserved fresh-quota admission and managed-operation locking when shared output is explicitly selected; added `allowed_paths=[OUTPUT_DIR]` and explicit launch start/fail/pass log markers.
+- `pipeline_trellis_3d_only.ipynb`: retained the already-present scratch-path and overwrite/capacity guards, then added `allowed_paths=[OUTPUT_DIR]` and explicit Gradio launch diagnostics to the final launch cell.
+- `pipeline_trellis_3d.py`: moved the theme from `Blocks` into `launch()` and allows only the configured output directory for Gradio file serving.
+- `tests/test_trellis_notebook_static.py`: added a regression test checking Gradio 6 theme placement and exact TRELLIS output-path allowlisting for the combined notebook, TRELLIS-only notebook and CLI.
+
+No dependencies were installed, no model weights were downloaded, and no shared output directory, storage reserve, cache, QA queue or unrelated process was modified in this batch. The fix is not yet synchronized to the persistent A100 checkout. After synchronization, the acceptance gate is a cache-only Gradio launch and actual image-to-GLB generation in the intended environment, with GLB geometry independently reopened. Keep downloads/writes behind the existing storage policy.
+
+### Sources consulted
+
+- [Gradio 6 migration guide](https://gradio.app/guides/gradio-6-migration-guide) — verified the app-level theme configuration migration used to place theme configuration at launch time.
+- [TRELLIS notebook static tests](https://github.com/Killer4K-N/OEC/blob/f10f2660193751351705b5fd601b0947a2e8e045/tests/test_trellis_notebook_static.py) — regression checks on notebook structure and launch/file path behavior.
+- [Combined TRELLIS/FLUX notebook](https://github.com/Killer4K-N/OEC/blob/f10f2660193751351705b5fd601b0947a2e8e045/pipeline_trellis_3d.ipynb), [TRELLIS-only notebook](https://github.com/Killer4K-N/OEC/blob/f10f2660193751351705b5fd601b0947a2e8e045/pipeline_trellis_3d_only.ipynb), and [standalone TRELLIS CLI](https://github.com/Killer4K-N/OEC/blob/f10f2660193751351705b5fd601b0947a2e8e045/pipeline_trellis_3d.py) — target code and output/launch policy.
+- [Candidate regression workflow](https://github.com/Killer4K-N/OEC/actions/runs/38896204476) — test results and notebook JSON checks.
+- [Live FLUX A100 workflow](https://github.com/Killer4K-N/OEC/actions/runs/38859218039) and [exact-run artifact](https://github.com/Killer4K-N/OEC/actions/runs/38859218039/artifacts/12028935755) — separate confirmed evidence for FLUX-only runtime, not Trellis.

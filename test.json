@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T11:40:46+05:30",
+  "last_updated": "2026-10-16T17:18:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "On 2026-10-16 Asia/Kolkata, the FLUX-only Jupyter/Gradio path is live-verified on oec-1 / scn30-mn / NVIDIA A100-SXM4-40GB, branch fix/flux-trellis-pipeline-20261015. Final cache-only run 38859218039 passed local proxy bypass, runtime and cached model load, Gradio HTTP 200, actual /generate response, PNG/sidecar validation and artifact upload. The generated PNG is 512x512 RGB, 196376 bytes, with seed 2048 and 4 steps. Artifact 12028935755 was downloaded and its contents independently checked. Hosted regression 38859218054 passed the configured 105 tests and notebook/static checks. No source was merged to main.",
+  "latest_summary": "On 2026-10-16, branch fix/flux-trellis-pipeline-20261015 commit f10f266 fixed TRELLIS Gradio launch theme placement and allowed-path handling across two notebooks and CLI. Candidate workflow 38896204476 passed 106 configured test cases, py_compile and four notebook JSON checks. Trellis live sync/runtime remains pending; separate FLUX-only A100 Gradio generation is confirmed in run 38859218039 with artifact 12028935755. No merge to main.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2912,6 +2912,68 @@
         "https://github.com/Killer4K-N/OEC/actions/runs/38859218039#artifacts"
       ],
       "follow_up": "The FLUX-only Jupyter Gradio API path is runtime-accepted for this revision. If user reports a browser/tunnel issue, check their SSH port forwarding and browser connection separately; do not downgrade this server-side generation pass."
+    },
+    {
+      "id": "TEST-2026-10-16-OEC-TRELLIS-GRADIO-FINAL-CELL-FIX",
+      "date": "2026-10-16",
+      "category": "Repair TRELLIS notebook/CLI Gradio final-cell compatibility and generated-GLB file serving",
+      "approach": "Compared the current TRELLIS-only and combined notebooks, standalone CLI, existing regression suite and prior phase2_3d Gradio failure evidence. Moved the theme keyword out of gr.Blocks constructors into launch(), passed only the configured GLB output directory through allowed_paths, preserved TRELLIS-only scratch guards, added an equivalent guarded local-scratch path for the combined notebook, and added a targeted static regression.",
+      "reason": "A valid notebook JSON/Python cell does not prove Gradio launches on the installed version or can serve custom /tmp outputs. The prior FLUX live failure established that BlockContext rejects the constructor theme parameter and that generated files outside allowed_paths can fail on client response.",
+      "parameters": {
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "source_commit": "f10f2660193751351705b5fd601b0947a2e8e045",
+        "files": [
+          "pipeline_trellis_3d.ipynb",
+          "pipeline_trellis_3d_only.ipynb",
+          "pipeline_trellis_3d.py",
+          "tests/test_trellis_notebook_static.py"
+        ],
+        "env": "phase2_3d is the intended live environment; this CI run executed its unit/static suite on ubuntu-latest Python 3.11",
+        "gradio_change": "theme configured through launch(), not Blocks constructor",
+        "output_policy": "combined notebook defaults to validated /tmp scratch; explicit shared output rechecks fresh quota under managed operation",
+        "file_serving": "allowed_paths restricted to configured output directory",
+        "runtime_test": "not run for Trellis in this experiment"
+      },
+      "command": "OEC GitHub Actions run 38896204476, job 116957159772",
+      "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38896204476",
+      "expected": "New launch/file-serving regression passes; existing configured static suites, Python compilation and all four notebook JSON checks pass; no runtime status inferred.",
+      "results": {
+        "status": "STATIC_PASS_LIVE_TRELLIS_PENDING",
+        "conclusion": "success",
+        "tests_by_suite": {
+          "qa": 15,
+          "trellis_notebook_static": 16,
+          "trellis_easy_run": 6,
+          "trellis_offline_config": 6,
+          "flux_trellis_pipeline": 16,
+          "flux_image": 9,
+          "flux_gpu_admission": 6,
+          "audiocraft_notebook_static": 5,
+          "storage_write_admission": 6,
+          "service_manager": 8,
+          "service_manager_help": 7,
+          "ltx_worker_config": 6,
+          "total": 106
+        },
+        "targeted_regression": "test_trellis_gradio_launch_allows_output_files_and_uses_gradio6_theme_api PASS",
+        "python_compilation": "PASS",
+        "notebook_json_checks": "PASS (combined TRELLIS/FLUX 16 cells; TRELLIS-only 15; FLUX-only 10; AudioCraft 6)",
+        "trellis_live_sync": "NOT_YET_RUN",
+        "trellis_gradio_runtime": "NOT_RUN",
+        "trellis_image_to_glb_runtime": "NOT_RUN",
+        "flux_previous_live_run": 38859218039,
+        "flux_previous_artifact_id": 12028935755,
+        "main_branch": "UNCHANGED"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/commit/f10f2660193751351705b5fd601b0947a2e8e045",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38896204476",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38896204476/job/116957159772",
+        "https://gradio.app/guides/gradio-6-migration-guide",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38859218039",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38859218039/artifacts/12028935755"
+      ],
+      "follow_up": "Safely synchronize the reviewed TRELLIS files to oec-1 after the passing test gate, then run a cache-only real Trellis Gradio start + image-to-GLB smoke in phase2_3d and independently reopen the GLB; keep shared storage admission intact."
     }
   ]
 }

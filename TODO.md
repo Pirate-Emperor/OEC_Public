@@ -254,3 +254,15 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - [x] Hosted regression [run 38859218054](https://github.com/Killer4K-N/OEC/actions/runs/38859218054) passed all 105 configured tests plus notebook JSON/compilation/CLI checks.
 - [x] No model download, dependency install, shared-output write, cache purge, reserve-file access, or source merge to main.
 - [ ] Follow up with a live browser-driven Jupyter session test on the user's own forwarded port if user experience outside the API smoke differs; the server-side Gradio UI and exact Generate callback are verified.
+
+
+## 2026-10-16 17:18 IST — latest notebook final-cell status (supersedes older interim state)
+
+- [x] **FLUX-only Jupyter/Gradio accepted on oec-1:** [live run 38859218039](https://github.com/Killer4K-N/OEC/actions/runs/38859218039) verified cached model loading, local Gradio HTTP 200, actual `/generate` response, valid 512×512 PNG/JSON sidecar and artifact [12028935755](https://github.com/Killer4K-N/OEC/actions/runs/38859218039/artifacts/12028935755). No package install/model download/shared output write.
+- [x] **TRELLIS Gradio final-cell source repair:** [commit f10f266](https://github.com/Killer4K-N/OEC/commit/f10f2660193751351705b5fd601b0947a2e8e045) moves theme configuration to Gradio `launch()`, enables only the selected output directory for file serving, adds launch diagnostics, and gives the combined notebook a validated local-scratch path by default while retaining quota-gated shared output.
+- [x] **Candidate static regression gate:** [run 38896204476](https://github.com/Killer4K-N/OEC/actions/runs/38896204476), job 116957159772, passed 106 configured tests, Python compilation, and all four notebook JSON checks.
+- [ ] **OPEN — sync the Trellis notebook/CLI fix to the persistent oec-1 checkout through the guarded workflow.** Preserve backups of any changed live target and leave unrelated dirty paths alone.
+- [ ] **OPEN — live Trellis acceptance:** in `phase2_3d`, launch the corrected Gradio UI, issue a real image-to-GLB request from cache where GPU/storage admission allows it, and independently reopen the resulting GLB. Do not substitute FLUX results or prior isolated Trellis results for this test.
+- [ ] **OPEN — combined UI acceptance:** validate separate TRELLIS/FLUX UI start on distinct GPUs/ports and an exact FLUX-PNG-to-TRELLIS input handoff after the latest files are synchronized. No shared output writes, downloads, or installs without current storage-policy admission.
+
+Source remains on review PR [#11](https://github.com/Killer4K-N/OEC/pull/11); do not merge to `main` without explicit authorization. Detailed evidence: [daily changelog](changelog/CHANGELOG-2026-10-16.md#2026-10-16-1718-ist--trellis-gradio-final-cell-compatibility-and-file-serving-repair).

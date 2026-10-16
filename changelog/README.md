@@ -5,6 +5,7 @@ Daily engineering records live here. Use the local Asia/Kolkata date in each fil
 ## Daily records
 
 - [2026-10-16 — A100 pipeline tools and TRELLIS entry points synchronized](CHANGELOG-2026-10-16.md)
+  - Latest review candidate [`f10f266`](https://github.com/Killer4K-N/OEC/commit/f10f2660193751351705b5fd601b0947a2e8e045) fixes Gradio 6 theme placement and TRELLIS GLB file serving in the notebook launch cells and CLI. Candidate CI [run 38896204476](https://github.com/Killer4K-N/OEC/actions/runs/38896204476) passed 106 configured tests plus notebook JSON and compilation checks. Trellis live sync/runtime validation is still open; the FLUX-only A100 Generate path is independently confirmed by [run 38859218039](https://github.com/Killer4K-N/OEC/actions/runs/38859218039) and artifact [12028935755](https://github.com/Killer4K-N/OEC/actions/runs/38859218039/artifacts/12028935755).
   - [Run 38796743755](https://github.com/Killer4K-N/OEC/actions/runs/38796743755) created and validated seven missing OEC/tools support files on oec-1.
   - The expanded sync first preserved dirty conflicts; [run 38797414327](https://github.com/Killer4K-N/OEC/actions/runs/38797414327) then backed up and synced the authorized TRELLIS Python entry point and two notebooks and passed AST, JSON, notebook, and CLI-help checks. The dirty FLUX-only notebook and QA worker remain untouched; no dependency install or new inference was run.
 
