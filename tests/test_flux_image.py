@@ -42,6 +42,11 @@ class FluxImageTests(unittest.TestCase):
         self.assertNotIn('pipeline.to("cuda")', source)
         self.assertIn("validate_png_file(", source)
         self.assertIn("validate_scratch_path(", source)
+        self.assertIn("minimum_free_mib: int = 512", source)
+        self.assertIn("AIEROS_FLUX_UI_OUTPUT_MODE", source)
+        self.assertIn('os.environ.get("AIEROS_FLUX_UI_OUTPUT_MODE", "scratch")', source)
+        self.assertIn("scratch_output=bool(scratch_output)", source)
+        self.assertIn("FLUX_UI_OUTPUT_MODE=scratch", source)
         self.assertIn('choices=("check", "generate", "gradio")', source)
 
     def test_complete_local_snapshot_is_resolved_without_hub_or_torch(self):
@@ -82,6 +87,10 @@ class FluxImageTests(unittest.TestCase):
         self.assertIn('"7864"', studio)
         self.assertIn("server_port=FLUX_SERVER_PORT", studio)
         self.assertIn("share=False", studio)
+        self.assertIn('FLUX_UI_OUTPUT_MODE = os.environ.get("AIEROS_FLUX_UI_OUTPUT_MODE", "scratch")', studio)
+        self.assertIn('scratch_output=(FLUX_UI_OUTPUT_MODE == "scratch")', studio)
+        self.assertIn('model_cache=SYSTEM_DIRS["models"]', studio)
+        self.assertIn("FLUX_GRADIO_LAUNCH=FAIL", studio)
         self.assertNotIn("guidance_scale=3.5", studio)
         self.assertNotIn("kwargs", studio)
 
