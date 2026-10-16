@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import tempfile
 import time
@@ -64,16 +65,37 @@ def build_snapshot_payload(
     quota_name: str | None = None,
 ) -> dict[str, Any]:
     """Validate and build legacy or structured quota JSON without writing it."""
-    if isinstance(used_bytes, bool) or int(used_bytes) != used_bytes or used_bytes < 0:
+    def exact_integer(value: Any, label: str, *, allow_none: bool = False) -> int | None:
+        if value is None and allow_none:
+            return None
+        if isinstance(value, bool):
+            raise ValueError(f"{label} must be an integer")
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float) and math.isfinite(value) and value.is_integer():
+            return int(value)
+        raise ValueError(f"{label} must be an integer")
+
+    used = exact_integer(used_bytes, "used_bytes")
+    assert used is not None
+    if used < 0:
         raise ValueError("used_bytes must be a non-negative integer")
-    if not source or not str(source).strip():
-        raise ValueError("source must be non-empty")
+    if not isinstance(source, str) or not source.strip():
+        raise ValueError("source must be a non-empty string")
 
     captured_at = time.time() if timestamp is None else float(timestamp)
+    if not math.isfinite(captured_at) or captured_at < 0:
+        raise ValueError("timestamp must be a non-negative finite number")
+
     structured = soft_quota_bytes is not None or hard_limit_bytes is not None
     if structured:
-        soft = int(soft_quota_bytes) if soft_quota_bytes is not None and int(soft_quota_bytes) > 0 else None
-        hard = int(hard_limit_bytes) if hard_limit_bytes is not None and int(hard_limit_bytes) > 0 else None
+        soft_value = exact_integer(soft_quota_bytes, "soft_quota_bytes", allow_none=True)
+        hard_value = exact_integer(hard_limit_bytes, "hard_limit_bytes", allow_none=True)
+        for label, value in (("soft_quota_bytes", soft_value), ("hard_limit_bytes", hard_value)):
+            if value is not None and value < 0:
+                raise ValueError(f"{label} must be non-negative; use zero or null for an unset limit")
+        soft = soft_value if soft_value is not None and soft_value > 0 else None
+        hard = hard_value if hard_value is not None and hard_value > 0 else None
         if soft is None and hard is None:
             raise ValueError("structured quota must provide a positive soft quota or hard limit")
         if soft is not None and hard is not None and soft > hard:
@@ -82,33 +104,37 @@ def build_snapshot_payload(
             raise ValueError("structured quota requires quota_kind=user, group, or project")
         if not isinstance(quota_name, str) or not quota_name.strip():
             raise ValueError("structured quota requires a non-empty quota_name")
+        if grace is not None and not isinstance(grace, str):
+            raise ValueError("grace must be a string or null")
         effective_limit = soft if soft is not None else hard
-        if limit_bytes is not None and int(limit_bytes) != effective_limit:
+        supplied_limit = exact_integer(limit_bytes, "limit_bytes", allow_none=True)
+        if supplied_limit is not None and supplied_limit != effective_limit:
             raise ValueError("limit_bytes must equal soft quota, or hard limit when soft is unset")
         return {
             "schema_version": 2,
-            "used_bytes": int(used_bytes),
+            "used_bytes": used,
             "limit_bytes": int(effective_limit),
             "soft_quota_bytes": soft,
             "hard_limit_bytes": hard,
-            "grace": str(grace).strip() if grace is not None and str(grace).strip() else None,
+            "grace": grace.strip() if grace is not None and grace.strip() else None,
             "quota_kind": quota_kind,
             "quota_name": quota_name.strip(),
             "timestamp": captured_at,
-            "source": str(source).strip(),
+            "source": source.strip(),
         }
 
-    if limit_bytes is None or isinstance(limit_bytes, bool) or int(limit_bytes) != limit_bytes:
-        raise ValueError("legacy mode requires an integer limit_bytes")
-    if limit_bytes <= 0 or used_bytes > limit_bytes:
-        raise ValueError("legacy quota values must satisfy 0 <= used_bytes <= limit_bytes and limit_bytes > 0")
     if quota_kind is not None or quota_name is not None or grace is not None:
         raise ValueError("quota identity/grace fields require structured soft/hard quota inputs")
+    legacy_limit = exact_integer(limit_bytes, "limit_bytes", allow_none=True)
+    if legacy_limit is None:
+        raise ValueError("legacy mode requires an integer limit_bytes")
+    if legacy_limit <= 0 or used > legacy_limit:
+        raise ValueError("legacy quota values must satisfy 0 <= used_bytes <= limit_bytes and limit_bytes > 0")
     return {
-        "used_bytes": int(used_bytes),
-        "limit_bytes": int(limit_bytes),
+        "used_bytes": used,
+        "limit_bytes": legacy_limit,
         "timestamp": captured_at,
-        "source": str(source).strip(),
+        "source": source.strip(),
     }
 
 

@@ -72,6 +72,70 @@ class QuotaSnapshotWriterTests(unittest.TestCase):
                 source="test",
             )
 
+    def test_structured_schema_requires_version_identity_and_both_limit_fields(self):
+        valid = build_snapshot_payload(
+            used_bytes=10, soft_quota_bytes=20, hard_limit_bytes=30,
+            quota_kind="group", quota_name="research", grace="-",
+            source="lfs quota test", timestamp=123.5,
+        )
+        cases = []
+        missing_version = dict(valid)
+        missing_version.pop("schema_version")
+        cases.append((missing_version, "schema_version=2"))
+        missing_kind = dict(valid)
+        missing_kind.pop("quota_kind")
+        cases.append((missing_kind, "missing quota_kind"))
+        missing_name = dict(valid)
+        missing_name["quota_name"] = " "
+        cases.append((missing_name, "quota_name"))
+        missing_soft_field = dict(valid)
+        missing_soft_field.pop("soft_quota_bytes")
+        cases.append((missing_soft_field, "missing soft_quota_bytes"))
+        wrong_version = dict(valid)
+        wrong_version["schema_version"] = 3
+        cases.append((wrong_version, "schema_version=2"))
+        no_limits = dict(valid)
+        no_limits["soft_quota_bytes"] = None
+        no_limits["hard_limit_bytes"] = 0
+        no_limits["limit_bytes"] = 20
+        cases.append((no_limits, "positive soft quota or hard limit"))
+        for payload, message in cases:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    QuotaSnapshot.from_mapping(payload)
+
+    def test_fractional_or_negative_structured_limits_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "soft_quota_bytes must be an integer"):
+            build_snapshot_payload(
+                used_bytes=10, soft_quota_bytes=20.5, hard_limit_bytes=30,
+                quota_kind="group", quota_name="research", source="test",
+            )
+        with self.assertRaisesRegex(ValueError, "soft_quota_bytes must be non-negative"):
+            build_snapshot_payload(
+                used_bytes=10, soft_quota_bytes=-20, hard_limit_bytes=30,
+                quota_kind="group", quota_name="research", source="test",
+            )
+        payload = {
+            "schema_version": 2, "used_bytes": 10, "limit_bytes": 30,
+            "soft_quota_bytes": -20, "hard_limit_bytes": 30,
+            "quota_kind": "group", "quota_name": "research", "timestamp": 123.5,
+            "source": "test",
+        }
+        with self.assertRaisesRegex(ValueError, "soft_quota_bytes must be non-negative"):
+            QuotaSnapshot.from_mapping(payload)
+
+    def test_byte_counts_above_float_exactness_boundary_are_preserved(self):
+        used = 9_007_199_254_740_993
+        payload = build_snapshot_payload(
+            used_bytes=used, soft_quota_bytes=used + 100,
+            hard_limit_bytes=used + 200, quota_kind="group",
+            quota_name="large", source="test", timestamp=123.5,
+        )
+        snapshot = QuotaSnapshot.from_mapping(payload)
+        self.assertEqual(snapshot.used_bytes, used)
+        self.assertEqual(snapshot.limit_bytes, used + 100)
+        self.assertEqual(snapshot.available_bytes, 100)
+
     def test_over_limit_legacy_payload_remains_rejected(self):
         with self.assertRaisesRegex(ValueError, "legacy quota values"):
             build_snapshot_payload(used_bytes=101, limit_bytes=100, source="legacy")

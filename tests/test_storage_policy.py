@@ -117,6 +117,48 @@ class StoragePolicyTests(unittest.TestCase):
             self.assertFalse(ok)
             self.assertIn("above the hard limit", reason)
 
+    def test_non_object_or_identity_free_structured_json_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "quota.json"
+            for payload in ([], "text", None, 7):
+                path.write_text(json.dumps(payload), encoding="utf-8")
+                with self.subTest(payload=payload):
+                    self.assertIsNone(load_quota_snapshot(path, 60))
+
+            malformed = {
+                "schema_version": 2,
+                "used_bytes": 10,
+                "limit_bytes": 20,
+                "soft_quota_bytes": 20,
+                "hard_limit_bytes": 30,
+                "timestamp": time.time(),
+                "source": "test",
+            }
+            path.write_text(json.dumps(malformed), encoding="utf-8")
+            self.assertIsNone(load_quota_snapshot(path, 60))
+
+    def test_preflight_blocks_soft_overage_even_for_zero_sized_write_request(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "data"
+            root.mkdir()
+            path = Path(temp) / "quota.json"
+            path.write_text(json.dumps({
+                "schema_version": 2,
+                "used_bytes": 121,
+                "limit_bytes": 100,
+                "soft_quota_bytes": 100,
+                "hard_limit_bytes": 150,
+                "grace": "1h",
+                "quota_kind": "group",
+                "quota_name": "research",
+                "timestamp": time.time(),
+                "source": "test",
+            }), encoding="utf-8")
+            policy = StoragePolicy({"quota_snapshot_path": str(path), "quota_snapshot_max_age_seconds": 60})
+            allowed, reason = policy.preflight(root, required_bytes=0, minimum_free_bytes=0, require_fresh_quota=True)
+            self.assertFalse(allowed)
+            self.assertIn("above the soft quota", reason)
+
     def test_legacy_snapshot_still_rejects_used_above_single_limit(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "quota.json"

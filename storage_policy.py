@@ -9,6 +9,7 @@ filesystem-level telemetry explicitly.
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import time
@@ -71,42 +72,95 @@ class QuotaSnapshot:
 
     @classmethod
     def from_mapping(cls, payload: Mapping[str, Any]) -> "QuotaSnapshot":
+        """Validate legacy single-limit or explicit schema-v2 quota telemetry.
+
+        Schema v2 must carry its quota identity and separate soft/hard fields.
+        It can never silently fall back to legacy semantics when malformed.
+        """
+        if not isinstance(payload, Mapping):
+            raise ValueError("quota snapshot must be a JSON object")
+
+        structured_keys = {
+            "schema_version", "soft_quota_bytes", "hard_limit_bytes",
+            "grace", "quota_kind", "quota_name",
+        }
+        structured = any(key in payload for key in structured_keys)
+        if structured:
+            version = payload.get("schema_version")
+            if isinstance(version, bool) or not isinstance(version, int) or version != 2:
+                raise ValueError("structured quota fields require schema_version=2")
+            for key in ("soft_quota_bytes", "hard_limit_bytes", "quota_kind", "quota_name"):
+                if key not in payload:
+                    raise ValueError(f"schema-v2 quota snapshot is missing {key}")
+            if payload.get("quota_kind") not in {"user", "group", "project"}:
+                raise ValueError("schema-v2 quota_kind must be user, group, or project")
+            quota_name_value = payload.get("quota_name")
+            if not isinstance(quota_name_value, str) or not quota_name_value.strip():
+                raise ValueError("schema-v2 quota_name must be a non-empty string")
+            source_value = payload.get("source")
+            if not isinstance(source_value, str) or not source_value.strip():
+                raise ValueError("schema-v2 quota source must be a non-empty string")
+            grace_value = payload.get("grace")
+            if grace_value is not None and not isinstance(grace_value, str):
+                raise ValueError("schema-v2 grace must be a string or null")
+            if "limit_bytes" not in payload:
+                raise ValueError("schema-v2 quota snapshot must include effective limit_bytes")
+
         def number(*keys: str) -> Optional[float]:
             for key in keys:
-                value = payload.get(key)
-                if value is not None:
-                    try:
-                        return float(value)
-                    except (TypeError, ValueError):
-                        continue
+                if key not in payload or payload[key] is None:
+                    continue
+                value = payload[key]
+                if isinstance(value, bool):
+                    raise ValueError(f"{key} must be numeric")
+                try:
+                    parsed = float(value)
+                except (TypeError, ValueError, OverflowError) as exc:
+                    raise ValueError(f"{key} must be numeric") from exc
+                if not math.isfinite(parsed):
+                    raise ValueError(f"{key} must be finite")
+                return parsed
             return None
 
         def integer_number(*keys: str) -> Optional[int]:
-            value = number(*keys)
-            if value is None:
-                return None
-            if not value.is_integer():
-                raise ValueError(f"{keys[0]} must be an integer byte count")
-            return int(value)
+            for key in keys:
+                if key not in payload or payload[key] is None:
+                    continue
+                value = payload[key]
+                if isinstance(value, bool):
+                    raise ValueError(f"{key} must be an integer byte count")
+                if isinstance(value, int):
+                    return value
+                if isinstance(value, float):
+                    if not math.isfinite(value) or not value.is_integer():
+                        raise ValueError(f"{key} must be an integer byte count")
+                    return int(value)
+                if isinstance(value, str):
+                    try:
+                        return int(value.strip(), 10)
+                    except (ValueError, TypeError) as exc:
+                        raise ValueError(f"{key} must be an integer byte count") from exc
+                raise ValueError(f"{key} must be an integer byte count")
+            return None
 
         used = integer_number("used_bytes")
         legacy_limit = integer_number("limit_bytes")
-
-        if used is None:
+        if used is None and not structured:
             used_gb = number("used_gb")
             if used_gb is not None:
                 used = int(used_gb * BYTES_PER_GB)
-
-        if legacy_limit is None:
+        if legacy_limit is None and not structured:
             limit_gb = number("limit_gb")
             if limit_gb is not None:
                 legacy_limit = int(limit_gb * BYTES_PER_GB)
 
-        soft_value = integer_number("soft_quota_bytes")
-        hard_value = integer_number("hard_limit_bytes")
+        soft_value = integer_number("soft_quota_bytes") if structured else None
+        hard_value = integer_number("hard_limit_bytes") if structured else None
+        for key, value in (("soft_quota_bytes", soft_value), ("hard_limit_bytes", hard_value)):
+            if value is not None and value < 0:
+                raise ValueError(f"{key} must be non-negative; use zero or null for an unset limit")
         soft_quota = soft_value if soft_value is not None and soft_value > 0 else None
         hard_limit = hard_value if hard_value is not None and hard_value > 0 else None
-        structured_quota_present = "soft_quota_bytes" in payload or "hard_limit_bytes" in payload
 
         if used is None:
             raise ValueError("quota snapshot must provide used_bytes")
@@ -115,53 +169,46 @@ class QuotaSnapshot:
         if soft_quota is not None and hard_limit is not None and soft_quota > hard_limit:
             raise ValueError("soft quota must not exceed hard limit")
 
-        # Soft quota is the conservative admission boundary when configured.
-        # Hard-limit headroom is retained for reporting, not write authorization.
+        # A schema-v2 row with both limits unset is invalid, even if it includes
+        # a legacy field that could misleadingly make it appear configured.
         effective_limit = soft_quota if soft_quota is not None else hard_limit
-        if effective_limit is None:
+        if structured and effective_limit is None:
+            raise ValueError("schema-v2 quota snapshot must configure a positive soft quota or hard limit")
+        if not structured:
             effective_limit = legacy_limit
-
-        if effective_limit is None:
-            available = integer_number("available_bytes")
-            if available is not None:
-                effective_limit = used + available
+            if effective_limit is None:
+                available = integer_number("available_bytes")
+                if available is not None:
+                    effective_limit = used + available
 
         if effective_limit is None or effective_limit <= 0:
             raise ValueError("quota snapshot must provide a positive soft, hard, or legacy limit")
-        if legacy_limit is not None and structured_quota_present and int(legacy_limit) != int(effective_limit):
+        if structured and legacy_limit is not None and legacy_limit != effective_limit:
             raise ValueError("limit_bytes must equal the conservative soft quota (or hard limit when soft is unset)")
-
-        # Legacy one-limit snapshots remain strict. Structured quota snapshots
-        # can report usage above soft/hard so policy can expose the condition
-        # and deny writes instead of silently discarding the telemetry.
-        has_structured_limit = soft_quota is not None or hard_limit is not None
-        if used > effective_limit and not has_structured_limit:
+        if not structured and used > effective_limit:
             raise ValueError("legacy quota used bytes must be between 0 and limit")
 
         timestamp = number("timestamp", "captured_at")
-        if timestamp is None:
-            raise ValueError("quota snapshot must provide timestamp")
+        if timestamp is None or timestamp < 0:
+            raise ValueError("quota snapshot must provide a non-negative finite timestamp")
 
-        quota_kind = payload.get("quota_kind")
-        if quota_kind is not None and quota_kind not in {"user", "group", "project"}:
-            raise ValueError("quota_kind must be user, group, or project")
-
-        grace = payload.get("grace")
+        grace = payload.get("grace") if structured else None
         if grace is not None:
-            grace = str(grace).strip() or None
-
-        quota_name = payload.get("quota_name")
+            grace = grace.strip() or None
+        quota_kind = payload.get("quota_kind") if structured else None
+        quota_name = payload.get("quota_name") if structured else None
         return cls(
-            used_bytes=int(used),
+            used_bytes=used,
             limit_bytes=int(effective_limit),
             timestamp=float(timestamp),
             source=str(payload.get("source", "unknown")),
             soft_quota_bytes=soft_quota,
             hard_limit_bytes=hard_limit,
             grace=grace,
-            quota_kind=str(quota_kind) if quota_kind is not None else None,
-            quota_name=str(quota_name) if quota_name is not None else None,
+            quota_kind=quota_kind,
+            quota_name=quota_name,
         )
+
 
 def load_quota_snapshot(
     path: str | os.PathLike[str],
