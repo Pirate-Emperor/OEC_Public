@@ -1,6 +1,6 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-16 02:02 IST (Asia/Kolkata)
+**Last updated:** 2026-10-16 11:23 IST (Asia/Kolkata)
 **Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
@@ -334,3 +334,12 @@ The review branch now removes that unconditional first gate, checks package vers
 The TRELLIS-only Gradio notebook now defaults to local scratch output for cached-model testing, provided `/tmp` is on a different filesystem from model storage and at least 512 MiB is free. Shared-output mode remains explicit and still requires fresh quota telemetry. The quick-start guide and static regression tests were updated; the A100 sync workflow now runs those tests before replacing the live notebook.
 
 The notebook JSON was re-read successfully, but no Actions test result or A100 sync confirmation was returned for [trigger commit `647d762`](https://github.com/Killer4K-N/OEC/commit/647d7627dca9c8c6b8816b6f5cd3c2f7f4dd0b23). No actual notebook code-cell execution, Gradio launch, model inference, package installation or shared-output write was performed. Do not mark the fix as deployed until the A100 source is verified; `main` remains unchanged.
+
+
+## 2026-10-16 11:23 IST — FLUX Gradio final-cell fix (hosted regression pass; live A100 pending)
+
+The FLUX-only notebook final cell called a Gradio helper whose Generate callback defaulted to managed shared output storage. This meant an otherwise cache-only test still needed a fresh quota snapshot when a user clicked Generate. The UI now defaults to guarded local scratch output under /tmp, explicitly checks filesystem separation from model storage, requires at least 512 MiB free, and refuses output overwrites. Shared output remains explicit opt-in and still uses the StorageManager admission path.
+
+The notebook now passes the selected output mode/cache into the helper, reports the port/mode on readiness, and emits FLUX_GRADIO_LAUNCH=FAIL with the original exception if UI startup fails. A stable /generate Gradio API route supports a real click/API smoke test. The A100 workflow backs up the FLUX notebook/helper before replacing them and then, after sync, attempts a cache-only UI launch, calls /generate, and validates one 512×512 PNG plus sidecar.
+
+Hosted CI [run 38857928846](https://github.com/Killer4K-N/OEC/actions/runs/38857928846) passed all 104 tests, including eight FLUX-specific regressions and the notebook JSON/compilation checks. The live A100 run [38857928677](https://github.com/Killer4K-N/OEC/actions/runs/38857928677) is still queued without a runner assignment. No live notebook replacement, Gradio launch, model load or image generation has been confirmed; this remains pending rather than marked complete. No source changes were merged to main.
