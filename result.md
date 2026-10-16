@@ -1,6 +1,6 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-16 11:39 IST (Asia/Kolkata)
+**Last updated:** 2026-10-16 11:40 IST (Asia/Kolkata)
 **Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
@@ -353,7 +353,7 @@ Live testing on oec-1 / scn30-mn has confirmed the cached FLUX pipeline loads an
 2. OEC's proxy environment originally routed Gradio's own localhost startup request through the proxy; core_config.py now preserves and extends NO_PROXY/no_proxy for localhost, 127.0.0.1 and ::1. The A100 workflow now actually syncs this file after a verified backup.
 3. The live callback generated a valid 512×512 PNG (196,376 bytes) and sidecar in 20.944 seconds and Gradio returned HTTP 200, but Gradio refused to transfer the callback's file paths because the custom /tmp output directory was not included in allowed_paths. The helper now exposes the selected per-run output directory, and the notebook and live smoke explicitly allow only that directory.
 
-Hosted regression [run 38859218054](https://github.com/Killer4K-N/OEC/actions/runs/38859218054) passed. The next live run [38859218039](https://github.com/Killer4K-N/OEC/actions/runs/38859218039) is still queued without a runner assignment at the time of this record. The complete Gradio Generate response is not yet accepted; source has been changed to fix the allowlist, and it must be confirmed by the resulting run and artifact. This is not a claimed full notebook pass yet. No packages were installed, no models were downloaded, no shared output was written, and main was not changed.
+Hosted regression [run 38859218054](https://github.com/Killer4K-N/OEC/actions/runs/38859218054) passed. At the time this interim entry was written, live run [38859218039](https://github.com/Killer4K-N/OEC/actions/runs/38859218039) was queued and the callback result was still pending. That interim state was superseded by the successful run recorded below. No packages were installed, no models were downloaded, no shared output was written, and main was not changed.
 
 
 ## 2026-10-16 11:39 IST — FLUX-only Jupyter / Gradio end-to-end acceptance: PASS
@@ -362,6 +362,6 @@ Final live test [run 38859218039](https://github.com/Killer4K-N/OEC/actions/runs
 
 The actual Gradio UI returned HTTP 200 and the real /generate client request completed successfully. The live run confirmed all localhost proxy-bypass checks, model runtime and cache pass, a 512×512 RGB PNG at 196,376 bytes, a JSON sidecar, and an exact-run artifact (12028935755) containing the report, PNG and sidecar. The final metadata records seed 2048, four inference steps, local scratch output, and 1.145 seconds for the generation call. I downloaded the artifact ZIP and independently verified the PNG using Pillow and parsed the metadata/report JSON.
 
-The fixes resolved three runtime failures found by the successive live attempts: unsupported Gradio theme argument, localhost startup traffic being sent through the HPC proxy because core_config.py was not initially synced, and Gradio rejecting returned files outside allowed_paths. The last issue is now addressed by passing only the chosen per-run scratch directory as an allowed path. Hosted regression [run 38859218054](https://github.com/Killer4K-N/OEC/actions/runs/38859218054) passed all 104 tests and notebook JSON/compilation/CLI checks.
+The fixes resolved three runtime failures found by the successive live attempts: unsupported Gradio theme argument, localhost startup traffic being sent through the HPC proxy because core_config.py was not initially synced, and Gradio rejecting returned files outside allowed_paths. The last issue is now addressed by passing only the chosen per-run scratch directory as an allowed path. Hosted regression [run 38859218054](https://github.com/Killer4K-N/OEC/actions/runs/38859218054) passed all 105 tests and notebook JSON/compilation/CLI checks.
 
 The notebook, helper and proxy fix are on the review branch and have been synchronized with verified backups while preserving unrelated dirty files. No shared-storage output write, dependency installation, model download, cache purge, reserve-file access or merge to main occurred. PR #11 remains open. The server-side Gradio Generate path is accepted for this revision; a browser/tunnel issue on the user's local forwarded port, if any, would be a separate networking check.
