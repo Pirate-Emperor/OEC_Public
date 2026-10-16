@@ -632,7 +632,7 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:
             raise gr.Error(f"TRELLIS generation failed: {type(exc).__name__}: {exc}") from exc
 
-    with gr.Blocks(title="OEC TRELLIS.2", theme=gr.themes.Monochrome()) as demo:
+    with gr.Blocks(title="OEC TRELLIS.2") as demo:
         gr.Markdown(
             "# OEC TRELLIS.2 Image-to-3D\n"
             "Upload one image, generate a textured GLB, and inspect it in the interactive viewer. "
@@ -679,6 +679,8 @@ def main(argv: list[str] | None = None) -> int:
         share=args.share,
         inbrowser=args.inbrowser,
         show_error=True,
+        allowed_paths=[str(args.output_dir or Path(runtime["system_dirs"]["outputs"]) / "3d_models")],
+        theme=gr.themes.Monochrome(),
     )
     return 0
 

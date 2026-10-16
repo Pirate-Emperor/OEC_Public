@@ -230,6 +230,35 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertIn("TRELLIS_IMAGE_TO_3D_SMOKE=PASS", self.runtime)
 
 
+    def test_trellis_gradio_launch_allows_output_files_and_uses_gradio6_theme_api(self):
+        notebook_cases = (
+            ("TRELLIS-only notebook", self.only, "demo.launch("),
+            ("combined notebook", self.combined, "demo_trellis.launch("),
+        )
+        for label, cells, launch_token in notebook_cases:
+            source = "\\n".join(cells)
+            blocks = [line.strip() for line in source.splitlines() if "gr.Blocks(" in line]
+            self.assertTrue(blocks, label)
+            self.assertTrue(all("theme=" not in line for line in blocks), label)
+            launch_start = source.rfind(launch_token)
+            self.assertGreaterEqual(launch_start, 0, label)
+            launch = source[launch_start:]
+            self.assertIn("allowed_paths=[OUTPUT_DIR]", launch, label)
+            if label == "combined notebook":
+                self.assertIn("theme=gr.themes.Monochrome()", launch, label)
+                self.assertIn('os.environ.get("AIEROS_TRELLIS_UI_OUTPUT_MODE", "scratch")', source)
+                self.assertIn("TRELLIS_OUTPUT_MODE=local_scratch_only", source)
+
+        cli = (self.ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
+        block_lines = [line.strip() for line in cli.splitlines() if "gr.Blocks(" in line]
+        self.assertTrue(block_lines, "standalone TRELLIS CLI")
+        self.assertTrue(all("theme=" not in line for line in block_lines))
+        launch_start = cli.rfind("demo.launch(")
+        self.assertGreaterEqual(launch_start, 0)
+        launch = cli[launch_start:]
+        self.assertIn("allowed_paths=[str(args.output_dir or Path(runtime[", launch)
+        self.assertIn("theme=gr.themes.Monochrome()", launch)
+
     def test_all_three_notebooks_keep_gradio_ports_private_and_outputs_fresh(self):
         expected = (
             (self.flux_only_nb, self.flux_only, "7864", "demo_flux.launch("),
