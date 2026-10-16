@@ -103,7 +103,10 @@ class StoragePolicyTests(unittest.TestCase):
                 "soft_quota_bytes": soft,
                 "hard_limit_bytes": hard,
                 "grace": "expired",
+                "quota_kind": "group",
+                "quota_name": "research",
                 "timestamp": time.time(),
+                "source": "lfs quota test fixture",
             }), encoding="utf-8")
             snapshot = load_quota_snapshot(quota_path, 60)
             self.assertIsNotNone(snapshot)
