@@ -162,3 +162,31 @@ The user reported that cell 10 stopped with `fresh quota telemetry is required b
 - [Storage write-admission tests](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tests/test_storage_write_admission.py)
 - [A100 regression-gated sync workflow](https://github.com/Killer4K-N/OEC/actions/workflows/sync-a100-pipeline-tools.yml)
 - [Trigger commit](https://github.com/Killer4K-N/OEC/commit/647d7627dca9c8c6b8816b6f5cd3c2f7f4dd0b23)
+
+
+## FLUX Gradio final-cell repair and live verification gate
+
+The user reported that the standalone FLUX Jupyter notebook's final code cell was failing. Source inspection found a functional issue in addition to missing runtime evidence: the notebook creates the Gradio UI through create_gradio_demo, but the UI callback called generate_flux_image without scratch_output=True. Generation attempts therefore defaulted to shared outputs/images, which requires fresh quota telemetry and can fail even when the model is cached.
+
+### Implemented on the review branch
+
+- The FLUX Gradio UI now defaults to AIEROS_FLUX_UI_OUTPUT_MODE=scratch, writes PNG and metadata beneath /tmp, rejects existing outputs, checks at least 512 MiB free, and verifies temporary storage is on a different filesystem from the model cache. Shared storage is explicit opt-in and continues to require fresh StorageManager admission.
+- Added a stable Gradio API name (/generate) and a configurable per-run scratch directory for exact-run smoke tests.
+- Updated the FLUX-only notebook's final active cell to pass the output mode and model-cache path, print pipeline-ready mode/port, and emit FLUX_GRADIO_LAUNCH=FAIL with the original exception if Gradio startup fails.
+- Added FLUX-specific regression assertions and a live oec-1 workflow gate that tests the exact Gradio /generate API, produces a 512×512 PNG, validates PNG signature and metadata, and uploads the evidence. The sync workflow backs up and hash-verifies pipeline_flux_only.ipynb and pipeline_flux_image.py before replacing those explicitly authorized targets; unrelated dirty files stay protected.
+
+### Test and runtime status
+
+- Hosted regression run [38857928846](https://github.com/Killer4K-N/OEC/actions/runs/38857928846) completed successfully on candidate commit [7084fbf](https://github.com/Killer4K-N/OEC/commit/7084fbf6f6add860d1ea7631b9f6b059b130c58b).
+- The run passed 104 tests across the configured suites: QA (15), TRELLIS notebook static (15), TRELLIS easy-run (6), offline TRELLIS config (6), FLUX/TRELLIS integration (16), FLUX image/Gradio configuration (8), FLUX GPU admission (6), AudioCraft notebook static (5), storage-write admission (6), service manager (8), service-manager help (7), and LTX worker config (6). All four notebook JSON checks, Python compilation and service-manager help checks passed.
+- Live A100 sync/Gradio verification [38857928677](https://github.com/Killer4K-N/OEC/actions/runs/38857928677) is still queued, with no runner assigned at the latest check. It has not copied the corrected notebook/helper to the persistent checkout and has not attempted cached-model load, Gradio launch or image generation. This is not live-runtime acceptance.
+- No model download, dependency install, shared-output write, cache purge or .storage_reserve.bin access was performed by the hosted test run. Main remains unchanged and PR #11 remains open.
+
+### References
+
+- [FLUX-only notebook](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_flux_only.ipynb)
+- [FLUX image/Gradio helper](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_flux_image.py)
+- [FLUX regression suite](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tests/test_flux_image.py)
+- [A100 sync and live Gradio gate](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/.github/workflows/sync-a100-pipeline-tools.yml)
+- [Hosted regression run](https://github.com/Killer4K-N/OEC/actions/runs/38857928846)
+- [Queued live A100 Gradio run](https://github.com/Killer4K-N/OEC/actions/runs/38857928677)
