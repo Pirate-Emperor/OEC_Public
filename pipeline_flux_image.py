@@ -457,7 +457,14 @@ def create_gradio_demo(
         safe_user = "".join(
             char for char in os.environ.get("USER", "user") if char.isalnum() or char in "-_"
         ) or "user"
-        chosen_output = Path("/tmp") / f"oec-flux-ui-{safe_user}-{os.getpid()}"
+        configured_scratch = os.environ.get("AIEROS_FLUX_UI_SCRATCH_DIR")
+        chosen_output = (
+            Path(configured_scratch).expanduser()
+            if configured_scratch
+            else Path("/tmp") / f"oec-flux-ui-{safe_user}-{os.getpid()}"
+        )
+        if not _is_relative_to(chosen_output.resolve(), Path("/tmp")):
+            raise RuntimeError("BLOCKED_SCRATCH_OUTPUT: AIEROS_FLUX_UI_SCRATCH_DIR must be under /tmp.")
         print(f"FLUX_UI_OUTPUT_MODE=scratch path={chosen_output}", flush=True)
     else:
         chosen_output = Path(output_dir).expanduser() if output_dir else Path(dirs["outputs"]) / "images"
@@ -503,6 +510,7 @@ def create_gradio_demo(
         button.click(
             fn=generate, inputs=[prompt, input_image, width, height, steps, guidance, seed, randomize],
             outputs=[output_image, output_seed, output_file, metadata_file],
+            api_name="generate",
         )
     demo.queue(default_concurrency_limit=1)
     return demo
