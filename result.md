@@ -383,3 +383,8 @@ The guarded live sync [38896579885](https://github.com/Killer4K-N/OEC/actions/ru
 After synchronization, cached FLUX generation also passed in that run: localhost proxy bypass and Gradio HTTP 200, successful actual `/generate`, valid 512×512 RGB PNG (196,376 bytes) with metadata sidecar, all saved in [artifact 12044347373](https://github.com/Killer4K-N/OEC/actions/runs/38896579885/artifacts/12044347373). Generation took 20.816 s, seed 2048, four inference steps, and output mode was local scratch. No shared output write, model download, cache purge, reserve-file access or dependency change occurred.
 
 A separate cache-only TRELLIS runtime test [38897009792](https://github.com/Killer4K-N/OEC/actions/runs/38897009792) is in progress. Until that job's logs and artifact prove image-to-GLB generation/geometry reopen and Gradio HTTP startup, do not mark Trellis runtime accepted based only on source synchronization and hosted static tests.
+
+
+### Runtime status correction — 2026-10-16 17:35 IST
+
+The TRELLIS runtime job [38897009792](https://github.com/Killer4K-N/OEC/actions/runs/38897009792) has not returned a final status or artifact in the latest status check; job 116959777408 still reports the main step in progress. Its last Actions API update is 11:56:37Z. No inference/GLB/Gradio outcome is published, so the Trellis runtime acceptance remains pending. Do not interpret the absence of a result log as success or failure. The completed static regression, guarded A100 synchronization, and FLUX live generation records above are independently complete.

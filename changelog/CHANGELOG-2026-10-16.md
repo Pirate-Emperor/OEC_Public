@@ -299,3 +299,8 @@ The trigger was committed with the workflow; its live runtime outcome is pending
 
 - The new cache-only workflow [38897009792](https://github.com/Killer4K-N/OEC/actions/runs/38897009792) has started on `oec-1` using existing `phase2_3d` dependencies. Its intended checks are real cached image-to-GLB inference, GLB geometry reopen, then Gradio launch/HTTP 200 on loopback.
 - No outcome or artifact was available at the time of this record. Treat this as `IN_PROGRESS`, not pass or fail. The accepted branch code is synchronized, but only this run's logs/artifact can establish whether the current Trellis environment passes runtime validation.
+
+
+### 17:35 IST status refresh — TRELLIS runtime still active
+
+Rechecked run [38897009792](https://github.com/Killer4K-N/OEC/actions/runs/38897009792), job `116959777408`. GitHub still reports the guarded runtime step as `in_progress` (the run's last API update remains 2026-10-16T11:56:37Z). The artifact list is still empty and the log-download endpoint has not yet exposed the active step log. Therefore no pass/fail, inference timing, mesh counts or root cause can currently be stated. The job may still be executing GPU work; do not dispatch a second TRELLIS inference job while this run is active and the shared lock is in use. The static and A100 sync/FLUX evidence earlier in this file remains verified independently.

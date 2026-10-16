@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T17:29:00+05:30",
+  "last_updated": "2026-10-16T17:35:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Current OEC status: TRELLIS Gradio final-cell source fix f10f266 passed all 106 configured hosted tests; guarded A100 sync 38896579885 backup-verified and synced pipeline_trellis_3d.py plus both Trellis notebooks (3 updated, 13 unchanged, 2 unrelated dirty conflicts preserved). The same run revalidated cached FLUX on oec-1/A100: localhost bypass, Gradio HTTP 200, /generate PASS, valid 512×512 PNG (196,376 bytes) and sidecar in artifact 12044347373. Dedicated Trellis cache-only image-to-GLB/Gradio acceptance run 38897009792 is in progress; not yet accepted. Main remains unchanged.",
+  "latest_summary": "Reviewed branch source fix and guarded A100 sync are verified; three Trellis files were backed up and synced on oec-1, with unrelated dirty paths preserved. FLUX cache-only Gradio HTTP 200 and actual /generate PNG generation passed in artifact 12044347373. Hosted regression passed 106 configured tests. Dedicated TRELLIS runtime run 38897009792 remains in_progress with no logs/artifact published at the 17:35 IST status refresh, so Trellis runtime is not yet accepted. Main remains unchanged.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -3069,7 +3069,10 @@
         "model_download": false,
         "dependency_install": false,
         "cache_purge": false,
-        "reserve_file_access": false
+        "reserve_file_access": false,
+        "trellis_runtime_separate_status": "IN_PROGRESS_NO_LOGS_OR_ARTIFACT_PUBLISHED_AS_OF_2026-10-16T17:35:00+05:30",
+        "trellis_run_last_api_update": "2026-10-16T11:56:37Z",
+        "trellis_runtime_artifact": "NONE_PUBLISHED_AT_STATUS_REFRESH"
       },
       "evidence_urls": [
         "https://github.com/Killer4K-N/OEC/actions/runs/38896579885",
@@ -3078,7 +3081,7 @@
         "https://github.com/Killer4K-N/OEC/actions/runs/38897009145",
         "https://github.com/Killer4K-N/OEC/actions/runs/38897009792"
       ],
-      "follow_up": "Inspect run 38897009792 and its artifact. If it passes, record the actual runtime values and validate artifact geometry. If blocked/failing, retain exact exception and diagnose the underlying attention/cache/API cause without bypassing storage or installing packages unless the authorized dependency process and storage guards permit it."
+      "follow_up": "Recheck run 38897009792 without dispatching another GPU job. Once complete, read its logs/artifact, record the real inference and Gradio result, and diagnose any exact failure before claiming Trellis runtime accepted."
     }
   ]
 }

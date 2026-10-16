@@ -283,3 +283,8 @@ Source remains on review PR [#11](https://github.com/Killer4K-N/OEC/pull/11); do
 - [ ] **OPEN — exact Jupyter kernel/browser test:** the separate workflow exercises the cached TRELLIS runtime and standalone CLI Gradio start; it does not click Generate in each notebook through the user's browser/kernel. After a runtime pass, distinguish that evidence from an actual notebook-browser session test.
 
 Current reviewed source is on [PR #11](https://github.com/Killer4K-N/OEC/pull/11); no merge to `main`.
+
+
+### 17:35 IST update
+
+- [ ] **Still IN PROGRESS — TRELLIS runtime run 38897009792**: job 116959777408 reports the inference/GLB/Gradio step active, last run API update 11:56:37Z. Logs/artifacts have not been exposed while the step remains active. Do not claim pass/fail without the final step output and artifact; do not launch a duplicate GPU workload while the current run may hold the inference lock.
