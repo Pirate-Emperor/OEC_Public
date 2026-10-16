@@ -266,3 +266,10 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - [ ] **OPEN — combined UI acceptance:** validate separate TRELLIS/FLUX UI start on distinct GPUs/ports and an exact FLUX-PNG-to-TRELLIS input handoff after the latest files are synchronized. No shared output writes, downloads, or installs without current storage-policy admission.
 
 Source remains on review PR [#11](https://github.com/Killer4K-N/OEC/pull/11); do not merge to `main` without explicit authorization. Detailed evidence: [daily changelog](changelog/CHANGELOG-2026-10-16.md#2026-10-16-1718-ist--trellis-gradio-final-cell-compatibility-and-file-serving-repair).
+
+
+## 2026-10-16 17:25 IST — live TRELLIS acceptance workflow status
+
+- [x] Added a dedicated reviewed-branch workflow [`.github/workflows/trellis-a100-runtime-smoke.yml`](.github/workflows/trellis-a100-runtime-smoke.yml), triggered by [`.github/trellis-runtime-smoke.trigger`](.github/trellis-runtime-smoke.trigger). It is restricted to `oec-1`, cache-only, uses the shared inference lock, checks a minimum 4 GiB scratch free-space threshold and requires `/tmp` to be distinct from model-cache storage. It exercises the existing image-to-GLB smoke, geometry reopen, and Gradio HTTP health.
+- [ ] **OPEN — live workflow outcome pending.** Do not create a test result record or mark live Trellis accepted until the actual run and artifact are inspected.
+- [ ] **OPEN — exact notebook-browser execution:** the workflow exercises CLI Gradio startup and the real TRELLIS model runtime; it does not execute every notebook cell in a browser/kernel. Verify exact notebook behavior after the source sync and distinguish it from CLI acceptance.

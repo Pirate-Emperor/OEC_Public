@@ -1,0 +1,154 @@
+name: TRELLIS A100 cache-only runtime acceptance
+
+on:
+  push:
+    branches:
+      - fix/flux-trellis-pipeline-20261015
+    paths:
+      - .github/trellis-runtime-smoke.trigger
+
+permissions:
+  contents: read
+
+jobs:
+  trellis-live-acceptance:
+    name: Cache-only TRELLIS image-to-GLB and Gradio launch on oec-1
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 60
+    steps:
+      - name: Check out the reviewed candidate
+        uses: actions/checkout@v4
+
+      - name: Run guarded TRELLIS inference, validate the GLB, and start the Gradio UI
+        shell: bash
+        env:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          HF_HUB_DISABLE_TELEMETRY: "1"
+          PYTHONUNBUFFERED: "1"
+        run: |
+          set -Eeuo pipefail
+          test "${RUNNER_NAME:-unknown}" = "oec-1" || { echo 'TRELLIS_RUNTIME_SMOKE=BLOCKED_WRONG_RUNNER'; exit 41; }
+          PYTHON="${OEC_PYTHON:-$HOME/Conda/envs/phase2_3d/bin/python}"
+          test -x "$PYTHON" || { echo "TRELLIS_RUNTIME_SMOKE=BLOCKED_PHASE2_3D_PYTHON_MISSING path=$PYTHON"; exit 42; }
+          TRELLIS_SMOKE_DIR="/tmp/oec-trellis-runtime-smoke-$GITHUB_RUN_ID"
+          test ! -e "$TRELLIS_SMOKE_DIR" || { echo "TRELLIS_RUNTIME_SMOKE=BLOCKED_RUN_DIR_EXISTS path=$TRELLIS_SMOKE_DIR"; exit 43; }
+          export TRELLIS_SMOKE_DIR
+          export AIEROS_TRELLIS_ATTN_BACKEND=xformers
+
+          exec 9>/tmp/oec-flux-inference.lock
+          if ! flock -x -w 180 9; then
+            echo 'TRELLIS_RUNTIME_SMOKE=BLOCKED_GPU_LOCK_TIMEOUT'
+            exit 44
+          fi
+
+          MODEL_ROOT="$("$PYTHON" - <<'PY'
+          import os
+          import shutil
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path(os.environ["GITHUB_WORKSPACE"]) / "tests"))
+          from trellis_runtime_smoke import load_path_env
+          env = load_path_env()
+          base = env.get("AIEROS_BASE_DIR", str(Path.home()))
+          model_root = Path(os.environ.get(
+              "AIEROS_TEST_MODEL_ROOT",
+              env.get("AIEROS_MODELS_DIR", str(Path(base) / "aireos_models")),
+          )).expanduser().resolve()
+          repo = model_root / "TRELLIS.2"
+          if not (repo / "setup.sh").is_file():
+              raise SystemExit(f"TRELLIS_RUNTIME_SMOKE=BLOCKED_TRELLIS_CHECKOUT_MISSING path={repo}")
+          scratch_root = Path("/tmp").resolve()
+          if scratch_root.stat().st_dev == model_root.stat().st_dev:
+              raise SystemExit("TRELLIS_RUNTIME_SMOKE=BLOCKED_SCRATCH_SAME_FILESYSTEM_AS_MODEL_STORAGE")
+          free_bytes = shutil.disk_usage(scratch_root).free
+          if free_bytes < 4 * 1024**3:
+              raise SystemExit(f"TRELLIS_RUNTIME_SMOKE=BLOCKED_SCRATCH_LOW_SPACE free_bytes={free_bytes} need_bytes={4 * 1024**3}")
+          print(f"TRELLIS_RUNTIME_PREFLIGHT=PASS model_root={model_root} tmp_free_bytes={free_bytes}", file=sys.stderr)
+          print(model_root)
+          PY
+          )"
+          export AIEROS_TEST_MODEL_ROOT="$MODEL_ROOT"
+          GPU="$("$PYTHON" "$GITHUB_WORKSPACE/tools/flux_gpu_admission.py" --print-index-only --wait-seconds 180)"
+          export CUDA_VISIBLE_DEVICES="$GPU"
+          export AIEROS_TRELLIS_GPU="$GPU"
+          echo "TRELLIS_RUNTIME_SMOKE=START runner=$RUNNER_NAME host=$(hostname) physical_gpu=$GPU python=$PYTHON"
+          "$PYTHON" -u "$GITHUB_WORKSPACE/tests/trellis_runtime_smoke.py" 2>&1 | tee "$GITHUB_WORKSPACE/trellis-runtime-smoke.log"
+
+          GLB="$TRELLIS_SMOKE_DIR/output/trellis-generated-asset.glb"
+          test -s "$GLB" || { echo "TRELLIS_RUNTIME_SMOKE=FAIL_GLB_MISSING path=$GLB"; exit 45; }
+          mkdir -p "$GITHUB_WORKSPACE/trellis-runtime-smoke-artifact"
+          cp -p "$GLB" "$GITHUB_WORKSPACE/trellis-runtime-smoke-artifact/trellis-generated-asset.glb"
+          "$PYTHON" - <<'PY'
+          import hashlib, json, os, time
+          from pathlib import Path
+          import trimesh
+          artifact = Path(os.environ["GITHUB_WORKSPACE"]) / "trellis-runtime-smoke-artifact" / "trellis-generated-asset.glb"
+          scene = trimesh.load(str(artifact), force="scene")
+          geometries = list(scene.geometry.values())
+          vertices = sum(len(g.vertices) for g in geometries if hasattr(g, "vertices"))
+          faces = sum(len(g.faces) for g in geometries if hasattr(g, "faces"))
+          if not geometries or vertices <= 0 or faces <= 0:
+              raise SystemExit(f"TRELLIS_RUNTIME_ARTIFACT=FAIL geometries={len(geometries)} vertices={vertices} faces={faces}")
+          report = {
+              "status": "PASS",
+              "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+              "commit": os.environ["GITHUB_SHA"],
+              "runner": os.environ.get("RUNNER_NAME"),
+              "host": os.uname().nodename,
+              "visible_physical_gpu": os.environ.get("AIEROS_TRELLIS_GPU"),
+              "offline_cache_only": True,
+              "model_download": False,
+              "dependency_install": False,
+              "glb_bytes": artifact.stat().st_size,
+              "glb_sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
+              "reopened_geometry_count": len(geometries),
+              "reopened_vertices": vertices,
+              "reopened_faces": faces,
+          }
+          report_path = artifact.parent / "trellis-runtime-smoke.json"
+          report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print("TRELLIS_RUNTIME_ARTIFACT=PASS " + json.dumps(report, sort_keys=True), flush=True)
+          PY
+
+          UI_OUTPUT="$TRELLIS_SMOKE_DIR/ui-output"
+          mkdir -p "$UI_OUTPUT"
+          UI_PORT=$((17862 + GITHUB_RUN_ID % 1000))
+          export AIEROS_TRELLIS_PORT="$UI_PORT"
+          "$PYTHON" -u "$GITHUB_WORKSPACE/pipeline_trellis_3d.py" --mode gradio --offline --gpu "$GPU" --port "$UI_PORT" --server-name 127.0.0.1 --output-dir "$UI_OUTPUT" > "$GITHUB_WORKSPACE/trellis-gradio-launch.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'if kill -0 "$SERVER_PID" 2>/dev/null; then kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true; fi' EXIT
+          "$PYTHON" - <<'PY'
+          import os, time, urllib.request
+          port = int(os.environ["AIEROS_TRELLIS_PORT"])
+          opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+          last_error = None
+          for _ in range(90):
+              try:
+                  with opener.open(f"http://127.0.0.1:{port}/", timeout=3) as response:
+                      if response.status == 200:
+                          print(f"TRELLIS_GRADIO_HTTP=PASS port={port} status=200", flush=True)
+                          raise SystemExit(0)
+              except Exception as exc:
+                  last_error = exc
+                  time.sleep(1)
+          raise SystemExit(f"TRELLIS_GRADIO_HTTP=FAIL port={port} last_error={last_error!r}")
+          PY
+          kill "$SERVER_PID" 2>/dev/null || true
+          wait "$SERVER_PID" 2>/dev/null || true
+          trap - EXIT
+          grep -F 'TRELLIS_GRADIO_START=PASS' "$GITHUB_WORKSPACE/trellis-gradio-launch.log" >/dev/null
+          echo 'TRELLIS_RUNTIME_SMOKE=PASS image_to_glb=PASS geometry_reopen=PASS gradio_http=200'
+          echo "TRELLIS_RUNTIME_SMOKE_RUN_ID=$GITHUB_RUN_ID"
+
+      - name: Upload exact-run TRELLIS runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-trellis-runtime-smoke
+          path: |
+            trellis-runtime-smoke.log
+            trellis-gradio-launch.log
+            trellis-runtime-smoke-artifact/**
+          if-no-files-found: warn
+          retention-days: 30

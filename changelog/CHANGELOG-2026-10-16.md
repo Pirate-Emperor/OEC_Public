@@ -265,3 +265,12 @@ No dependencies were installed, no model weights were downloaded, and no shared 
 - [Combined TRELLIS/FLUX notebook](https://github.com/Killer4K-N/OEC/blob/f10f2660193751351705b5fd601b0947a2e8e045/pipeline_trellis_3d.ipynb), [TRELLIS-only notebook](https://github.com/Killer4K-N/OEC/blob/f10f2660193751351705b5fd601b0947a2e8e045/pipeline_trellis_3d_only.ipynb), and [standalone TRELLIS CLI](https://github.com/Killer4K-N/OEC/blob/f10f2660193751351705b5fd601b0947a2e8e045/pipeline_trellis_3d.py) — target code and output/launch policy.
 - [Candidate regression workflow](https://github.com/Killer4K-N/OEC/actions/runs/38896204476) — test results and notebook JSON checks.
 - [Live FLUX A100 workflow](https://github.com/Killer4K-N/OEC/actions/runs/38859218039) and [exact-run artifact](https://github.com/Killer4K-N/OEC/actions/runs/38859218039/artifacts/12028935755) — separate confirmed evidence for FLUX-only runtime, not Trellis.
+
+
+## 2026-10-16 17:25 IST — dedicated cache-only TRELLIS A100 acceptance workflow added
+
+Added `.github/workflows/trellis-a100-runtime-smoke.yml`, triggered only by `.github/trellis-runtime-smoke.trigger` on the review branch. It targets only the verified `oec-1` label and uses the existing `phase2_3d` environment. Before running it takes the same host-local inference lock as the FLUX smoke, checks the TRELLIS source checkout and cached model root, requires at least 4 GiB measured free capacity under `/tmp`, and refuses to proceed if `/tmp` shares the model-cache filesystem.
+
+The workflow uses the existing `tests/trellis_runtime_smoke.py` for offline cached TRELLIS inference and GLB export/reopen, reopens the copied artifact again with trimesh, then launches the standalone CLI's Gradio UI on a loopback-only port and requires HTTP 200. It uploads the exact-run log, GLB and JSON summary. No dependency install/model download/shared output write/cache purge/reserve access is part of this test.
+
+The trigger was committed with the workflow; its live runtime outcome is pending at this log entry. No result is pre-recorded in `test.json` until the job actually runs. Even a successful CLI UI health check does not prove browser execution of every notebook cell, so notebook-runtime acceptance remains separately identified.
