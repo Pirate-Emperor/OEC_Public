@@ -190,3 +190,29 @@ The user reported that the standalone FLUX Jupyter notebook's final code cell wa
 - [A100 sync and live Gradio gate](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/.github/workflows/sync-a100-pipeline-tools.yml)
 - [Hosted regression run](https://github.com/Killer4K-N/OEC/actions/runs/38857928846)
 - [Queued live A100 Gradio run](https://github.com/Killer4K-N/OEC/actions/runs/38857928677)
+
+
+## FLUX Jupyter live GPU verification — Gradio compatibility, proxy routing and file allowlist
+
+The live test has now gone beyond static checks and isolated three sequential blockers. All changes remain on the review branch; PR #11 remains open and main was not modified.
+
+### Exact runtime evidence
+
+- [Live run 38857928677](https://github.com/Killer4K-N/OEC/actions/runs/38857928677): GPU admission passed, cached FLUX weights loaded on the A100, but Gradio UI construction failed because the installed Gradio version rejects the theme argument in Blocks. Removed optional theme styling for compatibility.
+- [Live run 38858591217](https://github.com/Killer4K-N/OEC/actions/runs/38858591217): Gradio created the local server, but /gradio_api/startup-events failed with HTTP 503. The OEC proxy setup did not bypass localhost. Added localhost, 127.0.0.1 and ::1 to both NO_PROXY and no_proxy, preserving existing bypass entries. The first follow-up workflow still did not synchronize core_config.py because it was absent from the actual copy list; that list was corrected explicitly.
+- [Live run 38858984764](https://github.com/Killer4K-N/OEC/actions/runs/38858984764): after core_config.py was backed up and synchronized, all three urllib localhost-bypass checks reported true. FLUX loaded from cache on oec-1 / scn30-mn / A100 GPU 0 in 11.014 seconds; Gradio root returned HTTP 200; the actual /generate callback produced a valid 512×512 PNG (196,376 bytes) and JSON sidecar in 20.944 seconds. The callback response then failed because Gradio would not serve files from the custom /tmp directory unless it was included in allowed_paths.
+- The current source sets an exact per-UI output directory on the Gradio object, and the notebook and live smoke now pass that directory explicitly as allowed_paths. It does not allow the whole /tmp tree. Hosted regression [run 38859218054](https://github.com/Killer4K-N/OEC/actions/runs/38859218054) passed after these changes.
+- Latest live retest [run 38859218039](https://github.com/Killer4K-N/OEC/actions/runs/38859218039) is queued without a runner assignment at the time of this record. The final client return/file-transfer check has therefore not yet passed. The PNG-generation evidence is real, but the full Gradio Generate response is not yet accepted.
+
+### Current acceptance gate
+
+Only mark the FLUX notebook fully working after the queued run confirms localhost proxy bypass, model load from cache, Gradio HTTP 200, /generate returns normally, the PNG and sidecar validate, and the exact-run artifact is present. No model download or package installation was performed in these smoke tests; image output stays in validated local scratch. No shared-output write or reserve-file access occurred.
+
+### References
+
+- [FLUX-only notebook](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_flux_only.ipynb)
+- [FLUX helper](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_flux_image.py)
+- [Local proxy bypass fix](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/core_config.py)
+- [Smoke workflow](https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/.github/workflows/sync-a100-pipeline-tools.yml)
+- [Hosted regression](https://github.com/Killer4K-N/OEC/actions/runs/38859218054)
+- [Latest queued live test](https://github.com/Killer4K-N/OEC/actions/runs/38859218039)
