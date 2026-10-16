@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T18:25:00+05:30",
+  "last_updated": "2026-10-16T21:15:20.823+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Draft OEC PR #12 (https://github.com/Killer4K-N/OEC/pull/12) adds structured Lustre quota schema v2 and strict fail-closed parsing. Final CI run 38903458777 passed 47 tests, Python compilation, and all four notebook JSON/Python-cell checks. The earlier run 38903339731 failed because an existing schema-v2 test fixture omitted required quota identity/source; the fixture was corrected and the failure remains recorded. Read-only quota sample from run 38898669614 showed lmedge group usage about 65.03 GiB over soft with 37.37 GiB to hard and reported grace at capture. No quota snapshot was written, no storage/reserve mutation occurred, and no training/download/install happened. PR is draft, unmerged, undeployed; obtain a fresh authoritative quota sample and explicit review before publishing a snapshot or allowing writes.",
+  "latest_summary": "Latest-cell validation run 38912593770 passed four targeted OEC notebook modes on oec-1: FLUX-only PNG generation, TRELLIS-only GLB generation, combined-notebook FLUX generation, and combined TRELLIS startup only. All are cache-only/local-scratch checks; combined TRELLIS generation and a joined end-to-end world-generation path remain unverified. Frozen-weight read-only audit 38924202279 completed with semantic status BLOCKED; no training or downloads started. Main is tracking-only; OEC code changes remain on fix/flux-trellis-pipeline-20261015.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2659,6 +2659,85 @@
         "https://github.com/Killer4K-N/OEC-Viewer/blob/main/diagrams/model_learning.json"
       ],
       "follow_up": "Keep PR #12 draft/unmerged pending source review and an explicit deployment/snapshot publication decision. Use a fresh authoritative read-only quota capture; do not write a stale sample. Storage admission remains blocked by captured soft-quota overage, even though hard-limit headroom remained at probe time."
+    },
+    {
+      "id": "TEST-2026-10-16-OEC-LATEST-NOTEBOOK-CELL-ACCEPTANCE",
+      "date": "2026-10-16",
+      "category": "actual Jupyter final-cell runtime acceptance",
+      "approach": "Execute actual final UI cells from pipeline_flux_only.ipynb, pipeline_trellis_3d_only.ipynb, and pipeline_trellis_3d.ipynb on the designated oec-1 runner with cached model snapshots and run-owned scratch outputs. Record each mode separately so combined-app startup is not conflated with inference.",
+      "reason": "Prior notebook final cells were reported as failing or insufficiently verified; a focused execution suite needed to prove real API requests, fresh generated artifacts, and cleanup without triggering downloads or shared-storage writes.",
+      "parameters": {
+        "repository": "Killer4K-N/OEC",
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "commit": "715fd005aa3746a148aa3a7030cb87eddf06e9c9",
+        "runner": "oec-1",
+        "host": "scn30-mn",
+        "environment": "phase2_3d",
+        "gpu": "0 (NVIDIA A100-SXM4-40GB)",
+        "run_id": 38912593770,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38912593770",
+        "job_id": 117011880046,
+        "artifact_id": 12052395126,
+        "artifact_url": "https://github.com/Killer4K-N/OEC/actions/runs/38912593770/artifacts/12052395126",
+        "artifact_sha256": "6764845113a90b85d46699612ff1f975e77bbf85be793968eb3ba208ca7cd95e",
+        "seed": 2048,
+        "downloads_enabled": false,
+        "shared_output_writes_enabled": false
+      },
+      "results": {
+        "overall": "PASS_TARGETED_CELL_ACCEPTANCE",
+        "flux_only": {
+          "status": "PASS",
+          "http": 200,
+          "width": 512,
+          "height": 512,
+          "png_bytes": 196376,
+          "generation_seconds": 8.839,
+          "elapsed_seconds": 99.723,
+          "api": "/generate"
+        },
+        "trellis_only": {
+          "status": "PASS",
+          "http": 200,
+          "glb_bytes": 5457384,
+          "glb_sha256": "7db7600e9dd9de6c1549eaf06f08cd687a55e8d62465754b426c521501ed9183",
+          "geometry_count": 1,
+          "vertices": 51658,
+          "faces": 97935,
+          "elapsed_seconds": 337.646,
+          "api": "/generate_3d"
+        },
+        "combined_notebook_flux": {
+          "status": "PASS",
+          "http": 200,
+          "width": 512,
+          "height": 512,
+          "png_bytes": 196376,
+          "generation_seconds": 10.012,
+          "elapsed_seconds": 61.949,
+          "api": "/generate"
+        },
+        "combined_notebook_trellis": {
+          "status": "PASS_STARTUP_ONLY",
+          "http": 200,
+          "elapsed_seconds": 171.322,
+          "generate_3d_invoked": false
+        },
+        "static_notebook_tests": "PASS",
+        "python_compilation": "PASS",
+        "service_cleanup": "PASS",
+        "model_downloads": "NOT_RUN_CACHE_ONLY",
+        "joined_combined_generation": "NOT_VERIFIED",
+        "geometric_quality": "NOT_EVALUATED",
+        "main_source_merge": "NOT_PERFORMED",
+        "training_started": "NO"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38912593770",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38912593912",
+        "https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38924202279"
+      ],
+      "follow_up": "Keep the result as component-level cache-only evidence. The combined TRELLIS notebook needs a separate live generate request and exact output inspection before the combined path is claimed. Continue blocking managed storage writes and model/data downloads until a fresh quota snapshot and normal storage admission are approved. Resolve the independent oec-freeze blockers before any real-model PEFT experiment."
     }
   ]
 }
