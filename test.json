@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T11:36:55+05:30",
+  "last_updated": "2026-10-16T11:39:04+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "On 2026-10-16, live FLUX Gradio tests on oec-1 confirmed the GPU, CUDA 12.4 runtime, cached FLUX weights and image generation all work. Run 38857928677 failed at the unsupported Blocks theme option; 38858591217 failed localhost startup events because core_config.py was not actually in the sync list; 38858984764 verified localhost proxy bypass, Gradio HTTP 200 and a valid 512x512 PNG/sidecar (196,376 bytes, 20.944s) but Gradio rejected returning files outside its allowed_paths. The helper, notebook and smoke now allow only the per-run scratch folder. Hosted run 38859218054 passed; live run 38859218039 is queued without an assigned runner, so final callback response/artefact acceptance remains pending.",
+  "latest_summary": "On 2026-10-16 Asia/Kolkata, the FLUX-only Jupyter/Gradio path is live-verified on oec-1 / scn30-mn / NVIDIA A100-SXM4-40GB, branch fix/flux-trellis-pipeline-20261015. Final cache-only run 38859218039 passed local proxy bypass, runtime and cached model load, Gradio HTTP 200, actual /generate response, PNG/sidecar validation and artifact upload. The generated PNG is 512x512 RGB, 196376 bytes, with seed 2048 and 4 steps. Artifact 12028935755 was downloaded and its contents independently checked. Hosted regression 38859218054 passed the configured 104 tests and notebook/static checks. No source was merged to main.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2813,10 +2813,16 @@
           }
         ],
         "current_retest_run": 38859218039,
-        "current_retest_url": "https://github.com/Killer4K-N/OEC/actions/runs/38859218039"
+        "current_retest_url": "https://github.com/Killer4K-N/OEC/actions/runs/38859218039",
+        "source_commit": "0abb6cf0c9183dce0f309dd09ce17a572a169c64",
+        "final_live_run": 38859218039,
+        "final_static_run": 38859218054,
+        "final_artifact_id": 12028935755,
+        "final_output_png": "/tmp/oec-flux-gradio-smoke-38859218039/flux2_klein_1792130821924830716_2048.png",
+        "test_gradio_port": 17864
       },
       "results": {
-        "status": "PNG_GENERATION_PASS_GRADIO_RESULT_TRANSFER_PENDING",
+        "status": "PASS_LIVE_GRADIO_GENERATE_AND_ARTIFACT_VERIFIED",
         "run_1": "FAIL_THEME_API_COMPATIBILITY",
         "run_2": "FAIL_LOCALHOST_PROXY_STARTUP",
         "run_3": {
@@ -2839,13 +2845,46 @@
         "hosted_regression_run": 38859218054,
         "hosted_regression_conclusion": "success",
         "final_live_retest_run": 38859218039,
-        "final_live_retest_status": "QUEUED_NO_RUNNER_ASSIGNED_AT_LAST_CHECK",
-        "final_callback_response": "NOT_YET_VERIFIED",
-        "artifact_transfer": "NOT_YET_VERIFIED",
+        "final_live_retest_status": "PASS",
+        "final_callback_response": "PASS",
+        "artifact_transfer": "PASS_DOWNLOADED_AND_VERIFIED",
         "shared_output_write": "NOT_PERFORMED",
         "model_download": "NOT_PERFORMED",
         "storage_reserve_access": "NOT_PERFORMED",
-        "main_branch": "UNCHANGED"
+        "main_branch": "UNCHANGED",
+        "final_live_run": 38859218039,
+        "final_live_url": "https://github.com/Killer4K-N/OEC/actions/runs/38859218039",
+        "final_live_conclusion": "success",
+        "final_static_run": 38859218054,
+        "final_static_url": "https://github.com/Killer4K-N/OEC/actions/runs/38859218054",
+        "final_static_conclusion": "success",
+        "artifact_id": 12028935755,
+        "proxy_fix": "PASS; core_config.py actually synced after verified backup",
+        "file_allowlist_fix": "PASS; exact per-run scratch directory allowed",
+        "model_pipeline_load_seconds": 12.112,
+        "png": {
+          "width": 512,
+          "height": 512,
+          "mode": "RGB",
+          "bytes": 196376,
+          "seed": 2048,
+          "inference_steps": 4,
+          "generation_seconds": 1.145,
+          "output_mode": "local_scratch_only"
+        },
+        "gradio_http_status": 200,
+        "gradio_predict_response_types": [
+          "str",
+          "int",
+          "str",
+          "str"
+        ],
+        "final_sync_counts": {
+          "created": 0,
+          "updated": 2,
+          "unchanged": 14,
+          "conflicts_preserved": 2
+        }
       },
       "supporting_urls": [
         "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_flux_only.ipynb",
@@ -2854,10 +2893,10 @@
         "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tests/test_flux_image.py",
         "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/.github/workflows/sync-a100-pipeline-tools.yml",
         "https://github.com/Killer4K-N/OEC/actions/runs/38859218054",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38858984764",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38859218039"
+        "https://github.com/Killer4K-N/OEC/actions/runs/38859218039",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38859218039#artifacts"
       ],
-      "follow_up": "Check the live retest run and artifact. Accept the notebook only if /generate returns cleanly and the PNG plus JSON sidecar are present and validated in the artifact. If still queued, do not claim runtime acceptance based only on successful image generation inside the callback."
+      "follow_up": "The FLUX-only Jupyter Gradio API path is runtime-accepted for this revision. If user reports a browser/tunnel issue, check their SSH port forwarding and browser connection separately; do not downgrade this server-side generation pass."
     }
   ]
 }
