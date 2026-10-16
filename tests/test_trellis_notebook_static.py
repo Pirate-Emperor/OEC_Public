@@ -253,7 +253,7 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertIn("demo_flux.launch(", flux)
         self.assertIn("allowed_paths=[demo_flux.oec_output_dir]", flux)
         self.assertIn("FLUX_GRADIO_LAUNCH=FAIL", flux)
-        self.assertNotRegex(flux, r"gr\\.Blocks\\([^\\n]*theme=")
+        self.assertFalse(any("theme=" in line and "gr.Blocks(" in line for line in flux.splitlines()))
         self.assertIn("scratch_output=(FLUX_UI_OUTPUT_MODE == \"scratch\")", flux)
 
         cli = (self.ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
