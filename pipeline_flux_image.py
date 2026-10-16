@@ -166,8 +166,12 @@ def _same_filesystem(path_a: Path, path_b: Path) -> bool:
     return False
 
 
-def validate_scratch_path(output_path: str | Path, model_cache: str | Path) -> Path:
-    """Only allow scratch under /tmp-like paths and on a different filesystem from weights."""
+def validate_scratch_path(
+    output_path: str | Path,
+    model_cache: str | Path,
+    minimum_free_mib: int = 512,
+) -> Path:
+    """Allow only new scratch under a temp root with headroom and separate storage."""
     target = Path(output_path).expanduser().resolve()
     roots = [Path("/tmp"), Path(tempfile.gettempdir())]
     for key in ("RUNNER_TEMP", "TMPDIR"):
@@ -175,8 +179,24 @@ def validate_scratch_path(output_path: str | Path, model_cache: str | Path) -> P
             roots.append(Path(os.environ[key]))
     if not any(_is_relative_to(target, root) for root in roots):
         raise RuntimeError("BLOCKED_SCRATCH_OUTPUT: use a path under /tmp or runner-local temporary storage.")
+    if target.exists() or target.with_name(target.stem + "_info.json").exists():
+        raise FileExistsError(f"BLOCKED_SCRATCH_OUTPUT: refusing to overwrite an existing PNG/metadata file: {target}")
     if _same_filesystem(target.parent, Path(model_cache)):
         raise RuntimeError("BLOCKED_SCRATCH_OUTPUT: temporary output filesystem is not distinct from shared model storage.")
+
+    probe = target.parent
+    while not probe.exists() and probe.parent != probe:
+        probe = probe.parent
+    try:
+        free_bytes = shutil.disk_usage(probe).free
+    except OSError as exc:
+        raise RuntimeError(f"BLOCKED_SCRATCH_OUTPUT: cannot measure scratch capacity: {exc}") from exc
+    required_bytes = max(1, int(minimum_free_mib)) * 1024 * 1024
+    if free_bytes < required_bytes:
+        raise RuntimeError(
+            f"BLOCKED_SCRATCH_OUTPUT: temporary filesystem has {free_bytes} free bytes; "
+            f"need at least {required_bytes} bytes."
+        )
     return target
 
 
@@ -412,18 +432,49 @@ def generate_flux_image(pipeline: Any, prompt: str, seed: int = 42, randomize_se
     return image, actual_seed, str(destination), str(metadata_path)
 
 
-def create_gradio_demo(pipeline: Any, output_dir: str | Path | None = None, port: int = 7864):
+def create_gradio_demo(
+    pipeline: Any,
+    output_dir: str | Path | None = None,
+    port: int = 7864,
+    scratch_output: bool | None = None,
+    model_cache: str | Path | None = None,
+):
+    """Create the UI with verified local scratch output by default.
+
+    Set AIEROS_FLUX_UI_OUTPUT_MODE=shared, or pass scratch_output=False, only
+    when shared output is intended and current StorageManager quota admission
+    is available. Scratch PNG/sidecars live under /tmp and are not durable.
+    """
     import gradio as gr
     dirs = _system_dirs()
-    chosen_output = Path(output_dir).expanduser() if output_dir else Path(dirs["outputs"]) / "images"
+    cache = Path(model_cache).expanduser() if model_cache else Path(dirs["models"]).expanduser()
+    if scratch_output is None:
+        mode = os.environ.get("AIEROS_FLUX_UI_OUTPUT_MODE", "scratch").strip().lower()
+        if mode not in {"scratch", "shared"}:
+            raise ValueError("AIEROS_FLUX_UI_OUTPUT_MODE must be 'scratch' or 'shared'.")
+        scratch_output = mode == "scratch"
+    if scratch_output:
+        safe_user = "".join(
+            char for char in os.environ.get("USER", "user") if char.isalnum() or char in "-_"
+        ) or "user"
+        chosen_output = Path("/tmp") / f"oec-flux-ui-{safe_user}-{os.getpid()}"
+        print(f"FLUX_UI_OUTPUT_MODE=scratch path={chosen_output}", flush=True)
+    else:
+        chosen_output = Path(output_dir).expanduser() if output_dir else Path(dirs["outputs"]) / "images"
+        print(f"FLUX_UI_OUTPUT_MODE=shared path={chosen_output}", flush=True)
 
     def generate(prompt, input_image, width, height, steps, guidance, seed, randomize):
         try:
+            output_path = None
+            if scratch_output:
+                chosen_output.mkdir(parents=True, exist_ok=True)
+                output_path = chosen_output / f"flux2_klein_{time.time_ns()}_{int(seed)}.png"
             return generate_flux_image(
                 pipeline=pipeline, prompt=prompt, input_image=input_image,
                 width=int(width), height=int(height), steps=int(steps),
                 guidance_scale=float(guidance), seed=int(seed), randomize_seed=bool(randomize),
-                output_dir=chosen_output,
+                output_path=output_path, output_dir=chosen_output,
+                scratch_output=bool(scratch_output), model_cache=cache,
             )
         except Exception as exc:
             raise gr.Error(f"FLUX generation failed: {type(exc).__name__}: {exc}") from exc
