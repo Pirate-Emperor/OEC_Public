@@ -97,6 +97,7 @@ jobs:
             tools/qa_checks.py
             tools/trellis2_pipeline.json
             tools/trellis_offline.py
+            core_config.py
             pipeline_flux_image.py
             pipeline_flux_trellis.py
             pipeline_trellis_3d.py
@@ -241,6 +242,16 @@ jobs:
           scratch = Path(os.environ["AIEROS_FLUX_UI_SCRATCH_DIR"])
           runtime = check_runtime(gpu=os.environ["AIEROS_GPU"])
           dirs = _system_dirs()
+          local_proxy_bypass = {
+              host: urllib.request.proxy_bypass(host)
+              for host in ("localhost", "127.0.0.1", "::1")
+          }
+          print("GRADIO_LOCAL_PROXY_BYPASS=" + json.dumps(local_proxy_bypass, sort_keys=True), flush=True)
+          if not all(local_proxy_bypass.values()):
+              raise RuntimeError(
+                  "Local Gradio URLs are still subject to proxy routing; "
+                  f"refusing to launch UI with bypass state {local_proxy_bypass!r}."
+              )
           pipe = load_flux_pipeline(
               model_id="black-forest-labs/FLUX.2-klein-4B",
               model_cache=dirs["models"],
