@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T02:02:33+05:30",
+  "last_updated": "2026-10-16T11:23:18+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "On 2026-10-16 Asia/Kolkata, the TRELLIS-only notebook was corrected after cell 10 blocked on missing fresh quota telemetry before checking whether setup writes were needed. The setup gate now applies only to real installs/clones/builds, basic dependencies are checked first, and Gradio output defaults to local /tmp scratch after a different-filesystem and 512 MiB free-space check. Shared output and model downloads still require fresh quota telemetry. Regression tests and an oec-1 pre-sync gate were added, but no Actions status or live A100 sync result was returned for trigger commit 647d7627dca9c8c6b8816b6f5cd3c2f7f4dd0b23; tests and runtime remain unverified. Main was not changed.",
+  "latest_summary": "On 2026-10-16 Asia/Kolkata, FLUX-only Gradio generation was corrected to default to guarded local /tmp scratch rather than shared outputs that require fresh quota telemetry. The notebook final cell passes output mode and model cache explicitly and reports launch failures by stage. Hosted regression run 38857928846 passed all 104 tests and notebook/static checks. Live A100 sync/Gradio run 38857928677 remains queued without a runner assignment; live notebook deployment and actual PNG generation remain unverified. PR #11 remains open and unmerged.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2706,6 +2706,73 @@
         "https://github.com/Killer4K-N/OEC/commit/647d7627dca9c8c6b8816b6f5cd3c2f7f4dd0b23"
       ],
       "follow_up": "Verify the regression-gated oec-1 run and deployed notebook source. Then launch with cached model/dependencies and generate one GLB in validated /tmp; keep shared writes/model downloads blocked until fresh authoritative quota telemetry is available."
+    },
+    {
+      "id": "TEST-2026-10-16-OEC-FLUX-GRADIO-FINAL-CELL",
+      "date": "2026-10-16",
+      "category": "Fix FLUX-only Jupyter final Gradio cell and verify the Generate callback",
+      "approach": "Traced the final notebook cell and found create_gradio_demo's callback defaulted to shared outputs/images, not the CLI scratch-output path. Changed the UI to scratch-first under /tmp, checks filesystem separation, no-overwrite and at least 512 MiB free, added a stable /generate API name, passed output mode/cache from the notebook, and made startup failures emit an explicit stage marker. Added a hosted regression test and an oec-1 live workflow that loads cached weights offline, starts the actual Gradio UI, calls /generate and validates the PNG/sidecar.",
+      "reason": "The UI generation path must be usable for a cache-only test even when authoritative shared quota telemetry is unavailable. Notebook syntax checks alone do not prove Gradio launch or a generation request works, so a live GPU smoke was added rather than marking it working after static CI.",
+      "parameters": {
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "source_commit": "7084fbf6f6add860d1ea7631b9f6b059b130c58b",
+        "notebook": "pipeline_flux_only.ipynb",
+        "active_code_cell_index": 6,
+        "model": "black-forest-labs/FLUX.2-klein-4B",
+        "runner_target": "oec-1",
+        "environment": "phase2_3d",
+        "ui_default_output_mode": "scratch",
+        "scratch_root": "/tmp",
+        "minimum_scratch_headroom_mib": 512,
+        "shared_output_mode": "AIEROS_FLUX_UI_OUTPUT_MODE=shared",
+        "test_port": 17864,
+        "smoke_prompt_size": "512x512",
+        "smoke_seed": 2048,
+        "model_download": false,
+        "dependency_install": false
+      },
+      "results": {
+        "status": "STATIC_PASS_LIVE_A100_PENDING",
+        "hosted_regression_run": 38857928846,
+        "hosted_regression_url": "https://github.com/Killer4K-N/OEC/actions/runs/38857928846",
+        "hosted_regression_conclusion": "success",
+        "test_counts": {
+          "qa": 15,
+          "trellis_notebook_static": 15,
+          "trellis_easy_run": 6,
+          "trellis_offline_config": 6,
+          "flux_trellis_pipeline": 16,
+          "flux_image": 8,
+          "flux_gpu_admission": 6,
+          "audiocraft_notebook_static": 5,
+          "storage_write_admission": 6,
+          "service_manager": 8,
+          "service_manager_help": 7,
+          "ltx_worker_config": 6,
+          "total": 104
+        },
+        "notebook_json_checks": "PASS (TRELLIS combined 16 cells, TRELLIS-only 15 cells, FLUX-only 10 cells, AudioCraft 6 cells)",
+        "compile_and_cli_checks": "PASS",
+        "live_sync_run": 38857928677,
+        "live_sync_url": "https://github.com/Killer4K-N/OEC/actions/runs/38857928677",
+        "live_sync_status": "QUEUED_NO_RUNNER_ASSIGNED_AT_LAST_CHECK",
+        "live_notebook_sync": "NOT_YET_VERIFIED",
+        "live_gradio_launch": "NOT_RUN",
+        "live_gradio_generate": "NOT_RUN",
+        "png_validation": "NOT_RUN",
+        "shared_storage_write": "NOT_PERFORMED",
+        "model_download": "NOT_PERFORMED",
+        "main_branch": "UNCHANGED"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_flux_only.ipynb",
+        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_flux_image.py",
+        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tests/test_flux_image.py",
+        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/.github/workflows/sync-a100-pipeline-tools.yml",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38857928846",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38857928677"
+      ],
+      "follow_up": "Check the queued oec-1 job's conclusion and artifact. Accept FLUX Gradio only after the exact /generate request succeeds and its output PNG/metadata are validated. If the job remains queued, restore runner availability or perform the same test in the existing phase2_3d Jupyter session while recording the exact traceback."
     }
   ]
 }
