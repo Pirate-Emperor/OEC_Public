@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-16 11:39 IST (Asia/Kolkata)
+**Last updated:** 2026-10-16 11:40 IST (Asia/Kolkata)
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 
 
@@ -251,6 +251,6 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - [x] Fixed Gradio's generated-file response handling by allowing only the exact selected local scratch output directory.
 - [x] Final live A100 smoke [run 38859218039](https://github.com/Killer4K-N/OEC/actions/runs/38859218039) passed: cached model load, localhost bypass, Gradio HTTP 200, actual /generate API result, and PNG/metadata validation.
 - [x] Verified artifact 12028935755 (smoke report, PNG and sidecar); independently opened the PNG and parsed its metadata after downloading the exact artifact ZIP.
-- [x] Hosted regression [run 38859218054](https://github.com/Killer4K-N/OEC/actions/runs/38859218054) passed all 104 configured tests plus notebook JSON/compilation/CLI checks.
+- [x] Hosted regression [run 38859218054](https://github.com/Killer4K-N/OEC/actions/runs/38859218054) passed all 105 configured tests plus notebook JSON/compilation/CLI checks.
 - [x] No model download, dependency install, shared-output write, cache purge, reserve-file access, or source merge to main.
 - [ ] Follow up with a live browser-driven Jupyter session test on the user's own forwarded port if user experience outside the API smoke differs; the server-side Gradio UI and exact Generate callback are verified.
