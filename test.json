@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-15T20:29:00+05:30",
+  "last_updated": "2026-10-16T18:25:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Final cluster service-manager candidate on review PR #11 was revalidated by CI run 38761087455 after aligning the example per-node Conda root with the project-local Conda/bin/activate launch pattern. All 86 tests, py_compile and JSON/Python-cell checks of four notebooks passed. Cluster plan and dry-run commands are covered; actual three-node startup, live LTX/QA, browser/Gradio submissions and folder-backed TRELLIS GPU inference remain NOT_RUN. The earlier single-image cache-only FLUX→TRELLIS run 38725376076 is separate runtime evidence. Fresh quota remains unavailable; keep missing-cache downloads and managed shared writes blocked. Source changes remain unmerged on PR #11.",
+  "latest_summary": "Draft OEC PR #12 (https://github.com/Killer4K-N/OEC/pull/12) adds structured Lustre quota schema v2 and strict fail-closed parsing. Final CI run 38903458777 passed 47 tests, Python compilation, and all four notebook JSON/Python-cell checks. The earlier run 38903339731 failed because an existing schema-v2 test fixture omitted required quota identity/source; the fixture was corrected and the failure remains recorded. Read-only quota sample from run 38898669614 showed lmedge group usage about 65.03 GiB over soft with 37.37 GiB to hard and reported grace at capture. No quota snapshot was written, no storage/reserve mutation occurred, and no training/download/install happened. PR is draft, unmerged, undeployed; obtain a fresh authoritative quota sample and explicit review before publishing a snapshot or allowing writes.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2572,6 +2572,93 @@
         "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tools/oec_cluster_services.example.json"
       ],
       "follow_up": "Before an authorized live test, copy the example config to the ignored local config, replace SSH aliases and paths on all three nodes, confirm the same reviewed checkout and environments exist on each, inspect existing GPU/process usage, then run cluster-plan followed by a small cache-only cluster launch. Do not perform missing-cache model/dependency downloads or managed shared writes while authoritative fresh quota telemetry is unavailable."
+    },
+    {
+      "id": "TEST-2026-10-16-OEC-LUSTRE-SOFT-HARD-QUOTA-SCHEMA-CI-FAIL",
+      "date": "2026-10-16",
+      "category": "structured Lustre quota snapshot schema strict validation",
+      "approach": "Ran the new structured snapshot parser and storage admission regressions after adding schema-v2 identity, limit, source and exact-integer validation. Existing storage-policy fixture for a hard-limit-overage diagnostic contained schema_version and soft/hard fields but omitted quota_kind, quota_name and source, which are now mandatory for structured telemetry.",
+      "reason": "Ensure malformed structured quota records fail closed rather than silently weakening storage admission. The initial failure showed the test fixture needed to meet the newly explicit schema contract.",
+      "parameters": {
+        "repository": "Killer4K-N/OEC",
+        "branch": "fix/lustre-soft-hard-quota-snapshot-20261016",
+        "commit": "b70c1c72f8c0cfdc665399a0380963b64d1ffbbb",
+        "run_id": 38903339731,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38903339731",
+        "test_groups_before_failure": [
+          12,
+          5,
+          5,
+          6
+        ],
+        "failed_test": "test_hard_quota_overage_is_loaded_for_diagnostics_but_blocks_writes",
+        "error": "assertIsNotNone(snapshot): strict schema-v2 parser rejected missing quota identity/source"
+      },
+      "results": {
+        "status": "FAIL_FIXTURE_SCHEMA_MISMATCH",
+        "test_failed": 1,
+        "other_tests_in_completed_groups": 28,
+        "final_later_suites_not_run": true,
+        "source_schema_validation_behavior": "EXPECTED_FAIL_CLOSED",
+        "production_code_changed_in_fixture_fix": false
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38903339731",
+        "https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38898669614"
+      ],
+      "follow_up": "Add quota_kind=group, quota_name=research and a non-empty source to the schema-v2 hard-overage fixture, then rerun all six test groups. Failure preserved; do not mark this attempt PASS."
+    },
+    {
+      "id": "TEST-2026-10-16-OEC-LUSTRE-SOFT-HARD-QUOTA-SCHEMA-CI-PASS",
+      "date": "2026-10-16",
+      "category": "structured Lustre soft/hard quota snapshot and conservative admission",
+      "approach": "Maintained backward compatibility for legacy single-limit snapshots; added a structured schema-v2 writer and strict consumer validation for separate soft quota, hard limit, grace, identity, source, timestamp and effective limit. Admission blocks above-soft usage while retaining hard-limit headroom for diagnostics only. Added tests for invalid identities/schema versions, negative/fractional/unset limits, malformed JSON roots, exact large-integer handling and preflight behavior.",
+      "reason": "The read-only Lustre investigation proved usage exceeded soft quota while hard-limit headroom and grace remained. One single-limit field cannot preserve these distinctions without either rejecting valid telemetry or hiding a soft-quota overage.",
+      "parameters": {
+        "repository": "Killer4K-N/OEC",
+        "branch": "fix/lustre-soft-hard-quota-snapshot-20261016",
+        "commit": "6182edd4cafe22f65145b94e1f66998b31bcc182",
+        "pull_request": 12,
+        "pull_request_url": "https://github.com/Killer4K-N/OEC/pull/12",
+        "run_id": 38903458777,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38903458777",
+        "job_id": 116981112079,
+        "test_group_counts": {
+          "trellis_notebook_static": 12,
+          "trellis_cli": 5,
+          "audiocraft_notebook_static": 5,
+          "storage_write_admission": 6,
+          "storage_policy": 12,
+          "quota_snapshot": 7,
+          "total": 47
+        },
+        "schema_version": 2,
+        "legacy_snapshot_compatibility": true
+      },
+      "results": {
+        "status": "PASS_47_TESTS_COMPILE_AND_FOUR_NOTEBOOKS",
+        "total_tests": 47,
+        "failed_tests": 0,
+        "python_compilation": "PASS",
+        "notebook_json_and_python_cells": "PASS_4_OF_4",
+        "runtime_storage_write": "NOT_RUN",
+        "quota_snapshot_written": "NO",
+        "reserve_file_accessed": "NO",
+        "models_or_datasets_read": "NO",
+        "downloads_started": "NO",
+        "training_started": "NO",
+        "main_source_merge": "NOT_PERFORMED"
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38898669614",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38903339731",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38903458777",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38903458777/job/116981112079",
+        "https://github.com/Killer4K-N/OEC/pull/12",
+        "https://wiki.lustre.org/Lustre_Quota_Administration",
+        "https://github.com/Killer4K-N/OEC-Viewer/blob/main/diagrams/model_learning.json"
+      ],
+      "follow_up": "Keep PR #12 draft/unmerged pending source review and an explicit deployment/snapshot publication decision. Use a fresh authoritative read-only quota capture; do not write a stale sample. Storage admission remains blocked by captured soft-quota overage, even though hard-limit headroom remained at probe time."
     }
   ]
 }

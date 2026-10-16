@@ -1,6 +1,16 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-15 20:29 IST (Asia/Kolkata)  
+## 2026-10-16 — Lustre soft/hard quota schema and admission hardening
+
+- [x] Verified the dedicated `oec-freeze` read-only probe [run 38898669614](https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38898669614): 8/8 probe/parser tests passed. Captured group usage above soft quota with hard-limit headroom and grace; this is time-stamped evidence, not a current quota guarantee.
+- [x] Extended the isolated OEC branch [fix/lustre-soft-hard-quota-snapshot-20261016](https://github.com/Killer4K-N/OEC/tree/fix/lustre-soft-hard-quota-snapshot-20261016) with structured quota schema v2, preserving soft/hard limits, grace, quota identity and provenance separately.
+- [x] Hardened structured-snapshot reading: schema/identity/limits/source must be valid, limits must be non-negative integers with at least one configured limit, malformed JSON roots reject, and hard headroom never authorizes writes when usage exceeds soft.
+- [x] Validated on hosted CI [run 38903458777](https://github.com/Killer4K-N/OEC/actions/runs/38903458777) / [job 116981112079](https://github.com/Killer4K-N/OEC/actions/runs/38903458777/job/116981112079): 47 tests passed, 0 failed; compilation and four notebook JSON/Python-cell checks passed.
+- [x] Opened [draft PR #12](https://github.com/Killer4K-N/OEC/pull/12). It remains unmerged/unpublished to runtime; main only receives tracking-file updates in this cycle.
+- [ ] Keep snapshot publication and all model/data/output writes blocked until a new authoritative quota sample is obtained, the schema/policy is reviewed and deployed under an explicit decision, and admission uses the structured soft/hard/grace fields. Never infer user quota from filesystem free-space output or fabricate values for the snapshot.
+- [ ] After storage admission is safe, return to OEC-Viewer's frozen_ft acceptance contract: approve exact model/license and source-specific dataset/provenance/splits; only then install required PEFT dependencies and run the real baseline/LoRA smoke with exact parameter, gradient, frozen-state, checkpoint/resume and held-out evaluation evidence.
+
+**Last updated:** 2026-10-16 18:25 IST (Asia/Kolkata)  
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 ## 2026-10-15 20:29 IST — cluster coordinator, CLI help and notebook GPU isolation
 

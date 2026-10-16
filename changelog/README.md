@@ -4,6 +4,9 @@ Daily engineering records live here. Use the local Asia/Kolkata date in each fil
 
 ## Daily records
 
+- [2026-10-16 — Lustre soft/hard quota schema hardening](CHANGELOG-2026-10-16.md)
+  - Read-only probe [38898669614](https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38898669614) found group usage above soft quota with hard-limit headroom and grace at capture. Isolated storage-schema PR [#12](https://github.com/Killer4K-N/OEC/pull/12) now preserves these fields separately, keeps write admission blocked above soft, and rejects malformed schema-v2 data. Final CI [38903458777](https://github.com/Killer4K-N/OEC/actions/runs/38903458777) passed 47 tests, Python compilation and all four notebook checks. An earlier fixture failure remains documented. No quota snapshot was written and PR #12 is draft/unmerged.
+
 - [2026-10-15 — FLUX/TRELLIS fix validated end to end on review branch](CHANGELOG-2026-10-15.md)
   - Hosted CI [38725202281](https://github.com/Killer4K-N/OEC/actions/runs/38725202281) passed 58/58 tests, Python compilation and all four notebook checks. This includes the findmnt/subprocess and high-utilization GPU-admission regressions.
   - First combined attempt [38723286765](https://github.com/Killer4K-N/OEC/actions/runs/38723286765) found the missing subprocess import in the scratch filesystem probe and an over-permissive IDLE policy at 100% utilization. Both were corrected on the review branch.

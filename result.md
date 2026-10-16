@@ -312,3 +312,13 @@ Open follow-ups are in `TODO.md`; per-run results and experiment details are in 
 ### Final launch-safety follow-through
 
 CI [run 38744924124](https://github.com/Killer4K-N/OEC/actions/runs/38744924124) is the current-head revalidation after the QA GPU-visibility fix and passed all 78 tests, compilation and four notebook JSON/Python-cell checks. Before rollout, first inventory any existing manually launched background jobs on each node. The supervisor cannot adopt them; do not start duplicate daemon/worker instances or use broad kill patterns. Stop only exact owned legacy PIDs after inspecting them, then use the supervisor's per-service status/logs/stop controls. No user host or running process was touched in this task.
+
+
+## 2026-10-16 — Structured Lustre quota schema and conservative admission
+
+The dedicated runner's [read-only Lustre probe](https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38898669614) passed 8/8 parser/probe tests and found group usage above soft quota but below hard limit, with grace remaining at capture. The old one-limit snapshot cannot accurately represent soft quota, hard limit and grace simultaneously.
+
+The isolated branch [fix/lustre-soft-hard-quota-snapshot-20261016](https://github.com/Killer4K-N/OEC/tree/fix/lustre-soft-hard-quota-snapshot-20261016) now adds a backward-compatible schema-v2 writer, strict structured-schema validation and conservative policy semantics. It preserves exact large byte counts, requires quota identity/source, rejects unknown or malformed schemas and limits, and denies new write admission while above soft quota even if hard-limit headroom remains. Legacy unversioned single-limit snapshots remain supported with the prior strict rule.
+
+The first validation [run 38903339731](https://github.com/Killer4K-N/OEC/actions/runs/38903339731) correctly exposed a hard-quota test fixture missing required schema-v2 identity/source. The fixture was corrected, preserving the failure in history. Final [run 38903458777](https://github.com/Killer4K-N/OEC/actions/runs/38903458777) / [job 116981112079](https://github.com/Killer4K-N/OEC/actions/runs/38903458777/job/116981112079) passed **47/47 tests**, Python compilation and all four notebook JSON/Python-cell checks. Review [PR #12](https://github.com/Killer4K-N/OEC/pull/12) is draft and unmerged. No quota snapshot was written/refreshed; no reserve/shared filesystem mutation, package install, model/data download, or training occurred. Storage admission remains blocked pending fresh authoritative quota and explicit review/deployment of the new schema/policy.
+
