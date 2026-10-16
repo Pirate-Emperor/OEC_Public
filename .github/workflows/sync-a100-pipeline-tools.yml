@@ -14,7 +14,7 @@ jobs:
   sync-pipeline-tools:
     name: Create or safely update the reviewed OEC pipeline tools on oec-1
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
-    timeout-minutes: 10
+    timeout-minutes: 45
     steps:
       - name: Check out the reviewed source revision
         uses: actions/checkout@v4
@@ -29,7 +29,7 @@ jobs:
             echo "A100_TOOL_SYNC=BLOCKED_PHASE2_3D_TEST_PYTHON_MISSING path=$PYTHON"
             exit 20
           fi
-          "$PYTHON" -m py_compile qa_compliance_worker.py tools/qa_checks.py
+          "$PYTHON" -m py_compile qa_compliance_worker.py tools/qa_checks.py pipeline_flux_image.py
           "$PYTHON" -m unittest discover -s tests -p 'test_qa_checks.py' -v
           "$PYTHON" -m unittest discover -s tests -p 'test_trellis_notebook_static.py' -v
           "$PYTHON" -m unittest discover -s tests -p 'test_flux_image.py' -v
@@ -190,6 +190,144 @@ jobs:
           PY
           python3 "$LIVE_ROOT/tools/oec_service_manager.py" --help >/dev/null
           echo 'A100_TOOL_SYNC_SERVICE_MANAGER_HELP=PASS'
+
+      - name: Run live cache-only FLUX Gradio generation smoke on oec-1
+        shell: bash
+        env:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          HF_HUB_DISABLE_TELEMETRY: "1"
+          PYTHONUNBUFFERED: "1"
+          AIEROS_FLUX_UI_OUTPUT_MODE: scratch
+        run: |
+          set -Eeuo pipefail
+          test "$RUNNER_NAME" = "oec-1" || { echo 'FLUX_GRADIO_SMOKE=BLOCKED_WRONG_RUNNER'; exit 31; }
+          LIVE_ROOT="$HOME/OEC"
+          if [ -n "$OEC_LIVE_REPO" ]; then LIVE_ROOT="$OEC_LIVE_REPO"; fi
+          LIVE_ROOT="$(realpath "$LIVE_ROOT")"
+          PYTHON="$HOME/Conda/envs/phase2_3d/bin/python"
+          if [ -n "$OEC_PYTHON" ]; then PYTHON="$OEC_PYTHON"; fi
+          test -x "$PYTHON" || { echo "FLUX_GRADIO_SMOKE=BLOCKED_PHASE2_3D_PYTHON_MISSING path=$PYTHON"; exit 32; }
+          export AIEROS_FLUX_GRADIO_PORT=17864
+          export AIEROS_FLUX_UI_SCRATCH_DIR="/tmp/oec-flux-gradio-smoke-$GITHUB_RUN_ID"
+          test ! -e "$AIEROS_FLUX_UI_SCRATCH_DIR" || { echo "FLUX_GRADIO_SMOKE=BLOCKED_OUTPUT_DIR_EXISTS path=$AIEROS_FLUX_UI_SCRATCH_DIR"; exit 33; }
+          exec 9>/tmp/oec-flux-inference.lock
+          if ! flock -x -w 180 9; then
+            echo 'FLUX_GRADIO_SMOKE=BLOCKED_GPU_LOCK_TIMEOUT'
+            exit 34
+          fi
+          GPU="$("$PYTHON" "$LIVE_ROOT/tools/flux_gpu_admission.py" --print-index-only --wait-seconds 180)"
+          export AIEROS_GPU="$GPU"
+          export CUDA_VISIBLE_DEVICES="$GPU"
+          echo "FLUX_GRADIO_SMOKE=START runner=$RUNNER_NAME host=$(hostname) gpu=$GPU port=$AIEROS_FLUX_GRADIO_PORT"
+          cd "$LIVE_ROOT"
+          "$PYTHON" -u - <<'PY'
+          import json
+          import os
+          import shutil
+          import time
+          import urllib.request
+          from pathlib import Path
+
+          from pipeline_flux_image import check_runtime, create_gradio_demo, load_flux_pipeline, validate_png_file, _system_dirs
+
+          port = int(os.environ["AIEROS_FLUX_GRADIO_PORT"])
+          scratch = Path(os.environ["AIEROS_FLUX_UI_SCRATCH_DIR"])
+          runtime = check_runtime(gpu=os.environ["AIEROS_GPU"])
+          dirs = _system_dirs()
+          pipe = load_flux_pipeline(
+              model_id="black-forest-labs/FLUX.2-klein-4B",
+              model_cache=dirs["models"],
+              offline=True,
+              gpu=os.environ["AIEROS_GPU"],
+          )
+          demo = create_gradio_demo(
+              pipe,
+              output_dir=Path(dirs["outputs"]) / "images",
+              port=port,
+              scratch_output=True,
+              model_cache=dirs["models"],
+          )
+          try:
+              demo.launch(
+                  server_name="127.0.0.1",
+                  server_port=port,
+                  inline=False,
+                  share=False,
+                  show_error=True,
+                  prevent_thread_lock=True,
+              )
+              root = f"http://127.0.0.1:{port}"
+              last_error = None
+              for _ in range(60):
+                  try:
+                      with urllib.request.urlopen(root + "/", timeout=3) as response:
+                          if response.status == 200:
+                              break
+                  except Exception as exc:
+                      last_error = exc
+                      time.sleep(1)
+              else:
+                  raise RuntimeError(f"Gradio root did not become healthy: {last_error!r}")
+              print(f"FLUX_GRADIO_HTTP=PASS url={root}/", flush=True)
+
+              from gradio_client import Client
+              client = Client(root, verbose=True)
+              result = client.predict(
+                  "A small red ceramic teapot on a clean studio table, soft window light, commercial product photography",
+                  None, 512, 512, 4, 1.0, 2048, False,
+                  api_name="/generate",
+              )
+              print("FLUX_GRADIO_PREDICT=PASS response_types=" + json.dumps([type(x).__name__ for x in result]), flush=True)
+
+              pngs = sorted(scratch.glob("flux2_klein_*.png"), key=lambda p: p.stat().st_mtime)
+              if not pngs:
+                  raise RuntimeError(f"No generated PNG appeared under {scratch}")
+              png = pngs[-1]
+              meta_path = png.with_name(png.stem + "_info.json")
+              validation = validate_png_file(png)
+              if not meta_path.is_file():
+                  raise RuntimeError(f"Generation metadata is missing: {meta_path}")
+              meta = json.loads(meta_path.read_text(encoding="utf-8"))
+              assert (meta["width"], meta["height"]) == (512, 512), meta
+              assert meta["seed"] == 2048, meta
+              assert meta["output_mode"] == "local_scratch_only", meta
+              artifact_dir = Path(os.environ["GITHUB_WORKSPACE"]) / "oec-flux-gradio-smoke"
+              artifact_dir.mkdir(parents=True, exist_ok=False)
+              shutil.copy2(png, artifact_dir / "flux2_klein.png")
+              shutil.copy2(meta_path, artifact_dir / "flux2_klein_info.json")
+              report = {
+                  "status": "PASS",
+                  "runner": os.environ.get("RUNNER_NAME"),
+                  "host": os.uname().nodename,
+                  "gpu": os.environ["AIEROS_GPU"],
+                  "port": port,
+                  "gradio_http": 200,
+                  "gradio_predict": "PASS",
+                  "png": str(png),
+                  "png_bytes": validation["bytes"],
+                  "metadata": str(meta_path),
+                  "generation_seconds": meta["generation_seconds"],
+                  "runtime": runtime,
+              }
+              report_path = Path(os.environ["GITHUB_WORKSPACE"]) / "oec-flux-gradio-smoke.json"
+              report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+              print("FLUX_GRADIO_SMOKE=PASS " + json.dumps(report, sort_keys=True), flush=True)
+          finally:
+              demo.close()
+              del pipe
+          PY
+
+      - name: Upload exact-run FLUX Gradio smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-flux-gradio-smoke
+          path: |
+            oec-flux-gradio-smoke.json
+            oec-flux-gradio-smoke/**
+          if-no-files-found: warn
+          retention-days: 30
           printf 'A100_TOOL_SYNC_SUMMARY created=%s updated=%s unchanged=%s conflicts_preserved=%s backup_root=%s\n' "$created" "$updated" "$unchanged" "$conflicts" "$BACKUP_ROOT"
           if [ "$conflicts" -gt 0 ]; then
             echo 'A100_TOOL_SYNC=PASS_WITH_UNRELATED_CONFLICTS_PRESERVED'
