@@ -113,6 +113,7 @@ jobs:
           conflicts=0
           # User-requested notebook repair is authorized only after a verified backup.
           authorized_notebook_overwrite=(
+            pipeline_flux_image.py
             pipeline_flux_only.ipynb
             pipeline_trellis_3d.py
             pipeline_trellis_3d.ipynb
@@ -130,7 +131,7 @@ jobs:
             status="$(git -C "$LIVE_ROOT" status --porcelain -- "$rel" 2>/dev/null || true)"
             if [ -e "$dest" ] && [ -n "$status" ]; then
               case "$rel" in
-                pipeline_flux_only.ipynb|pipeline_trellis_3d.py|pipeline_trellis_3d.ipynb|pipeline_trellis_3d_only.ipynb)
+                pipeline_flux_image.py|pipeline_flux_only.ipynb|pipeline_trellis_3d.py|pipeline_trellis_3d.ipynb|pipeline_trellis_3d_only.ipynb)
                   backup="$BACKUP_ROOT/$rel"
                   mkdir -p "$(dirname "$backup")"
                   cp -p "$dest" "$backup"
@@ -208,11 +209,9 @@ jobs:
         run: |
           set -Eeuo pipefail
           test "$RUNNER_NAME" = "oec-1" || { echo 'FLUX_GRADIO_SMOKE=BLOCKED_WRONG_RUNNER'; exit 31; }
-          LIVE_ROOT="$HOME/OEC"
-          if [ -n "$OEC_LIVE_REPO" ]; then LIVE_ROOT="$OEC_LIVE_REPO"; fi
+          LIVE_ROOT="${OEC_LIVE_REPO:-$HOME/OEC}"
           LIVE_ROOT="$(realpath "$LIVE_ROOT")"
-          PYTHON="$HOME/Conda/envs/phase2_3d/bin/python"
-          if [ -n "$OEC_PYTHON" ]; then PYTHON="$OEC_PYTHON"; fi
+          PYTHON="${OEC_PYTHON:-$HOME/Conda/envs/phase2_3d/bin/python}"
           test -x "$PYTHON" || { echo "FLUX_GRADIO_SMOKE=BLOCKED_PHASE2_3D_PYTHON_MISSING path=$PYTHON"; exit 32; }
           export AIEROS_FLUX_GRADIO_PORT=17864
           export AIEROS_FLUX_UI_SCRATCH_DIR="/tmp/oec-flux-gradio-smoke-$GITHUB_RUN_ID"
@@ -320,7 +319,10 @@ jobs:
               report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
               print("FLUX_GRADIO_SMOKE=PASS " + json.dumps(report, sort_keys=True), flush=True)
           finally:
-              demo.close()
+              try:
+                  demo.close()
+              except Exception as close_error:
+                  print(f"FLUX_GRADIO_CLOSE_WARNING={type(close_error).__name__}: {close_error}", flush=True)
               del pipe
           PY
 
