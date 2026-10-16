@@ -1,6 +1,6 @@
 # OEC Significant Results
 
-**Last updated:** 2026-10-16 11:23 IST (Asia/Kolkata)
+**Last updated:** 2026-10-16 11:36 IST (Asia/Kolkata)
 **Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
@@ -343,3 +343,14 @@ The FLUX-only notebook final cell called a Gradio helper whose Generate callback
 The notebook now passes the selected output mode/cache into the helper, reports the port/mode on readiness, and emits FLUX_GRADIO_LAUNCH=FAIL with the original exception if UI startup fails. A stable /generate Gradio API route supports a real click/API smoke test. The A100 workflow backs up the FLUX notebook/helper before replacing them and then, after sync, attempts a cache-only UI launch, calls /generate, and validates one 512×512 PNG plus sidecar.
 
 Hosted CI [run 38857928846](https://github.com/Killer4K-N/OEC/actions/runs/38857928846) passed all 104 tests, including eight FLUX-specific regressions and the notebook JSON/compilation checks. The live A100 run [38857928677](https://github.com/Killer4K-N/OEC/actions/runs/38857928677) is still queued without a runner assignment. No live notebook replacement, Gradio launch, model load or image generation has been confirmed; this remains pending rather than marked complete. No source changes were merged to main.
+
+
+## 2026-10-16 11:36 IST — FLUX Gradio live verification: generation works, final result transfer pending
+
+Live testing on oec-1 / scn30-mn has confirmed the cached FLUX pipeline loads and performs generation on the A100; it has also identified three version/environment integration problems static checks could not reveal:
+
+1. The installed Gradio version rejects the optional theme keyword on Blocks; the helper now uses the compatible constructor.
+2. OEC's proxy environment originally routed Gradio's own localhost startup request through the proxy; core_config.py now preserves and extends NO_PROXY/no_proxy for localhost, 127.0.0.1 and ::1. The A100 workflow now actually syncs this file after a verified backup.
+3. The live callback generated a valid 512×512 PNG (196,376 bytes) and sidecar in 20.944 seconds and Gradio returned HTTP 200, but Gradio refused to transfer the callback's file paths because the custom /tmp output directory was not included in allowed_paths. The helper now exposes the selected per-run output directory, and the notebook and live smoke explicitly allow only that directory.
+
+Hosted regression [run 38859218054](https://github.com/Killer4K-N/OEC/actions/runs/38859218054) passed. The next live run [38859218039](https://github.com/Killer4K-N/OEC/actions/runs/38859218039) is still queued without a runner assignment at the time of this record. The complete Gradio Generate response is not yet accepted; source has been changed to fix the allowlist, and it must be confirmed by the resulting run and artifact. This is not a claimed full notebook pass yet. No packages were installed, no models were downloaded, no shared output was written, and main was not changed.
