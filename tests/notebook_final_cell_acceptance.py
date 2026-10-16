@@ -241,7 +241,7 @@ def run_acceptance(mode: str, port: int, timeout: int, artifact_dir: Path, run_r
             )
             from pipeline_flux_image import validate_png_file
 
-            scratch = Path(os.environ["AIEROS_FLUX_UI_SCRATCH_DIR"])
+            scratch = run_root / "flux-scratch"
             pngs = sorted(scratch.glob("flux2_klein_*.png"), key=lambda p: p.stat().st_mtime)
             if not pngs:
                 raise RuntimeError(f"Notebook final cell returned {result!r}, but no FLUX PNG appeared in {scratch}")
