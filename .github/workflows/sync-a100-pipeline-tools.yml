@@ -273,6 +273,7 @@ jobs:
                   share=False,
                   show_error=True,
                   prevent_thread_lock=True,
+                  allowed_paths=[str(scratch)],
               )
               root = f"http://127.0.0.1:{port}"
               last_error = None
