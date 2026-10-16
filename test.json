@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T11:39:04+05:30",
+  "last_updated": "2026-10-16T11:40:46+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "On 2026-10-16 Asia/Kolkata, the FLUX-only Jupyter/Gradio path is live-verified on oec-1 / scn30-mn / NVIDIA A100-SXM4-40GB, branch fix/flux-trellis-pipeline-20261015. Final cache-only run 38859218039 passed local proxy bypass, runtime and cached model load, Gradio HTTP 200, actual /generate response, PNG/sidecar validation and artifact upload. The generated PNG is 512x512 RGB, 196376 bytes, with seed 2048 and 4 steps. Artifact 12028935755 was downloaded and its contents independently checked. Hosted regression 38859218054 passed the configured 104 tests and notebook/static checks. No source was merged to main.",
+  "latest_summary": "On 2026-10-16 Asia/Kolkata, the FLUX-only Jupyter/Gradio path is live-verified on oec-1 / scn30-mn / NVIDIA A100-SXM4-40GB, branch fix/flux-trellis-pipeline-20261015. Final cache-only run 38859218039 passed local proxy bypass, runtime and cached model load, Gradio HTTP 200, actual /generate response, PNG/sidecar validation and artifact upload. The generated PNG is 512x512 RGB, 196376 bytes, with seed 2048 and 4 steps. Artifact 12028935755 was downloaded and its contents independently checked. Hosted regression 38859218054 passed the configured 105 tests and notebook/static checks. No source was merged to main.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2884,6 +2884,21 @@
           "updated": 2,
           "unchanged": 14,
           "conflicts_preserved": 2
+        },
+        "test_counts": {
+          "qa": 15,
+          "trellis_notebook_static": 15,
+          "trellis_easy_run": 6,
+          "trellis_offline_config": 6,
+          "flux_trellis_pipeline": 16,
+          "flux_image": 9,
+          "flux_gpu_admission": 6,
+          "audiocraft_notebook_static": 5,
+          "storage_write_admission": 6,
+          "service_manager": 8,
+          "service_manager_help": 7,
+          "ltx_worker_config": 6,
+          "total": 105
         }
       },
       "supporting_urls": [
