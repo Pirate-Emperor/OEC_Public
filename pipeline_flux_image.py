@@ -467,7 +467,8 @@ def create_gradio_demo(
         try:
             output_path = None
             if scratch_output:
-                chosen_output.mkdir(parents=True, exist_ok=True)
+                # Let generate_flux_image validate the target filesystem/headroom
+                # before it creates the scratch directory.
                 output_path = chosen_output / f"flux2_klein_{time.time_ns()}_{int(seed)}.png"
             return generate_flux_image(
                 pipeline=pipeline, prompt=prompt, input_image=input_image,
