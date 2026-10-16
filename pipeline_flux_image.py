@@ -487,7 +487,9 @@ def create_gradio_demo(
         except Exception as exc:
             raise gr.Error(f"FLUX generation failed: {type(exc).__name__}: {exc}") from exc
 
-    with gr.Blocks(title="FLUX.2 Klein — OEC", theme=gr.themes.Monochrome()) as demo:
+    # Keep the UI compatible with the older Gradio version installed in phase2_3d.
+    # Theme customization is optional and has caused BlockContext constructor failures.
+    with gr.Blocks(title="FLUX.2 Klein — OEC") as demo:
         gr.Markdown("# FLUX.2 Klein 4B — text-to-image and image-conditioned generation")
         gr.Markdown("Saves a validated PNG and JSON sidecar. Public Gradio sharing is disabled by default.")
         with gr.Row():
