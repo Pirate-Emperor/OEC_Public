@@ -547,7 +547,7 @@ def main(argv: list[str] | None = None) -> int:
     pipeline = load_flux_pipeline(args.model_id, cache, offline=args.offline, gpu=gpu)
     demo = create_gradio_demo(pipeline, output_dir=args.output_dir, port=args.port)
     print(f"FLUX_GRADIO_START port={args.port} server={args.server_name} share={args.share}", flush=True)
-    demo.launch(server_name=args.server_name, server_port=args.port, inline=False, share=bool(args.share), show_error=True)
+    demo.launch(server_name=args.server_name, server_port=args.port, inline=False, share=bool(args.share), show_error=True, allowed_paths=[demo.oec_output_dir])
     return 0
 
 

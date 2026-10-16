@@ -66,6 +66,7 @@ class FluxImageTests(unittest.TestCase):
         self.assertIn('with gr.Blocks(title="FLUX.2 Klein — OEC") as demo:', source)
         self.assertNotIn("theme=gr.themes.Monochrome()", source)
         self.assertIn("demo.oec_output_dir = str(chosen_output.resolve())", source)
+        self.assertIn("allowed_paths=[demo.oec_output_dir]", source)
 
     def test_complete_local_snapshot_is_resolved_without_hub_or_torch(self):
         with tempfile.TemporaryDirectory() as td:

@@ -64,7 +64,10 @@ jobs:
           COMBINED_PORT=$((31000 + GITHUB_RUN_ID % 7000))
           "$PYTHON" tests/notebook_final_cell_acceptance.py --mode trellis-combined --port "$COMBINED_PORT" --timeout-seconds 420 --artifact-dir "$ARTIFACT_ROOT/trellis-combined" --run-root "$RUN_ROOT/trellis-combined"
 
-          echo "NOTEBOOK_FINAL_CELL=PASS flux_live_generate=PASS trellis_only_live_generate=PASS combined_trellis_gradio_start=PASS"
+          COMBINED_FLUX_PORT=$((41000 + GITHUB_RUN_ID % 5000))
+          "$PYTHON" tests/notebook_final_cell_acceptance.py --mode trellis-combined-flux --port "$COMBINED_FLUX_PORT" --timeout-seconds 240 --artifact-dir "$ARTIFACT_ROOT/trellis-combined-flux" --run-root "$RUN_ROOT/trellis-combined-flux"
+
+          echo "NOTEBOOK_FINAL_CELL=PASS flux_live_generate=PASS trellis_only_live_generate=PASS combined_trellis_gradio_start=PASS combined_flux_live_generate=PASS"
 
       - name: Upload exact-run notebook final-cell evidence
         if: always()

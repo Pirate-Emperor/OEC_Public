@@ -279,6 +279,20 @@ class TrellisNotebookStaticTests(unittest.TestCase):
             self.assertIn("sys.path.insert(0, str(_TRELLIS_SOURCE_ROOT))", studio, label)
             self.assertIn("the studio cell will not install or download dependencies", studio, label)
 
+    def test_combined_flux_service_uses_the_same_conda_root_default_as_the_manager(self):
+        cell = self.find(self.combined, "FLUX_MANAGER_CONDA_ROOT")
+        self.assertIn('os.environ.get("CONDA_ROOT", str(Path.home() / "Conda"))', cell)
+        self.assertIn("_MANAGER_CONDA_ROOT = Path(", cell)
+        self.assertIn("_MANAGER_CONDA_ROOT.is_dir()", cell)
+        self.assertIn('"--conda-root", str(_MANAGER_CONDA_ROOT)', cell)
+        self.assertNotIn('_OEC_MANAGER.resolve().parents[1] / "Conda"', cell)
+        manager = (self.ROOT / "tools" / "oec_service_manager.py").read_text(encoding="utf-8")
+        self.assertIn('str(Path.home() / "Conda")', manager)
+        harness = (self.ROOT / "tests" / "notebook_final_cell_acceptance.py").read_text(encoding="utf-8")
+        self.assertIn('"trellis-combined-flux":', harness)
+        self.assertIn('api_name="/generate"', harness)
+        self.assertIn("COMBINED_FLUX_SERVICE_CLEANUP=PASS", harness)
+
     def test_notebook_final_cells_are_reentrant_diagnostic_and_live_testable(self):
         flux = self.find(self.flux_only, "FLUX_PIPELINE_READY=PASS")
         self.assertIn("FLUX_PIPELINE_LOAD=START", flux)

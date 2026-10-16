@@ -41,6 +41,12 @@ MODE_CONFIG = {
         "default_timeout": 420,
         "kind": "trellis-startup",
     },
+    "trellis-combined-flux": {
+        "notebook": "pipeline_trellis_3d.ipynb",
+        "selector": "FLUX_GRADIO_START=",
+        "default_timeout": 180,
+        "kind": "flux-service",
+    },
 }
 
 
@@ -151,6 +157,29 @@ def _launch_cell(mode: str, port: int, timeout: int, artifact_dir: Path, run_roo
         env["AIEROS_FLUX_UI_OUTPUT_MODE"] = "scratch"
         env["AIEROS_FLUX_UI_SCRATCH_DIR"] = str(run_root / "flux-scratch")
         env.setdefault("AIEROS_GPU", env.get("CUDA_VISIBLE_DEVICES", "0").split(",")[0])
+    elif config["kind"] == "flux-service":
+        env["AIEROS_FLUX_GRADIO_PORT"] = str(port)
+        env["AIEROS_FLUX_UI_OUTPUT_MODE"] = "scratch"
+        env["AIEROS_FLUX_UI_SCRATCH_DIR"] = str(run_root / "flux-combined-scratch")
+        flux_gpu = os.environ.get("AIEROS_GPU", env.get("CUDA_VISIBLE_DEVICES", "0").split(",")[0]).strip()
+        if not flux_gpu.isdigit():
+            raise RuntimeError(f"Invalid physical FLUX GPU selected for combined notebook: {flux_gpu!r}")
+        try:
+            probe = subprocess.run(
+                ["nvidia-smi", "--query-gpu=index", "--format=csv,noheader"],
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise RuntimeError(f"Cannot enumerate physical GPUs for combined notebook acceptance: {exc}") from exc
+        available_gpus = [line.strip() for line in probe.stdout.splitlines() if line.strip().isdigit()]
+        if flux_gpu not in available_gpus:
+            raise RuntimeError(f"Selected FLUX GPU {flux_gpu} is not present in nvidia-smi inventory {available_gpus}")
+        other_gpus = [gpu for gpu in available_gpus if gpu != flux_gpu]
+        if not other_gpus:
+            raise RuntimeError("Combined notebook requires distinct physical GPU IDs for FLUX and TRELLIS.")
+        env["AIEROS_FLUX_UI_GPU"] = flux_gpu
+        env["AIEROS_TRELLIS_UI_GPU"] = other_gpus[0]
+        env.pop("CONDA_ROOT", None)
     else:
         env["AIEROS_TRELLIS_GRADIO_PORT"] = str(port)
         env["AIEROS_TRELLIS_GRADIO_HOST"] = "127.0.0.1"
@@ -266,6 +295,43 @@ def run_acceptance(mode: str, port: int, timeout: int, artifact_dir: Path, run_r
                 "generation_seconds": metadata.get("generation_seconds"),
                 "artifact_png": str(artifact_dir / "flux-notebook-final-cell.png"),
             }
+        elif mode == "trellis-combined-flux":
+            result = client.predict(
+                "A small red ceramic teapot on a clean studio table, soft window light, commercial product photography",
+                None, 512, 512, 4, 1.0, 2048, False,
+                api_name="/generate",
+            )
+            from pipeline_flux_image import validate_png_file
+
+            scratch = run_root / "flux-combined-scratch"
+            pngs = sorted(scratch.glob("flux2_klein_*.png"), key=lambda p: p.stat().st_mtime)
+            if not pngs:
+                raise RuntimeError(f"Combined notebook FLUX cell returned {result!r}, but no PNG appeared in {scratch}")
+            png = pngs[-1]
+            metadata_path = png.with_name(png.stem + "_info.json")
+            png_info = validate_png_file(png)
+            if not metadata_path.is_file():
+                raise RuntimeError(f"Combined notebook FLUX sidecar is missing: {metadata_path}")
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            if (metadata.get("width"), metadata.get("height")) != (512, 512):
+                raise RuntimeError(f"Combined notebook FLUX metadata has incorrect dimensions: {metadata}")
+            if metadata.get("output_mode") != "local_scratch_only":
+                raise RuntimeError(f"Combined notebook FLUX did not use scratch output: {metadata}")
+            shutil.copy2(png, artifact_dir / "flux-combined-notebook-final-cell.png")
+            shutil.copy2(metadata_path, artifact_dir / "flux-combined-notebook-final-cell-info.json")
+            report = {
+                "mode": mode, "status": "PASS", "notebook": MODE_CONFIG[mode]["notebook"],
+                "port": port, "http": 200, "api_name": "/generate",
+                "response_types": [type(x).__name__ for x in result],
+                "png_bytes": png_info["bytes"], "width": metadata["width"],
+                "height": metadata["height"], "seed": metadata.get("seed"),
+                "steps": metadata.get("num_inference_steps", metadata.get("steps")),
+                "output_mode": metadata.get("output_mode"),
+                "generation_seconds": metadata.get("generation_seconds"),
+                "flux_gpu": os.environ.get("AIEROS_GPU", os.environ.get("CUDA_VISIBLE_DEVICES")),
+                "manager_conda_root_default": str(Path.home() / "Conda"),
+                "artifact_png": str(artifact_dir / "flux-combined-notebook-final-cell.png"),
+            }
         elif mode == "trellis-only":
             from PIL import Image, ImageDraw
             import trimesh
@@ -331,6 +397,31 @@ def run_acceptance(mode: str, port: int, timeout: int, artifact_dir: Path, run_r
         _artifact_report(artifact_dir, report)
         raise
     finally:
+        active_error = sys.exc_info()[0]
+        if mode == "trellis-combined-flux" and log_path.is_file():
+            try:
+                cell_log = log_path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                cell_log = ""
+            if "FLUX_GRADIO_START=PASS" in cell_log:
+                manager = ROOT / "tools" / "oec_service_manager.py"
+                conda_root = Path.home() / "Conda"
+                try:
+                    stopped = subprocess.run(
+                        [sys.executable, str(manager), "--conda-root", str(conda_root), "stop", "flux-ui"],
+                        text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False, timeout=30,
+                    )
+                    print(stopped.stdout, end="" if stopped.stdout.endswith("\n") else "\n", flush=True)
+                    if stopped.returncode == 0:
+                        print("COMBINED_FLUX_SERVICE_CLEANUP=PASS", flush=True)
+                    else:
+                        print(f"COMBINED_FLUX_SERVICE_CLEANUP=FAIL exit={stopped.returncode}", flush=True)
+                        if active_error is None:
+                            raise RuntimeError(f"Failed to stop the test-owned combined FLUX service: exit={stopped.returncode}")
+                except (OSError, subprocess.SubprocessError) as exc:
+                    print(f"COMBINED_FLUX_SERVICE_CLEANUP=FAIL error={type(exc).__name__}: {exc}", flush=True)
+                    if active_error is None:
+                        raise
         if process is not None and process.poll() is None:
             process.terminate()
             try:
@@ -347,7 +438,7 @@ def main() -> int:
     parser.add_argument("--execute-cell", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--notebook", type=Path)
     parser.add_argument("--selector")
-    parser.add_argument("--kind", choices=("flux", "trellis", "trellis-startup"))
+    parser.add_argument("--kind", choices=("flux", "trellis", "trellis-startup", "flux-service"))
     parser.add_argument("--port", type=int, default=7864)
     parser.add_argument("--timeout-seconds", type=int)
     parser.add_argument("--artifact-dir", type=Path, default=Path("notebook-final-cell-artifacts"))
