@@ -65,6 +65,7 @@ class FluxImageTests(unittest.TestCase):
         self.assertIn("FLUX_UI_OUTPUT_MODE=shared", source)
         self.assertIn('with gr.Blocks(title="FLUX.2 Klein — OEC") as demo:', source)
         self.assertNotIn("theme=gr.themes.Monochrome()", source)
+        self.assertIn("demo.oec_output_dir = str(chosen_output.resolve())", source)
 
     def test_complete_local_snapshot_is_resolved_without_hub_or_torch(self):
         with tempfile.TemporaryDirectory() as td:
@@ -108,6 +109,7 @@ class FluxImageTests(unittest.TestCase):
         self.assertIn('scratch_output=(FLUX_UI_OUTPUT_MODE == "scratch")', studio)
         self.assertIn('model_cache=SYSTEM_DIRS["models"]', studio)
         self.assertIn("FLUX_GRADIO_LAUNCH=FAIL", studio)
+        self.assertIn("allowed_paths=[demo_flux.oec_output_dir]", studio)
         self.assertNotIn("guidance_scale=3.5", studio)
         self.assertNotIn("kwargs", studio)
 
