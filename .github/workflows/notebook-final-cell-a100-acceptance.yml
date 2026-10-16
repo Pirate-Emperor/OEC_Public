@@ -1,0 +1,76 @@
+name: Execute OEC Jupyter final UI cells on A100
+
+on:
+  push:
+    branches:
+      - fix/flux-trellis-pipeline-20261015
+    paths:
+      - .github/notebook-final-cell-acceptance.trigger
+
+permissions:
+  contents: read
+
+jobs:
+  notebook-final-cell-acceptance:
+    name: Run FLUX and TRELLIS notebook final cells on oec-1
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 75
+    steps:
+      - name: Check out the reviewed notebook candidate
+        uses: actions/checkout@v4
+
+      - name: Validate source and execute the actual notebook UI cells
+        shell: bash
+        env:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          HF_HUB_DISABLE_TELEMETRY: "1"
+          PYTHONUNBUFFERED: "1"
+          AIEROS_TRELLIS_ATTN_BACKEND: xformers
+          AIEROS_FLUX_UI_OUTPUT_MODE: scratch
+        run: |
+          set -Eeuo pipefail
+          test "${RUNNER_NAME:-unknown}" = "oec-1" || { echo 'NOTEBOOK_FINAL_CELL=BLOCKED_WRONG_RUNNER'; exit 52; }
+          PYTHON="${OEC_PYTHON:-$HOME/Conda/envs/phase2_3d/bin/python}"
+          test -x "$PYTHON" || { echo "NOTEBOOK_FINAL_CELL=BLOCKED_PHASE2_3D_PYTHON_MISSING path=$PYTHON"; exit 53; }
+          cd "$GITHUB_WORKSPACE"
+          "$PYTHON" -m py_compile tests/notebook_final_cell_acceptance.py pipeline_trellis_3d.py
+          "$PYTHON" -m unittest discover -s tests -p 'test_trellis_notebook_static.py' -v
+
+          RUN_ROOT="/tmp/oec-notebook-final-cell-run-$GITHUB_RUN_ID"
+          test ! -e "$RUN_ROOT" || { echo "NOTEBOOK_FINAL_CELL=BLOCKED_RUN_ROOT_EXISTS path=$RUN_ROOT"; exit 54; }
+          ARTIFACT_ROOT="$GITHUB_WORKSPACE/notebook-final-cell-artifacts"
+          mkdir -p "$ARTIFACT_ROOT"
+          cleanup_run_root() {
+            "$PYTHON" -c 'import shutil,sys; from pathlib import Path; p=Path(sys.argv[1]).resolve(); r=Path("/tmp").resolve(); shutil.rmtree(p) if p.parent==r and p.name.startswith("oec-notebook-final-cell-run-") and p.is_dir() else None' "$RUN_ROOT"
+          }
+          trap cleanup_run_root EXIT
+
+          exec 9>/tmp/oec-flux-inference.lock
+          if ! flock -x -w 180 9; then
+            echo 'NOTEBOOK_FINAL_CELL=BLOCKED_GPU_LOCK_TIMEOUT'
+            exit 55
+          fi
+          GPU="$("$PYTHON" tools/flux_gpu_admission.py --print-index-only --wait-seconds 180)"
+          export AIEROS_GPU="$GPU"
+          export CUDA_VISIBLE_DEVICES="$GPU"
+          echo "NOTEBOOK_FINAL_CELL=START runner=$RUNNER_NAME host=$(hostname) gpu=$GPU env=phase2_3d"
+
+          "$PYTHON" tests/notebook_final_cell_acceptance.py --mode flux --port 17864 --timeout-seconds 180 --artifact-dir "$ARTIFACT_ROOT/flux" --run-root "$RUN_ROOT/flux"
+
+          TRELLIS_PORT=$((23000 + GITHUB_RUN_ID % 7000))
+          "$PYTHON" tests/notebook_final_cell_acceptance.py --mode trellis-only --port "$TRELLIS_PORT" --timeout-seconds 420 --artifact-dir "$ARTIFACT_ROOT/trellis-only" --run-root "$RUN_ROOT/trellis-only"
+
+          COMBINED_PORT=$((31000 + GITHUB_RUN_ID % 7000))
+          "$PYTHON" tests/notebook_final_cell_acceptance.py --mode trellis-combined --port "$COMBINED_PORT" --timeout-seconds 420 --artifact-dir "$ARTIFACT_ROOT/trellis-combined" --run-root "$RUN_ROOT/trellis-combined"
+
+          echo "NOTEBOOK_FINAL_CELL=PASS flux_live_generate=PASS trellis_only_live_generate=PASS combined_trellis_gradio_start=PASS"
+
+      - name: Upload exact-run notebook final-cell evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-notebook-final-cell-acceptance
+          path: notebook-final-cell-artifacts/**
+          if-no-files-found: warn
+          retention-days: 30

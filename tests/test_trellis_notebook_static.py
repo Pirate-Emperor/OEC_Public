@@ -266,6 +266,36 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertIn("allowed_paths=[str(args.output_dir or Path(runtime[", launch)
         self.assertIn("theme=gr.themes.Monochrome()", launch)
 
+    def test_notebook_final_cells_are_reentrant_diagnostic_and_live_testable(self):
+        flux = self.find(self.flux_only, "FLUX_PIPELINE_READY=PASS")
+        self.assertIn("FLUX_PIPELINE_LOAD=START", flux)
+        self.assertIn("FLUX_PIPELINE_LOAD=FAIL", flux)
+        self.assertIn("FLUX_GRADIO_LAUNCH=START", flux)
+        self.assertIn("FLUX_GRADIO_LAUNCH=PASS", flux)
+        self.assertIn("prevent_thread_lock=True", flux)
+        self.assertIn("allowed_paths=[demo_flux.oec_output_dir]", flux)
+
+        for label, cells in (
+            ("TRELLIS-only", self.only),
+            ("combined TRELLIS", self.combined),
+        ):
+            studio = self.find(cells, "TRELLIS_GRADIO_LAUNCH=START")
+            self.assertIn("TRELLIS_MODEL_LOAD=START", studio, label)
+            self.assertIn("TRELLIS_MODEL_LOAD=FAIL", studio, label)
+            self.assertIn("TRELLIS_GRADIO_PORT = int(os.environ.get(\"AIEROS_TRELLIS_GRADIO_PORT\", \"7862\"))", studio, label)
+            self.assertIn("TRELLIS_GRADIO_HOST = os.environ.get(\"AIEROS_TRELLIS_GRADIO_HOST\", \"0.0.0.0\")", studio, label)
+            self.assertIn('api_name="generate_3d"', studio, label)
+            self.assertIn("prevent_thread_lock=True", studio, label)
+            self.assertIn("TRELLIS_GRADIO_PREVIOUS_CLOSE_WARNING", studio, label)
+            self.assertIn("allowed_paths=[OUTPUT_DIR]", studio, label)
+
+        harness = (self.ROOT / "tests" / "notebook_final_cell_acceptance.py").read_text(encoding="utf-8")
+        self.assertIn("exec(compile(source", harness)
+        self.assertIn('api_name="/generate"', harness)
+        self.assertIn('api_name="/generate_3d"', harness)
+        self.assertIn("trimesh.load", harness)
+        self.assertIn("NOTEBOOK_FINAL_CELL_HTTP=PASS", harness)
+
     def test_all_three_notebooks_keep_gradio_ports_private_and_outputs_fresh(self):
         expected = (
             (self.flux_only_nb, self.flux_only, "7864", "demo_flux.launch("),
