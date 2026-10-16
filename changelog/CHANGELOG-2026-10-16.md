@@ -39,3 +39,13 @@ Continue the OEC frozen-weight readiness work safely by addressing the blocker e
 - [Read-only quota probe and 8-test suite](https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38898669614)
 - [Final structured snapshot/admission regression CI](https://github.com/Killer4K-N/OEC/actions/runs/38903458777)
 - [Draft review PR #12](https://github.com/Killer4K-N/OEC/pull/12)
+
+
+## Late-day notebook acceptance — 2026-10-16
+
+- OEC run [38912593770](https://github.com/Killer4K-N/OEC/actions/runs/38912593770), job 117011880046 on \`oec-1\` / \`scn30-mn\`, passed the actual final-cell acceptance suite for FLUX-only, TRELLIS-only, combined-notebook FLUX, and combined-notebook TRELLIS startup. Artifact [12052395126](https://github.com/Killer4K-N/OEC/actions/runs/38912593770/artifacts/12052395126) SHA-256 is \`6764845113a90b85d46699612ff1f975e77bbf85be793968eb3ba208ca7cd95e\`.
+- FLUX-only generation returned HTTP 200 and a fresh 512$\times$512 PNG (196,376 bytes; generation 8.839 s; total elapsed 99.723 s). TRELLIS-only returned a GLB (5,457,384 bytes, SHA-256 \`7db7600e9dd9de6c1549eaf06f08cd687a55e8d62465754b426c521501ed9183\`) with one geometry, 51,658 vertices and 97,935 faces (337.646 s elapsed). FLUX generation in the combined notebook returned HTTP 200 (196,376-byte PNG, 10.012 s generation). The combined TRELLIS cell only started Gradio successfully (HTTP 200, 171.322 s), without invoking 3D generation.
+- These checks use cached model snapshots and run-owned local scratch; they do not validate cold-cache downloads, mesh quality, joined combined FLUX-to-TRELLIS inference, or production integration. OEC code remains on review branch \`fix/flux-trellis-pipeline-20261015\`; tracking was updated on main without merging source.
+- Storage-admission regression run [38912593912](https://github.com/Killer4K-N/OEC/actions/runs/38912593912) passed. No shared-output/reserve mutation, quota snapshot write, install, download, or training occurred.
+- Frozen-weight read-only readiness run [38924202279](https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38924202279) completed its job but reported semantic status BLOCKED: missing PEFT, missing fresh numeric quota, models storage warning / group soft quota exceeded, pending exact model/license/task approval and unverified data provenance/schema/splits. Training and downloads remained false. The real-model fine-tuning claim remains not run.
+- Open next gates: separately execute the combined notebook's \`/generate_3d\` call with artifact/hash/reopen verification; run the full request chain end-to-end; clear fresh quota/managed storage admission; and only then execute the approved frozen-weight baseline and adapter checks.
