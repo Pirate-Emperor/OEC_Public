@@ -1,5 +1,16 @@
 # OEC Active TODO
 
+## 2026-10-16 — latest notebook acceptance and frozen-weight audit
+
+- [x] Executed the actual final UI cells on designated \`oec-1\` in [run 38912593770](https://github.com/Killer4K-N/OEC/actions/runs/38912593770): FLUX-only generation, TRELLIS-only GLB generation, combined-notebook FLUX generation and combined TRELLIS app startup. Artifact: [12052395126](https://github.com/Killer4K-N/OEC/actions/runs/38912593770/artifacts/12052395126).
+- [x] Recorded standalone TRELLIS GLB size 5,457,384 bytes, SHA-256 \`7db7600e9dd9de6c1549eaf06f08cd687a55e8d62465754b426c521501ed9183\`, 51,658 vertices / 97,935 faces; run time 337.646 s. FLUX-only PNG generation took 8.839 s and the combined-notebook FLUX cell took 10.012 s.
+- [x] Confirmed precise scope: all modes were cache-only/local scratch; the combined TRELLIS notebook was startup-only (HTTP 200), not a generate_3d call. Do not describe this as a combined end-to-end image-to-mesh result or production integration.
+- [x] Logged the storage admission regression run 38912593912 as passing; no quota snapshot publication, reserved/shared storage mutation, package install, model/data download or training was performed in this reporting pass.
+- [x] Re-read [frozen-weight audit 38924202279](https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38924202279): audit execution passed but semantic readiness remains BLOCKED; PEFT missing, fresh numeric quota unavailable, managed models directory WARNING / group soft-quota overage, model/license/task and dataset provenance/schema/split approvals unresolved; \`training_started=false\`, \`downloads_started=false\`.
+- [ ] Keep all write/download/training gates closed until fresh authoritative quota and managed storage NORMAL state are verified through the sanctioned storage-manager interface. Never access \`.storage_reserve.bin\` directly.
+- [ ] For the combined TRELLIS notebook, exercise \`/generate_3d\` through the combined UI with exact input/output hashes, mesh reopen, timeout and cleanup checks; then test the intended FLUX→TRELLIS request chain end-to-end before making an integration claim.
+- [ ] Resume frozen-weight work only after the dedicated environment has PEFT and exact model/license/task plus dataset provenance/schema/group-safe split approvals, then perform baseline, one-batch adapter gradient/frozen-tensor assertions, checkpoint round-trip/resume and held-out evaluation.
+
 ## 2026-10-16 — Lustre soft/hard quota schema and admission hardening
 
 - [x] Verified the dedicated `oec-freeze` read-only probe [run 38898669614](https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38898669614): 8/8 probe/parser tests passed. Captured group usage above soft quota with hard-limit headroom and grace; this is time-stamped evidence, not a current quota guarantee.
@@ -10,7 +21,7 @@
 - [ ] Keep snapshot publication and all model/data/output writes blocked until a new authoritative quota sample is obtained, the schema/policy is reviewed and deployed under an explicit decision, and admission uses the structured soft/hard/grace fields. Never infer user quota from filesystem free-space output or fabricate values for the snapshot.
 - [ ] After storage admission is safe, return to OEC-Viewer's frozen_ft acceptance contract: approve exact model/license and source-specific dataset/provenance/splits; only then install required PEFT dependencies and run the real baseline/LoRA smoke with exact parameter, gradient, frozen-state, checkpoint/resume and held-out evaluation evidence.
 
-**Last updated:** 2026-10-16 18:25 IST (Asia/Kolkata)  
+**Last updated:** 2026-10-16T21:15:20.823+05:30 (Asia/Kolkata)
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 ## 2026-10-15 20:29 IST — cluster coordinator, CLI help and notebook GPU isolation
 
