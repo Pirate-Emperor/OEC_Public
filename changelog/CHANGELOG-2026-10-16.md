@@ -304,3 +304,36 @@ The trigger was committed with the workflow; its live runtime outcome is pending
 ### 17:35 IST status refresh — TRELLIS runtime still active
 
 Rechecked run [38897009792](https://github.com/Killer4K-N/OEC/actions/runs/38897009792), job `116959777408`. GitHub still reports the guarded runtime step as `in_progress` (the run's last API update remains 2026-10-16T11:56:37Z). The artifact list is still empty and the log-download endpoint has not yet exposed the active step log. Therefore no pass/fail, inference timing, mesh counts or root cause can currently be stated. The job may still be executing GPU work; do not dispatch a second TRELLIS inference job while this run is active and the shared lock is in use. The static and A100 sync/FLUX evidence earlier in this file remains verified independently.
+
+
+## 2026-10-16 — Latest notebook final-cell hardening and A100 verification
+
+### Source changes and hosted tests
+
+- Review branch head for the notebook cell hardening/harness is eb63fbb6dc14f20392bc71359020ade87a2037d7 ([commit](https://github.com/Killer4K-N/OEC/commit/eb63fbb6dc14f20392bc71359020ade87a2037d7)). The FLUX-only, TRELLIS-only and combined notebooks now emit model-load and Gradio-launch start/pass/fail diagnostics with tracebacks, support explicit test host/port environment variables while keeping defaults (FLUX 7864; TRELLIS 7862), expose a TRELLIS /generate_3d API, close old TRELLIS demo objects before rerun, and use prevent_thread_lock=True so the combined notebook can return from the UI cell.
+- Hosted regression [run 38905014952](https://github.com/Killer4K-N/OEC/actions/runs/38905014952), job [116986281846](https://github.com/Killer4K-N/OEC/actions/runs/38905014952/job/116986281846), passed 107 tests across the configured suites and validated all four notebook JSON files (combined TRELLIS/FLUX 16 cells; TRELLIS-only 15; FLUX-only 10; AudioCraft 6). The older tests that assumed Gradio port 7862 must appear as a literal server_port argument were updated to verify the default plus the environment-selected port variable.
+- Standalone CLI runtime [run 38902874800](https://github.com/Killer4K-N/OEC/actions/runs/38902874800) is confirmed PASS on oec-1 / scn30-mn / A100 GPU 0: xFormers CUDA attention probe passed; cached TRELLIS inference/export passed; independently reopened GLB contains one geometry, 52,640 vertices and 97,897 faces; loopback Gradio returned HTTP 200 on test port 18662 after a 141-second startup wait. Exact-run artifact [12046639503](https://github.com/Killer4K-N/OEC/actions/runs/38902874800/artifacts/12046639503) includes the generated GLB, logs and runtime report. This proves the standalone CLI runtime path, not yet the exact notebook final cell.
+
+### Synchronization and FLUX regression
+
+- Guarded sync [run 38904725642](https://github.com/Killer4K-N/OEC/actions/runs/38904725642), job [116985320087](https://github.com/Killer4K-N/OEC/actions/runs/38904725642/job/116985320087), completed PASS on oec-1. The persistent live checkout was at detached revision 081aaf34f6379873bdc925d1dcf6b9c3d50349d3, with 43 dirty paths. The workflow verified backups and synced three authorized notebook paths, reported 13 unchanged files and preserved two unrelated dirty paths. Backup root: /nlsasfs/home/lmedge/rahkus/.local/state/oec-live-sync-backups/38904725642.
+- Live notebook hashes after sync: pipeline_flux_only.ipynb = 7ed40039be5c71caac9d146c8a780ea5306f9e7634539a070910ce84878700d0; pipeline_trellis_3d.ipynb = 880ede60284a5bd165ce81d9e5e16b92a718ecbd8cd8aed85868897772835a86; pipeline_trellis_3d_only.ipynb = 47e4ca2d5d8a4d26c781037eeb635d7b3e4b11034fdbdec4bf43cbca481f969e.
+- The same live run retested FLUX after sync: localhost proxy bypass passed, Gradio HTTP 200, actual /generate returned normally, and validation accepted a 512×512 PNG of 196,376 bytes with its JSON sidecar. Model is cached black-forest-labs/FLUX.2-klein-4B, PyTorch 2.6.0+cu124 / CUDA 12.4 / Diffusers 0.37.0 / Hub 0.36.0 / Transformers 4.56.1. Generation call reported 1.523 s, seed 2048, four steps. Artifact [12047507280](https://github.com/Killer4K-N/OEC/actions/runs/38904725642/artifacts/12047507280) contains the smoke report, PNG and sidecar.
+
+### Exact notebook-cell test: first attempt and current state
+
+- The new A100 workflow ([workflow source](https://github.com/Killer4K-N/OEC/blob/eb63fbb6dc14f20392bc71359020ade87a2037d7/.github/workflows/notebook-final-cell-a100-acceptance.yml)) executes the actual final UI source from each of the FLUX-only, TRELLIS-only and combined notebooks in clean child processes. It tests the real FLUX /generate callback, TRELLIS-only /generate_3d callback plus GLB geometry reopen, and combined notebook's theme-configured TRELLIS Gradio startup.
+- First attempt [run 38904725697](https://github.com/Killer4K-N/OEC/actions/runs/38904725697), job [116985319415](https://github.com/Killer4K-N/OEC/actions/runs/38904725697/job/116985319415), passed its 17 focused static tests and reached the live FLUX final cell, then failed in the parent harness with KeyError: AIEROS_FLUX_UI_SCRATCH_DIR. That variable was intentionally set in the Gradio child, not exported into the parent validator. This was a harness bug after the cell/API call, not evidence of a notebook import/model failure; the attempt did not complete PNG/metadata validation and is not an accepted run.
+- The harness fix is in [commit eb63fbb](https://github.com/Killer4K-N/OEC/commit/eb63fbb6dc14f20392bc71359020ade87a2037d7): the parent now derives the exact same run-scoped scratch directory from the mode's run root. A subsequent run [38904884931](https://github.com/Killer4K-N/OEC/actions/runs/38904884931) using the pre-fix harness remained in progress at this record time; do not treat that run as evidence for the correction.
+- The corrected actual-notebook workflow [run 38905014913](https://github.com/Killer4K-N/OEC/actions/runs/38905014913) is queued for oec-1. It requires all three final-cell stages and exact-run artifacts before acceptance. Until its logs/artifact are reviewed, the actual Jupyter-cell acceptance remains pending even though standalone CLI TRELLIS and FLUX helper runtime checks passed.
+- No dependencies were installed, models downloaded, shared output written, cache purged, reserve file accessed, QA queue modified, or arbitrary processes terminated. Source remains unmerged from the review branch; main is unchanged.
+
+### Sources
+
+- Gradio 6 migration guide: https://gradio.app/guides/gradio-6-migration-guide
+- Candidate notebook/CLI/harness sources: https://github.com/Killer4K-N/OEC/tree/eb63fbb6dc14f20392bc71359020ade87a2037d7
+- Static regression: https://github.com/Killer4K-N/OEC/actions/runs/38905014952
+- TRELLIS CLI runtime: https://github.com/Killer4K-N/OEC/actions/runs/38902874800
+- Guarded notebook sync + FLUX test: https://github.com/Killer4K-N/OEC/actions/runs/38904725642
+- Exact notebook final-cell test, first attempt: https://github.com/Killer4K-N/OEC/actions/runs/38904725697
+- Exact notebook final-cell test with corrected harness, queued: https://github.com/Killer4K-N/OEC/actions/runs/38905014913

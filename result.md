@@ -388,3 +388,16 @@ A separate cache-only TRELLIS runtime test [38897009792](https://github.com/Kill
 ### Runtime status correction — 2026-10-16 17:35 IST
 
 The TRELLIS runtime job [38897009792](https://github.com/Killer4K-N/OEC/actions/runs/38897009792) has not returned a final status or artifact in the latest status check; job 116959777408 still reports the main step in progress. Its last Actions API update is 11:56:37Z. No inference/GLB/Gradio outcome is published, so the Trellis runtime acceptance remains pending. Do not interpret the absence of a result log as success or failure. The completed static regression, guarded A100 synchronization, and FLUX live generation records above are independently complete.
+
+
+## 2026-10-16 — Notebook cells synchronized; runtime acceptance split by path
+
+The current source hardens the final UI cells in all three notebooks with model-load/Gradio launch diagnostics, environment-selectable test ports, explicit TRELLIS /generate_3d, safe repeated launch handling, and prevent_thread_lock so the combined notebook can proceed to its separate FLUX UI.
+
+Hosted candidate CI [38905014952](https://github.com/Killer4K-N/OEC/actions/runs/38905014952), job [116986281846](https://github.com/Killer4K-N/OEC/actions/runs/38905014952/job/116986281846), passed all 107 configured tests plus notebook JSON checks. The standalone CLI TRELLIS acceptance [38902874800](https://github.com/Killer4K-N/OEC/actions/runs/38902874800) produced and reopened a GLB with 52,640 vertices and 97,897 faces, then received loopback Gradio HTTP 200 after a 141-second startup wait; artifact [12046639503](https://github.com/Killer4K-N/OEC/actions/runs/38902874800/artifacts/12046639503). This confirms the CLI path, not the notebook final cell.
+
+The guarded A100 sync [38904725642](https://github.com/Killer4K-N/OEC/actions/runs/38904725642) backed up and updated the three notebook files (three updated, 13 unchanged, two unrelated dirty paths preserved) and passed a post-sync live FLUX call. The cached FLUX model served HTTP 200, /generate returned successfully, and a valid 512×512 PNG (196,376 bytes) plus metadata sidecar were uploaded in artifact [12047507280](https://github.com/Killer4K-N/OEC/actions/runs/38904725642/artifacts/12047507280). Generation call time was 1.523 seconds.
+
+The first attempt at direct notebook final-cell execution [38904725697](https://github.com/Killer4K-N/OEC/actions/runs/38904725697) passed the 17 focused static tests and then failed when the harness parent tried to read AIEROS_FLUX_UI_SCRATCH_DIR from its own environment, although that variable was correctly set in the child process. The parent now derives run_root/flux-scratch in [commit eb63fbb](https://github.com/Killer4K-N/OEC/commit/eb63fbb6dc14f20392bc71359020ade87a2037d7). The corrected exact-cell workflow [38905014913](https://github.com/Killer4K-N/OEC/actions/runs/38905014913) is queued; wait for its exact-run reports and artifacts before acceptance of FLUX notebook /generate, TRELLIS-only /generate_3d + geometry reopen, and combined notebook themed UI startup.
+
+No packages were installed, models downloaded, shared output written, cache purged, storage reserve accessed or unrelated processes killed. Source remains on review PR #11; main unchanged.

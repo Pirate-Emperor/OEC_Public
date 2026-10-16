@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T17:35:00+05:30",
+  "last_updated": "2026-10-16T18:38:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Reviewed branch source fix and guarded A100 sync are verified; three Trellis files were backed up and synced on oec-1, with unrelated dirty paths preserved. FLUX cache-only Gradio HTTP 200 and actual /generate PNG generation passed in artifact 12044347373. Hosted regression passed 106 configured tests. Dedicated TRELLIS runtime run 38897009792 remains in_progress with no logs/artifact published at the 17:35 IST status refresh, so Trellis runtime is not yet accepted. Main remains unchanged.",
+  "latest_summary": "Review branch eb63fbb hardened the actual Jupyter final UI cells with model-load/launch diagnostics, reentrant Gradio launch and an A100 harness for FLUX /generate, TRELLIS /generate_3d + GLB geometry reopen, and combined notebook themed UI startup. Hosted regression 38905014952 passed 107 tests plus four notebook JSON checks. Standalone CLI TRELLIS runtime 38902874800 passed real cache-only generation/export/reopen (52,640 vertices, 97,897 faces) and Gradio HTTP 200. Guarded sync 38904725642 backed up and synced all three notebooks, preserving two unrelated conflicts; cached FLUX /generate passed with a valid 512x512 PNG/sidecar in artifact 12047507280. The first exact-cell attempt 38904725697 failed on the harness parent reading a child-only FLUX scratch environment variable; corrected code in eb63fbb derives the same path from run_root. Corrected exact-cell run 38905014913 is queued and must pass before claiming Jupyter final-cell acceptance. main unchanged.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2938,7 +2938,7 @@
       "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38896204476",
       "expected": "New launch/file-serving regression passes; existing configured static suites, Python compilation and all four notebook JSON checks pass; no runtime status inferred.",
       "results": {
-        "status": "STATIC_PASS_LIVE_TRELLIS_PENDING",
+        "status": "STATIC_PASS_AND_STANDALONE_CLI_RUNTIME_PASS; EXACT_NOTEBOOK_CELL_PENDING",
         "conclusion": "success",
         "tests_by_suite": {
           "qa": 15,
@@ -2963,7 +2963,27 @@
         "trellis_image_to_glb_runtime": "NOT_RUN",
         "flux_previous_live_run": 38859218039,
         "flux_previous_artifact_id": 12028935755,
-        "main_branch": "UNCHANGED"
+        "main_branch": "UNCHANGED",
+        "cli_runtime": {
+          "run_id": 38902874800,
+          "status": "PASS",
+          "environment": "oec-1 / scn30-mn / phase2_3d / NVIDIA A100-SXM4-40GB GPU 0",
+          "model_cache_only": true,
+          "model_download": false,
+          "dependency_install": false,
+          "xformers_cuda_attention": "PASS",
+          "glb_bytes": 2951296,
+          "glb_sha256": "3afe54d8d3180c2907b4295d6b22da7638ff9a3a1f49b1e93a7d45dfa38c3bed",
+          "reopened_geometry_count": 1,
+          "reopened_vertices": 52640,
+          "reopened_faces": 97897,
+          "gradio_port": 18662,
+          "gradio_http": 200,
+          "startup_wait_seconds": 141,
+          "artifact_id": 12046639503,
+          "artifact_url": "https://github.com/Killer4K-N/OEC/actions/runs/38902874800/artifacts/12046639503"
+        },
+        "trellis_notebook_exact_cell": "PENDING; corrected live workflow 38905014913 queued"
       },
       "supporting_urls": [
         "https://github.com/Killer4K-N/OEC/commit/f10f2660193751351705b5fd601b0947a2e8e045",
@@ -2973,7 +2993,7 @@
         "https://github.com/Killer4K-N/OEC/actions/runs/38859218039",
         "https://github.com/Killer4K-N/OEC/actions/runs/38859218039/artifacts/12028935755"
       ],
-      "follow_up": "Safely synchronize the reviewed TRELLIS files to oec-1 after the passing test gate, then run a cache-only real Trellis Gradio start + image-to-GLB smoke in phase2_3d and independently reopen the GLB; keep shared storage admission intact."
+      "follow_up": "Inspect the corrected exact notebook final-cell run 38905014913 and artifact. Require FLUX PNG/sidecar validation, TRELLIS notebook /generate_3d GLB geometry reopen, and the combined notebook's theme-configured Gradio startup. Standalone CLI success is not a replacement for exact notebook cell acceptance."
     },
     {
       "id": "TEST-2026-10-16-OEC-A100-SYNC-TRELLIS-AND-FLUX-LIVE-RETEST",
@@ -2983,10 +3003,10 @@
       "approach": "Triggered sync-a100-pipeline-tools.yml from reviewed branch revision 3dce11fb392bafa343606855361e11d3a4f31975. The workflow ran phase2_3d pre-sync tests, verified backup copies of changed authorized targets, copied only reviewed files, validated source syntax/notebooks, then loaded cached FLUX weights offline and issued an actual Gradio /generate request.",
       "parameters": {
         "branch": "fix/flux-trellis-pipeline-20261015",
-        "workflow_run_id": 38896579885,
-        "job_id": 116958385036,
-        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38896579885",
-        "source_sha": "3dce11fb392bafa343606855361e11d3a4f31975",
+        "workflow_run_id": 38904725642,
+        "job_id": 116985320087,
+        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38904725642",
+        "source_sha": "6ad0d3d28d9099950dcd191f562de740c929e93d",
         "initial_live_commit": "081aaf34f6379873bdc925d1dcf6b9c3d50349d3",
         "live_root": "/nlsasfs/home/lmedge/rahkus/OEC",
         "runner": "oec-1",
@@ -2998,22 +3018,22 @@
         "requirements_txt": "ABSENT; no dependency install was attempted",
         "synced_files": [
           {
-            "path": "pipeline_trellis_3d.py",
-            "sha256": "42bec1e2821c97d996dfcb5c8370e210cda3251dcc72c3f79d91f5e362354107",
+            "path": "pipeline_flux_only.ipynb",
+            "sha256": "7ed40039be5c71caac9d146c8a780ea5306f9e7634539a070910ce84878700d0",
             "backup_verified": true
           },
           {
             "path": "pipeline_trellis_3d.ipynb",
-            "sha256": "41041fcd3c8d5004af351856a6a98d289620b51472278ff4f72f5f694bb43d28",
+            "sha256": "880ede60284a5bd165ce81d9e5e16b92a718ecbd8cd8aed85868897772835a86",
             "backup_verified": true
           },
           {
             "path": "pipeline_trellis_3d_only.ipynb",
-            "sha256": "60f985c3dfee69f781b3d914399e0986232313950a4c3e06f2ac6923778db1fe",
+            "sha256": "47e4ca2d5d8a4d26c781037eeb635d7b3e4b11034fdbdec4bf43cbca481f969e",
             "backup_verified": true
           }
         ],
-        "backup_root": "/nlsasfs/home/lmedge/rahkus/.local/state/oec-live-sync-backups/38896579885",
+        "backup_root": "/nlsasfs/home/lmedge/rahkus/.local/state/oec-live-sync-backups/38904725642",
         "sync_summary": {
           "created": 0,
           "updated": 3,
@@ -3026,26 +3046,22 @@
         ],
         "flux_runtime": {
           "status": "PASS",
-          "model_id": "black-forest-labs/FLUX.2-klein-4B",
-          "torch": "2.6.0+cu124",
-          "cuda": "12.4",
-          "diffusers": "0.37.0",
-          "huggingface_hub": "0.36.0",
-          "transformers": "4.56.1",
-          "localhost_proxy_bypass": "PASS",
+          "run_id": 38904725642,
+          "host": "scn30-mn",
+          "runner": "oec-1",
+          "gpu_index": 0,
           "gradio_http_status": 200,
           "endpoint": "/generate",
           "endpoint_result": "PASS",
           "image_width": 512,
           "image_height": 512,
-          "image_mode": "RGB",
           "image_bytes": 196376,
           "seed": 2048,
           "steps": 4,
+          "generation_seconds": 1.523,
           "output_mode": "local_scratch_only",
-          "generation_seconds": 20.816,
-          "artifact_id": 12044347373,
-          "artifact_url": "https://github.com/Killer4K-N/OEC/actions/runs/38896579885/artifacts/12044347373"
+          "artifact_id": 12047507280,
+          "artifact_url": "https://github.com/Killer4K-N/OEC/actions/runs/38904725642/artifacts/12047507280"
         },
         "trellis_runtime_separate_run": 38897009792,
         "trellis_runtime_separate_status": "IN_PROGRESS_AT_RECORD_TIME",
@@ -3053,7 +3069,7 @@
       },
       "expected": "The three authorized files should be backup-verified and copied; unrelated dirty files preserved; phase2_3d static validation pass; FLUX cached model/Gradio generation still returns a valid PNG and sidecar.",
       "results": {
-        "status": "SYNC_PASS_FLUX_LIVE_PASS_TRELLIS_RUNTIME_PENDING",
+        "status": "SYNC_PASS_FLUX_LIVE_PASS_TRELLIS_CLI_RUNTIME_PASS_EXACT_NOTEBOOK_CELL_PENDING",
         "sync": "PASS",
         "pre_sync_validation": "PASS",
         "post_sync_static_validation": "PASS",
@@ -3072,7 +3088,11 @@
         "reserve_file_access": false,
         "trellis_runtime_separate_status": "IN_PROGRESS_NO_LOGS_OR_ARTIFACT_PUBLISHED_AS_OF_2026-10-16T17:35:00+05:30",
         "trellis_run_last_api_update": "2026-10-16T11:56:37Z",
-        "trellis_runtime_artifact": "NONE_PUBLISHED_AT_STATUS_REFRESH"
+        "trellis_runtime_artifact": "NONE_PUBLISHED_AT_STATUS_REFRESH",
+        "trellis_cli_runtime_run": 38902874800,
+        "exact_notebook_cell_run_failed_harness": 38904725697,
+        "exact_notebook_cell_failure": "KeyError AIEROS_FLUX_UI_SCRATCH_DIR in parent validator after client.predict; corrected in commit eb63fbb",
+        "corrected_exact_notebook_cell_run": "38905014913"
       },
       "evidence_urls": [
         "https://github.com/Killer4K-N/OEC/actions/runs/38896579885",
@@ -3081,7 +3101,57 @@
         "https://github.com/Killer4K-N/OEC/actions/runs/38897009145",
         "https://github.com/Killer4K-N/OEC/actions/runs/38897009792"
       ],
-      "follow_up": "Recheck run 38897009792 without dispatching another GPU job. Once complete, read its logs/artifact, record the real inference and Gradio result, and diagnose any exact failure before claiming Trellis runtime accepted."
+      "follow_up": "Inspect corrected run 38905014913 and its artifact after it is assigned to oec-1. Confirm all three notebook cell stages and output validation; do not claim notebook final-cell acceptance from static/CLI tests alone."
+    },
+    {
+      "id": "TEST-2026-10-16-OEC-JUPYTER-FINAL-CELL-LIVE-ACCEPTANCE",
+      "date": "2026-10-16",
+      "category": "Execute exact FLUX and TRELLIS Jupyter final UI cells on oec-1",
+      "approach": "Execute each actual final UI code cell from the selected notebook JSON in a fresh child/kernel-like process, wait for real Gradio loopback HTTP 200 without proxy use, invoke live FLUX /generate, invoke TRELLIS-only /generate_3d then reopen the GLB with trimesh, and check combined notebook's themed TRELLIS Gradio startup. Offline model mode, no installs/downloads, unique run-scoped /tmp scratch and shared inference lock.",
+      "reason": "Notebook syntax and standalone CLI checks do not prove that the specific Jupyter UI cells start and return valid outputs. The exact-cell harness found a parent/child environment scoping bug during its first attempt.",
+      "parameters": {
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "source_commit": "eb63fbb6dc14f20392bc71359020ade87a2037d7",
+        "harness": "tests/notebook_final_cell_acceptance.py",
+        "workflow": ".github/workflows/notebook-final-cell-a100-acceptance.yml",
+        "first_attempt_run": 38904725697,
+        "first_attempt_job": 116985319415,
+        "first_attempt_outcome": "FAIL_HARNESS_KEYERROR_AFTER_CLIENT_PREDICT",
+        "first_attempt_error": "KeyError: AIEROS_FLUX_UI_SCRATCH_DIR",
+        "harness_fix": "Parent computes run_root / 'flux-scratch'; matches child environment path",
+        "corrected_attempt_run": 38905014913,
+        "corrected_attempt_status": "QUEUED_AT_RECORD_TIME",
+        "expected_modes": [
+          "flux",
+          "trellis-only",
+          "trellis-combined"
+        ],
+        "intended_env": "oec-1 / phase2_3d",
+        "offline_cache_only": true
+      },
+      "expected": "FLUX final cell starts Gradio and /generate returns a valid 512x512 PNG+sidecar; TRELLIS-only final cell starts and /generate_3d returns a valid GLB with nonempty geometry after reopen; combined notebook themed TRELLIS UI starts and returns HTTP 200; artifacts contain reports/logs/validated outputs.",
+      "results": {
+        "status": "IN_PROGRESS_CORRECTED_ATTEMPT_QUEUED",
+        "first_attempt_status": "FAIL",
+        "failure_scope": "Harness output-path lookup after API call; output validation not completed",
+        "hosted_regression_run": 38905014952,
+        "hosted_regression_tests": 107,
+        "static_test": "PASS",
+        "json_checks": "PASS for four notebooks",
+        "source_synchronized_on_oec_1": "PASS via run 38904725642",
+        "actual_flux_notebook_cell": "PENDING_ACCEPTANCE",
+        "actual_trellis_only_notebook_cell": "PENDING_ACCEPTANCE",
+        "actual_combined_trellis_cell": "PENDING_ACCEPTANCE",
+        "main_modified": false
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38905014952",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38904725642",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38904725697",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38905014913",
+        "https://gradio.app/guides/gradio-6-migration-guide"
+      ],
+      "follow_up": "Inspect corrected exact-cell run 38905014913 and its artifact. Fix any real callback/final-cell errors, record actual output evidence, and only mark the notebook paths accepted when all three modes pass."
     }
   ]
 }

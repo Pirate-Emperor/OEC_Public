@@ -288,3 +288,15 @@ Current reviewed source is on [PR #11](https://github.com/Killer4K-N/OEC/pull/11
 ### 17:35 IST update
 
 - [ ] **Still IN PROGRESS — TRELLIS runtime run 38897009792**: job 116959777408 reports the inference/GLB/Gradio step active, last run API update 11:56:37Z. Logs/artifacts have not been exposed while the step remains active. Do not claim pass/fail without the final step output and artifact; do not launch a duplicate GPU workload while the current run may hold the inference lock.
+
+
+## 2026-10-16 — Latest final-cell status refresh
+
+- [x] Standalone TRELLIS CLI runtime passed: [run 38902874800](https://github.com/Killer4K-N/OEC/actions/runs/38902874800) performed cache-only image-to-GLB inference; GLB reopened with one geometry, 52,640 vertices and 97,897 faces; Gradio HTTP 200 after 141-second startup. Artifact [12046639503](https://github.com/Killer4K-N/OEC/actions/runs/38902874800/artifacts/12046639503).
+- [x] Static/hosted suite passed: [run 38905014952](https://github.com/Killer4K-N/OEC/actions/runs/38905014952), job 116986281846, passed 107 tests and four notebook JSON checks.
+- [x] A100 notebook sync + FLUX regression passed: [run 38904725642](https://github.com/Killer4K-N/OEC/actions/runs/38904725642) backup-verified then updated all three notebook files, preserved two unrelated dirty paths, and passed a live cached FLUX /generate with valid 512×512 PNG + metadata in [artifact 12047507280](https://github.com/Killer4K-N/OEC/actions/runs/38904725642/artifacts/12047507280).
+- [x] Fixed the final-cell harness scratch variable bug: commit [eb63fbb](https://github.com/Killer4K-N/OEC/commit/eb63fbb6dc14f20392bc71359020ade87a2037d7) makes the parent derive the same run-scoped FLUX scratch path as its child process.
+- [ ] OPEN — exact notebook final-cell live acceptance: corrected run [38905014913](https://github.com/Killer4K-N/OEC/actions/runs/38905014913) is queued. It must complete FLUX image generation + metadata validation, TRELLIS /generate_3d + GLB geometry reopen, and combined notebook themed UI startup before declaring the Jupyter cells accepted.
+- [ ] OPEN — actual user-browser session: the A100 harness executes exact final cell source in clean child/kernel-like processes, not the user's already-running browser/kernel session. If that session still errors after server-side acceptance, inspect its exact current traceback separately.
+
+Source remains on review PR [#11](https://github.com/Killer4K-N/OEC/pull/11); don't merge into main.
