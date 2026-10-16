@@ -56,6 +56,8 @@ class FluxImageTests(unittest.TestCase):
         self.assertIn("BLOCKED_SCRATCH_OUTPUT", source)
         self.assertIn("refusing to overwrite an existing PNG/metadata file", source)
         self.assertIn("FLUX_UI_OUTPUT_MODE=shared", source)
+        self.assertIn('with gr.Blocks(title="FLUX.2 Klein — OEC") as demo:', source)
+        self.assertNotIn("theme=gr.themes.Monochrome()", source)
 
     def test_complete_local_snapshot_is_resolved_without_hub_or_torch(self):
         with tempfile.TemporaryDirectory() as td:
