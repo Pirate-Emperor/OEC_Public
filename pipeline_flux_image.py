@@ -515,6 +515,10 @@ def create_gradio_demo(
             api_name="generate",
         )
     demo.queue(default_concurrency_limit=1)
+    # Gradio restricts file outputs to its cache, current directory, system temp,
+    # or explicitly allowed paths. Our scratch directory can be a distinct local
+    # filesystem, so the launcher must add exactly this output directory.
+    demo.oec_output_dir = str(chosen_output.resolve())
     return demo
 
 
