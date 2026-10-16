@@ -306,6 +306,8 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertIn("exec(compile(source", harness)
         self.assertIn('api_name="/generate"', harness)
         self.assertIn('api_name="/generate_3d"', harness)
+        self.assertIn("from gradio_client import Client, handle_file", harness)
+        self.assertIn("handle_file(str(input_image_path))", harness)
         self.assertIn("trimesh.load", harness)
         self.assertIn("NOTEBOOK_FINAL_CELL_HTTP=PASS", harness)
 

@@ -229,7 +229,7 @@ def run_acceptance(mode: str, port: int, timeout: int, artifact_dir: Path, run_r
     started = time.time()
     try:
         process, log_path = _launch_cell(mode, port, timeout, artifact_dir, run_root)
-        from gradio_client import Client
+        from gradio_client import Client, handle_file
 
         root_url = f"http://127.0.0.1:{port}"
         client = Client(root_url, verbose=True)
@@ -277,7 +277,7 @@ def run_acceptance(mode: str, port: int, timeout: int, artifact_dir: Path, run_r
             draw.ellipse((160, 110, 350, 175), fill=(70, 145, 220), outline=(20, 45, 80), width=8)
             draw.ellipse((160, 325, 350, 380), fill=(30, 80, 150), outline=(20, 45, 80), width=8)
             image.save(input_image_path)
-            result = client.predict(str(input_image_path), 100000, api_name="/generate_3d")
+            result = client.predict(handle_file(str(input_image_path)), 100000, api_name="/generate_3d")
 
             safe_user = "".join(ch for ch in os.environ.get("USER", "user") if ch.isalnum() or ch in "-_") or "user"
             output_dir = Path("/tmp") / f"oec-trellis-ui-{safe_user}-{process.pid}"
