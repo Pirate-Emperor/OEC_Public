@@ -49,6 +49,14 @@ class FluxImageTests(unittest.TestCase):
         self.assertIn("FLUX_UI_OUTPUT_MODE=scratch", source)
         self.assertIn('choices=("check", "generate", "gradio")', source)
 
+    def test_flux_gradio_scratch_mode_is_guarded_and_generates_a_stable_api_route(self):
+        source = (ROOT / "pipeline_flux_image.py").read_text(encoding="utf-8")
+        self.assertIn('api_name="generate"', source)
+        self.assertIn("AIEROS_FLUX_UI_SCRATCH_DIR", source)
+        self.assertIn("BLOCKED_SCRATCH_OUTPUT", source)
+        self.assertIn("refusing to overwrite an existing PNG/metadata file", source)
+        self.assertIn("FLUX_UI_OUTPUT_MODE=shared", source)
+
     def test_complete_local_snapshot_is_resolved_without_hub_or_torch(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
