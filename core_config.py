@@ -76,7 +76,22 @@ def set_hpc_proxies():
     ]
     for p in proxies:
         os.environ[p] = proxy_url
-    
+
+    # Local Gradio startup checks and browser/API callbacks must not be sent
+    # through the HPC HTTP proxy. Keep any site-specific bypass entries.
+    no_proxy_items = []
+    for key in ("NO_PROXY", "no_proxy"):
+        for item in os.environ.get(key, "").split(","):
+            host = item.strip()
+            if host and host.lower() not in {entry.lower() for entry in no_proxy_items}:
+                no_proxy_items.append(host)
+    for host in ("localhost", "127.0.0.1", "::1"):
+        if host.lower() not in {entry.lower() for entry in no_proxy_items}:
+            no_proxy_items.append(host)
+    no_proxy_value = ",".join(no_proxy_items)
+    os.environ["NO_PROXY"] = no_proxy_value
+    os.environ["no_proxy"] = no_proxy_value
+
     os.environ["HF_HUB_USE_XET"] = "0"
     os.environ["HF_HUB_DISABLE_XET"] = "1"
     os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
