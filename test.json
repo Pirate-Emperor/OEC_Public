@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T17:18:00+05:30",
+  "last_updated": "2026-10-16T17:29:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "On 2026-10-16, branch fix/flux-trellis-pipeline-20261015 commit f10f266 fixed TRELLIS Gradio launch theme placement and allowed-path handling across two notebooks and CLI. Candidate workflow 38896204476 passed 106 configured test cases, py_compile and four notebook JSON checks. Trellis live sync/runtime remains pending; separate FLUX-only A100 Gradio generation is confirmed in run 38859218039 with artifact 12028935755. No merge to main.",
+  "latest_summary": "Current OEC status: TRELLIS Gradio final-cell source fix f10f266 passed all 106 configured hosted tests; guarded A100 sync 38896579885 backup-verified and synced pipeline_trellis_3d.py plus both Trellis notebooks (3 updated, 13 unchanged, 2 unrelated dirty conflicts preserved). The same run revalidated cached FLUX on oec-1/A100: localhost bypass, Gradio HTTP 200, /generate PASS, valid 512×512 PNG (196,376 bytes) and sidecar in artifact 12044347373. Dedicated Trellis cache-only image-to-GLB/Gradio acceptance run 38897009792 is in progress; not yet accepted. Main remains unchanged.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2974,6 +2974,111 @@
         "https://github.com/Killer4K-N/OEC/actions/runs/38859218039/artifacts/12028935755"
       ],
       "follow_up": "Safely synchronize the reviewed TRELLIS files to oec-1 after the passing test gate, then run a cache-only real Trellis Gradio start + image-to-GLB smoke in phase2_3d and independently reopen the GLB; keep shared storage admission intact."
+    },
+    {
+      "id": "TEST-2026-10-16-OEC-A100-SYNC-TRELLIS-AND-FLUX-LIVE-RETEST",
+      "date": "2026-10-16",
+      "category": "Guarded synchronization of Trellis Gradio final-cell repairs and post-sync FLUX runtime regression",
+      "reason": "Verify that the corrected TRELLIS notebook/CLI files actually reached the authorized live A100 checkout without overwriting unrelated dirty paths, and ensure the previously repaired FLUX Gradio generation path still works after sync.",
+      "approach": "Triggered sync-a100-pipeline-tools.yml from reviewed branch revision 3dce11fb392bafa343606855361e11d3a4f31975. The workflow ran phase2_3d pre-sync tests, verified backup copies of changed authorized targets, copied only reviewed files, validated source syntax/notebooks, then loaded cached FLUX weights offline and issued an actual Gradio /generate request.",
+      "parameters": {
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "workflow_run_id": 38896579885,
+        "job_id": 116958385036,
+        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38896579885",
+        "source_sha": "3dce11fb392bafa343606855361e11d3a4f31975",
+        "initial_live_commit": "081aaf34f6379873bdc925d1dcf6b9c3d50349d3",
+        "live_root": "/nlsasfs/home/lmedge/rahkus/OEC",
+        "runner": "oec-1",
+        "host": "scn30-mn",
+        "gpu_index": 0,
+        "gpu_model": "NVIDIA A100-SXM4-40GB",
+        "python_environment": "$HOME/Conda/envs/phase2_3d",
+        "live_initial_dirty_paths": 43,
+        "requirements_txt": "ABSENT; no dependency install was attempted",
+        "synced_files": [
+          {
+            "path": "pipeline_trellis_3d.py",
+            "sha256": "42bec1e2821c97d996dfcb5c8370e210cda3251dcc72c3f79d91f5e362354107",
+            "backup_verified": true
+          },
+          {
+            "path": "pipeline_trellis_3d.ipynb",
+            "sha256": "41041fcd3c8d5004af351856a6a98d289620b51472278ff4f72f5f694bb43d28",
+            "backup_verified": true
+          },
+          {
+            "path": "pipeline_trellis_3d_only.ipynb",
+            "sha256": "60f985c3dfee69f781b3d914399e0986232313950a4c3e06f2ac6923778db1fe",
+            "backup_verified": true
+          }
+        ],
+        "backup_root": "/nlsasfs/home/lmedge/rahkus/.local/state/oec-live-sync-backups/38896579885",
+        "sync_summary": {
+          "created": 0,
+          "updated": 3,
+          "unchanged": 13,
+          "conflicts_preserved": 2
+        },
+        "preserved_conflicts": [
+          "qa_compliance_worker.py",
+          "docs/background-pipelines.md"
+        ],
+        "flux_runtime": {
+          "status": "PASS",
+          "model_id": "black-forest-labs/FLUX.2-klein-4B",
+          "torch": "2.6.0+cu124",
+          "cuda": "12.4",
+          "diffusers": "0.37.0",
+          "huggingface_hub": "0.36.0",
+          "transformers": "4.56.1",
+          "localhost_proxy_bypass": "PASS",
+          "gradio_http_status": 200,
+          "endpoint": "/generate",
+          "endpoint_result": "PASS",
+          "image_width": 512,
+          "image_height": 512,
+          "image_mode": "RGB",
+          "image_bytes": 196376,
+          "seed": 2048,
+          "steps": 4,
+          "output_mode": "local_scratch_only",
+          "generation_seconds": 20.816,
+          "artifact_id": 12044347373,
+          "artifact_url": "https://github.com/Killer4K-N/OEC/actions/runs/38896579885/artifacts/12044347373"
+        },
+        "trellis_runtime_separate_run": 38897009792,
+        "trellis_runtime_separate_status": "IN_PROGRESS_AT_RECORD_TIME",
+        "main_branch_modified": false
+      },
+      "expected": "The three authorized files should be backup-verified and copied; unrelated dirty files preserved; phase2_3d static validation pass; FLUX cached model/Gradio generation still returns a valid PNG and sidecar.",
+      "results": {
+        "status": "SYNC_PASS_FLUX_LIVE_PASS_TRELLIS_RUNTIME_PENDING",
+        "sync": "PASS",
+        "pre_sync_validation": "PASS",
+        "post_sync_static_validation": "PASS",
+        "service_manager_help": "PASS",
+        "files_updated": 3,
+        "files_unchanged": 13,
+        "conflicts_preserved": 2,
+        "flux_generation": "PASS",
+        "png_validation": "PASS",
+        "artifact_upload": "PASS",
+        "trellis_inference_for_this_experiment": "NOT_TESTED; separate run 38897009792 is active",
+        "shared_output_write": false,
+        "model_download": false,
+        "dependency_install": false,
+        "cache_purge": false,
+        "reserve_file_access": false
+      },
+      "evidence_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/38896579885",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38896579885/job/116958385036",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38896579885/artifacts/12044347373",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38897009145",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38897009792"
+      ],
+      "follow_up": "Inspect run 38897009792 and its artifact. If it passes, record the actual runtime values and validate artifact geometry. If blocked/failing, retain exact exception and diagnose the underlying attention/cache/API cause without bypassing storage or installing packages unless the authorized dependency process and storage guards permit it."
     }
   ]
 }

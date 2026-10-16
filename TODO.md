@@ -273,3 +273,13 @@ Source remains on review PR [#11](https://github.com/Killer4K-N/OEC/pull/11); do
 - [x] Added a dedicated reviewed-branch workflow [`.github/workflows/trellis-a100-runtime-smoke.yml`](.github/workflows/trellis-a100-runtime-smoke.yml), triggered by [`.github/trellis-runtime-smoke.trigger`](.github/trellis-runtime-smoke.trigger). It is restricted to `oec-1`, cache-only, uses the shared inference lock, checks a minimum 4 GiB scratch free-space threshold and requires `/tmp` to be distinct from model-cache storage. It exercises the existing image-to-GLB smoke, geometry reopen, and Gradio HTTP health.
 - [ ] **OPEN — live workflow outcome pending.** Do not create a test result record or mark live Trellis accepted until the actual run and artifact are inspected.
 - [ ] **OPEN — exact notebook-browser execution:** the workflow exercises CLI Gradio startup and the real TRELLIS model runtime; it does not execute every notebook cell in a browser/kernel. Verify exact notebook behavior after the source sync and distinguish it from CLI acceptance.
+
+
+## 2026-10-16 17:29 IST — current live status after safe synchronization
+
+- [x] **Sync accepted Trellis fixes to oec-1:** [run 38896579885](https://github.com/Killer4K-N/OEC/actions/runs/38896579885), job 116958385036, completed PASS on oec-1. Three authorized files were backup-verified then copied; hashes and backup root are recorded in the daily changelog. Two unrelated dirty-path conflicts were preserved.
+- [x] **Repeat FLUX live generation after sync:** same run returned HTTP 200 and a successful `/generate` response; the 512×512 PNG (196,376 bytes) and metadata are in [artifact 12044347373](https://github.com/Killer4K-N/OEC/actions/runs/38896579885/artifacts/12044347373).
+- [ ] **IN PROGRESS — live TRELLIS image-to-GLB + Gradio UI acceptance:** [run 38897009792](https://github.com/Killer4K-N/OEC/actions/runs/38897009792). Await its real inference/export/reopen and Gradio HTTP evidence before marking Trellis runtime done.
+- [ ] **OPEN — exact Jupyter kernel/browser test:** the separate workflow exercises the cached TRELLIS runtime and standalone CLI Gradio start; it does not click Generate in each notebook through the user's browser/kernel. After a runtime pass, distinguish that evidence from an actual notebook-browser session test.
+
+Current reviewed source is on [PR #11](https://github.com/Killer4K-N/OEC/pull/11); no merge to `main`.

@@ -274,3 +274,28 @@ Added `.github/workflows/trellis-a100-runtime-smoke.yml`, triggered only by `.gi
 The workflow uses the existing `tests/trellis_runtime_smoke.py` for offline cached TRELLIS inference and GLB export/reopen, reopens the copied artifact again with trimesh, then launches the standalone CLI's Gradio UI on a loopback-only port and requires HTTP 200. It uploads the exact-run log, GLB and JSON summary. No dependency install/model download/shared output write/cache purge/reserve access is part of this test.
 
 The trigger was committed with the workflow; its live runtime outcome is pending at this log entry. No result is pre-recorded in `test.json` until the job actually runs. Even a successful CLI UI health check does not prove browser execution of every notebook cell, so notebook-runtime acceptance remains separately identified.
+
+## 2026-10-16 17:29 IST — guarded TRELLIS sync completed; live FLUX retest PASS
+
+### Sync evidence — PASS
+
+- [A100 synchronization run 38896579885](https://github.com/Killer4K-N/OEC/actions/runs/38896579885), job [116958385036](https://github.com/Killer4K-N/OEC/actions/runs/38896579885/job/116958385036), completed successfully on runner `oec-1`. It executed the phase2_3d pre-sync checks, guarded backup and file synchronization, and a cache-only FLUX Gradio runtime retest.
+- Live root: `/nlsasfs/home/lmedge/rahkus/OEC`; live checkout was detached at `081aaf34f6379873bdc925d1dcf6b9c3d50349d3`, with 43 dirty paths before sync. The runner confirmed root `requirements.txt` was absent; no requirements backup or dependency install was needed.
+- The workflow backed up and verified each changed authorized path under `/nlsasfs/home/lmedge/rahkus/.local/state/oec-live-sync-backups/38896579885` before copying:
+  - `pipeline_trellis_3d.py` — SHA-256 `42bec1e2821c97d996dfcb5c8370e210cda3251dcc72c3f79d91f5e362354107`
+  - `pipeline_trellis_3d.ipynb` — SHA-256 `41041fcd3c8d5004af351856a6a98d289620b51472278ff4f72f5f694bb43d28`
+  - `pipeline_trellis_3d_only.ipynb` — SHA-256 `60f985c3dfee69f781b3d914399e0986232313950a4c3e06f2ac6923778db1fe`
+- The script reports `created=0 updated=3 unchanged=13 conflicts_preserved=2`. `qa_compliance_worker.py` and `docs/background-pipelines.md` were preserved as unrelated local conflicts. `core_config.py`, `pipeline_flux_image.py` and `pipeline_flux_only.ipynb` were already unchanged, so they were not overwritten.
+- Phase2_3d static checks and notebook/CLI configuration checks passed before synchronization.
+
+### FLUX live regression after sync — PASS
+
+- Same run [38896579885](https://github.com/Killer4K-N/OEC/actions/runs/38896579885) on `oec-1` / `scn30-mn` / physical GPU 0 (NVIDIA A100-SXM4-40GB) revalidated the existing cached FLUX UI helper: package versions PyTorch `2.6.0+cu124`, CUDA `12.4`, Diffusers `0.37.0`, Hugging Face Hub `0.36.0`, Transformers `4.56.1`.
+- All localhost proxy bypass checks passed. Gradio returned HTTP 200 on port 17864, `/generate` returned successfully, and the generated local-scratch output passed PNG/metadata validation: 512×512 RGB, 196,376 bytes, seed 2048, four steps, generation time 20.816 s.
+- Exact-run artifact [12044347373](https://github.com/Killer4K-N/OEC/actions/runs/38896579885/artifacts/12044347373) is present (197,985-byte ZIP). The output stayed in the per-run `/tmp` directory. No dependency installation, model download, shared-output write, cache purge, reserve-file access or process restart occurred.
+- This retest supports the FLUX helper and the synchronized support-file state. It still does not constitute a literal execution of the notebook in the user's browser/kernel.
+
+### Separate TRELLIS runtime acceptance — IN PROGRESS
+
+- The new cache-only workflow [38897009792](https://github.com/Killer4K-N/OEC/actions/runs/38897009792) has started on `oec-1` using existing `phase2_3d` dependencies. Its intended checks are real cached image-to-GLB inference, GLB geometry reopen, then Gradio launch/HTTP 200 on loopback.
+- No outcome or artifact was available at the time of this record. Treat this as `IN_PROGRESS`, not pass or fail. The accepted branch code is synchronized, but only this run's logs/artifact can establish whether the current Trellis environment passes runtime validation.
