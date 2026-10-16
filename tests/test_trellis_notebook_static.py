@@ -266,6 +266,19 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertIn("allowed_paths=[str(args.output_dir or Path(runtime[", launch)
         self.assertIn("theme=gr.themes.Monochrome()", launch)
 
+    def test_trellis_final_cells_resolve_existing_source_checkout_before_import(self):
+        for label, cells in (
+            ("TRELLIS-only", self.only),
+            ("combined TRELLIS", self.combined),
+        ):
+            studio = self.find(cells, "from trellis2.pipelines import Trellis2ImageTo3DPipeline")
+            resolver = '_TRELLIS_SOURCE_ROOT = Path(SYSTEM_DIRS["models"]).expanduser().resolve() / "TRELLIS.2"'
+            self.assertIn(resolver, studio, label)
+            self.assertLess(studio.index(resolver), studio.index("from trellis2.pipelines import Trellis2ImageTo3DPipeline"), label)
+            self.assertIn('(_TRELLIS_SOURCE_ROOT / "trellis2" / "pipelines").is_dir()', studio, label)
+            self.assertIn("sys.path.insert(0, str(_TRELLIS_SOURCE_ROOT))", studio, label)
+            self.assertIn("the studio cell will not install or download dependencies", studio, label)
+
     def test_notebook_final_cells_are_reentrant_diagnostic_and_live_testable(self):
         flux = self.find(self.flux_only, "FLUX_PIPELINE_READY=PASS")
         self.assertIn("FLUX_PIPELINE_LOAD=START", flux)
