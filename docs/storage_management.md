@@ -35,3 +35,16 @@ Do not use filesystem-wide free space (for example, an NFS filesystem reporting 
 ## Storage status
 
 python storage_manager.py --status reports configured directory targets, filesystem telemetry, optional quota-snapshot freshness, and existing reserve file sizes. Reporting does not modify the reserve.
+
+
+## Structured Lustre quota snapshots (schema version 2)
+
+Legacy snapshots with a single used/limit pair remain supported. For Lustre quota sources that report block soft quota, hard limit and grace separately, the writer can preserve all fields without changing the source quota or contacting the filesystem. Use only values captured from an authoritative read-only quota command and include the exact quota type/name and command provenance.
+
+Example command shape (use only after reviewing the captured values and the destination):
+    
+    python tools/quota_snapshot.py --used-kib USED_KIB --soft-quota-kib SOFT_KIB --hard-limit-kib HARD_KIB --grace GRACE --quota-kind group --quota-name GROUP_NAME --source "lfs quota -g GROUP_NAME MOUNTPOINT"
+
+Schema v2 keeps soft quota, hard limit, grace, quota kind and name separately. The policy's effective limit is the soft quota if configured, otherwise the hard limit. If usage is above soft, the snapshot is still valid diagnostic telemetry, but conservative available bytes is zero and preflight blocks any new write even if a grace period and hard-limit headroom remain. Hard-limit headroom is reported for diagnosis only; it does not authorize a write. If usage exceeds hard, the state is also blocked. The system must not map only the hard limit into a legacy single-limit snapshot because doing so conceals a soft-quota overage.
+
+The snapshot writer is a utility, not a quota acquisition tool. It does not run quota_check, call lfs quota, infer values from filesystem free space, resize storage reserves, or refresh itself. Do not use it to publish a manually guessed snapshot.

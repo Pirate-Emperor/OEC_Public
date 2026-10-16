@@ -23,15 +23,26 @@ BYTES_PER_MB = 1024 ** 2
 
 @dataclass(frozen=True)
 class QuotaSnapshot:
-    """A point-in-time project/user quota snapshot."""
+    """Point-in-time quota telemetry with conservative admission semantics.
+
+    limit_bytes is the effective conservative admission limit: soft quota when
+    configured, otherwise hard limit or the legacy single limit. Hard-limit
+    headroom is reporting-only and never overrides a soft-quota overage.
+    """
 
     used_bytes: int
     limit_bytes: int
     timestamp: float
     source: str = "unknown"
+    soft_quota_bytes: Optional[int] = None
+    hard_limit_bytes: Optional[int] = None
+    grace: Optional[str] = None
+    quota_kind: Optional[str] = None
+    quota_name: Optional[str] = None
 
     @property
     def available_bytes(self) -> int:
+        """Conservative free headroom to soft quota, or legacy/hard limit."""
         return max(0, self.limit_bytes - self.used_bytes)
 
     @property
@@ -43,6 +54,20 @@ class QuotaSnapshot:
         if self.limit_bytes <= 0:
             return 1.0
         return min(1.0, max(0.0, self.used_bytes / self.limit_bytes))
+
+    @property
+    def soft_quota_exceeded(self) -> bool:
+        return self.soft_quota_bytes is not None and self.used_bytes > self.soft_quota_bytes
+
+    @property
+    def hard_limit_exceeded(self) -> bool:
+        return self.hard_limit_bytes is not None and self.used_bytes > self.hard_limit_bytes
+
+    @property
+    def hard_limit_headroom_bytes(self) -> Optional[int]:
+        if self.hard_limit_bytes is None:
+            return None
+        return max(0, self.hard_limit_bytes - self.used_bytes)
 
     @classmethod
     def from_mapping(cls, payload: Mapping[str, Any]) -> "QuotaSnapshot":
@@ -56,42 +81,87 @@ class QuotaSnapshot:
                         continue
             return None
 
-        used = number("used_bytes")
-        limit = number("limit_bytes")
+        def integer_number(*keys: str) -> Optional[int]:
+            value = number(*keys)
+            if value is None:
+                return None
+            if not value.is_integer():
+                raise ValueError(f"{keys[0]} must be an integer byte count")
+            return int(value)
+
+        used = integer_number("used_bytes")
+        legacy_limit = integer_number("limit_bytes")
 
         if used is None:
             used_gb = number("used_gb")
             if used_gb is not None:
-                used = used_gb * BYTES_PER_GB
+                used = int(used_gb * BYTES_PER_GB)
 
-        if limit is None:
+        if legacy_limit is None:
             limit_gb = number("limit_gb")
             if limit_gb is not None:
-                limit = limit_gb * BYTES_PER_GB
+                legacy_limit = int(limit_gb * BYTES_PER_GB)
 
-        available = number("available_bytes")
-        if limit is None and used is not None and available is not None:
-            limit = used + available
+        soft_value = integer_number("soft_quota_bytes")
+        hard_value = integer_number("hard_limit_bytes")
+        soft_quota = soft_value if soft_value is not None and soft_value > 0 else None
+        hard_limit = hard_value if hard_value is not None and hard_value > 0 else None
+        structured_quota_present = "soft_quota_bytes" in payload or "hard_limit_bytes" in payload
 
-        if used is None or limit is None:
-            raise ValueError("quota snapshot must provide used_bytes and limit_bytes")
+        if used is None:
+            raise ValueError("quota snapshot must provide used_bytes")
+        if used < 0:
+            raise ValueError("quota used bytes must be non-negative")
+        if soft_quota is not None and hard_limit is not None and soft_quota > hard_limit:
+            raise ValueError("soft quota must not exceed hard limit")
+
+        # Soft quota is the conservative admission boundary when configured.
+        # Hard-limit headroom is retained for reporting, not write authorization.
+        effective_limit = soft_quota if soft_quota is not None else hard_limit
+        if effective_limit is None:
+            effective_limit = legacy_limit
+
+        if effective_limit is None:
+            available = integer_number("available_bytes")
+            if available is not None:
+                effective_limit = used + available
+
+        if effective_limit is None or effective_limit <= 0:
+            raise ValueError("quota snapshot must provide a positive soft, hard, or legacy limit")
+        if legacy_limit is not None and structured_quota_present and int(legacy_limit) != int(effective_limit):
+            raise ValueError("limit_bytes must equal the conservative soft quota (or hard limit when soft is unset)")
+
+        # Legacy one-limit snapshots remain strict. Structured quota snapshots
+        # can report usage above soft/hard so policy can expose the condition
+        # and deny writes instead of silently discarding the telemetry.
+        has_structured_limit = soft_quota is not None or hard_limit is not None
+        if used > effective_limit and not has_structured_limit:
+            raise ValueError("legacy quota used bytes must be between 0 and limit")
 
         timestamp = number("timestamp", "captured_at")
         if timestamp is None:
             raise ValueError("quota snapshot must provide timestamp")
 
-        if limit <= 0:
-            raise ValueError("quota limit must be positive")
-        if used < 0 or used > limit:
-            raise ValueError("quota used bytes must be between 0 and limit")
+        quota_kind = payload.get("quota_kind")
+        if quota_kind is not None and quota_kind not in {"user", "group", "project"}:
+            raise ValueError("quota_kind must be user, group, or project")
 
+        grace = payload.get("grace")
+        if grace is not None:
+            grace = str(grace).strip() or None
+
+        quota_name = payload.get("quota_name")
         return cls(
             used_bytes=int(used),
-            limit_bytes=int(limit),
+            limit_bytes=int(effective_limit),
             timestamp=float(timestamp),
             source=str(payload.get("source", "unknown")),
+            soft_quota_bytes=soft_quota,
+            hard_limit_bytes=hard_limit,
+            grace=grace,
+            quota_kind=str(quota_kind) if quota_kind is not None else None,
+            quota_name=str(quota_name) if quota_name is not None else None,
         )
-
 
 def load_quota_snapshot(
     path: str | os.PathLike[str],
@@ -272,15 +342,25 @@ class StoragePolicy:
             reasons.append("directory is at warning target threshold")
 
         if quota is not None:
-            if quota.available_bytes <= self.critical_free_gb * BYTES_PER_GB:
+            if quota.hard_limit_exceeded:
                 state = "CRITICAL"
-                reasons.append("fresh quota reports critically low free space")
+                reasons.append("fresh quota reports usage above the hard limit")
+            elif quota.soft_quota_exceeded:
+                state = "CRITICAL"
+                grace_text = quota.grace or "unknown grace"
+                reasons.append(
+                    "fresh quota reports usage above the soft quota; "
+                    f"grace={grace_text}; conservative write admission is blocked"
+                )
+            elif quota.available_bytes <= self.critical_free_gb * BYTES_PER_GB:
+                state = "CRITICAL"
+                reasons.append("fresh quota reports critically low conservative headroom")
             elif (
                 quota.available_bytes <= self.warning_free_gb * BYTES_PER_GB
                 and state == "NORMAL"
             ):
                 state = "WARNING"
-                reasons.append("fresh quota reports low free space")
+                reasons.append("fresh quota reports low conservative headroom")
         elif free_bytes <= self.critical_free_gb * BYTES_PER_GB:
             state = "CRITICAL"
             reasons.append("filesystem reports critically low free space")
@@ -333,6 +413,19 @@ class StoragePolicy:
                 )
 
         if quota is not None:
+            if quota.hard_limit_exceeded:
+                return (
+                    False,
+                    "quota snapshot reports usage above the hard limit; refusing write admission",
+                )
+            if quota.soft_quota_exceeded:
+                grace_text = quota.grace or "unknown grace"
+                return (
+                    False,
+                    "quota snapshot reports usage above the soft quota; "
+                    f"grace={grace_text}; conservative write admission remains blocked "
+                    "until usage returns below soft quota",
+                )
             available = quota.available_bytes
             source = f"quota snapshot ({quota.age_seconds:.0f}s old)"
         else:
