@@ -392,3 +392,38 @@ The source-checkout issue was fixed and synchronized; the subsequent exact-cell 
 - Hosted regression [run 38912593912](https://github.com/Killer4K-N/OEC/actions/runs/38912593912) passed 109 configured tests: QA 15, TRELLIS notebook static 19, TRELLIS easy-run 6, TRELLIS offline config 6, combined pipeline 16, FLUX helper 9, FLUX GPU admission 6, AudioCraft notebook static 5, storage admission 6, service manager 8, service-manager help 7, and LTX worker config 6. Python compilation and JSON checks for all four notebooks passed.
 - New A100 exact-cell run [38912593770](https://github.com/Killer4K-N/OEC/actions/runs/38912593770) is still `in_progress` at the time of this record. The guarded sync run [38912593974](https://github.com/Killer4K-N/OEC/actions/runs/38912593974) is queued behind the A100 runner. Do not mark the new combined-notebook FLUX path accepted until the current job's log and artifact prove HTTP 200, `/generate` success, PNG/metadata validation, and cleanup of only a test-owned service.
 - No dependencies were installed; no model downloads, shared output writes, cache purges, storage-reserve access, QA queue mutation or merge to `main` occurred. Source remains on review PR [#11](https://github.com/Killer4K-N/OEC/pull/11).
+
+
+## 2026-10-16 19:46 IST — Exact notebook acceptance and guarded A100 sync completed
+
+This entry supersedes the in-progress/queued state recorded immediately above. Both live jobs completed successfully and their final logs were reviewed.
+
+### Exact notebook final-cell acceptance — PASS
+
+The four-stage run [38912593770](https://github.com/Killer4K-N/OEC/actions/runs/38912593770), job [117011880046](https://github.com/Killer4K-N/OEC/actions/runs/38912593770/job/117011880046), ran on runner `oec-1`, host `scn30-mn`, using the existing `phase2_3d` environment and cached models only.
+
+- **Standalone FLUX notebook final cell:** Gradio HTTP 200; real `/generate` call passed; valid 512×512 PNG (196,376 bytes) with seed 2048, four steps, and 8.839 seconds generation time.
+- **TRELLIS-only notebook final cell:** Gradio HTTP 200; real `/generate_3d` call passed; resulting GLB was independently reopened and validated: 5,457,384 bytes, SHA-256 `7db7600e9dd9de6c1549eaf06f08cd687a55e8d62465754b426c521501ed9183`, one geometry, 51,658 vertices, 97,935 faces.
+- **Combined notebook TRELLIS final cell:** Gradio HTTP 200; the combined notebook's Gradio 6 launch/theme path passed.
+- **Combined notebook supervised FLUX service cell:** with `CONDA_ROOT` unset, fallback resolved to `/nlsasfs/home/lmedge/rahkus/Conda`, matching the service manager. Gradio HTTP 200 and the real `/generate` request passed; valid 512×512 PNG (196,376 bytes), sidecar metadata, seed 2048, four steps, and 10.012 seconds generation time were recorded. Output remained in run-scoped local scratch.
+- **Service cleanup:** `COMBINED_FLUX_SERVICE_CLEANUP=PASS`; the test stopped its own newly started `flux-ui` process gracefully and did not stop a reused/pre-existing service.
+
+Exact-run evidence artifact: [12052395126](https://github.com/Killer4K-N/OEC/actions/runs/38912593770/artifacts/12052395126). The workflow ended with `NOTEBOOK_FINAL_CELL=PASS` and all four stage markers passing.
+
+### Guarded A100 checkout sync — PASS WITH UNRELATED DIRTY CHANGES PRESERVED
+
+Sync run [38912593974](https://github.com/Killer4K-N/OEC/actions/runs/38912593974), job [117011881881](https://github.com/Killer4K-N/OEC/actions/runs/38912593974/job/117011881881), also succeeded on `oec-1`, targeting `/nlsasfs/home/lmedge/rahkus/OEC`. The checkout had 43 dirty/untracked paths; it was not reset, cleaned, or force-checked-out. The two authorized changed files were backed up, byte-verified, updated, and hash-verified:
+
+- `pipeline_flux_image.py`: backup `/nlsasfs/home/lmedge/rahkus/.local/state/oec-live-sync-backups/38912593974/pipeline_flux_image.py`; installed SHA-256 `40e05c6bd6513b6b5502118d780552cd85ca116b7c68ccfe6168b875ca82d005`.
+- `pipeline_trellis_3d.ipynb`: backup `/nlsasfs/home/lmedge/rahkus/.local/state/oec-live-sync-backups/38912593974/pipeline_trellis_3d.ipynb`; installed SHA-256 `b7d4f3210b19b64d11538a81ec34d6204ba38028bbd6d7658d676aa44f1a05bd`.
+
+Sync summary: 2 updated, 14 unchanged, 2 unrelated conflicts preserved. The dirty `qa_compliance_worker.py` and untracked `docs/background-pipelines.md` were deliberately left untouched. Python compilation/static validation passed (10 Python files, two config JSON files, three notebooks), and the service-manager help check passed. The root `requirements.txt` was absent, so no dependency installation was attempted.
+
+The post-sync cache-only FLUX smoke also passed: actual Gradio `/generate`, HTTP 200, valid 512×512 PNG (196,376 bytes) and JSON sidecar, output under `/tmp/oec-flux-gradio-smoke-38912593974`; generation took 1.209 seconds. Evidence artifact [12052455216](https://github.com/Killer4K-N/OEC/actions/runs/38912593974/artifacts/12052455216).
+
+### Research/operational interpretation and limitations
+
+- Hosted static run [38912593912](https://github.com/Killer4K-N/OEC/actions/runs/38912593912) passed all 109 configured tests, Python compilation, and JSON checks for all four notebooks.
+- The four-stage runtime result closes the tested server-side final-cell paths in fresh child/kernel-like processes. It does not prove that an already-open user browser/kernel session has refreshed its source; any persistent-session error should be assessed from that session's current traceback.
+- No model was downloaded; no dependency was installed; no shared output was written; no cache was purged; no storage-reserve file was accessed.
+- Review PR [#11](https://github.com/Killer4K-N/OEC/pull/11) remains open and unmerged. The `main` branch was not changed.

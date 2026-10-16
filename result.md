@@ -428,3 +428,23 @@ A final audit found the combined notebook's supervised FLUX-service cell still h
 Review commit [715fd00](https://github.com/Killer4K-N/OEC/commit/715fd005aa3746a148aa3a7030cb87eddf06e9c9) fixes the fallback root and adds an actionable path check, restricts Gradio file serving to `demo.oec_output_dir`, and extends the acceptance harness/workflow to launch that exact combined notebook cell, call its real `/generate` route, validate PNG/sidecar, and stop only a newly started test-owned service. Hosted regression [38912593912](https://github.com/Killer4K-N/OEC/actions/runs/38912593912) passed all 109 configured tests, Python compilation and four notebook JSON checks.
 
 **Status at this entry:** live A100 test [38912593770](https://github.com/Killer4K-N/OEC/actions/runs/38912593770) remains in progress and guarded sync [38912593974](https://github.com/Killer4K-N/OEC/actions/runs/38912593974) is queued. The combined FLUX cell is not marked accepted until its actual service start, HTTP 200, PNG/sidecar validation and cleanup marker are present in exact-run logs/artifact. No dependency install, model download, shared output write, reserve access or merge to `main` occurred.
+
+
+## 2026-10-16 — Four-stage Jupyter final-cell acceptance and guarded A100 sync: PASS
+
+The exact-cell A100 workflow [38912593770](https://github.com/Killer4K-N/OEC/actions/runs/38912593770) has completed successfully on `oec-1` / `scn30-mn` with the existing `phase2_3d` environment. This closes all four tested final-cell paths for the reviewed source, including the combined notebook's separate managed FLUX UI that had not been exercised by the earlier three-stage run.
+
+- **FLUX-only:** actual Gradio `/generate` returned HTTP 200 and a validated 512×512 PNG plus metadata; 196,376 bytes, seed 2048, four steps, 8.839 seconds generation.
+- **TRELLIS-only:** actual `/generate_3d` passed; GLB independently reopened with trimesh and validated at 5,457,384 bytes, SHA-256 `7db7600e9dd9de6c1549eaf06f08cd687a55e8d62465754b426c521501ed9183`, one geometry, 51,658 vertices, 97,935 faces.
+- **Combined TRELLIS:** actual final UI cell reached HTTP 200, verifying the combined notebook's Gradio 6 theme launch path.
+- **Combined FLUX service cell:** with no `CONDA_ROOT` override, it resolved `/nlsasfs/home/lmedge/rahkus/Conda`, called real `/generate`, validated a 512×512 PNG plus sidecar (196,376 bytes, seed 2048, four steps, 10.012 seconds) under local scratch, and logged `COMBINED_FLUX_SERVICE_CLEANUP=PASS` after gracefully stopping only the service started by this test.
+
+Exact-run artifact [12052395126](https://github.com/Killer4K-N/OEC/actions/runs/38912593770/artifacts/12052395126) includes the run's cell reports, logs, and output evidence. The hosted static workflow [38912593912](https://github.com/Killer4K-N/OEC/actions/runs/38912593912) passed 109 configured tests, Python compilation, and JSON validation for all four notebooks.
+
+### Persistent A100 checkout
+
+Guarded synchronization [38912593974](https://github.com/Killer4K-N/OEC/actions/runs/38912593974) passed on the same runner. It backed up and byte-verified prior versions before updating `pipeline_flux_image.py` and `pipeline_trellis_3d.ipynb`. Installed SHA-256 values are `40e05c6bd6513b6b5502118d780552cd85ca116b7c68ccfe6168b875ca82d005` and `b7d4f3210b19b64d11538a81ec34d6204ba38028bbd6d7658d676aa44f1a05bd`, respectively. Summary: two updated, 14 unchanged, and two unrelated dirty conflicts preserved. The dirty `qa_compliance_worker.py` and untracked `docs/background-pipelines.md` were not overwritten. No reset/clean was run; the root requirements file is absent.
+
+The post-sync cached FLUX regression also returned HTTP 200 and a valid PNG/sidecar (196,376 bytes, 1.209-second generation) with evidence artifact [12052455216](https://github.com/Killer4K-N/OEC/actions/runs/38912593974/artifacts/12052455216). No dependency installation, model download, shared-output write, cache purge or reserve-file access occurred.
+
+**Scope note:** the acceptance workflow executes the actual final-cell source in fresh child/kernel-like processes; it does not update an already-open user Jupyter kernel or browser session. If an existing session still errors, its current traceback is the next evidence needed. PR [#11](https://github.com/Killer4K-N/OEC/pull/11) remains open and `main` remains unchanged.

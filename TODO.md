@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Last updated:** 2026-10-16 11:40 IST (Asia/Kolkata)
+**Last updated:** 2026-10-16 19:46 IST (Asia/Kolkata)
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 
 
@@ -329,3 +329,17 @@ The source remains on review PR [#11](https://github.com/Killer4K-N/OEC/pull/11)
 - [ ] **IN PROGRESS — A100 exact-cell acceptance:** [run 38912593770](https://github.com/Killer4K-N/OEC/actions/runs/38912593770). Require the combined FLUX service startup, real `/generate`, PNG/sidecar validation and service cleanup evidence before closing this path.
 - [ ] **QUEUED — guarded sync:** [run 38912593974](https://github.com/Killer4K-N/OEC/actions/runs/38912593974). Check verified backups, file hashes and conflict preservation; no manual copy/reset.
 - Main remains unchanged; source is on review PR [#11](https://github.com/Killer4K-N/OEC/pull/11).
+
+
+## 2026-10-16 19:46 IST — Four-stage notebook acceptance and persistent sync
+
+- [x] Exact FLUX-only notebook final cell passed on A100: real Gradio `/generate`, HTTP 200, valid 512×512 PNG and sidecar, seed 2048, four steps.
+- [x] Exact TRELLIS-only notebook final cell passed: real `/generate_3d`, GLB independently reopened and validated at one geometry, 51,658 vertices and 97,935 faces. Run [38912593770](https://github.com/Killer4K-N/OEC/actions/runs/38912593770), artifact [12052395126](https://github.com/Killer4K-N/OEC/actions/runs/38912593770/artifacts/12052395126).
+- [x] Combined notebook TRELLIS UI startup passed with HTTP 200.
+- [x] Combined notebook's separate FLUX service cell passed with `CONDA_ROOT` unset, using the correct `~/Conda` fallback; its real `/generate` returned a validated PNG/sidecar, and the test-owned service was gracefully stopped. No pre-existing service was stopped.
+- [x] Guarded A100 sync [38912593974](https://github.com/Killer4K-N/OEC/actions/runs/38912593974) passed: two authorized files updated after verified backups, 14 unchanged, and the two dirty conflicts `qa_compliance_worker.py` and `docs/background-pipelines.md` preserved. Post-sync FLUX smoke and artifact [12052455216](https://github.com/Killer4K-N/OEC/actions/runs/38912593974/artifacts/12052455216) passed.
+- [x] Hosted regression [38912593912](https://github.com/Killer4K-N/OEC/actions/runs/38912593912) passed all 109 tests, Python compilation and four notebook JSON checks.
+- [x] Updated `changelog/CHANGELOG-2026-10-16.md`, `changelog/README.md`, `test.json`, and `result.md` with the final run outcomes, metrics, artifacts, and safety constraints.
+- [ ] Only if the user's already-open Jupyter/browser session still errors: capture the current traceback and compare it with the now-passing clean-process source. The Actions acceptance proves the tested final cells in fresh child/kernel-like processes; it does not refresh an existing kernel/browser session automatically.
+
+PR [#11](https://github.com/Killer4K-N/OEC/pull/11) remains open; `main` remains unchanged.

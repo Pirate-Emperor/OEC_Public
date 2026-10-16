@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T19:33:00+05:30",
+  "last_updated": "2026-10-16T19:46:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Prior live exact-cell run 38907508493 passed FLUX-only /generate with validated PNG, TRELLIS-only /generate_3d with independent GLB geometry reopen, and combined TRELLIS UI startup. Further audit found the combined notebook's FLUX service cell used the wrong default Conda root and the separate FLUX CLI omitted its generated output directory from Gradio allowed_paths. Review commit 715fd00 fixes both, extends live acceptance to a fourth combined FLUX service /generate test with guarded service cleanup, and hosted run 38912593912 passed 109 tests plus notebook JSON/compilation. A100 exact-cell run 38912593770 is in progress; guarded sync run 38912593974 is queued. Main remains unchanged.",
+  "latest_summary": "Four-stage exact Jupyter final-cell acceptance passed on oec-1: FLUX-only /generate returned a validated 512x512 PNG, TRELLIS-only /generate_3d produced a GLB independently reopened with one geometry, combined TRELLIS UI returned HTTP 200, and the combined notebook's supervised FLUX cell generated a validated PNG/sidecar through the correct ~/Conda service-manager fallback, then cleaned up only its test-owned service. Guarded sync run 38912593974 passed: two authorized files updated after verified backups, 14 unchanged, two unrelated dirty conflicts preserved. Hosted static run passed 109 tests and four notebook JSON/compilation checks. Main remains unchanged.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -3220,7 +3220,7 @@
       },
       "expected": "Static regressions pass; combined notebook starts its managed FLUX UI through the same ~/Conda root as the service manager, Gradio HTTP returns 200, the actual /generate callback yields a valid 512x512 PNG and JSON sidecar, and the test-owned service is cleanly stopped.",
       "results": {
-        "status": "STATIC_PASS_A100_ACCEPTANCE_IN_PROGRESS",
+        "status": "PASS_FOUR_STAGE_A100_ACCEPTANCE_AND_GUARDED_SYNC",
         "hosted_static_run": 38912593912,
         "tests_by_suite": {
           "qa": 15,
@@ -3247,9 +3247,107 @@
           "trellis_only_generate_and_glb_reopen": "PASS",
           "combined_trellis_gradio_start": "PASS"
         },
-        "combined_flux_live_acceptance": "IN_PROGRESS",
-        "sync_status": "QUEUED",
-        "main_branch_modified": false
+        "combined_flux_live_acceptance": "PASS",
+        "sync_status": "PASS_WITH_UNRELATED_CONFLICTS_PRESERVED",
+        "main_branch_modified": false,
+        "actual_notebook_cells": {
+          "runner": "oec-1",
+          "host": "scn30-mn",
+          "gpu_index": 0,
+          "gpu_model": "NVIDIA A100-SXM4-40GB",
+          "python_environment": "phase2_3d",
+          "offline_cache_only": true,
+          "flux_only": {
+            "status": "PASS",
+            "http": 200,
+            "api": "/generate",
+            "width": 512,
+            "height": 512,
+            "png_bytes": 196376,
+            "seed": 2048,
+            "steps": 4,
+            "generation_seconds": 8.839
+          },
+          "trellis_only": {
+            "status": "PASS",
+            "http": 200,
+            "api": "/generate_3d",
+            "glb_bytes": 5457384,
+            "glb_sha256": "7db7600e9dd9de6c1549eaf06f08cd687a55e8d62465754b426c521501ed9183",
+            "geometry_count": 1,
+            "vertices": 51658,
+            "faces": 97935
+          },
+          "combined_trellis": {
+            "status": "PASS",
+            "http": 200,
+            "startup_only": true
+          },
+          "combined_flux": {
+            "status": "PASS",
+            "http": 200,
+            "api": "/generate",
+            "conda_root_default": "/nlsasfs/home/lmedge/rahkus/Conda",
+            "width": 512,
+            "height": 512,
+            "png_bytes": 196376,
+            "seed": 2048,
+            "steps": 4,
+            "generation_seconds": 10.012,
+            "output_mode": "local_scratch_only",
+            "sidecar": "PASS"
+          },
+          "combined_flux_service_cleanup": "PASS"
+        },
+        "sync": {
+          "status": "PASS_WITH_UNRELATED_CONFLICTS_PRESERVED",
+          "run_id": 38912593974,
+          "runner": "oec-1",
+          "live_root": "/nlsasfs/home/lmedge/rahkus/OEC",
+          "initial_live_commit": "081aaf34f6379873bdc925d1dcf6b9c3d50349d3",
+          "live_dirty_path_count": 43,
+          "files_updated": 2,
+          "files_unchanged": 14,
+          "conflicts_preserved": 2,
+          "preserved_conflicts": [
+            "qa_compliance_worker.py",
+            "docs/background-pipelines.md"
+          ],
+          "backups_verified": true,
+          "files": [
+            {
+              "path": "pipeline_flux_image.py",
+              "sha256": "40e05c6bd6513b6b5502118d780552cd85ca116b7c68ccfe6168b875ca82d005",
+              "backup": "/nlsasfs/home/lmedge/rahkus/.local/state/oec-live-sync-backups/38912593974/pipeline_flux_image.py"
+            },
+            {
+              "path": "pipeline_trellis_3d.ipynb",
+              "sha256": "b7d4f3210b19b64d11538a81ec34d6204ba38028bbd6d7658d676aa44f1a05bd",
+              "backup": "/nlsasfs/home/lmedge/rahkus/.local/state/oec-live-sync-backups/38912593974/pipeline_trellis_3d.ipynb"
+            }
+          ],
+          "post_sync_flux_smoke": {
+            "status": "PASS",
+            "http": 200,
+            "api": "/generate",
+            "width": 512,
+            "height": 512,
+            "png_bytes": 196376,
+            "generation_seconds": 1.209,
+            "sidecar": "PASS",
+            "output_mode": "local_scratch_only",
+            "artifact_id": 12052455216
+          },
+          "static_validation": "PASS: 10 Python files, two config JSON files, three notebooks; service-manager help passed",
+          "requirements_txt": "ABSENT; no dependency install attempted"
+        },
+        "acceptance_artifact_id": 12052395126,
+        "acceptance_artifact_digest": "sha256:6764845113a90b85d46699612ff1f975e77bbf85be793968eb3ba208ca7cd95e",
+        "no_dependency_install": true,
+        "no_model_download": true,
+        "no_shared_output_write": true,
+        "no_cache_purge": true,
+        "no_reserve_file_access": true
       },
       "supporting_urls": [
         "https://github.com/Killer4K-N/OEC/commit/715fd005aa3746a148aa3a7030cb87eddf06e9c9",
@@ -3257,9 +3355,11 @@
         "https://github.com/Killer4K-N/OEC/actions/runs/38912593770",
         "https://github.com/Killer4K-N/OEC/actions/runs/38912593974",
         "https://github.com/Killer4K-N/OEC/actions/runs/38907508493",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38907508493/artifacts/12049033031"
+        "https://github.com/Killer4K-N/OEC/actions/runs/38907508493/artifacts/12049033031",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38912593770/artifacts/12052395126",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38912593974/artifacts/12052455216"
       ],
-      "follow_up": "Inspect current A100 exact-cell run 38912593770 and its exact-run artifact. Mark combined FLUX accepted only if the new stage reports HTTP 200, /generate PASS, valid local-scratch PNG/metadata and COMBINED_FLUX_SERVICE_CLEANUP=PASS; then inspect sync run 38912593974 for backups, hashes and preservation of unrelated dirty files."
+      "follow_up": "The four final-cell paths and guarded live sync are accepted for the exact tested source. If the user's already-open Jupyter kernel/browser still shows an error, capture its current traceback and compare it with the passing fresh-process cell source; this run does not refresh an already-open kernel. Review PR #11; do not merge to main without authorization."
     }
   ]
 }
