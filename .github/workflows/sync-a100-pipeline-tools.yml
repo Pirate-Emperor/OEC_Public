@@ -32,6 +32,7 @@ jobs:
           "$PYTHON" -m py_compile qa_compliance_worker.py tools/qa_checks.py
           "$PYTHON" -m unittest discover -s tests -p 'test_qa_checks.py' -v
           "$PYTHON" -m unittest discover -s tests -p 'test_trellis_notebook_static.py' -v
+          "$PYTHON" -m unittest discover -s tests -p 'test_flux_image.py' -v
           "$PYTHON" -m unittest discover -s tests -p 'test_storage_write_admission.py' -v
 
       - name: Back up and synchronize only the pipeline support files
@@ -110,7 +111,9 @@ jobs:
           updated=0
           unchanged=0
           conflicts=0
-          authorized_trellis_overwrite=(
+          # User-requested notebook repair is authorized only after a verified backup.
+          authorized_notebook_overwrite=(
+            pipeline_flux_only.ipynb
             pipeline_trellis_3d.py
             pipeline_trellis_3d.ipynb
             pipeline_trellis_3d_only.ipynb
@@ -127,7 +130,7 @@ jobs:
             status="$(git -C "$LIVE_ROOT" status --porcelain -- "$rel" 2>/dev/null || true)"
             if [ -e "$dest" ] && [ -n "$status" ]; then
               case "$rel" in
-                pipeline_trellis_3d.py|pipeline_trellis_3d.ipynb|pipeline_trellis_3d_only.ipynb)
+                pipeline_flux_only.ipynb|pipeline_trellis_3d.py|pipeline_trellis_3d.ipynb|pipeline_trellis_3d_only.ipynb)
                   backup="$BACKUP_ROOT/$rel"
                   mkdir -p "$(dirname "$backup")"
                   cp -p "$dest" "$backup"
