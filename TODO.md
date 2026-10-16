@@ -318,3 +318,14 @@ The source remains on review PR [#11](https://github.com/Killer4K-N/OEC/pull/11)
 - [x] Source checkout is now resolved from the actual TRELLIS notebook final cell and its UI reaches HTTP 200 in the live exact-cell test.
 - [x] Fixed the test harness /generate_3d argument serialization: use the official gradio_client.handle_file(...) helper for the local image instead of a bare string. Static tests passed in [run 38907508496](https://github.com/Killer4K-N/OEC/actions/runs/38907508496).
 - [ ] IN PROGRESS — retest with file payload: [run 38907508493](https://github.com/Killer4K-N/OEC/actions/runs/38907508493). Require an actual generated GLB, successful independent geometry reopen, and combined notebook themed UI start before marking Trellis Jupyter acceptance complete.
+
+
+## 2026-10-16 19:33 IST — remaining combined-notebook FLUX cell
+
+- [x] Prior A100 exact-cell run [38907508493](https://github.com/Killer4K-N/OEC/actions/runs/38907508493) validated FLUX-only /generate, TRELLIS-only /generate_3d plus GLB geometry reopen, and combined TRELLIS Gradio startup (HTTP 200). Artifact [12049033031](https://github.com/Killer4K-N/OEC/actions/runs/38907508493/artifacts/12049033031).
+- [x] Fixed the combined notebook's bad fallback Conda path: use `~/Conda` (same default as the service manager), not `OEC/Conda`; added a clear missing-root check.
+- [x] Fixed the separate FLUX UI CLI's missing Gradio `allowed_paths` value; it now permits only the selected output directory `demo.oec_output_dir`.
+- [x] Added regression coverage and a fourth live acceptance stage that executes the combined notebook's actual FLUX service cell, calls `/generate`, validates local-scratch PNG/metadata, and stops only a service explicitly started by that test. Hosted run [38912593912](https://github.com/Killer4K-N/OEC/actions/runs/38912593912) passed 109 tests plus notebook JSON/compilation checks.
+- [ ] **IN PROGRESS — A100 exact-cell acceptance:** [run 38912593770](https://github.com/Killer4K-N/OEC/actions/runs/38912593770). Require the combined FLUX service startup, real `/generate`, PNG/sidecar validation and service cleanup evidence before closing this path.
+- [ ] **QUEUED — guarded sync:** [run 38912593974](https://github.com/Killer4K-N/OEC/actions/runs/38912593974). Check verified backups, file hashes and conflict preservation; no manual copy/reset.
+- Main remains unchanged; source is on review PR [#11](https://github.com/Killer4K-N/OEC/pull/11).

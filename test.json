@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T18:54:00+05:30",
+  "last_updated": "2026-10-16T19:33:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Review branch commit 441049f fixes missing TRELLIS source path in both notebook final cells; static 108-test run 38906566860 passed and guarded sync 38906567047 backed up/synced both notebooks, preserving unrelated dirty files. Exact-cell run 38905014913 fully passed the FLUX final cell with a valid 512x512 PNG/sidecar but then failed the Trellis source-path check. After that fix, run 38906567419 showed TRELLIS Gradio HTTP 200 but the harness supplied a raw image path and was rejected by ImageData validation before inference; artifact 12049150146. Harness commit f3e1942 wraps this local file with gradio_client.handle_file; static suite run 38907508496 passed. Exact-cell retest 38907508493 is in progress to validate real /generate_3d, GLB geometry reopen, and combined themed UI. main unchanged.",
+  "latest_summary": "Prior live exact-cell run 38907508493 passed FLUX-only /generate with validated PNG, TRELLIS-only /generate_3d with independent GLB geometry reopen, and combined TRELLIS UI startup. Further audit found the combined notebook's FLUX service cell used the wrong default Conda root and the separate FLUX CLI omitted its generated output directory from Gradio allowed_paths. Review commit 715fd00 fixes both, extends live acceptance to a fourth combined FLUX service /generate test with guarded service cleanup, and hosted run 38912593912 passed 109 tests plus notebook JSON/compilation. A100 exact-cell run 38912593770 is in progress; guarded sync run 38912593974 is queued. Main remains unchanged.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -3191,6 +3191,75 @@
         "https://gradio.app/guides/gradio-6-migration-guide"
       ],
       "follow_up": "Inspect run 38907508493 and its artifact. Confirm handle_file payload reaches TRELLIS inference, produces and independently reopens a non-empty GLB, and combined notebook themed UI startup passes. No pass should be inferred from HTTP 200 alone."
+    },
+    {
+      "id": "TEST-2026-10-16-OEC-COMBINED-FLUX-SERVICE-CELL-REPAIR",
+      "date": "2026-10-16",
+      "category": "Repair combined notebook FLUX service cell Conda root and generated-file serving",
+      "reason": "Latest exact-cell A100 acceptance passed the standalone FLUX, TRELLIS-only and combined TRELLIS UI paths, but did not directly execute the combined notebook's separate supervised FLUX service cell. Code review found a wrong default Conda root and a missing Gradio allowed_paths value in that path.",
+      "approach": "Compared pipeline_trellis_3d.ipynb cell 12 with tools/oec_service_manager.py and pipeline_flux_image.py --mode gradio. Corrected the Conda fallback to Path.home()/Conda, validated the root before invoking the manager, added the CLI output directory to Gradio allowed_paths, and added an acceptance mode that executes the cell in a child process, tests HTTP health and /generate, validates the PNG/sidecar, and stops only a newly started test-owned flux-ui.",
+      "parameters": {
+        "branch": "fix/flux-trellis-pipeline-20261015",
+        "source_commit": "715fd005aa3746a148aa3a7030cb87eddf06e9c9",
+        "changed_files": [
+          "pipeline_trellis_3d.ipynb",
+          "pipeline_flux_image.py",
+          "tests/test_flux_image.py",
+          "tests/test_trellis_notebook_static.py",
+          "tests/notebook_final_cell_acceptance.py",
+          ".github/workflows/notebook-final-cell-a100-acceptance.yml"
+        ],
+        "live_acceptance_run_id": 38912593770,
+        "sync_run_id": 38912593974,
+        "static_run_id": 38912593912,
+        "runtime_environment": "phase2_3d on runner oec-1",
+        "output_policy": "run-scoped /tmp scratch; no shared outputs",
+        "model_download": false,
+        "dependency_install": false,
+        "service_cleanup_policy": "stop only when combined cell log explicitly reports FLUX_GRADIO_START=PASS from a new service start; preserve reused/pre-existing services"
+      },
+      "expected": "Static regressions pass; combined notebook starts its managed FLUX UI through the same ~/Conda root as the service manager, Gradio HTTP returns 200, the actual /generate callback yields a valid 512x512 PNG and JSON sidecar, and the test-owned service is cleanly stopped.",
+      "results": {
+        "status": "STATIC_PASS_A100_ACCEPTANCE_IN_PROGRESS",
+        "hosted_static_run": 38912593912,
+        "tests_by_suite": {
+          "qa": 15,
+          "trellis_notebook_static": 19,
+          "trellis_easy_run": 6,
+          "trellis_offline_config": 6,
+          "flux_trellis_pipeline": 16,
+          "flux_image": 9,
+          "flux_gpu_admission": 6,
+          "audiocraft_notebook_static": 5,
+          "storage_write_admission": 6,
+          "service_manager": 8,
+          "service_manager_help": 7,
+          "ltx_worker_config": 6,
+          "total": 109
+        },
+        "python_compilation": "PASS",
+        "notebook_json_checks": "PASS (4 notebooks)",
+        "prior_three_stage_a100_notebook_acceptance": {
+          "run_id": 38907508493,
+          "status": "PASS",
+          "artifact_id": 12049033031,
+          "flux_only_generate": "PASS",
+          "trellis_only_generate_and_glb_reopen": "PASS",
+          "combined_trellis_gradio_start": "PASS"
+        },
+        "combined_flux_live_acceptance": "IN_PROGRESS",
+        "sync_status": "QUEUED",
+        "main_branch_modified": false
+      },
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/commit/715fd005aa3746a148aa3a7030cb87eddf06e9c9",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38912593912",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38912593770",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38912593974",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38907508493",
+        "https://github.com/Killer4K-N/OEC/actions/runs/38907508493/artifacts/12049033031"
+      ],
+      "follow_up": "Inspect current A100 exact-cell run 38912593770 and its exact-run artifact. Mark combined FLUX accepted only if the new stage reports HTTP 200, /generate PASS, valid local-scratch PNG/metadata and COMBINED_FLUX_SERVICE_CLEANUP=PASS; then inspect sync run 38912593974 for backups, hashes and preservation of unrelated dirty files."
     }
   ]
 }
