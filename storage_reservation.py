@@ -118,7 +118,9 @@ def temporary_download_reservation(
         policy = StoragePolicy(config)
         quota = policy.get_quota_snapshot(folder)
         if quota is None:
-            raise RuntimeError("no fresh live Lustre group-quota result or fresh quota snapshot is available")
+            raise RuntimeError(
+                "no fresh quota snapshot and no successful live Lustre group-quota result are available"
+            )
         available, quota_reason = policy.quota_write_headroom(quota)
         if quota.hard_limit_exceeded:
             raise RuntimeError("quota is already above the hard limit; temporary reserve leases are blocked")
