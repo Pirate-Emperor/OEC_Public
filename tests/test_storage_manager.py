@@ -251,5 +251,27 @@ class StorageManagerTests(unittest.TestCase):
                 self.assertTrue(reserve.exists())
                 self.assertEqual(reserve.read_bytes(), b"keep-me-reserved")
 
+    def test_cli_preflight_path_requires_live_or_fresh_quota(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config_path = root / "storage_config.json"
+            config_path.write_text(json.dumps({
+                "quota_snapshot_path": str(root / "missing-quota.json"),
+                "quota_snapshot_max_age_seconds": 60,
+                "live_lustre_quota": False,
+                "directories": [],
+            }), encoding="utf-8")
+            with mock.patch.object(storage_manager, "CONFIG_FILE", str(config_path)), \
+                 mock.patch("sys.argv", [
+                     "storage_manager.py",
+                     "--preflight-path", str(root),
+                     "--required-gb", "1",
+                     "--require-fresh-quota",
+                 ]):
+                with self.assertRaises(SystemExit) as caught:
+                    storage_manager.main()
+            self.assertEqual(caught.exception.code, 2)
+            self.assertFalse((root / storage_manager.RESERVE_FILENAME).exists())
+
 if __name__ == "__main__":
     unittest.main()
