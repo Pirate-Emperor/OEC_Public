@@ -11,6 +11,7 @@ on:
     branches:
       - main
       - 'fix/storage-admission-write-guards-20261014'
+      - 'feat/quota-aware-reserve-management-20261017'
 
 permissions:
   contents: read
@@ -37,7 +38,11 @@ jobs:
           python -m unittest discover -s tests -p 'test_trellis_easy_run.py' -v
           python -m unittest discover -s tests -p 'test_audiocraft_notebook_static.py' -v
           python -m unittest discover -s tests -p 'test_storage_write_admission.py' -v
-          python -m py_compile pipeline_trellis_3d.py storage_manager.py
+          python -m unittest discover -s tests -p 'test_storage_manager.py' -v
+          python -m unittest discover -s tests -p 'test_storage_policy.py' -v
+          python -m unittest discover -s tests -p 'test_quota_snapshot.py' -v
+          python -m unittest discover -s tests -p 'test_storage_reservation.py' -v
+          python -m py_compile pipeline_trellis_3d.py storage_manager.py storage_policy.py storage_reservation.py tools/quota_snapshot.py
           python - <<'PY'
           import json
           from pathlib import Path
