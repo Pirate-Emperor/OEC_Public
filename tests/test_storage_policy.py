@@ -158,9 +158,9 @@ class StoragePolicyTests(unittest.TestCase):
         class Result:
             returncode = 0
             stdout = (
-                "Disk quotas for grp lmedge (gid 55000):\\n"
-                "Filesystem kbytes quota limit grace files quota limit grace\\n"
-                "/nlsasfs 2253642804 2147483648 2254857830 5d23h32m 4220723 0 0 -\\n"
+                "Disk quotas for grp lmedge (gid 55000):\n"
+                "Filesystem kbytes quota limit grace files quota limit grace\n"
+                "/nlsasfs 2253642804 2147483648 2254857830 5d23h32m 4220723 0 0 -\n"
             )
 
         with tempfile.TemporaryDirectory() as temp:

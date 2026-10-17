@@ -483,12 +483,10 @@ def managed_storage_operation(
     require_fresh_quota=True,
     minimum_free_gb=0,
 ):
-    """Serialize an operation while keeping the allocated reserve unchanged.
+    """Serialize a managed write and recheck quota under the directory lock.
 
-    Quota arguments remain accepted for API compatibility but are not used here.
-    This function does not probe quota, resize the reserve, or release it.
-    Operators must explicitly resize the reserve before an operation that needs
-    more space.
+    The persistent reserve remains unchanged. Reserve release for a download must
+    use the bounded temporary_download_reservation lease API.
     """
     config = load_config()
     if not config:
@@ -537,7 +535,7 @@ def managed_storage_operation(
         try:
             logging.info(
                 "Managed operation STARTED for '%s' (planned %.3f GB); reserve "
-                "remains %.3f GB. No quota probe or reserve mutation is performed.",
+                "remains %.3f GB after in-lock storage admission.",
                 dir_name,
                 max(0.0, float(required_gb)),
                 reserve_bytes_before / BYTES_PER_GB,
