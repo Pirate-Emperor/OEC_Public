@@ -1,37 +1,76 @@
-# OEC Storage Reserve
+# OEC Storage Manager v2026-10-17
 
-OEC's persistent .storage_reserve.bin file is the primary reservation mechanism. Its allocated blocks consume the user's storage allocation so that the reserved portion is not available for unrelated files. The reserve must remain present unless an operator explicitly chooses a new positive size.
+The manager separates live quota measurement, per-operation admission and reserve reconciliation. **`--status` is read-only.** The continuous manager and `--once` apply each configured `reserve_target_gb`.
 
-## Reservation rules
+## Quota source and admission
 
-- The monitor is read/report/alert only. It never creates, deletes, or resizes .storage_reserve.bin.
-- A critical directory state does not release the reserve.
-- Stopping the monitor or receiving Ctrl+C does not release the reserve.
-- Managed operations hold a lock and verify that a non-empty regular reserve exists, but leave it unchanged.
-- A zero-byte reserve is forbidden.
-- Reserve sizing does not require quota telemetry because its real allocation is performed directly by posix_fallocate.
-- If an operation needs more room, the operator explicitly resizes the reserve first. There is no automatic resize based on stale quota snapshots, filesystem-wide free-space numbers, or directory target calculations.
+- On Lustre compute nodes, the manager prefers a live, read-only `lfs quota -g GROUP PATH` query, preserving used blocks, soft quota, hard limit and grace separately.
+- A fresh JSON quota snapshot is the fallback. Filesystem-wide free space is only a fallback warning metric; it is never treated as group-quota headroom when fresh quota is required.
+- Below soft quota, admission uses soft-quota headroom.
+- Above soft quota, admission is permitted **only when grace is explicitly active, a hard limit is present and not exceeded, and the operation plus safety margin fits inside hard-limit headroom**. Unknown/expired grace or usage over the hard limit blocks new writes.
+- Shrinking reserve blocks does not need free quota. Growing the reserve requires live/fresh quota admission and a configured restore margin.
 
-## Explicit reserve update
+## Normal use
 
-First inspect the existing reserve without changing it:
+Read status without mutation:
 
-    python storage_manager.py --status
+```bash
+source "$HOME/Conda/bin/activate"
+conda activate oec_deploy
+export OEC_ROOT="$HOME/OEC"
+python "$OEC_ROOT/storage_manager.py" --status
+```
 
-When an operator has decided the intended reserve size, explicitly resize it to a positive value:
+Apply the configured reserve targets once; this may shrink oversized existing reserves but never creates a missing reserve:
 
-    python storage_manager.py --set-reserve-gb models --reserve-gb 10
+```bash
+python "$OEC_ROOT/storage_manager.py" --once
+python "$OEC_ROOT/storage_manager.py" --status
+```
 
-This example sets the models reserve to 10 GB; it should only be run when that is the intended reservation. The analogous command may be used for outputs. The command does not call quota_check, read a quota snapshot, or infer quota from filesystem-wide free space.
+Run continuously for monitoring and reconciliation:
 
-The reserve is never deleted by --clean. That command only inspects storage controls and removes stale pause locks. The old --release DIR command is deprecated and refuses to delete the reserve.
+```bash
+python "$OEC_ROOT/storage_manager.py"
+```
 
-## Quota telemetry is a separate, unverified integration
+Configuration keeps a 5 GiB model reserve (minimum 1 GiB) and a 0.5 GiB output reserve (minimum 0.25 GiB). A prior runner log showed a 31.27 GB model reserve; if still that size, one cycle will release about 26 GiB of allocated blocks. Verify with live status; historical logs are not a current measurement.
 
-quota_check is a site-specific login-node command. OEC must not infer its output format or claim verified user/project quota until the actual login-node output has been inspected. The optional quota-snapshot parser/writer is not the source of truth for reservation and must not be used to automatically mutate the reserve.
+Explicit positive reserve sizing remains available:
 
-Do not use filesystem-wide free space (for example, an NFS filesystem reporting terabytes/petabytes free) as the user's quota. Login-node quota verification must be performed separately, using a read-only quota_check call.
+```bash
+python "$OEC_ROOT/storage_manager.py" --set-reserve-gb models --reserve-gb 5
+```
 
-## Storage status
+Explicit shrink is quota-independent; growth is denied without live/fresh quota and sufficient headroom. A missing reserve is never recreated implicitly.
 
-python storage_manager.py --status reports configured directory targets, filesystem telemetry, optional quota-snapshot freshness, and existing reserve file sizes. Reporting does not modify the reserve.
+## Managed writes and temporary downloads
+
+Use `managed_storage_operation(...)` around large writes. It rechecks admission **under the directory lock** immediately before entering the write body.
+
+For temporary large downloads, use a bounded lease:
+
+```python
+from storage_reservation import temporary_download_reservation
+
+with temporary_download_reservation(
+    "models",
+    reserve_release_gb=12,
+    max_download_gb=10,
+    minimum_reserve_gb=1,
+    minimum_quota_headroom_gb=2,
+) as scratch:
+    # Configure the downloader's local_dir/HF cache to write ONLY under scratch.
+    download_model_to(scratch)
+```
+
+Those values are illustrative, not an automatic approval for a particular model. Size the release to cover the real peak partial-shard/cache footprint. The lease checks quota, logical directory target, remaining reserve and maximum scratch size; scratch is deleted before reserve restoration.
+
+## Interruption recovery
+
+- An unresolved `.storage_lease.json` manifest and pause lock are recovery barriers. The manager will not resize while a lease/recovery state exists.
+- If a download crashes or cleanup/restoration fails, the markers intentionally remain. Do not run `--resume` blindly. Verify no process is active, inspect the manifest's exact scratch path, remove only that recorded scratch payload, restore the exact `original_reserve_bytes` with allocated blocks, verify it, then clear markers.
+- Reserve files must be regular, non-sparse and positive-sized. Growth allocates the tail before touching the old reserve; shrinking truncates the tail.
+- These locks coordinate OEC processes, not unrelated cluster jobs sharing the same quota. Margins and immediate preflight reduce but do not eliminate that race.
+
+Hosted unit/static tests validate quota parsing/admission, reserve resizing and lease cleanup. They do not prove the shared OEC checkout has been updated or that fresh A100 measurements have completed.

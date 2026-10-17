@@ -12,11 +12,20 @@
     "directories": [
         {
             "name": "models",
-            "target_allocation_gb": 200
+            "target_allocation_gb": 240,
+            "reserve_target_gb": 5,
+            "minimum_reserve_gb": 1
         },
         {
             "name": "outputs",
-            "target_allocation_gb": 1
+            "target_allocation_gb": 1,
+            "reserve_target_gb": 0.5,
+            "minimum_reserve_gb": 0.25
         }
-    ]
+    ],
+    "live_lustre_quota": true,
+    "quota_group": "lmedge",
+    "live_quota_timeout_seconds": 10,
+    "minimum_reserve_gb": 0.25,
+    "reserve_restore_headroom_gb": 2
 }

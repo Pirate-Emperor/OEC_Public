@@ -37,6 +37,8 @@ CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "storage_
 RESERVE_FILENAME = ".storage_reserve.bin"
 LOCK_FILENAME = ".storage_pause.lock"
 MANAGER_LOCK_FILENAME = ".storage_manager.lock"
+LEASE_MANIFEST_FILENAME = ".storage_lease.json"
+RESERVE_POLICY_VERSION = "2026-10-17"
 DEFAULT_LOCK_TTL_SECONDS = 6 * 60 * 60
 
 log_path = os.path.join(
@@ -184,37 +186,38 @@ def get_actual_folder_size(folder_path):
     """Backward-compatible wrapper around the shared directory-size primitive."""
     return directory_size_bytes(
         folder_path,
-        (RESERVE_FILENAME, LOCK_FILENAME, MANAGER_LOCK_FILENAME),
+        (RESERVE_FILENAME, LOCK_FILENAME, MANAGER_LOCK_FILENAME, LEASE_MANIFEST_FILENAME),
     )
 
 
 def _pause_lock_active(folder_path, lock_ttl_seconds):
+    """Return true for live locks or any unresolved lease manifest.
+
+    A manifest is a recovery barrier, not a stale lock to time out.
+    """
+    manifest_file = os.path.join(folder_path, LEASE_MANIFEST_FILENAME)
+    if os.path.lexists(manifest_file):
+        logging.critical(
+            "Unresolved storage lease manifest in %s; reserve changes are locked until recovery.",
+            folder_path,
+        )
+        return True
+
     lock_file = os.path.join(folder_path, LOCK_FILENAME)
     if not os.path.exists(lock_file):
         return False
-
     try:
         age = time.time() - os.path.getmtime(lock_file)
     except OSError:
         return False
-
     if age > lock_ttl_seconds:
-        logging.warning(
-            "Stale storage pause lock detected in %s (age %.0fs); removing it.",
-            folder_path,
-            age,
-        )
+        logging.warning("Stale storage pause lock detected in %s (age %.0fs); removing it.", folder_path, age)
         try:
             os.remove(lock_file)
         except OSError as exc:
-            logging.error(
-                "Could not remove stale pause lock in %s: %s",
-                folder_path,
-                type(exc).__name__,
-            )
+            logging.error("Could not remove stale pause lock in %s: %s", folder_path, type(exc).__name__)
             return True
         return False
-
     return True
 
 
@@ -260,13 +263,12 @@ def release_reserve(dir_name):
 
 
 def set_reserve_size(dir_name, reserve_gb):
-    """Explicitly create/resize a persistent reserve; does not query quota."""
+    """Explicit reserve resize; shrink is quota-independent, growth is quota-gated."""
     try:
         config = load_config()
         if not config:
             raise RuntimeError("storage configuration is unavailable")
         _directory_config(config, dir_name)
-
         reserve_gb = float(reserve_gb)
         if not (reserve_gb > 0):
             raise ValueError("reserve size must be positive; zero is forbidden")
@@ -274,49 +276,130 @@ def set_reserve_size(dir_name, reserve_gb):
         folder_path = SYSTEM_DIRS.get(dir_name, dir_name)
         os.makedirs(folder_path, exist_ok=True)
         reserve_path = os.path.join(folder_path, RESERVE_FILENAME)
-        tolerance_bytes = int(
-            float(config.get("reserve_resize_tolerance_mb", 64)) * BYTES_PER_MB
-        )
+        if os.path.islink(reserve_path):
+            raise RuntimeError("reserve path is a symlink; refusing to change it")
+        target_bytes = int(reserve_gb * BYTES_PER_GB)
+        tolerance_bytes = int(float(config.get("reserve_resize_tolerance_mb", 64)) * BYTES_PER_MB)
         ttl_seconds = float(config.get("lock_ttl_seconds", DEFAULT_LOCK_TTL_SECONDS))
+        margin_bytes = int(max(0.0, float(config.get("reserve_restore_headroom_gb", 2.0))) * BYTES_PER_GB)
 
         with _directory_lock(folder_path):
             if _pause_lock_active(folder_path, ttl_seconds):
-                raise RuntimeError("Cannot resize reserve during an active managed operation")
-            changed = ensure_reserve_file(
-                reserve_path,
-                int(reserve_gb * BYTES_PER_GB),
-                tolerance_bytes=tolerance_bytes,
-            )
+                raise RuntimeError("Cannot resize reserve during a managed operation or unresolved lease")
+            current_bytes = os.path.getsize(reserve_path) if os.path.isfile(reserve_path) else 0
+            if target_bytes > current_bytes:
+                ok, reason = StoragePolicy(config).preflight(
+                    folder_path,
+                    required_bytes=target_bytes - current_bytes,
+                    minimum_free_bytes=margin_bytes,
+                    require_fresh_quota=True,
+                )
+                if not ok:
+                    raise RuntimeError(f"reserve growth denied: {reason}")
+            changed = ensure_reserve_file(reserve_path, target_bytes, tolerance_bytes=tolerance_bytes)
 
-        actual_gb = os.path.getsize(reserve_path) / BYTES_PER_GB
+        actual_bytes = os.path.getsize(reserve_path)
         logging.warning(
             "[%s] Explicit reserve update: %.3f GB (%s).",
-            dir_name,
-            actual_gb,
+            dir_name, actual_bytes / BYTES_PER_GB,
             "resized" if changed else "already within tolerance",
         )
         return True
     except (OSError, KeyError, RuntimeError, ValueError) as exc:
+        logging.error("Could not update '%s' reserve: %s: %s", dir_name, type(exc).__name__, exc)
+        return False
+
+def reconcile_reserve_target(config, dir_cfg):
+    """Reconcile an existing reserve to its configured positive target.
+
+    Shrinks release allocated blocks immediately without quota headroom. Growth
+    is attempted only after a fresh quota admission check with a restore margin.
+    Missing reserves and unresolved lease manifests are never auto-repaired.
+    """
+    if "reserve_target_gb" not in dir_cfg:
+        return False
+    dir_name = str(dir_cfg["name"])
+    folder_path = SYSTEM_DIRS.get(dir_name, dir_name)
+    target_gb = float(dir_cfg["reserve_target_gb"])
+    minimum_gb = float(dir_cfg.get("minimum_reserve_gb", config.get("minimum_reserve_gb", 0.25)))
+    if target_gb <= 0 or target_gb < minimum_gb:
         logging.error(
-            "Could not update '%s' reserve: %s: %s",
-            dir_name,
-            type(exc).__name__,
-            exc,
+            "[%s] Invalid reserve target %.3f GB; minimum is %.3f GB. No change.",
+            dir_name, target_gb, minimum_gb,
         )
         return False
 
+    reserve_path = os.path.join(folder_path, RESERVE_FILENAME)
+    target_bytes = int(target_gb * BYTES_PER_GB)
+    tolerance_bytes = int(float(config.get("reserve_resize_tolerance_mb", 64)) * BYTES_PER_MB)
+    ttl_seconds = float(config.get("lock_ttl_seconds", DEFAULT_LOCK_TTL_SECONDS))
+    margin_bytes = int(max(0.0, float(config.get("reserve_restore_headroom_gb", 2.0))) * BYTES_PER_GB)
+
+    try:
+        with _directory_lock(folder_path):
+            if _pause_lock_active(folder_path, ttl_seconds):
+                logging.warning("[%s] Reconciliation skipped: operation or lease recovery active.", dir_name)
+                return False
+            if os.path.islink(reserve_path) or not os.path.isfile(reserve_path):
+                logging.critical("[%s] Reserve missing/unsafe; monitor will not create it automatically.", dir_name)
+                return False
+            current_bytes = os.path.getsize(reserve_path)
+            if current_bytes <= 0:
+                logging.critical("[%s] Empty reserve; refusing automatic recreation.", dir_name)
+                return False
+            if abs(current_bytes - target_bytes) <= tolerance_bytes:
+                return False
+
+            if target_bytes < current_bytes:
+                changed = ensure_reserve_file(reserve_path, target_bytes, tolerance_bytes=0)
+                after_bytes = os.path.getsize(reserve_path)
+                if changed:
+                    logging.warning(
+                        "[%s] Reserve shrunk %.3f -> %.3f GiB; released %.3f GiB of allocated blocks.",
+                        dir_name, current_bytes / BYTES_PER_GB, after_bytes / BYTES_PER_GB,
+                        max(0, current_bytes - after_bytes) / BYTES_PER_GB,
+                    )
+                return changed
+
+            needed_bytes = target_bytes - current_bytes
+            ok, reason = StoragePolicy(config).preflight(
+                folder_path,
+                required_bytes=needed_bytes,
+                minimum_free_bytes=margin_bytes,
+                require_fresh_quota=True,
+            )
+            if not ok:
+                logging.warning("[%s] Reserve growth deferred; %s", dir_name, reason)
+                return False
+            changed = ensure_reserve_file(reserve_path, target_bytes, tolerance_bytes=0)
+            if changed:
+                logging.info(
+                    "[%s] Reserve grown %.3f -> %.3f GiB after quota admission; %s",
+                    dir_name, current_bytes / BYTES_PER_GB, target_gb, reason,
+                )
+            return changed
+    except (OSError, RuntimeError, ValueError) as exc:
+        logging.error("[%s] Reserve reconciliation failed safely: %s: %s", dir_name, type(exc).__name__, exc)
+        return False
+
 def resume_reserve(dir_name):
-    """Remove the pause lock; the next manager cycle will rebuild the reserve."""
+    """Remove a plain pause lock, but never discard a lease recovery manifest."""
     try:
         config = load_config() or {}
         _directory_config(config, dir_name)
         folder_path = SYSTEM_DIRS.get(dir_name, dir_name)
-
+        manifest_path = os.path.join(folder_path, LEASE_MANIFEST_FILENAME)
+        if os.path.lexists(manifest_path):
+            raise RuntimeError(
+                f"lease recovery manifest exists at {manifest_path}; inspect and recover the "
+                "recorded scratch path and exact original reserve before clearing recovery markers"
+            )
         with _directory_lock(folder_path):
+            if os.path.lexists(manifest_path):
+                raise RuntimeError("lease manifest appeared during resume; refusing to clear pause lock")
             lock_file = os.path.join(folder_path, LOCK_FILENAME)
             if os.path.exists(lock_file):
                 os.remove(lock_file)
-
         logging.info("Storage reserve RESUMED on '%s'.", dir_name)
         return True
     except (OSError, KeyError) as exc:
@@ -434,6 +517,16 @@ def managed_storage_operation(
                 f"Allocated reserve {reserve_file} is empty. "
                 "Set an explicit positive size before running the operation."
             )
+        # Recheck admission while holding the directory lock to close the earlier
+        # preflight-to-write race.
+        ok, reason = StoragePolicy(config).preflight(
+            folder_path,
+            required_bytes=int(max(0.0, float(required_gb)) * BYTES_PER_GB),
+            minimum_free_bytes=int(max(0.0, float(minimum_free_gb)) * BYTES_PER_GB),
+            require_fresh_quota=require_fresh_quota,
+        )
+        if not ok:
+            raise RuntimeError(f"managed storage operation denied: {reason}")
 
         with open(lock_file, "w", encoding="utf-8") as handle:
             handle.write(f"pid={os.getpid()}\ntime={time.time():.6f}\n")
@@ -481,60 +574,60 @@ def managed_storage_operation(
 
 
 def print_status(config):
-    """Print quota and per-directory status without modifying storage."""
+    """Print live group-quota status and per-directory reserve policy without mutation."""
     policy = StoragePolicy(config)
-    quota = policy.get_quota_snapshot()
+    quota_path = SYSTEM_DIRS.get("models") or next(
+        (SYSTEM_DIRS.get(item["name"]) for item in config.get("directories", []) if SYSTEM_DIRS.get(item["name"])),
+        None,
+    )
+    quota = policy.get_quota_snapshot(quota_path) if quota_path else policy.get_quota_snapshot()
 
     print("==================================================")
-    print("OEC STORAGE STATUS")
+    print(f"OEC STORAGE STATUS — reserve policy {RESERVE_POLICY_VERSION}")
     print("==================================================")
-
     if quota is None:
-        print("Quota snapshot: unavailable or stale")
+        print("Group quota: UNAVAILABLE (no successful live LFS result or fresh snapshot)")
+        print("Filesystem-wide free space is not a substitute for the group quota.")
     else:
+        soft_text = format_bytes(quota.soft_quota_bytes) if quota.soft_quota_bytes is not None else "unset"
+        hard_text = format_bytes(quota.hard_limit_bytes) if quota.hard_limit_bytes is not None else "unset"
+        hard_headroom = format_bytes(quota.hard_limit_headroom_bytes) if quota.hard_limit_headroom_bytes is not None else "unknown"
+        write_headroom, write_reason = policy.quota_write_headroom(quota)
         print(
-            "Quota snapshot: "
-            f"used={format_bytes(quota.used_bytes)} "
-            f"limit={format_bytes(quota.limit_bytes)} "
-            f"available={format_bytes(quota.available_bytes)} "
-            f"age={quota.age_seconds:.0f}s "
-            f"source={quota.source}"
+            f"Quota source={quota.source} age={quota.age_seconds:.0f}s "
+            f"used={format_bytes(quota.used_bytes)} soft={soft_text} hard={hard_text} "
+            f"hard_headroom={hard_headroom} grace={quota.grace or '-'} "
+            f"grace_active={quota.grace_active} write_headroom={format_bytes(write_headroom)}"
         )
+        print(f"Quota admission: {write_reason}")
 
     for dir_cfg in config.get("directories", []):
         dir_name = dir_cfg["name"]
         target_gb = float(dir_cfg["target_allocation_gb"])
         folder_path = SYSTEM_DIRS.get(dir_name, dir_name)
         os.makedirs(folder_path, exist_ok=True)
-
-        decision = policy.evaluate(
-            folder_path,
-            int(target_gb * BYTES_PER_GB),
-            RESERVE_FILENAME,
-            LOCK_FILENAME,
-        )
+        decision = policy.evaluate(folder_path, int(target_gb * BYTES_PER_GB), RESERVE_FILENAME, LOCK_FILENAME)
         reserve_path = os.path.join(folder_path, RESERVE_FILENAME)
-        reserve_bytes = os.path.getsize(reserve_path) if os.path.exists(reserve_path) else 0
-        total_bytes, used_bytes, free_bytes = filesystem_usage(folder_path)
-
-        print(
-            f"[{dir_name}] state={decision.state} "
-            f"actual={format_bytes(decision.actual_bytes)} / {target_gb:.2f} GB "
-            f"reserve={format_bytes(reserve_bytes)} "
-            f"fs_free={format_bytes(free_bytes)} "
-            f"fs_total={format_bytes(total_bytes)} "
-            f"reason={decision.reason}"
+        reserve_bytes = (
+            os.path.getsize(reserve_path)
+            if os.path.isfile(reserve_path) and not os.path.islink(reserve_path) else 0
         )
-
+        total_bytes, _used_bytes, free_bytes = filesystem_usage(folder_path)
+        reserve_target = dir_cfg.get("reserve_target_gb")
+        target_note = f" reserve_target={float(reserve_target):.2f} GiB" if reserve_target is not None else ""
+        print(
+            f"[{dir_name}] state={decision.state} actual={format_bytes(decision.actual_bytes)} / "
+            f"{target_gb:.2f} GB reserve={format_bytes(reserve_bytes)}{target_note} "
+            f"fs_free={format_bytes(free_bytes)} fs_total={format_bytes(total_bytes)} reason={decision.reason}"
+        )
     print("==================================================")
 
 
 def perform_allocation_cycle(config, alert_triggered):
-    """Report storage state without creating, deleting, or resizing reserves."""
+    """Apply configured reserve targets, then report and alert on quota state."""
     policy = StoragePolicy(config)
     lock_ttl_seconds = float(config.get("lock_ttl_seconds", DEFAULT_LOCK_TTL_SECONDS))
     webhook_url = _webhook_url(config)
-
     for dir_cfg in config.get("directories", []):
         dir_name = dir_cfg["name"]
         target_gb = float(dir_cfg["target_allocation_gb"])
@@ -542,70 +635,38 @@ def perform_allocation_cycle(config, alert_triggered):
         folder_path = SYSTEM_DIRS.get(dir_name, dir_name)
         os.makedirs(folder_path, exist_ok=True)
 
+        # --status is read-only; --once and the continuous monitor apply reserve targets.
+        reconcile_reserve_target(config, dir_cfg)
         if _pause_lock_active(folder_path, lock_ttl_seconds):
-            logging.info("[%s] Active operation; reserve remains untouched.", dir_name)
+            logging.info("[%s] Operation/lease recovery active; reserve remains untouched.", dir_name)
             continue
 
         try:
-            decision = policy.evaluate(
-                folder_path,
-                target_bytes,
-                RESERVE_FILENAME,
-                LOCK_FILENAME,
-            )
+            decision = policy.evaluate(folder_path, target_bytes, RESERVE_FILENAME, LOCK_FILENAME)
             reserve_file = os.path.join(folder_path, RESERVE_FILENAME)
             reserve_ok = (
                 os.path.isfile(reserve_file)
                 and not os.path.islink(reserve_file)
                 and os.path.getsize(reserve_file) > 0
             )
-            reserve_gb = (
-                os.path.getsize(reserve_file) / BYTES_PER_GB
-                if reserve_ok
-                else 0.0
-            )
+            reserve_gb = os.path.getsize(reserve_file) / BYTES_PER_GB if reserve_ok else 0.0
             actual_gb = decision.actual_bytes / BYTES_PER_GB
-
             if not reserve_ok:
-                logging.critical(
-                    "[%s] STORAGE RESERVE MISSING/EMPTY. Monitor will not recreate, "
-                    "delete, or resize reserves automatically.",
-                    dir_name,
-                )
+                logging.critical("[%s] Reserve missing/empty; manager will not create it implicitly.", dir_name)
             else:
                 logging.info(
                     "[%s] State=%s | Actual=%.2f GB | Reserve=%.3f GB | Target=%.2f GB | %s",
-                    dir_name,
-                    decision.state,
-                    actual_gb,
-                    reserve_gb,
-                    target_gb,
-                    decision.reason,
+                    dir_name, decision.state, actual_gb, reserve_gb, target_gb, decision.reason,
                 )
-
             if decision.state == "CRITICAL" or not reserve_ok:
-                logging.critical(
-                    "[%s] Storage alert condition; preserving reserve unchanged (%.3f GB).",
-                    dir_name,
-                    reserve_gb,
-                )
+                logging.critical("[%s] Storage alert condition; retained reserve=%.3f GB.", dir_name, reserve_gb)
                 if not alert_triggered.get(dir_name, False):
-                    send_discord_alert(
-                        webhook_url,
-                        dir_name,
-                        actual_gb,
-                        target_gb,
-                    )
+                    send_discord_alert(webhook_url, dir_name, actual_gb, target_gb)
                     alert_triggered[dir_name] = True
             elif decision.state == "NORMAL":
                 alert_triggered[dir_name] = False
-
-        except (OSError, RuntimeError) as exc:
-            logging.error(
-                "[%s] Storage monitoring failed: %s",
-                dir_name,
-                type(exc).__name__,
-            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            logging.error("[%s] Storage monitoring/reconciliation failed: %s", dir_name, type(exc).__name__)
 
 
 def manage_allocations(once=False):
@@ -616,7 +677,7 @@ def manage_allocations(once=False):
     alert_triggered = {item["name"]: False for item in config.get("directories", [])}
 
     print("==================================================")
-    print("Starting OEC Quota-Aware Storage Manager")
+    print(f"Starting OEC Quota-Aware Storage Manager (reserve policy {RESERVE_POLICY_VERSION})")
     print("==================================================")
 
     while True:
@@ -636,7 +697,7 @@ def manage_allocations(once=False):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="OEC persistent storage-reserve manager (reserve changes are explicit)",
+        description="OEC quota-aware storage manager with configured reserve reconciliation",
     )
     action = parser.add_mutually_exclusive_group()
     action.add_argument("--status", action="store_true", help="Print storage/quota status and exit.")
@@ -667,7 +728,7 @@ def main():
     parser.add_argument(
         "--once",
         action="store_true",
-        help="Run one allocation cycle and exit.",
+        help="Run one quota/reconciliation cycle and exit (configured reserve targets may shrink).",
     )
 
     args = parser.parse_args()
