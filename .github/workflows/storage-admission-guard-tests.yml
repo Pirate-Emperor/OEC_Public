@@ -12,6 +12,7 @@ on:
       - main
       - 'fix/storage-admission-write-guards-20261014'
       - 'feat/quota-aware-reserve-management-20261017'
+      - 'fix/read-only-storage-status-20261017'
 
 permissions:
   contents: read

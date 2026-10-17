@@ -9,6 +9,36 @@ import storage_manager
 
 
 class StorageManagerTests(unittest.TestCase):
+
+    def test_status_does_not_create_missing_managed_directories(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            models = root / "missing-models"
+            outputs = root / "missing-outputs"
+            config = {
+                "quota_snapshot_path": str(root / "missing-quota.json"),
+                "quota_snapshot_max_age_seconds": 60,
+                "live_lustre_quota": False,
+                "directories": [
+                    {"name": "models", "target_allocation_gb": 10, "reserve_target_gb": 5},
+                    {"name": "outputs", "target_allocation_gb": 1, "reserve_target_gb": 0.5},
+                ],
+            }
+
+            with mock.patch.object(
+                storage_manager,
+                "SYSTEM_DIRS",
+                {"models": str(models), "outputs": str(outputs)},
+            ), mock.patch.object(
+                storage_manager.StoragePolicy,
+                "get_quota_snapshot",
+                return_value=None,
+            ):
+                storage_manager.print_status(config)
+
+            self.assertFalse(models.exists(), "status must not create a missing models directory")
+            self.assertFalse(outputs.exists(), "status must not create a missing outputs directory")
+
     def test_storage_preflight_path_can_use_fresh_quota(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
