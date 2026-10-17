@@ -1,6 +1,6 @@
 # OEC Storage Manager v2026-10-17
 
-The manager separates live quota measurement, per-operation admission and reserve reconciliation. **`--status` is read-only.** The continuous manager and `--once` apply each configured `reserve_target_gb`.
+The manager separates live quota measurement, per-operation admission and reserve reconciliation. Use `--preflight-path PATH --required-gb N --minimum-free-gb M --require-fresh-quota` for build or temporary paths on the same group quota; this omits an OEC logical-directory target. **`--status` is read-only.** The continuous manager and `--once` apply each configured `reserve_target_gb`.
 
 ## Quota source and admission
 
@@ -44,27 +44,28 @@ python "$OEC_ROOT/storage_manager.py" --set-reserve-gb models --reserve-gb 5
 
 Explicit shrink is quota-independent; growth is denied without live/fresh quota and sufficient headroom. A missing reserve is never recreated implicitly.
 
-## Managed writes and temporary downloads
+## Managed writes and temporary staging
 
-Use `managed_storage_operation(...)` around large writes. It rechecks admission **under the directory lock** immediately before entering the write body.
+Use `managed_storage_operation(...)` around persistent model, dataset, checkpoint or output writes. It rechecks admission **under the directory lock** immediately before entering the write body. For persistent artifacts, first let `--once` reconcile the configured reserve target, then use the final model/dataset path only after quota preflight passes. **Do not use a temporary lease for a model or dataset that must remain on disk.** The lease deletes its scratch directory and attempts to restore the original reserve before returning.
 
-For temporary large downloads, use a bounded lease:
+The bounded lease is for *ephemeral staging data that should be discarded on exit*, such as a temporary reassembly payload or intermediate shard that will be removed after use:
 
 ```python
 from storage_reservation import temporary_download_reservation
 
 with temporary_download_reservation(
     "models",
-    reserve_release_gb=12,
-    max_download_gb=10,
+    reserve_release_gb=4,
+    max_download_gb=3,
     minimum_reserve_gb=1,
     minimum_quota_headroom_gb=2,
 ) as scratch:
-    # Configure the downloader's local_dir/HF cache to write ONLY under scratch.
-    download_model_to(scratch)
+    create_ephemeral_stage_files(scratch)
+    consume_then_discard_stage_files(scratch)
 ```
 
-Those values are illustrative, not an automatic approval for a particular model. Size the release to cover the real peak partial-shard/cache footprint. The lease checks quota, logical directory target, remaining reserve and maximum scratch size; scratch is deleted before reserve restoration.
+These parameters are examples, not an automatic approval for a particular operation. Size the release to cover the real peak staging footprint. The lease checks quota, logical directory target, remaining reserve and maximum scratch size; scratch is removed before reserve restoration. For persistent model downloads, the long-term reserve target—not a temporary lease—is the intended capacity mechanism.
+
 
 ## Interruption recovery
 

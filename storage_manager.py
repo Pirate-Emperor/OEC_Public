@@ -703,9 +703,10 @@ def main():
     action.add_argument("--release", metavar="DIR", help="Deprecated: reserve deletion is disabled; use --set-reserve-gb.")
     action.add_argument("--resume", metavar="DIR", help="Resume one directory reserve after an intentional large operation.")
     action.add_argument("--set-reserve-gb", metavar="DIR", help="Explicitly create/resize the persistent reserve.")
-    action.add_argument("--preflight-dir", metavar="DIR", help="Run storage admission control for a directory.")
+    action.add_argument("--preflight-dir", metavar="DIR", help="Run quota/target admission for a configured OEC directory.")
+    action.add_argument("--preflight-path", metavar="PATH", help="Run quota admission for an arbitrary existing path without a logical OEC directory target.")
 
-    parser.add_argument("--required-gb", type=float, help="Expected size of a large operation.")
+    parser.add_argument("--required-gb", type=float, help="Expected size of a large operation/preflight.")
     parser.add_argument("--reserve-gb", type=float, help="Positive reserve size used with --set-reserve-gb; no quota query.")
     parser.add_argument(
         "--minimum-free-gb",
@@ -716,7 +717,7 @@ def main():
     parser.add_argument(
         "--require-fresh-quota",
         action="store_true",
-        help="Reject preflight when no fresh login-node quota snapshot is available.",
+        help="Reject preflight unless live Lustre quota or a fresh quota snapshot is available.",
     )
     parser.add_argument(
         "--test-webhook",
@@ -767,6 +768,18 @@ def main():
             raise SystemExit("--required-gb is required with --preflight-dir")
         ok, reason = storage_preflight(
             args.preflight_dir,
+            args.required_gb,
+            require_fresh_quota=args.require_fresh_quota,
+            minimum_free_gb=args.minimum_free_gb,
+        )
+        print(("✅ " if ok else "❌ ") + reason)
+        raise SystemExit(0 if ok else 2)
+
+    if args.preflight_path:
+        if args.required_gb is None:
+            raise SystemExit("--required-gb is required with --preflight-path")
+        ok, reason = storage_preflight_path(
+            args.preflight_path,
             args.required_gb,
             require_fresh_quota=args.require_fresh_quota,
             minimum_free_gb=args.minimum_free_gb,
