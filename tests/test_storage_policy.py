@@ -152,5 +152,69 @@ class StoragePolicyTests(unittest.TestCase):
             self.assertTrue(ok, reason)
 
 
+    def test_live_lustre_quota_parser_preserves_soft_hard_and_grace(self):
+        from storage_policy import _live_lustre_quota
+
+        class Result:
+            returncode = 0
+            stdout = (
+                "Disk quotas for grp lmedge (gid 55000):\n"
+                "Filesystem kbytes quota limit grace files quota limit grace\n"
+                "/nlsasfs 2253642804 2147483648 2254857830 5d23h32m 4220723 0 0 -\n"
+            )
+
+        with tempfile.TemporaryDirectory() as temp:
+            with mock.patch("storage_policy.shutil.which", return_value="/usr/bin/lfs"), \
+                 mock.patch("storage_policy.subprocess.run", return_value=Result()) as run:
+                quota = _live_lustre_quota(temp, "lmedge")
+            self.assertIsNotNone(quota)
+            self.assertEqual(quota.used_bytes, 2253642804 * 1024)
+            self.assertEqual(quota.soft_quota_bytes, 2147483648 * 1024)
+            self.assertEqual(quota.hard_limit_bytes, 2254857830 * 1024)
+            self.assertTrue(quota.grace_active)
+            self.assertIn("lfs quota -g lmedge", quota.source)
+            self.assertEqual(run.call_args.args[0][1:4], ["quota", "-g", "lmedge"])
+
+    def test_soft_quota_overage_is_allowed_only_during_active_grace_and_below_hard(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            quota_path = root / "quota.json"
+            config = {
+                "quota_snapshot_path": str(quota_path),
+                "quota_snapshot_max_age_seconds": 600,
+                "live_lustre_quota": False,
+                "critical_free_gb": 1,
+            }
+            payload = {
+                "schema_version": 2,
+                "used_bytes": 12 * BYTES_PER_GB,
+                "limit_bytes": 10 * BYTES_PER_GB,
+                "soft_quota_bytes": 10 * BYTES_PER_GB,
+                "hard_limit_bytes": 20 * BYTES_PER_GB,
+                "timestamp": time.time(),
+                "source": "unit-test quota",
+                "grace": "5d23h",
+                "quota_kind": "group",
+                "quota_name": "lmedge",
+            }
+            quota_path.write_text(json.dumps(payload), encoding="utf-8")
+            policy = StoragePolicy(config)
+            ok, reason = policy.preflight(
+                root, required_bytes=4 * BYTES_PER_GB,
+                minimum_free_bytes=1 * BYTES_PER_GB, require_fresh_quota=True,
+            )
+            self.assertTrue(ok, reason)
+            ok, _ = policy.preflight(
+                root, required_bytes=8 * BYTES_PER_GB,
+                minimum_free_bytes=1 * BYTES_PER_GB, require_fresh_quota=True,
+            )
+            self.assertFalse(ok)
+            payload["grace"] = "-"
+            payload["timestamp"] = time.time()
+            quota_path.write_text(json.dumps(payload), encoding="utf-8")
+            ok, reason = policy.preflight(root, required_bytes=1, require_fresh_quota=True)
+            self.assertFalse(ok)
+            self.assertIn("no provably active grace", reason)
+
 if __name__ == "__main__":
     unittest.main()

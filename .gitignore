@@ -65,6 +65,9 @@ LTX-2/
 
 Miniconda3-latest-Linux-x86_64.sh
 
+# Nested checkout used by the A100 deployment runner; keep it out of this repository's working tree.
+oec_deploy/
+
 # System / user-home state -- never part of OEC
 .Xauthority
 .anaconda/
