@@ -57,3 +57,4 @@ The local suite validates the prototype API/job boundaries only. It does not pro
 - Follow-up storage review found that an admission check only around output-folder creation would not guard the subsequent artifact writes. The source now holds the managed outputs operation across actual TRELLIS GLB, LTX MP4/metadata and ACE-Step audio generation. Audio WAV/TXT saves also run within the output gate.
 - ACE-Step defaults to the lighter 0.6B language-model checkpoint as a resource-conscious first test. This is a source default, not evidence of model fit or quality on the target device.
 - Added official upstream links and dependency/checkpoint licensing review requirements for ACE-Step, Kokoro, Whisper and Qwen3-ASR.
+- Final source review confirms the managed outputs gate covers actual TRELLIS GLB, LTX MP4/metadata and ACE-Step music generation. ACE-Step defaults to the official 0.6B LM option for the first resource-conscious smoke test; no inference has been run.
