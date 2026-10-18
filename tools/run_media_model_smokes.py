@@ -73,7 +73,10 @@ def _env_for(provider: str, envs: dict[str, Path]) -> tuple[str | None, Path | N
 
 def _health(url: str) -> tuple[bool, Any]:
     try:
-        with urllib.request.urlopen(url, timeout=4) as response:
+        if not url.startswith(("http://127.0.0.1:", "http://localhost:", "http://[::1]:")):
+            raise ValueError("health checks must target a loopback media service")
+        local_http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with local_http.open(url, timeout=4) as response:
             return response.status == 200, json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         try:
