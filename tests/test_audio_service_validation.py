@@ -25,6 +25,7 @@ if not (REPO_ROOT / "core_config.py").is_file():
     sys.modules["core_config"] = _stub
 
 import audio_api
+import common
 import model_cache
 
 class AudioValidationTests(unittest.TestCase):
@@ -36,6 +37,15 @@ class AudioValidationTests(unittest.TestCase):
             self.assertFalse(audio_api._has_model_weights(checkpoint))
             (checkpoint / "model.safetensors").write_bytes(b"weights")
             self.assertTrue(audio_api._has_model_weights(checkpoint))
+
+    def test_manager_directory_fallback_requires_explicit_opt_in(self):
+    def test_manager_directory_fallback_requires_explicit_opt_in(self):
+        with mock.patch.dict(os.environ, {"OEC_USE_MANAGER_DIRECTORY_ONLY": "1"}):
+            self.assertFalse(common.require_fresh_quota())
+        with mock.patch.dict(os.environ, {"OEC_USE_MANAGER_DIRECTORY_ONLY": "0"}):
+            self.assertTrue(common.require_fresh_quota())
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(common.require_fresh_quota())
 
     def test_ace_step_request_is_bounded(self):
         provider = audio_api.AudioProvider("ace-step", require_cuda=False)

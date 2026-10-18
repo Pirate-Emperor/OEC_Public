@@ -127,6 +127,12 @@ jobs:
             echo "OEC_PYTHON was not selected; cache status unavailable."
           fi
 
+      - name: Prepare isolated audio runtimes and verify output reserve
+        if: success()
+        run: |
+          set -euo pipefail
+          "$OEC_PYTHON" tools/prepare_media_runtime.py
+
       - name: Run live inference smoke jobs in existing runtimes
         if: success()
         run: |

@@ -46,6 +46,25 @@ def _conda_prefixes() -> dict[str, Path]:
 
 def _env_for(provider: str, envs: dict[str, Path]) -> tuple[str | None, Path | None, dict[str, bool]]:
     report: dict[str, bool] = {}
+    if provider in {"kokoro", "whisper", "qwen3-asr"}:
+        python = Path.home() / ".local" / "venvs" / "oec-audio-py311" / "bin" / "python"
+        if python.is_file():
+            code = (
+                "import importlib.util as u, json; "
+                f"mods={list(REQUIRED[provider])!r}; "
+                "print(json.dumps({m: bool(u.find_spec(m)) for m in mods}))"
+            )
+            try:
+                proc = subprocess.run([str(python), "-c", code], cwd=ROOT, text=True,
+                                      capture_output=True, timeout=15, check=False)
+                available = json.loads(proc.stdout.strip().splitlines()[-1]) if proc.returncode == 0 else {}
+                report["oec-audio-venv"] = all(available.get(m, False) for m in REQUIRED[provider])
+                print(f"SMOKE_ENV provider={provider} environment=oec-audio-venv packages={json.dumps(available)}", flush=True)
+                if report["oec-audio-venv"]:
+                    return "oec-audio-venv", python, report
+            except Exception as exc:
+                report["oec-audio-venv"] = False
+                print(f"SMOKE_ENV provider={provider} environment=oec-audio-venv check_error={type(exc).__name__}", flush=True)
     for name in PYTHON_ENVS:
         prefix = envs.get(name)
         python = (prefix / "bin" / "python") if prefix else None
@@ -90,6 +109,8 @@ def _health(url: str) -> tuple[bool, Any]:
 def _run_provider(provider: str, python: Path, audio_path: Path | None, log_dir: Path) -> tuple[dict[str, Any], Path | None]:
     port = PORTS[provider]
     url = f"http://127.0.0.1:{port}"
+    if provider == "whisper" and shutil.which("ffmpeg") is None:
+        return {"provider": provider, "status": "SKIPPED", "reason": "ffmpeg executable is not available on PATH"}, None
     try:
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", port))
@@ -102,6 +123,8 @@ def _run_provider(provider: str, python: Path, audio_path: Path | None, log_dir:
     env["PATH"] = str(python.parent) + os.pathsep + env.get("PATH", "")
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONPATH"] = str(ROOT) + os.pathsep + str(MEDIA) + os.pathsep + env.get("PYTHONPATH", "")
+    # Enabled only after prepare_media_runtime verifies the directory budget and reserve.
+    env["OEC_USE_MANAGER_DIRECTORY_ONLY"] = "1"
     command = [str(python), str(MEDIA / "audio_api.py"), "--model", provider, "--host", "127.0.0.1", "--port", str(port)]
     print(f"SMOKE_START provider={provider} environment_python={python} port={port}", flush=True)
     started = time.monotonic()

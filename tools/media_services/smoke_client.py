@@ -23,6 +23,7 @@ if str(ROOT) not in __import__("sys").path:
 
 from core_config import SYSTEM_DIRS  # noqa: E402
 from storage_manager import managed_storage_operation  # noqa: E402
+from common import require_fresh_quota  # noqa: E402
 
 PORTS = {"ace-step": 7870, "kokoro": 7871, "whisper": 7872, "qwen3-asr": 7873}
 
@@ -157,7 +158,7 @@ def main() -> int:
     outputs = Path(SYSTEM_DIRS["outputs"]).expanduser().resolve() / "media_services" / "smoke"
     filename = f"{args.provider}-{time.strftime('%Y%m%d-%H%M%S')}-{job_id}{extension}"
     target = outputs / filename
-    with managed_storage_operation("outputs", required_gb=0.02, require_fresh_quota=True, minimum_free_gb=0.05):
+    with managed_storage_operation("outputs", required_gb=0.02, require_fresh_quota=require_fresh_quota(), minimum_free_gb=0.05):
         target.parent.mkdir(parents=True, exist_ok=True)
         if target.is_symlink():
             raise RuntimeError("refusing to overwrite a symbolic-link artifact path")

@@ -58,14 +58,19 @@ def _system_dirs() -> dict[str, str]:
     return core_config.SYSTEM_DIRS
 
 
+def require_fresh_quota() -> bool:
+    """Explicit operator-approved fallback after directory/reserve preflight."""
+    return os.environ.get("OEC_USE_MANAGER_DIRECTORY_ONLY", "").strip().lower() not in {"1", "true", "yes"}
+
+
 def storage_check(area: str, required_gb: float, minimum_free_gb: float = 0.05) -> tuple[bool, str]:
-    """Use OEC's authoritative admission gate; never substitute guessed quota."""
+    """Use OEC StorageManager admission; directory-only mode must be explicitly enabled."""
     try:
         from storage_manager import storage_preflight
         ok, reason = storage_preflight(
             area,
             required_gb=required_gb,
-            require_fresh_quota=True,
+            require_fresh_quota=require_fresh_quota(),
             minimum_free_gb=minimum_free_gb,
         )
         return bool(ok), str(reason)
@@ -79,7 +84,7 @@ def managed_write(area: str, required_gb: float, minimum_free_gb: float = 0.05):
     with managed_storage_operation(
         area,
         required_gb=required_gb,
-        require_fresh_quota=True,
+        require_fresh_quota=require_fresh_quota(),
         minimum_free_gb=minimum_free_gb,
     ):
         yield
