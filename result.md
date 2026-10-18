@@ -6,6 +6,8 @@ Added isolated service adapters for ACE-Step 1.5 music generation, Kokoro-82M TT
 
 Local checks on the working source: Python compilation passed; 17/17 CPU/mock tests passed. The tests cover request bounds, voice selection, transcription options, audio container/base64 handling, job upload lifecycle, cache-root confinement and locks. These tests do not load a real model or assess generated music, voice quality, language accuracy, VRAM or latency. The connected feature branch files were read/written through the GitHub integration; a fresh checkout was not run here.
 
+The final source pass added a cache-only readiness check for ACE-Step: the selected DiT, VAE and 5Hz LM folders must each contain nonempty weight files, so a metadata-only or partially populated directory is not treated as cached and ready. ACE-Step defaults to the documented 0.6B LM option. The outputs-storage gate covers actual TRELLIS GLB, LTX MP4/metadata, ACE-Step audio, Kokoro WAV and transcript writes; this is source-level evidence only, not a live StorageManager test.
+
 Operator-supplied quota_check baseline on 2026-10-18: 2.14 TB project occupancy, 2.15 TB soft limit, 2.25 TB hard limit; 1836 GitHub Actions minutes reported used. The assistant did not start StorageManager or obtain a live A100 reading.
 
 No StorageManager daemon, model download, environment install, GPU inference, purge, reserve-file access, or GitHub Actions run was performed by this source implementation. Model-specific purge is still unapproved until first-output, post-purge resident inference and independent clean-restart/reload acceptance all pass. The original 15-day project duration is not recomputed here.
