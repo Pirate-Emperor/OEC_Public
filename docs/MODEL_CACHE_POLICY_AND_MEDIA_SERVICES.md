@@ -99,3 +99,15 @@ No purge runs automatically. The cache manager never reads, removes, shrinks or 
 Disk-purge safety does not prove model reload works. Before declaring a model purge-safe, record its original size; produce and reopen a first artifact; delete only that model-owned folder; test a second artifact using the resident pipeline; then separately stop/restart and verify clean reload. Record latency, VRAM, bytes reclaimed and any lazy cache reads. The current code does not automatically unload idle models; stop the corresponding sidecar to release its runtime lock and model references.
 
 No Conda environment was installed, no model weight downloaded, no GPU run, no storage daemon was started, no cache purged and no GitHub Actions workflow was triggered as part of this source/CPU-test work.
+
+
+### Official model references and release checks
+
+- ACE-Step 1.5: https://github.com/ace-step/ACE-Step-1.5 — the adapter defaults to the documented lighter 0.6B language model as a resource-conscious starting point; check the exact checkpoint and dependencies at download time.
+- Kokoro-82M: https://huggingface.co/hexgrad/Kokoro-82M and https://github.com/hexgrad/kokoro — weights are listed as Apache-2.0. Check phonemizer and audio-stack dependencies, including espeak-ng if used, before packaging.
+- Whisper: https://github.com/openai/whisper — the official repository says code and weights use MIT. Compare size-specific latency and VRAM before selecting the deployment default.
+- Qwen3-ASR: https://github.com/QwenLM/Qwen3-ASR — the official repository is Apache-2.0 and documents multilingual recognition; verify the exact 0.6B checkpoint card and installed dependency licences.
+
+The official ACE-Step inference guide documents the handler/generation API used here and demonstrates the 0.6B LM option. The source integration has not loaded these packages in the target Conda environments, so all upstream call compatibility remains subject to live acceptance.
+
+Storage admission is held across actual output writes for TRELLIS GLB, LTX MP4/metadata, ACE-Step music and Kokoro WAV. Whisper/Qwen transcript writes are also managed. A check before folder creation is not a substitute for gating the write itself.
