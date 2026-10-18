@@ -123,7 +123,6 @@ def main() -> int:
             "gpu_peak_allocated_gib": round(torch.cuda.max_memory_allocated() / (1024 ** 3), 3),
             "gpu_peak_reserved_gib": round(torch.cuda.max_memory_reserved() / (1024 ** 3), 3),
             "shared_outputs_written": False,
-            "shared_outputs_written": False,
         })
         print("AUDIOGEN_LIVE_ACCEPTANCE " + json.dumps(report, ensure_ascii=False), flush=True)
         return 0
