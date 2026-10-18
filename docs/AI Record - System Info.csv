@@ -1,0 +1,7 @@
+Category,Concept,Name,Description
+System Paradigm,Multi-Mode Creation,Mode A: Director Mode,Sequential phase generation with developer-in-the-loop review.
+System Paradigm,Multi-Mode Creation,Mode B: Streaming Mode,Runtime generation reacting to player kinematics dynamically.
+System Paradigm,Multi-Mode Creation,Mode C: One-Click Generator,Autonomous Slurm dependency chaining for full world generation.
+System Paradigm,Architecture Integration,Way 1: Standard AI Agents,Modular integration utilizing isolated models and a simple rule-based integrator.
+System Paradigm,Architecture Integration,Way 2: Advanced Agentic AI,Advanced LLM router identifying and orchestrating sub-model APIs dynamically.
+System Paradigm,Architecture Integration,Way 3: Unified Omni-Architecture,"Single-pass synthesis outputting interleaved multimodal tokens (3D, logic, logic)."
