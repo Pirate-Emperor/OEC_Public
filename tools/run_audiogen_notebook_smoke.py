@@ -15,6 +15,8 @@ from typing import Any
 from IPython.core.interactiveshell import InteractiveShell
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 NOTEBOOK = ROOT / "pipeline_audiocraft.ipynb"
 
 
