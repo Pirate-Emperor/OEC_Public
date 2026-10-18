@@ -42,3 +42,14 @@ The local suite validates the prototype API/job boundaries only. It does not pro
 4. Authorize model cache purge individually only after a repeat inference succeeds after deleting that exact model-cache directory, and record disk/VRAM/latency effects.
 5. Establish the original project start/deadline from an authoritative project record; it was not recoverable during this pass.
 
+
+## Follow-up — additional audio models, managed cache and purge controls
+
+- Added isolated capability adapters for ACE-Step 1.5 music generation, Kokoro-82M English TTS, Whisper transcription and Qwen3-ASR 0.6B multilingual transcription. Proposed loopback ports are 7870–7873. They do not import model stacks into the Waypoint/OEC-Play process.
+- Added configured model-cache roots and a runtime lock per model. The companion \`tools/model_cache_manager.py status\` reports exact targets and disk size; \`purge MODEL --confirm\` refuses active or ambiguous locks and calls OEC \`DiskPurgeManager\` on only that model-owned subdirectory.
+- Checkpoints stay under \`SYSTEM_DIRS["models"]\`/configured \`AIEROS_MODELS_DIR\`. Whisper's \`download_root\` and ACE-Step's \`ACESTEP_CHECKPOINTS_DIR\` are explicit; the HF cache uses the OEC-configured \`HF_HOME\`. Downloads are cache-only by default; deliberate download mode is wrapped in StorageManager admission.
+- Fixed sidecar persistent state and temporary job inputs to use the configured \`outputs\` target. The current storage configuration defines \`models\` and \`outputs\`, not separate \`cache\` and \`inputs\` target areas. Runtime locks also live under the managed outputs directory. The reserve file is not opened or modified.
+- Operator-supplied fresh quota reading for 2026-10-18: 2.14 TB occupancy, 2.15 TB soft limit, 2.25 TB hard limit; reported Actions usage 1836 minutes. This source work did not start StorageManager; the operator runs it on A100.
+- Local tests: Python compilation passed and 16/16 CPU/mock tests passed, including model prompt/voice/transcription constraints, cache-root confinement, runtime lock behavior and audio-upload job lifecycle.
+- Not run: model downloads, dependency installs, live StorageManager reading, GPU inference, generated music/voice/transcription artifact evaluation, purge/reload trial, or Actions workflows. Branch files were updated through the connected GitHub integration, but the remote branch was not independently checked out and run in this session.
+- Next acceptance: the operator reviews pre-existing isolated Conda environments; checks cache inventory with the active StorageManager; selects one model at a time for a real smoke test; then runs separate resident-pipeline post-purge and clean restart/reload checks before approving that model's purge policy. Do not describe deterministic task routing as a trained MoE.
