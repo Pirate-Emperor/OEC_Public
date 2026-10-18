@@ -142,3 +142,23 @@ conda run -n phase1 python "$HOME/OEC/tools/media_services/audio_api.py" --model
 This example is valid only if env-audit confirms Kokoro, Torch and audio dependencies in phase1. For ACE-Step, use a Python 3.11/3.12 environment that has the official ACE-Step runtime. No environment name beyond phase1, phase1_ltx and phase2_3d is assumed to exist.
 
 The previous source tests were CPU/mock tests only. A model is not considered used successfully until a live health check returns ready, an artifact is generated, and the returned audio/video/transcript is validated. Purge remains disabled by default until a resident second inference succeeds after exact-cache deletion and a separate restart/reload test passes.
+
+
+### Live inference smoke acceptance
+
+After starting one service in its confirmed pre-existing runtime, validate it through the loopback client. The client checks health/readiness, submits a real request, polls until success/failure, fetches the artifact, validates WAV/FLAC/text output, and retains the accepted artifact under StorageManager-managed outputs.
+
+\`\`\`bash
+# TTS first
+python tools/media_services/smoke_client.py --provider kokoro
+
+# Feed its saved WAV to a speech recognizer
+python tools/media_services/smoke_client.py --provider whisper --audio-file /path/reported/by/the/first/acceptance.wav
+# Or test multilingual recognition in its separately running process
+python tools/media_services/smoke_client.py --provider qwen3-asr --audio-file /path/to/test.wav
+
+# Music generation
+python tools/media_services/smoke_client.py --provider ace-step --prompt "Warm ambient fantasy forest music with soft strings and flute" --duration-seconds 10
+\`\`\`
+
+Replace the placeholder audio path with the actual path printed by the first acceptance report. Do not start multiple large services on the same GPU concurrently unless nvidia-smi confirms resource headroom and the allocation is approved. A smoke report is live artifact evidence, not a quality benchmark. Record latency, peak VRAM, checkpoint revision and a human/decoder review before calling a model production-ready.
