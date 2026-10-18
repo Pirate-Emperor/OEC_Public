@@ -101,6 +101,30 @@ class RuntimeLock:
         except (OSError, json.JSONDecodeError): pass
         self.owned = False
 
+def hf_cache_has_weights(model_key: str) -> bool:
+    """Verify a Hugging Face repo cache has a real nonempty weight behind a snapshot entry."""
+    if model_key not in model_targets():
+        raise ValueError("unknown Hugging Face model cache key")
+    repo_root = model_targets()[model_key][0]
+    if repo_root.is_symlink() or not repo_root.is_dir():
+        return False
+    snapshots = repo_root / "snapshots"
+    if not snapshots.is_dir() or snapshots.is_symlink():
+        return False
+    weight_suffixes = {".safetensors", ".bin", ".pt", ".pth"}
+    for candidate in snapshots.rglob("*"):
+        if not candidate.is_file() or candidate.suffix.lower() not in weight_suffixes:
+            continue
+        try:
+            resolved = candidate.resolve(strict=True)
+            if repo_root.resolve() not in resolved.parents or not resolved.is_file() or resolved.stat().st_size <= 0:
+                continue
+            return True
+        except OSError:
+            continue
+    return False
+
+
 def cache_status() -> list[dict[str, Any]]:
     rows = []
     for key, paths in model_targets().items():
