@@ -50,7 +50,7 @@ The local suite validates the prototype API/job boundaries only. It does not pro
 - Checkpoints stay under `SYSTEM_DIRS["models"]`/configured `AIEROS_MODELS_DIR`. Whisper's `download_root` and ACE-Step's `ACESTEP_CHECKPOINTS_DIR` are explicit; the HF cache uses the OEC-configured `HF_HOME`. Downloads are cache-only by default; deliberate download mode is wrapped in StorageManager admission.
 - Fixed sidecar persistent state and temporary job inputs to use the configured `outputs` target. The current storage configuration defines `models` and `outputs`, not separate `cache` and `inputs` target areas. Runtime locks also live under the managed outputs directory. The reserve file is not opened or modified.
 - Operator-supplied fresh quota reading for 2026-10-18: 2.14 TB occupancy, 2.15 TB soft limit, 2.25 TB hard limit; reported Actions usage 1836 minutes. This source work did not start StorageManager; the operator runs it on A100.
-- Local tests: Python compilation passed and 16/16 CPU/mock tests passed, including model prompt/voice/transcription constraints, cache-root confinement, runtime lock behavior and audio-upload job lifecycle.
+- Local tests: Python compilation passed and 17/17 CPU/mock tests passed, including model prompt/voice/transcription constraints, cache-root confinement, runtime lock behavior and audio-upload job lifecycle.
 - Not run: model downloads, dependency installs, live StorageManager reading, GPU inference, generated music/voice/transcription artifact evaluation, purge/reload trial, or Actions workflows. Branch files were updated through the connected GitHub integration, but the remote branch was not independently checked out and run in this session.
 - Next acceptance: the operator reviews pre-existing isolated Conda environments; checks cache inventory with the active StorageManager; selects one model at a time for a real smoke test; then runs separate resident-pipeline post-purge and clean restart/reload checks before approving that model's purge policy. Do not describe deterministic task routing as a trained MoE.
 
@@ -58,3 +58,5 @@ The local suite validates the prototype API/job boundaries only. It does not pro
 - ACE-Step defaults to the lighter 0.6B language-model checkpoint as a resource-conscious first test. This is a source default, not evidence of model fit or quality on the target device.
 - Added official upstream links and dependency/checkpoint licensing review requirements for ACE-Step, Kokoro, Whisper and Qwen3-ASR.
 - Final source review confirms the managed outputs gate covers actual TRELLIS GLB, LTX MP4/metadata and ACE-Step music generation. ACE-Step defaults to the official 0.6B LM option for the first resource-conscious smoke test; no inference has been run.
+
+- Added a cache-only ACE-Step readiness guard requiring weight files for the selected DiT, VAE and LM folders; a metadata-only folder is not treated as a complete local model cache. Regression coverage added for this check.
