@@ -70,5 +70,17 @@ class AudioCraftNotebookTests(unittest.TestCase):
         self.assertIn("outputs=[output_audio, output_file]", model_cell)
 
 
+    def test_headless_smoke_is_explicit_and_default_output_stays_managed(self):
+        setup = self.sources[1]
+        model_cell = self.sources[4]
+        self.assertIn("OEC_AUDIOGEN_HEADLESS_SMOKE", setup)
+        self.assertIn("OEC_AUDIOGEN_OUTPUT_DIR", setup)
+        self.assertIn("if HEADLESS_SMOKE:", model_cell)
+        self.assertIn("AUDIOGEN_NOTEBOOK_SMOKE=PASS", model_cell)
+        self.assertIn("storage_preflight(", model_cell)
+        self.assertIn("managed_storage_operation(", model_cell)
+        self.assertIn("demo.launch(", model_cell)
+
+
 if __name__ == "__main__":
     unittest.main()
