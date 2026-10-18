@@ -28,13 +28,18 @@ PORTS = {"ace-step": 7870, "kokoro": 7871, "whisper": 7872, "qwen3-asr": 7873}
 
 
 def _request(url: str, payload: dict | None = None, timeout: float = 30.0):
+    parsed = urlsplit(url)
+    if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+        raise ValueError("the smoke client only makes HTTP requests to loopback media services")
+    # core_config sets cluster proxies globally; never route a loopback API request through them.
+    local_http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     data = None if payload is None else json.dumps(payload).encode("utf-8")
     headers = {"Accept": "application/json"}
     if data is not None:
         headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=data, headers=headers)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with local_http.open(request, timeout=timeout) as response:
             return response.status, response.headers, response.read()
     except urllib.error.HTTPError as exc:
         body = exc.read()
