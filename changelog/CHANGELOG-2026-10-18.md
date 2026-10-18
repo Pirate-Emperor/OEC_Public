@@ -12,7 +12,7 @@ Audit load/purge safety and make progress toward OEC-Play media-service integrat
 
 ## Implementation
 - Created feature branch feat/media-service-sidecars-20261018 and updated worker_ltx_video.py to support allow_download=False for cache-only service startup and preserve_cuda_visible_devices=True for respecting the scheduler's visibility mask. Existing worker defaults remain unchanged.
-- Prepared a local prototype archive with tools/media_services/common.py, trellis_api.py, ltx_api.py, API fixture tests, and a cache/model selection note. The adapter source bundle is available for download in the associated project chat; its source files have not yet been committed to the repository.
+- Prepared a local prototype archive with tools/media_services/common.py, trellis_api.py, ltx_api.py, API fixture tests, and a cache/model selection note. The adapter source bundle is available for download in the associated project chat. The files were subsequently committed to this isolated feature branch; see the follow-up source-integration section below.
 - The sidecar design uses loopback-only HTTP, bounded job queues, opaque IDs, safe image validation, OEC quota-aware input/output/state writes, job persistence, run-scoped temporary input cleanup, bounded result retention, GLB geometry validation and MP4 container/ffprobe checks.
 - No remote FLUX sidecar was added. OEC-Play's built-in World Creator prompt route remains the FLUX interactive seed path.
 - Candidate triage favors ACE-Step 1.5 for music, Kokoro-82M for lightweight English speech, SenseVoice/Whisper for speech input, and Hunyuan3D-2.1 as a later TRELLIS comparison. MusicGen/AudioGen remain research-only pending acceptance of their CC-BY-NC weight licensing for the intended product.
