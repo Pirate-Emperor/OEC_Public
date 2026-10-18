@@ -1,5 +1,17 @@
 # OEC Active TODO
 
+## 2026-10-18 — Audio model services and explicit cache purge
+
+- [x] Added separate cache-first audio provider service for ACE-Step 1.5 (music), Kokoro-82M (English TTS), Whisper (transcription), and Qwen3-ASR 0.6B (multilingual transcription). Proposed loopback ports: 7870-7873.
+- [x] Added model-specific cache target inventory and runtime locks. The purge command targets only the chosen model's exact subdirectory under configured AIEROS_MODELS_DIR and calls OEC DiskPurgeManager; it refuses unsafe paths and active/ambiguous runtime locks.
+- [x] Aligned all media service state and temporary job inputs with StorageManager's configured outputs target. Only weights/checkpoints are placed under the configured models target; this avoids unconfigured cache/inputs admission areas.
+- [x] Added bounded audio upload validation and CPU/mock tests. Local result: py_compile PASS; unittest suite 16 passed, 0 failed, 0 errors.
+- [x] Recorded operator-supplied quota baseline: 2.14 TB occupancy / 2.15 TB soft / 2.25 TB hard; reported Actions usage 1836 minutes. No workflow was triggered, and no StorageManager daemon was started by the assistant.
+- [ ] Operator to inspect cache status with the already-running StorageManager and verify that the intended isolated environments exist before starting a service. Proposed environment names are examples only; no package install or env provisioning occurred.
+- [ ] After live model loading and one valid artifact per model are confirmed, measure runtime/VRAM and evaluate music/TTS/transcription quality. Test exact-cache purge with resident inference and then separate clean restart/reload before enabling any purge policy.
+- [ ] Live GPU inference, model download, dependency installation, shared-cache purge, direct A100 StorageManager check, and fresh checkout execution have not been run.
+
+
 ## 2026-10-18 — TRELLIS/LTX media sidecars and model-cache policy
 
 - [x] Audited current model/cache code and the OEC-Deploy media-service contract. Confirmed the disk purger deletes Hugging Face cache folders; it does not unload model tensors from VRAM. TRELLIS and FLUX retain cache by current policy. The established multi-node LTX launch uses `--no-purge`; leave production policy unchanged until post-purge repeated-inference checks pass.
