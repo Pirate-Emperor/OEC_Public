@@ -85,6 +85,13 @@ jobs:
           echo "Python: $selected"
           nvidia-smi
 
+      - name: Compile and run CPU/mock regressions before storage changes
+        run: |
+          set -euo pipefail
+          "$OEC_PYTHON" -m py_compile tools/prepare_media_models.py tools/run_media_model_smokes.py tools/media_services/common.py tools/media_services/model_cache.py tools/media_services/audio_api.py tools/media_services/smoke_client.py tools/model_cache_manager.py tests/test_media_service_api.py tests/test_audio_service_validation.py
+          "$OEC_PYTHON" -m unittest discover -s tests -p 'test_media_service_api.py' -v
+          "$OEC_PYTHON" -m unittest discover -s tests -p 'test_audio_service_validation.py' -v
+
       - name: Read current StorageManager status, log tail and cached models
         run: |
           set -euo pipefail
@@ -100,15 +107,15 @@ jobs:
           # still gates every actual checkpoint write.
           exit 0
 
-      - name: Aggregate fresh admission preflight
+      - name: Aggregate models-target plus positive-reserve preflight
         run: |
           set -euo pipefail
-          "$OEC_PYTHON" tools/prepare_media_models.py plan --preflight
+          "$OEC_PYTHON" tools/prepare_media_models.py plan --preflight --use-manager-directory-only --reserve-floor-gb 40
 
       - name: Download checkpoint groups sequentially under managed storage
         run: |
           set -euo pipefail
-          "$OEC_PYTHON" tools/prepare_media_models.py download --model all
+          "$OEC_PYTHON" tools/prepare_media_models.py download --model all --use-manager-directory-only --reserve-floor-gb 40
 
       - name: Recheck model cache after downloads
         if: always()
