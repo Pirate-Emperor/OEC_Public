@@ -111,3 +111,34 @@ No Conda environment was installed, no model weight downloaded, no GPU run, no s
 The official ACE-Step inference guide documents the handler/generation API used here and demonstrates the 0.6B LM option. The source integration has not loaded these packages in the target Conda environments, so all upstream call compatibility remains subject to live acceptance.
 
 Storage admission is held across actual output writes for TRELLIS GLB, LTX MP4/metadata, ACE-Step music and Kokoro WAV. Whisper/Qwen transcript writes are also managed. A check before folder creation is not a substitute for gating the write itself.
+
+
+## Read StorageManager status and prepare the first model downloads
+
+Run these commands on A100 inside the OEC checkout, with the user-managed StorageManager daemon already running. The status subcommand invokes only storage_manager.py --status, displays recent manager-log lines and inventories exact model cache folders. The env-audit subcommand checks existing phase1, phase1_ltx and phase2_3d environments without installing anything.
+
+\`\`\`bash
+cd "$HOME/OEC"
+python tools/prepare_media_models.py status
+python tools/prepare_media_models.py env-audit
+python tools/prepare_media_models.py plan --preflight
+\`\`\`
+
+The downloader is explicit and cache-first. It downloads one model at a time into the configured model directory using live StorageManager preflight and managed_storage_operation; it never launches the daemon or touches the reserve file directly. The aggregate estimate is 21 GB for all five checkpoint groups, with a 2 GB additional free-space margin; each individual transfer rechecks fresh admission under the managed lock. The latest user-supplied model-directory reading was 209 GB used of a 280 GB target (about 71 GB nominal remaining), with a 40 GB positive reserve managed by the operator. These figures were not directly measured by this session. If the aggregate preflight passes, the intended initial batch is:
+
+\`\`\`bash
+python tools/prepare_media_models.py download --model all
+python tools/model_cache_manager.py status
+\`\`\`
+
+The batch includes Kokoro-82M, Whisper turbo, Qwen3-ASR-0.6B, ACE-Step 1.5's DiT/VAE/text encoder, and the separate ACE-Step 0.6B LM. The ACE-Step downloader omits the unused bundled 1.7B LM to avoid duplicate weights. The script validates Hugging Face snapshot weight links and verifies Whisper's official checkpoint hash. On an admission, network or download-tool failure it stops instead of beginning the remaining downloads; rerun after resolving the named failure. It does not install Python packages or create Conda environments.
+
+After downloading, run the environment audit. Start a service only in an existing environment that the audit shows has the required runtime packages; do not put all CUDA model stacks into one environment. For example, Kokoro's service is:
+
+\`\`\`bash
+conda run -n phase1 python "$HOME/OEC/tools/media_services/audio_api.py" --model kokoro --host 127.0.0.1 --port 7871
+\`\`\`
+
+This example is valid only if env-audit confirms Kokoro, Torch and audio dependencies in phase1. For ACE-Step, use a Python 3.11/3.12 environment that has the official ACE-Step runtime. No environment name beyond phase1, phase1_ltx and phase2_3d is assumed to exist.
+
+The previous source tests were CPU/mock tests only. A model is not considered used successfully until a live health check returns ready, an artifact is generated, and the returned audio/video/transcript is validated. Purge remains disabled by default until a resident second inference succeeds after exact-cache deletion and a separate restart/reload test passes.
