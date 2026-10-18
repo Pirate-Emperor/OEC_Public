@@ -41,12 +41,13 @@ def main() -> int:
         "test": "OEC AudioGen notebook live smoke",
         "notebook": str(NOTEBOOK),
         "started_unix": time.time(),
+        "started_monotonic": time.monotonic(),
         "runner_name": os.environ.get("RUNNER_NAME"),
         "hostname": __import__("socket").gethostname(),
         "output_root": str(output_root),
         "mode": "headless; output is run-scoped runner temp",
         "status": "FAIL",
-        "model_weights_downloaded_by_harness": False,
+        "model_download_path": "notebook-managed StorageManager admission; no bypass in this harness",
     }
     try:
         import torch
@@ -122,7 +123,7 @@ def main() -> int:
             "gpu_peak_allocated_gib": round(torch.cuda.max_memory_allocated() / (1024 ** 3), 3),
             "gpu_peak_reserved_gib": round(torch.cuda.max_memory_reserved() / (1024 ** 3), 3),
             "shared_outputs_written": False,
-            "persistent_model_download_performed": False,
+            "shared_outputs_written": False,
         })
         print("AUDIOGEN_LIVE_ACCEPTANCE " + json.dumps(report, ensure_ascii=False), flush=True)
         return 0
@@ -130,7 +131,7 @@ def main() -> int:
         report["error_type"] = type(exc).__name__
         report["error"] = str(exc)
         report["traceback"] = traceback.format_exc()
-        report["elapsed_seconds"] = round(time.monotonic() - report.get("started_monotonic", time.monotonic()), 3)
+        report["elapsed_seconds"] = round(time.monotonic() - report["started_monotonic"], 3)
         print("AUDIOGEN_LIVE_ACCEPTANCE " + json.dumps(report, ensure_ascii=False), flush=True)
         traceback.print_exc()
         return 1
