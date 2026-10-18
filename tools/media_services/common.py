@@ -552,7 +552,7 @@ class MediaJobService:
                 self.loading = False
                 self.ready = False
                 self.fatal_error = f"{type(exc).__name__}: model runtime could not be loaded"
-            LOG.error("%s runtime load failed (%s)", self.provider.name, type(exc).__name__)
+            LOG.exception("%s runtime load failed (%s); traceback follows", self.provider.name, type(exc).__name__)
 
         while True:
             job_id = self.queue.get()
