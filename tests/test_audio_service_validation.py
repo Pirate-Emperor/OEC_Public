@@ -39,7 +39,6 @@ class AudioValidationTests(unittest.TestCase):
             self.assertTrue(audio_api._has_model_weights(checkpoint))
 
     def test_manager_directory_fallback_requires_explicit_opt_in(self):
-    def test_manager_directory_fallback_requires_explicit_opt_in(self):
         with mock.patch.dict(os.environ, {"OEC_USE_MANAGER_DIRECTORY_ONLY": "1"}):
             self.assertFalse(common.require_fresh_quota())
         with mock.patch.dict(os.environ, {"OEC_USE_MANAGER_DIRECTORY_ONLY": "0"}):

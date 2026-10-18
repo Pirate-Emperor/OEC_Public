@@ -7,7 +7,9 @@ import time
 from pathlib import Path
 from typing import Any
 from core_config import SYSTEM_DIRS
-from common import require_fresh_quota
+def _require_fresh_quota() -> bool:
+    return os.environ.get("OEC_USE_MANAGER_DIRECTORY_ONLY", "").strip().lower() not in {"1", "true", "yes"}
+
 
 MODELS_ROOT = Path(SYSTEM_DIRS["models"]).expanduser().resolve()
 LOCK_ROOT = Path(SYSTEM_DIRS["outputs"]).expanduser().resolve() / "media_services" / ".runtime_locks"
@@ -74,7 +76,7 @@ class RuntimeLock:
 
     def acquire(self) -> None:
         from storage_manager import managed_storage_operation
-        with managed_storage_operation("outputs", required_gb=0.001, require_fresh_quota=require_fresh_quota(), minimum_free_gb=0.01):
+        with managed_storage_operation("outputs", required_gb=0.001, require_fresh_quota=_require_fresh_quota(), minimum_free_gb=0.01):
             LOCK_ROOT.mkdir(parents=True, exist_ok=True)
             existing = read_lock(self.model_key)
             if existing and existing.get("state") == "stale" and existing.get("host") == socket.gethostname():
