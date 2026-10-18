@@ -234,6 +234,23 @@ class MediaServiceApiTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 common.validate_mp4(bad)
 
+    def test_ltx_runtime_checks_only_configured_storage_target(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "tools" / "media_services" / "ltx_api.py").read_text(encoding="utf-8")
+        start = source.index("    def load_runtime(self) -> None:")
+        end = source.index("    def run_job(", start)
+        loader = source[start:end]
+        self.assertIn('storage_check("outputs"', loader)
+        self.assertIn('managed_write("outputs"', loader)
+        self.assertNotIn('storage_check("inputs"', loader)
+        self.assertNotIn('storage_check("cache"', loader)
+        self.assertNotIn('for area in ("inputs", "outputs", "cache")', loader)
+
+    def test_runtime_loader_logs_private_traceback_on_failure(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "tools" / "media_services" / "common.py").read_text(encoding="utf-8")
+        self.assertIn('LOG.exception("%s runtime load failed (%s); traceback follows"', source)
+
     def test_http_routes_return_health_status_and_not_found(self):
         service = self.new_service()
         server = common.ReusableThreadingHTTPServer(("127.0.0.1", 0), common.build_handler(service))
