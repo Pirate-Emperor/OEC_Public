@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-18T09:13:29.556Z",
+  "last_updated": "2026-10-18T09:46:37.358Z",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Isolated cache-first audio adapters were added for ACE-Step 1.5, Kokoro-82M, Whisper and Qwen3-ASR 0.6B, plus per-model cache status/purge safeguards. Local py_compile passed and 17/17 CPU/mock tests passed. The ACE-Step cache-only gate now requires weight files for DiT, VAE and LM. Managed output gates wrap actual artifact writes in source. No weights downloaded, dependencies installed, GPU inference run, cache purged, or StorageManager daemon started by the assistant; no Actions triggered. Live model API compatibility, artifacts, quality, latency, VRAM and purge/reload remain unverified. Operator-supplied quota_check: 2.14 TB occupancy; 2.15 TB soft; 2.25 TB hard; 1836 Actions minutes reported used.",
+  "latest_summary": "OEC feature branch includes guarded model download/status tools and live inference acceptance client, plus isolated ACE-Step, Kokoro, Whisper, Qwen3-ASR, TRELLIS and LTX services. Local compile passed; 19/19 CPU/mock tests passed. The downloader and smoke client were compiled only, not run on A100. The assistant could not read the current storage manager log directly because there is no SSH/remote-shell connector or A100 mount in this session. Latest user-provided model directory reading: 209 GB of 280 GB used, about 71 GB nominal free; 40 GB reserve is managed by the user-run daemon. No actual model downloads, dependency installation, GPU inference, cache purge or GitHub Actions were started.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -2791,7 +2791,7 @@
       "reason": "Confirm request validation, audio payload handling, configured model-root confinement, per-model runtime locking and managed output paths before any live model or download.",
       "parameters": {
         "commands": [
-          "python -m py_compile tools/media_services/common.py tools/media_services/model_cache.py tools/media_services/audio_api.py tools/media_services/trellis_api.py tools/media_services/ltx_api.py tools/model_cache_manager.py tests/test_media_service_api.py tests/test_audio_service_validation.py",
+          "python -m py_compile tools/prepare_media_models.py tools/media_services/smoke_client.py tools/media_services/common.py tools/media_services/model_cache.py tools/media_services/audio_api.py tools/media_services/trellis_api.py tools/media_services/ltx_api.py tools/model_cache_manager.py tests/test_media_service_api.py tests/test_audio_service_validation.py",
           "python -m unittest discover -s tests -v"
         ],
         "compute": "Local CPU only; fake provider and unit-level fixtures",
@@ -2820,10 +2820,10 @@
       },
       "results": {
         "compile": "PASS",
-        "tests_passed": 17,
+        "tests_passed": 19,
         "tests_failed": 0,
         "tests_errored": 0,
-        "duration_seconds": 0.65,
+        "duration_seconds": 0.155,
         "live_model_loading": "NOT_RUN",
         "generated_audio_or_transcript_artifact": "NOT_RUN",
         "direct_storage_manager_status": "NOT_RUN",
@@ -2831,14 +2831,26 @@
         "cache_purge_and_reload": "NOT_RUN",
         "output_write_admission": "Managed outputs operation wraps actual TRELLIS GLB, LTX MP4/metadata, ACE-Step music, Kokoro WAV and transcript writes; source-level only, not a live A100 verification.",
         "ace_step_default_lm": "acestep-5Hz-lm-0.6B (documented option, not loaded in this experiment)",
-        "ace_step_cache_guard": "PASS (unit-level check: metadata-only folder rejected; nonempty .safetensors accepted)"
+        "ace_step_cache_guard": "PASS (unit-level check: metadata-only folder rejected; nonempty .safetensors accepted)",
+        "live_storage_manager_status": "NOT_RUN_HERE: this execution environment has no A100 shell/SSH connector and no /nlsasfs or ~/OEC mount",
+        "storage_manager_log_tail": "NOT_READ_DIRECTLY by the assistant; helper is available for A100 use",
+        "user_reported_model_directory": {
+          "occupied_gb": 209,
+          "target_gb": 280,
+          "nominal_free_gb": 71,
+          "reserve_gb": 40,
+          "source": "user-provided message on 2026-10-18; not independently measured by this test"
+        },
+        "downloader_helper": "compiled only; no actual model downloads executed from this session",
+        "smoke_client": "compiled only; no live model API or GPU artifact test executed",
+        "hf_cache_symlink_guard": "PASS: internal cache snapshot symlink to repo blob accepted; external symlink rejected"
       },
-      "interpretation": "Local compile passed and 17 CPU/mock tests passed. Tests cover request validation, audio upload lifecycle, cache path selection, runtime lock behavior and ACE-Step cache completeness. The service source uses managed outputs operations around artifact generation/writes. These source and CPU tests do not prove a real model loads, the installed package APIs match, output quality, VRAM/latency or purge/reload safety.",
+      "interpretation": "Local bundle py_compile passed and 19 CPU/mock tests passed. Tests cover request validation, job lifecycle, cache path selection, runtime-lock behavior, ACE-Step cache completeness and in-repository Hugging Face snapshot symlinks. The downloader and live smoke client compile but were not executed against A100. No actual storage log was read by the assistant, no model loaded, no weights downloaded, and no output-quality, VRAM, latency or purge/reload claim is made.",
       "next_steps": [
-        "Inspect intended pre-existing isolated Conda environments and cached model files.",
-        "Use the already-running StorageManager to confirm current admission before any model write or service start.",
-        "Run one authorized smoke test per model and record artefact, model revision, latency, peak VRAM and output validation.",
-        "Test exact-folder cache purge only after stopping the service; verify resident inference after purge and then a separate restart/reload before approving that model's purge policy."
+        "On A100, run python tools/prepare_media_models.py status and env-audit to get direct current status/log and inspect existing isolated runtime packages; no daemon is started by these commands.",
+        "Run python tools/prepare_media_models.py plan --preflight. Only if aggregate live admission passes, run python tools/prepare_media_models.py download --model all; each model transfer rechecks fresh admission under the managed write lock.",
+        "Use the environment audit to select existing runtimes, then run one live smoke test per model with tools/media_services/smoke_client.py and retain the output acceptance report.",
+        "Only test exact model-folder purge after first inference; require resident second inference and separate clean restart/reload before approving purge."
       ]
     }
   ]
