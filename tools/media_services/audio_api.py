@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path: sys.path.insert(0, str(ROOT))
 from core_config import SYSTEM_DIRS
 from common import MediaProvider, ModelNotReady, RequestError, managed_write, safe_child, serve, storage_check
-from model_cache import MODELS_ROOT, RuntimeLock, model_targets
+from model_cache import MODELS_ROOT, RuntimeLock, hf_cache_has_weights, model_targets
 
 LOG = logging.getLogger("oec.media_service.audio")
 VOICES = {"af_heart", "af_bella", "af_sarah", "af_nicole", "af_sky", "am_adam", "am_michael",
@@ -134,7 +134,8 @@ class AudioProvider(MediaProvider):
         from acestep.inference import GenerationParams, GenerationConfig, generate_music
         checkpoint_root = MODELS_ROOT / "ace-step-1.5"
         if not self.allow_download:
-            required = (checkpoint_root / self.ace_config, checkpoint_root / "vae", checkpoint_root / self.ace_lm)
+            required = (checkpoint_root / self.ace_config, checkpoint_root / "vae",
+                        checkpoint_root / "Qwen3-Embedding-0.6B", checkpoint_root / self.ace_lm)
             missing = [path.name for path in required if not _has_model_weights(path)]
             if missing:
                 raise ModelNotReady(
@@ -142,15 +143,24 @@ class AudioProvider(MediaProvider):
                     f"{checkpoint_root}; missing weight folders: {', '.join(missing)}"
                 )
         dit = AceStepHandler()
-        dit.initialize_service(project_root=str(ROOT), config_path=self.ace_config, device=device)
+        dit_status, dit_ok = dit.initialize_service(
+            project_root=str(ROOT), config_path=self.ace_config, device=device, offload_to_cpu=False
+        )
+        if not dit_ok:
+            raise ModelNotReady(f"ACE-Step DiT initialization failed: {dit_status}")
         llm = LLMHandler()
-        llm.initialize(checkpoint_dir=str(checkpoint_root), lm_model_path=self.ace_lm, backend="pt", device=device)
+        llm_status, llm_ok = llm.initialize(
+            checkpoint_dir=str(checkpoint_root), lm_model_path=self.ace_lm,
+            backend="pt", device=device, offload_to_cpu=False
+        )
+        if not llm_ok:
+            raise ModelNotReady(f"ACE-Step language-model initialization failed: {llm_status}")
         self.handlers.update(dit=dit, llm=llm, GenerationParams=GenerationParams, GenerationConfig=GenerationConfig,
                              generate_music=generate_music)
 
     def _load_kokoro(self) -> None:
-        if not self.allow_download and not model_targets()["kokoro"][0].is_dir():
-            raise ModelNotReady("Kokoro checkpoint not cached under AIEROS_MODELS_DIR")
+        if not self.allow_download and not hf_cache_has_weights("kokoro"):
+            raise ModelNotReady("Kokoro checkpoint not cached completely under AIEROS_MODELS_DIR/hub")
         from kokoro import KPipeline
         self.runtime = KPipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M")
 
@@ -170,8 +180,8 @@ class AudioProvider(MediaProvider):
     def _load_qwen_asr(self, device: str) -> None:
         import torch
         from qwen_asr import Qwen3ASRModel
-        if not self.allow_download and not model_targets()[self.name][0].is_dir():
-            raise ModelNotReady("Qwen3-ASR checkpoint not cached under AIEROS_MODELS_DIR")
+        if not self.allow_download and not hf_cache_has_weights(self.name):
+            raise ModelNotReady("Qwen3-ASR checkpoint not cached completely under AIEROS_MODELS_DIR/hub")
         dtype = torch.bfloat16 if device == "cuda" and torch.cuda.is_bf16_supported() else torch.float16 if device == "cuda" else torch.float32
         self.runtime = Qwen3ASRModel.from_pretrained("Qwen/Qwen3-ASR-0.6B", dtype=dtype,
                 device_map="cuda:0" if device == "cuda" else "cpu", max_inference_batch_size=1, max_new_tokens=1024)
@@ -208,7 +218,7 @@ class AudioProvider(MediaProvider):
         params, start = request.get("parameters", {}), time.monotonic()
         if self.kind == "ace-step":
             h = self.handlers
-            gp = h["GenerationParams"](caption=request["prompt"], lyrics=params["lyrics"], instrumental=params["instrumental"],
+            gp = h["GenerationParams"](task_type="text2music", thinking=True, caption=request["prompt"], lyrics=params["lyrics"], instrumental=params["instrumental"],
                 duration=params["duration_seconds"], seed=params["seed"], inference_steps=params["steps"], bpm=params["bpm"],
                 vocal_language=params["language"])
             cfg = h["GenerationConfig"](batch_size=1, use_random_seed=params["seed"] < 0, audio_format="flac")
