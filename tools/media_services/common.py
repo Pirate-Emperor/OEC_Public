@@ -28,6 +28,7 @@ from urllib.parse import unquote, urlsplit
 LOG = logging.getLogger("oec.media_service")
 MAX_HTTP_BODY = 20 * 1024 * 1024
 MAX_IMAGE_BYTES = 12 * 1024 * 1024
+MAX_AUDIO_BYTES = 12 * 1024 * 1024
 MAX_IMAGE_DIMENSION = 4096
 MAX_IMAGE_PIXELS = 16_777_216
 JOB_ID_RE = re.compile(r"job_[A-Za-z0-9_-]{12,40}\Z")
@@ -146,6 +147,33 @@ def image_bytes_to_png(image_base64: str) -> bytes:
         raise RequestError("image file could not be decoded") from exc
 
 
+
+def audio_bytes_with_extension(audio_base64: str) -> tuple[bytes, str]:
+    """Decode bounded audio uploads and determine the container from its signature."""
+    if not isinstance(audio_base64, str) or not audio_base64:
+        raise RequestError("audio_base64 is required for this task")
+    if len(audio_base64) > (MAX_AUDIO_BYTES * 4 // 3 + 16):
+        raise RequestError("encoded audio exceeds the 12 MiB input limit", 413)
+    try:
+        raw = base64.b64decode(audio_base64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise RequestError("audio_base64 must contain valid base64 without a data-URL prefix") from exc
+    if not raw or len(raw) > MAX_AUDIO_BYTES:
+        raise RequestError("audio must be between 1 byte and 12 MiB", 413)
+    if len(raw) >= 12 and raw[:4] == b"RIFF" and raw[8:12] == b"WAVE":
+        extension = "wav"
+    elif raw.startswith(b"fLaC"):
+        extension = "flac"
+    elif raw.startswith(b"OggS"):
+        extension = "ogg"
+    elif raw.startswith(b"ID3") or (len(raw) >= 2 and raw[0] == 0xFF and (raw[1] & 0xE0) == 0xE0):
+        extension = "mp3"
+    elif len(raw) >= 12 and raw[4:8] == b"ftyp":
+        extension = "m4a"
+    else:
+        raise RequestError("unsupported audio container; use WAV, MP3, FLAC, OGG, or M4A")
+    return raw, extension
+
 def validate_glb(path: Path) -> dict[str, Any]:
     """Validate the GLB container and non-empty mesh accessors."""
     import struct
@@ -252,6 +280,10 @@ class MediaProvider:
     def load_runtime(self) -> None:
         raise NotImplementedError
 
+    def close(self) -> None:
+        """Release per-model runtime guards on orderly service shutdown."""
+        return None
+
     def run_job(self, job_id: str, request: dict[str, Any], input_file: Path | None) -> tuple[Path, dict[str, Any]]:
         raise NotImplementedError
 
@@ -270,9 +302,12 @@ class MediaJobService:
         self.loading = True
         self.shutdown_requested = False
         dirs = _system_dirs()
-        self.input_root = Path(dirs["inputs"]).expanduser().resolve() / "media_services" / provider.name / "jobs"
-        self.output_root = Path(dirs["outputs"]).expanduser().resolve() / "media_services" / provider.name / "jobs"
-        self.state_root = Path(dirs["cache"]).expanduser().resolve() / "media_services" / provider.name / "jobs"
+        # StorageManager provisions managed targets for models and outputs only.
+        # Put service state/temporary inputs under outputs, where the configured reserve applies.
+        service_root = Path(dirs["outputs"]).expanduser().resolve() / "media_services" / provider.name
+        self.input_root = service_root / "inputs" / "jobs"
+        self.output_root = service_root / "jobs"
+        self.state_root = service_root / "state"
         self._restore_job_records_and_prune()
         self.worker = threading.Thread(target=self._worker_loop, name=f"oec-{provider.name}-worker", daemon=True)
         self.worker.start()
@@ -355,7 +390,7 @@ class MediaJobService:
                 LOG.info("Expired %d own %s job records/artifacts by retention policy", len(expired), self.provider.name)
 
     def _check_storage(self, required_output_gb: float = 0.05) -> None:
-        for area, required in (("outputs", required_output_gb), ("cache", 0.002)):
+        for area, required in (("outputs", required_output_gb),):
             ok, reason = storage_check(area, required)
             if not ok:
                 LOG.error("OEC %s storage admission denied: %s", area, reason)
@@ -364,7 +399,7 @@ class MediaJobService:
     def health(self) -> dict[str, Any]:
         storage_ok, storage_reason = True, "admission passed"
         if self.provider.model_loaded:
-            for area, required in (("outputs", 0.05), ("cache", 0.002)):
+            for area, required in (("outputs", 0.05),):
                 ok, reason = storage_check(area, required)
                 if not ok:
                     storage_ok, storage_reason = False, reason
@@ -385,7 +420,7 @@ class MediaJobService:
         temp = path.with_suffix(".json.tmp")
         serialized = json.dumps(job, ensure_ascii=False, separators=(",", ":"))
         try:
-            with managed_write("cache", 0.002, minimum_free_gb=0.01):
+            with managed_write("outputs", 0.002, minimum_free_gb=0.01):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 temp.write_text(serialized, encoding="utf-8")
                 os.replace(temp, path)
@@ -422,24 +457,34 @@ class MediaJobService:
                 raise RequestError("model runtime is unavailable; inspect the service log", 503)
         normalized = self.provider.validate_request(payload)
         has_image = "image_base64" in payload
+        has_audio = "audio_base64" in payload
+        if has_image and has_audio:
+            raise RequestError("a job cannot include both image_base64 and audio_base64")
         if has_image and not normalized.get("expects_image", False):
             raise RequestError("this task does not accept an image")
         if normalized.get("expects_image", False) and not has_image:
             raise RequestError("image_base64 is required for this task")
-        # Never retain a base64 payload in job state or logs.
+        if has_audio and not normalized.get("expects_audio", False):
+            raise RequestError("this task does not accept audio")
+        if normalized.get("expects_audio", False) and not has_audio:
+            raise RequestError("audio_base64 is required for this task")
         normalized.pop("expects_image", None)
+        normalized.pop("expects_audio", None)
         job_id = "job_" + secrets.token_urlsafe(18).rstrip("=")
         input_file: Path | None = None
         input_dir: Path | None = None
-        if has_image:
-            png_bytes = image_bytes_to_png(payload.get("image_base64"))
+        if has_image or has_audio:
+            if has_image:
+                input_bytes, input_extension = image_bytes_to_png(payload.get("image_base64")), "png"
+            else:
+                input_bytes, input_extension = audio_bytes_with_extension(payload.get("audio_base64"))
             self._check_storage(0.10)
             input_dir = safe_child(self.input_root, job_id)
-            input_file = safe_child(input_dir, "input.png")
+            input_file = safe_child(input_dir, f"input.{input_extension}")
             try:
-                with managed_write("inputs", 0.03, minimum_free_gb=0.01):
+                with managed_write("outputs", 0.03, minimum_free_gb=0.01):
                     input_dir.mkdir(parents=True, exist_ok=False)
-                    input_file.write_bytes(png_bytes)
+                    input_file.write_bytes(input_bytes)
             except Exception as exc:
                 remove_job_input(input_dir, self.input_root.parent)
                 raise StorageUnavailable(f"input storage admission failed ({type(exc).__name__})") from exc
@@ -455,7 +500,7 @@ class MediaJobService:
                "metadata": None, "error_type": None}
         if not self._persist(job, required=True):
             remove_job_input(input_dir, self.input_root.parent)
-            raise StorageUnavailable("could not persist job state under OEC cache storage")
+            raise StorageUnavailable("could not persist job state under OEC outputs storage")
         with self.lock:
             self.jobs[job_id] = job
         try:
@@ -496,6 +541,8 @@ class MediaJobService:
                 self.loading = False
             LOG.info("%s model runtime loaded; API ready", self.provider.name)
         except Exception as exc:
+            with contextlib.suppress(Exception):
+                self.provider.close()
             with self.lock:
                 self.loading = False
                 self.ready = False
@@ -615,6 +662,8 @@ class MediaJobService:
                 LOG.warning("Media worker queue did not drain before shutdown")
         if threading.current_thread() is not self.worker:
             self.worker.join(timeout=10)
+        with contextlib.suppress(Exception):
+            self.provider.close()
 
 
 class ReusableThreadingHTTPServer(ThreadingHTTPServer):
