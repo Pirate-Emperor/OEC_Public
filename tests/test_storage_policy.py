@@ -175,6 +175,32 @@ class StoragePolicyTests(unittest.TestCase):
             self.assertIn("lfs quota -g lmedge", quota.source)
             self.assertEqual(run.call_args.args[0][1:4], ["quota", "-g", "lmedge"])
 
+    def test_live_lustre_quota_parser_accepts_soft_quota_asterisk_marker(self):
+        from storage_policy import _live_lustre_quota
+
+        class Result:
+            returncode = 0
+            stdout = (
+                "Disk quotas for grp lmedge (gid 55000):\\n"
+                "Filesystem kbytes quota limit grace files quota limit grace\\n"
+                "/nlsasfs 2181235744* 2147483648 2254857830 6d20h39m13s 5294992 0 0 -\\n"
+            )
+
+        with tempfile.TemporaryDirectory() as temp:
+            with mock.patch("storage_policy.shutil.which", return_value="/usr/bin/lfs"), \\
+                 mock.patch("storage_policy.subprocess.run", return_value=Result()):
+                quota = _live_lustre_quota(temp, "lmedge")
+
+        self.assertIsNotNone(quota)
+        self.assertEqual(quota.used_bytes, 2181235744 * 1024)
+        self.assertEqual(quota.soft_quota_bytes, 2147483648 * 1024)
+        self.assertEqual(quota.hard_limit_bytes, 2254857830 * 1024)
+        self.assertTrue(quota.soft_quota_exceeded)
+        self.assertTrue(quota.grace_active)
+        headroom, reason = StoragePolicy.quota_write_headroom(quota)
+        self.assertEqual(headroom, (2254857830 - 2181235744) * 1024)
+        self.assertIn("grace is active", reason)
+
     def test_soft_quota_overage_is_allowed_only_during_active_grace_and_below_hard(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
