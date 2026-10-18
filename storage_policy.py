@@ -319,9 +319,19 @@ def _live_lustre_quota(
         fields = line.split()
         if fields and fields[0].startswith("/"):
             fields = fields[1:]
-        if len(fields) < 3 or not all(re.fullmatch(r"\d+", value) for value in fields[:3]):
+        if len(fields) < 3:
             continue
-        used_kib, soft_kib, hard_kib = map(int, fields[:3])
+        # Lustre appends '*' to the used-KiB field when usage exceeds soft
+        # quota. Accept this documented marker while preserving the numeric
+        # overage; rejecting the whole row would incorrectly report quota as
+        # unavailable exactly when grace/hard-limit admission is most needed.
+        used_token = fields[0].rstrip("*")
+        if not re.fullmatch(r"\d+", used_token):
+            continue
+        if not all(re.fullmatch(r"\d+", value) for value in fields[1:3]):
+            continue
+        used_kib = int(used_token)
+        soft_kib, hard_kib = map(int, fields[1:3])
         soft_bytes = soft_kib * 1024 if soft_kib > 0 else None
         hard_bytes = hard_kib * 1024 if hard_kib > 0 else None
         effective_limit = soft_bytes if soft_bytes is not None else hard_bytes
