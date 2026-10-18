@@ -28,6 +28,15 @@ import audio_api
 import model_cache
 
 class AudioValidationTests(unittest.TestCase):
+    def test_weight_presence_requires_nonempty_checkpoint_file(self):
+        with tempfile.TemporaryDirectory() as folder:
+            checkpoint = Path(folder) / "checkpoint"
+            checkpoint.mkdir()
+            (checkpoint / "config.json").write_text("{}", encoding="utf-8")
+            self.assertFalse(audio_api._has_model_weights(checkpoint))
+            (checkpoint / "model.safetensors").write_bytes(b"weights")
+            self.assertTrue(audio_api._has_model_weights(checkpoint))
+
     def test_ace_step_request_is_bounded(self):
         provider = audio_api.AudioProvider("ace-step", require_cuda=False)
         normalized = provider.validate_request({"prompt": "calm ambient piano"})
