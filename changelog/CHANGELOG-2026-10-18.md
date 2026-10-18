@@ -24,11 +24,14 @@ Audit load/purge safety and make progress toward OEC-Play media-service integrat
 - NOT RUN: live TRELLIS/LTX model load and inference, clean-restart/reload, OEC-Play-to-sidecar integration, cache deletion after load, model download, GPU job, fresh cluster storage probe.
 - No GitHub Actions were triggered; no shared model cache, user asset, reserve or quota was changed.
 
+## Follow-up source integration on the same feature branch
+- Added `tools/media_services/common.py`, `trellis_api.py`, `ltx_api.py`, package initializer, and `tests/test_media_service_api.py` to this branch after the local prototype suite passed. These remote source files have not been independently re-tested from a fresh branch checkout. This did not trigger GitHub Actions.
+
 ## Interpretation and limitations
 The local suite validates the prototype API/job boundaries only. It does not prove either model runs in the proposed sidecar or that real GLB/MP4 outputs pass end-to-end acceptance. The current timeout check only catches an overrun after inference returns; a hung in-process CUDA call is not forcibly interrupted. Hard timeout enforcement via process supervision remains open. The model adapter files must first be transferred into the repository and reviewed, then tested in their assigned environments after fresh storage and allocation checks.
 
 ## Next actions
-1. Transfer/review the prototype source files on this feature branch and rerun tests from the actual branch checkout.
+1. Review the committed sidecar files and rerun the CPU/mock suite from a fresh checkout of this feature branch.
 2. In an authorized allocation, verify GET /health, run one fixed TRELLIS image-to-GLB job and one fixed LTX prompt-to-MP4 job; independently reopen the GLB and read the MP4.
 3. Configure OEC-Play service URLs only after both adapters pass live artifact acceptance.
 4. Authorize model cache purge individually only after a repeat inference succeeds after deleting that exact model-cache directory, and record disk/VRAM/latency effects.
