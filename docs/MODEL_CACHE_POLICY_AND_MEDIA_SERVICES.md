@@ -55,4 +55,4 @@ Start with deterministic task routing from a requested task to a compatible prov
 
 ## Current test status (2026-10-18)
 
-Local compile check passed; the CPU/mock sidecar API suite passed 8/8 tests. Live TRELLIS/LTX inference, model downloads, clean restart, cache purge and OEC-Play integration were not run. Hard process-level timeout enforcement for a GPU call that never returns is not yet implemented. The adapter source remains a local prototype archive until it is transferred and reviewed on this branch.
+Local compile check passed; the CPU/mock sidecar API suite passed 8/8 tests. Live TRELLIS/LTX inference, model downloads, clean restart, cache purge and OEC-Play integration were not run. Hard process-level timeout enforcement for a GPU call that never returns is not yet implemented. The adapter modules and CPU/mock tests are now committed on the isolated feature branch, but the remote branch was not independently checked out and re-tested after transfer. Live model load/inference and client integration remain unverified.
