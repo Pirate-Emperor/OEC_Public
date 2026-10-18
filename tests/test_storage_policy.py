@@ -181,13 +181,13 @@ class StoragePolicyTests(unittest.TestCase):
         class Result:
             returncode = 0
             stdout = (
-                "Disk quotas for grp lmedge (gid 55000):\\n"
-                "Filesystem kbytes quota limit grace files quota limit grace\\n"
-                "/nlsasfs 2181235744* 2147483648 2254857830 6d20h39m13s 5294992 0 0 -\\n"
+                "Disk quotas for grp lmedge (gid 55000):\n"
+                "Filesystem kbytes quota limit grace files quota limit grace\n"
+                "/nlsasfs 2181235744* 2147483648 2254857830 6d20h39m13s 5294992 0 0 -\n"
             )
 
         with tempfile.TemporaryDirectory() as temp:
-            with mock.patch("storage_policy.shutil.which", return_value="/usr/bin/lfs"), \\
+            with mock.patch("storage_policy.shutil.which", return_value="/usr/bin/lfs"), \
                  mock.patch("storage_policy.subprocess.run", return_value=Result()):
                 quota = _live_lustre_quota(temp, "lmedge")
 
