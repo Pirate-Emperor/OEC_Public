@@ -16,6 +16,14 @@ TOOLS_DIR = REPO_ROOT / "tools"
 MEDIA_DIR = TOOLS_DIR / "media_services"
 for entry in (str(REPO_ROOT), str(TOOLS_DIR), str(MEDIA_DIR)):
     if entry not in sys.path: sys.path.insert(0, entry)
+if not (REPO_ROOT / "core_config.py").is_file():
+    # Bundle-only CPU tests use isolated temporary roots; production OEC uses its real config.
+    import types
+    _base = Path(_TEST_HOME) / "oec"
+    _stub = types.ModuleType("core_config")
+    _stub.SYSTEM_DIRS = {name: str(_base / name) for name in ("models", "outputs", "cache", "inputs", "datasets", "logs")}
+    sys.modules["core_config"] = _stub
+
 import audio_api
 import model_cache
 
