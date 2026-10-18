@@ -491,6 +491,9 @@ class MediaJobService:
                     input_dir.mkdir(parents=True, exist_ok=False)
                     input_file.write_bytes(input_bytes)
             except Exception as exc:
+                # Keep the API response generic, but preserve the actual manager
+                # denial/exception in the private service log for debugging.
+                LOG.exception("%s input managed-write failed (cause=%s)", self.provider.name, type(exc).__name__)
                 remove_job_input(input_dir, self.input_root.parent)
                 raise StorageUnavailable(f"input storage admission failed ({type(exc).__name__})") from exc
         else:
