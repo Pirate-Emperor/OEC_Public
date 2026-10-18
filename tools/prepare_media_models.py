@@ -335,7 +335,7 @@ def _download_hf_cache(model: str, *, manager_directory_only: bool = False) -> d
         raise RuntimeError("huggingface_hub is missing in this environment; no install was attempted") from exc
     spec = MODEL_SPECS[model]
     repo_id = spec["repo_id"]
-    target = MODEL_SPECS["target"] if spec["kind"] == "hf-local" else None
+    target = spec["target"] if spec["kind"] == "hf-local" else None
     before = _bytes(target) if target else _bytes(HUB_CACHE / ("models--" + repo_id.replace("/", "--")))
     required_gb = float(spec["required_gb"])
     require_fresh = not manager_directory_only
