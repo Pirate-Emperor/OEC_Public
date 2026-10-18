@@ -12,9 +12,13 @@ Additional model triage favors ACE-Step 1.5 for music generation, Kokoro-82M for
 
 The existing experiment ledger also distinguishes prior FLUX/TRELLIS artifact runs from LTX service readiness: the 15 October OEC background-pipeline static suite passed, but it explicitly records `live_ltx_service_start=NOT_RUN`. Therefore the new LTX sidecar must be treated as unverified until it loads on the assigned runtime and produces an MP4 that can be read by ffprobe/a decoder. Historical FLUX/TRELLIS output evidence is linked in the existing result history; this pass did not reproduce those GPU runs.
 
+
+
+**OEC-Play integration status:** The companion `hpc-dgx-deployment` source CI [39106225707](https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39106225707) finished with Python source validation passing but TypeScript validation failing in `MediaServicesPanel.tsx`: TS2677 at line 145 (optional `JobUpdate.message` conflicts with a required inferred field) and TS18047 at line 149 (`value` may be null). An earlier run also reported Tailwind line-wrap lint errors. OEC-Play service URLs were not configured, no OEC_Deploy files were changed, and no additional Actions run was started from this session.
+
 The original 15-day project deadline could not be recovered from an authoritative start/deadline record in this pass; no remaining-days figure is asserted.
 
-**Last updated:** 2026-10-18T12:34:42.324+05:30 (Asia/Kolkata)
+**Last updated:** 2026-10-18T12:36:53.201+05:30 (Asia/Kolkata)
 **Branch:** `feat/media-service-sidecars-20261018` (isolated implementation and tracking branch; not merged to main).
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
