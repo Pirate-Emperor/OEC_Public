@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-18T09:11:02.294Z",
+  "last_updated": "2026-10-18T09:13:29.556Z",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Isolated cache-first audio adapters were added for ACE-Step 1.5, Kokoro-82M, Whisper and Qwen3-ASR 0.6B, plus per-model cache status/purge safeguards. Local py_compile passed and 16/16 CPU/mock tests passed. Managed output gates wrap actual artifact writes in source. No weights downloaded, dependencies installed, GPU inference run, cache purged, or StorageManager daemon started by the assistant; no Actions triggered. Live model API compatibility, artifacts, quality, latency, VRAM and purge/reload remain unverified. Operator-supplied quota_check: 2.14 TB occupancy; 2.15 TB soft; 2.25 TB hard; 1836 Actions minutes reported used.",
+  "latest_summary": "Isolated cache-first audio adapters were added for ACE-Step 1.5, Kokoro-82M, Whisper and Qwen3-ASR 0.6B, plus per-model cache status/purge safeguards. Local py_compile passed and 17/17 CPU/mock tests passed. The ACE-Step cache-only gate now requires weight files for DiT, VAE and LM. Managed output gates wrap actual artifact writes in source. No weights downloaded, dependencies installed, GPU inference run, cache purged, or StorageManager daemon started by the assistant; no Actions triggered. Live model API compatibility, artifacts, quality, latency, VRAM and purge/reload remain unverified. Operator-supplied quota_check: 2.14 TB occupancy; 2.15 TB soft; 2.25 TB hard; 1836 Actions minutes reported used.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -2820,7 +2820,7 @@
       },
       "results": {
         "compile": "PASS",
-        "tests_passed": 16,
+        "tests_passed": 17,
         "tests_failed": 0,
         "tests_errored": 0,
         "duration_seconds": 0.65,
@@ -2830,9 +2830,10 @@
         "fresh_checkout_test": "NOT_RUN",
         "cache_purge_and_reload": "NOT_RUN",
         "output_write_admission": "Managed outputs operation wraps actual TRELLIS GLB, LTX MP4/metadata, ACE-Step music, Kokoro WAV and transcript writes; source-level only, not a live A100 verification.",
-        "ace_step_default_lm": "acestep-5Hz-lm-0.6B (documented option, not loaded in this experiment)"
+        "ace_step_default_lm": "acestep-5Hz-lm-0.6B (documented option, not loaded in this experiment)",
+        "ace_step_cache_guard": "PASS (unit-level check: metadata-only folder rejected; nonempty .safetensors accepted)"
       },
-      "interpretation": "Local CPU/mock tests cover API/request validation, audio upload lifecycle, cache path selection and runtime-lock behavior. Python compilation passes. Managed output calls are present in source but were not run against live StorageManager. No real model loaded; no output-quality, resource-fit, or post-purge inference claim is made.",
+      "interpretation": "Local compile passed and 17 CPU/mock tests passed. Tests cover request validation, audio upload lifecycle, cache path selection, runtime lock behavior and ACE-Step cache completeness. The service source uses managed outputs operations around artifact generation/writes. These source and CPU tests do not prove a real model loads, the installed package APIs match, output quality, VRAM/latency or purge/reload safety.",
       "next_steps": [
         "Inspect intended pre-existing isolated Conda environments and cached model files.",
         "Use the already-running StorageManager to confirm current admission before any model write or service start.",
