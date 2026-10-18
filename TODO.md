@@ -4,7 +4,7 @@
 
 - [x] Audited current model/cache code and the OEC-Deploy media-service contract. Confirmed the disk purger deletes Hugging Face cache folders; it does not unload model tensors from VRAM. TRELLIS and FLUX retain cache by current policy. The established multi-node LTX launch uses `--no-purge`; leave production policy unchanged until post-purge repeated-inference checks pass.
 - [x] Added cache-only controls to the LTX loader on this feature branch: `allow_download=False` prevents missing model files from being downloaded, and `preserve_cuda_visible_devices=True` preserves the scheduler allocation. Legacy worker defaults are unchanged.
-- [x] Built a local prototype under `tools/media_services/` for separate loopback JSON job APIs: TRELLIS image-to-GLB on port 7868 and LTX text/image-to-MP4 on port 7869. The prototype uses bounded queues, quota-gated writes, job status, temporary-input cleanup, result metadata and GLB/MP4 validation. See downloadable prototype archive in the chat; do not claim these local prototype files are in GitHub yet.
+- [x] Added `tools/media_services/common.py`, `trellis_api.py`, `ltx_api.py`, `__init__.py`, and `tests/test_media_service_api.py` on this isolated feature branch. The APIs use bounded queues, loopback-only bind, StorageManager-gated writes, job status, temporary-input cleanup, result metadata and GLB/MP4 validation. The ZIP remains a convenient snapshot; live models and OEC-Play integration are not verified.
 - [x] Local tests: `python -m py_compile tools/media_services/common.py tools/media_services/trellis_api.py tools/media_services/ltx_api.py tests/test_media_service_api.py` passed; `python -m unittest discover -s tests -p 'test_media_service_api.py' -v` passed 8/8 CPU/mock tests (2026-10-18). No model weights were downloaded, no GPU inference was run, no shared cache was purged, and no Actions workflow was triggered.
 - [ ] Transfer and review the prototype source files into this branch, then rerun these tests from the branch checkout.
 - [ ] Add process-level timeout supervision for a GPU inference call that hangs indefinitely. Current prototype detects a timeout only after the provider call returns; it cannot safely interrupt an in-process CUDA call. Do not configure OEC-Play URLs until both real model services pass health and authorized live artifact checks.
@@ -33,7 +33,7 @@
 - [ ] Keep snapshot publication and all model/data/output writes blocked until a new authoritative quota sample is obtained, the schema/policy is reviewed and deployed under an explicit decision, and admission uses the structured soft/hard/grace fields. Never infer user quota from filesystem free-space output or fabricate values for the snapshot.
 - [ ] After storage admission is safe, return to OEC-Viewer's frozen_ft acceptance contract: approve exact model/license and source-specific dataset/provenance/splits; only then install required PEFT dependencies and run the real baseline/LoRA smoke with exact parameter, gradient, frozen-state, checkpoint/resume and held-out evaluation evidence.
 
-**Last updated:** 2026-10-18T12:22:51.985+05:30 (Asia/Kolkata)
+**Last updated:** 2026-10-18T12:30:22.109+05:30 (Asia/Kolkata)
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 ## 2026-10-15 20:29 IST — cluster coordinator, CLI help and notebook GPU isolation
 
