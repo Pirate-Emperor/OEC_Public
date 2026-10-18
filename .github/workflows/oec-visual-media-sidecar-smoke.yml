@@ -26,7 +26,8 @@ permissions:
 
 concurrency:
   group: oec-visual-media-sidecar-smoke
-  cancel-in-progress: false
+  # A newer code revision must replace a stale, long-running GPU acceptance job.
+  cancel-in-progress: true
 
 jobs:
   sequential-visual-model-acceptance:
