@@ -25,7 +25,7 @@ Audit load/purge safety and make progress toward OEC-Play media-service integrat
 - No GitHub Actions were triggered; no shared model cache, user asset, reserve or quota was changed.
 
 ## Interpretation and limitations
-The local suite validates the prototype API/job boundaries only. It does not prove either model runs in the proposed sidecar or that real GLB/MP4 outputs pass end-to-end acceptance. The model adapter files must first be transferred into the repository and reviewed, then tested in their assigned environments after fresh storage and allocation checks.
+The local suite validates the prototype API/job boundaries only. It does not prove either model runs in the proposed sidecar or that real GLB/MP4 outputs pass end-to-end acceptance. The current timeout check only catches an overrun after inference returns; a hung in-process CUDA call is not forcibly interrupted. Hard timeout enforcement via process supervision remains open. The model adapter files must first be transferred into the repository and reviewed, then tested in their assigned environments after fresh storage and allocation checks.
 
 ## Next actions
 1. Transfer/review the prototype source files on this feature branch and rerun tests from the actual branch checkout.
