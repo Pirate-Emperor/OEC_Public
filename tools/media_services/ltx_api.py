@@ -82,17 +82,17 @@ class LtxProvider(MediaProvider):
                 "expects_image": expects_image}
 
     def load_runtime(self) -> None:
-        # worker_ltx_video creates its standard input/output/queue directories
-        # during import. Admit and pre-create them before importing that module.
-        for area in ("inputs", "outputs", "cache"):
-            ok, reason = storage_check(area, 0.01, 0.05)
-            if not ok:
-                LOG.error("OEC %s storage admission denied before LTX import: %s", area, reason)
-                raise RuntimeError(f"OEC {area} storage admission denied; inspect the storage-manager log")
+        # StorageManager only defines the models and outputs targets. Sidecar
+        # job inputs, state and results are all contained under the managed
+        # outputs/media_services tree; "inputs" and "cache" are not configured
+        # logical targets and must not be passed as StorageManager areas.
+        ok, reason = storage_check("outputs", 0.05, 0.05)
+        if not ok:
+            LOG.error("OEC outputs storage admission denied before LTX import: %s", reason)
+            raise RuntimeError("OEC outputs storage admission denied; inspect the storage-manager log")
         import core_config
-        for area in ("inputs", "outputs"):
-            with managed_write(area, 0.01, minimum_free_gb=0.05):
-                Path(core_config.SYSTEM_DIRS[area]).expanduser().mkdir(parents=True, exist_ok=True)
+        with managed_write("outputs", 0.05, minimum_free_gb=0.05):
+            Path(core_config.SYSTEM_DIRS["outputs"]).expanduser().mkdir(parents=True, exist_ok=True)
         import worker_ltx_video as ltx
         self.module = ltx
         # The updated worker method guarantees cache-only loading unless the
