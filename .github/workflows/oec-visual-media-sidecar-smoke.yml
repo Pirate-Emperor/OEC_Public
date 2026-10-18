@@ -1,0 +1,108 @@
+name: OEC cache-only TRELLIS and LTX sidecar acceptance
+run-name: "OEC visual media sidecar smoke - ${{ github.ref_name }}"
+
+on:
+  push:
+    branches:
+      - feat/media-service-sidecars-20261018
+    paths:
+      - ".github/workflows/oec-visual-media-sidecar-smoke.yml"
+      - "tools/run_visual_media_sidecar_smokes.py"
+      - "tools/media_services/common.py"
+      - "tools/media_services/trellis_api.py"
+      - "tools/media_services/ltx_api.py"
+      - "tools/media_services/model_cache.py"
+      - "pipeline_trellis_3d.py"
+      - "worker_ltx_video.py"
+      - "storage_manager.py"
+      - "storage_policy.py"
+      - "storage_config.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-visual-media-sidecar-smoke
+  cancel-in-progress: false
+
+jobs:
+  sequential-visual-model-acceptance:
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout OEC feature branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate runner and configured environments without installing dependencies
+        run: |
+          set -euo pipefail
+          test "${RUNNER_NAME:-unknown}" = "oec-1" || {
+            echo "::error::Expected the oec-1 A100 runner; got ${RUNNER_NAME:-unknown}"
+            exit 2
+          }
+          test -x "$HOME/Conda/condabin/conda"
+          test -f "$HOME/OEC/storage_config.json" || {
+            echo "::error::Live storage configuration is missing; refusing managed model tests."
+            exit 2
+          }
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          for name in phase2_3d phase1_ltx; do
+            if "$HOME/Conda/condabin/conda" env list | awk '{print $1}' | grep -qx "$name"; then
+              echo "ENV_PRESENT=$name"
+            else
+              echo "ENV_MISSING=$name"
+            fi
+          done
+          nvidia-smi
+
+      - name: Compile sidecar smoke harness and adapters
+        run: |
+          set -euo pipefail
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python -m py_compile \
+            tools/run_visual_media_sidecar_smokes.py \
+            tools/media_services/common.py \
+            tools/media_services/model_cache.py \
+            tools/media_services/trellis_api.py \
+            tools/media_services/ltx_api.py
+
+      - name: Capture StorageManager status before model tests
+        run: |
+          set -euo pipefail
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy \
+            python storage_manager.py --status 2>&1 | tee "$RUNNER_TEMP/oec-visual-storage-status.log"
+
+      - name: Test each visual sidecar in isolation without model downloads
+        run: |
+          set -euo pipefail
+          export OEC_VISUAL_SMOKE_DIR="$RUNNER_TEMP/oec-visual-sidecar-smoke"
+          export HF_HUB_OFFLINE=1
+          export TRANSFORMERS_OFFLINE=1
+          timeout 6900s "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy \
+            python tools/run_visual_media_sidecar_smokes.py 2>&1 | tee "$RUNNER_TEMP/oec-visual-sidecar-smoke-run.log"
+
+      - name: Capture final read-only StorageManager status
+        if: always()
+        run: |
+          set +e
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy \
+            python storage_manager.py --status 2>&1 | tee "$RUNNER_TEMP/oec-visual-final-storage-status.log"
+          exit 0
+
+      - name: Upload visual sidecar acceptance report and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-visual-sidecar-smoke-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/oec-visual-sidecar-smoke/
+            ${{ runner.temp }}/oec-visual-storage-status.log
+            ${{ runner.temp }}/oec-visual-final-storage-status.log
+            ${{ runner.temp }}/oec-visual-sidecar-smoke-run.log
+          if-no-files-found: warn
+          retention-days: 3
