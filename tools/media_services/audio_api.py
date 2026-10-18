@@ -28,6 +28,21 @@ LANGUAGE_NAMES = {"en": "English", "hi": "Hindi", "zh": "Chinese", "ja": "Japane
                   "ms": "Malay", "nl": "Dutch", "sv": "Swedish", "da": "Danish", "fi": "Finnish",
                   "pl": "Polish", "tr": "Turkish", "fa": "Persian", "el": "Greek"}
 
+def _has_model_weights(folder: Path) -> bool:
+    """Return true only when a model-owned folder contains a nonempty weight file."""
+    if not folder.is_dir() or folder.is_symlink():
+        return False
+    for path in folder.rglob("*"):
+        if path.is_symlink() or not path.is_file() or path.suffix.lower() not in {".safetensors", ".bin", ".pt", ".pth"}:
+            continue
+        try:
+            if path.stat().st_size > 0:
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def _network_policy(allow_download: bool) -> None:
     offline = "0" if allow_download else "1"
     os.environ["HF_HUB_OFFLINE"] = offline
@@ -118,8 +133,14 @@ class AudioProvider(MediaProvider):
         from acestep.llm_inference import LLMHandler
         from acestep.inference import GenerationParams, GenerationConfig, generate_music
         checkpoint_root = MODELS_ROOT / "ace-step-1.5"
-        if not self.allow_download and (not checkpoint_root.is_dir() or not any(checkpoint_root.iterdir())):
-            raise ModelNotReady(f"ACE-Step checkpoints missing under {checkpoint_root}")
+        if not self.allow_download:
+            required = (checkpoint_root / self.ace_config, checkpoint_root / "vae", checkpoint_root / self.ace_lm)
+            missing = [path.name for path in required if not _has_model_weights(path)]
+            if missing:
+                raise ModelNotReady(
+                    "ACE-Step cache-only startup requires complete checkpoints under "
+                    f"{checkpoint_root}; missing weight folders: {', '.join(missing)}"
+                )
         dit = AceStepHandler()
         dit.initialize_service(project_root=str(ROOT), config_path=self.ace_config, device=device)
         llm = LLMHandler()
