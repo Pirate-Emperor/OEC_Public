@@ -226,8 +226,15 @@ def _estimate_output_gb(duration, output_type="video"):
     return estimated_bytes / BYTES_PER_GB
 
 
-def load_pipeline_instance(gpu_id):
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+def load_pipeline_instance(gpu_id, *, allow_download=True, preserve_cuda_visible_devices=False):
+    """Load LTX from cache, optionally permitting a guarded download.
+
+    The production worker keeps its existing download behavior by default.
+    Sidecar services pass allow_download=False unless the operator explicitly
+    opts in; scheduler-provided CUDA visibility is preserved in that mode.
+    """
+    if not preserve_cuda_visible_devices or "CUDA_VISIBLE_DEVICES" not in os.environ:
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
     ensure_ltx_runtime()
     apply_fuse_patches()
 
@@ -251,7 +258,13 @@ def load_pipeline_instance(gpu_id):
         spatial_upsampler_path = hf_hub_download(repo_id="Lightricks/LTX-2.3", filename="ltx-2.3-spatial-upscaler-x2-1.1.safetensors", local_files_only=True)
         gemma_root = snapshot_download(repo_id="google/gemma-3-12b-it-qat-q4_0-unquantized", local_files_only=True)
         print(f"[GPU {gpu_id}] Cache hit! Models verified offline.")
-    except Exception:
+    except Exception as cache_error:
+        if not allow_download:
+            raise RuntimeError(
+                "LTX model cache is incomplete. This launch is cache-only; "
+                "restore the approved local cache or restart with --allow-download "
+                "after verifying OEC storage admission."
+            ) from cache_error
         print(f"[GPU {gpu_id}] Cache miss or partial. Estimating required download size before transfer...")
         required_gb = _estimate_ltx_model_download_gb()
         print(f"[GPU {gpu_id}] Conservative model download budget: {required_gb:.2f} GB")
