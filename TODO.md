@@ -32,7 +32,7 @@
 - [ ] Keep snapshot publication and all model/data/output writes blocked until a new authoritative quota sample is obtained, the schema/policy is reviewed and deployed under an explicit decision, and admission uses the structured soft/hard/grace fields. Never infer user quota from filesystem free-space output or fabricate values for the snapshot.
 - [ ] After storage admission is safe, return to OEC-Viewer's frozen_ft acceptance contract: approve exact model/license and source-specific dataset/provenance/splits; only then install required PEFT dependencies and run the real baseline/LoRA smoke with exact parameter, gradient, frozen-state, checkpoint/resume and held-out evaluation evidence.
 
-**Last updated:** 2026-10-16T21:15:20.823+05:30 (Asia/Kolkata)
+**Last updated:** 2026-10-18T12:21:26.846+05:30 (Asia/Kolkata)
 **Policy:** This is the single consolidated TODO list. Update this file at the end of every OEC work prompt; keep day-by-day history in `changelog/CHANGELOG-YYYY-MM-DD.md`. Record each meaningful test/experiment in `test.json` and only major milestones in `result.md`.
 ## 2026-10-15 20:29 IST — cluster coordinator, CLI help and notebook GPU isolation
 
