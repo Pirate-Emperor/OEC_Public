@@ -142,6 +142,8 @@ class AudioProvider(MediaProvider):
         checkpoint = cache_path / urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]
         if not self.allow_download and not checkpoint.is_file():
             raise ModelNotReady(f"Whisper checkpoint not cached at {checkpoint}")
+        if self.allow_download:
+            cache_path.mkdir(parents=True, exist_ok=True)
         self.runtime = whisper.load_model(self.whisper_size, device=device, download_root=str(cache_path))
 
     def _load_qwen_asr(self, device: str) -> None:
