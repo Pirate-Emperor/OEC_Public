@@ -1,0 +1,135 @@
+name: OEC A100 model download and live smoke
+
+run-name: "OEC A100 model bootstrap - ${{ github.ref_name }}"
+
+on:
+  push:
+    branches:
+      - feat/media-service-sidecars-20261018
+    paths:
+      - ".github/workflows/oec-a100-media-model-bootstrap.yml"
+      - "tools/prepare_media_models.py"
+      - "tools/run_media_model_smokes.py"
+      - "tools/media_services/**"
+      - "tools/model_cache_manager.py"
+      - "core_config.py"
+      - "storage_manager.py"
+      - "storage_policy.py"
+      - "storage_config.json"
+      - "tests/test_audio_service_validation.py"
+      - "tests/test_media_service_api.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-a100-media-model-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  inspect-download-smoke:
+    # Self-hosted only: never substitute ubuntu-latest or a billable hosted runner.
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout OEC feature branch
+        uses: actions/checkout@v4
+
+      - name: Select existing Python with StorageManager and Hugging Face tools
+        run: |
+          set -euo pipefail
+          if [[ -f "$HOME/Conda/bin/activate" ]]; then
+            source "$HOME/Conda/bin/activate"
+          elif [[ -f "$HOME/Conda/etc/profile.d/conda.sh" ]]; then
+            source "$HOME/Conda/etc/profile.d/conda.sh"
+          fi
+          if ! command -v conda >/dev/null 2>&1; then
+            echo "::error::Conda was not found. No installs or downloads were attempted."
+            exit 2
+          fi
+
+          # Use the host's current storage policy, including the operator's reserve/target
+          # changes, rather than blindly using the committed default storage_config.json.
+          if [[ ! -f "$HOME/OEC/storage_config.json" ]]; then
+            echo "::error::Could not find $HOME/OEC/storage_config.json to confirm the live model target/reserve policy."
+            exit 2
+          fi
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+
+          selected=""
+          for name in oec_deploy phase1 phase1_ltx phase2_3d; do
+            py="$(conda run --no-capture-output -n "$name" python -c 'import sys; print(sys.executable)' 2>/dev/null | tail -n 1 || true)"
+            if [[ -z "$py" || ! -x "$py" ]]; then
+              continue
+            fi
+            if "$py" -c 'import huggingface_hub, core_config; from storage_manager import storage_preflight, managed_storage_operation' >/dev/null 2>&1; then
+              selected="$py"
+              echo "SELECTED_ENV=$name"
+              break
+            fi
+          done
+
+          if [[ -z "$selected" ]]; then
+            echo "::error::No existing Conda environment can import OEC StorageManager and huggingface_hub. No dependencies were installed and no model files were downloaded."
+            exit 2
+          fi
+          echo "OEC_PYTHON=$selected" >> "$GITHUB_ENV"
+          "$selected" --version
+          echo "Runner host: $(hostname)"
+          echo "Python: $selected"
+          nvidia-smi || true
+
+      - name: Read current StorageManager status, log tail and cached models
+        run: |
+          set -euo pipefail
+          "$OEC_PYTHON" tools/prepare_media_models.py status
+
+      - name: Audit existing inference environments
+        run: |
+          set +e
+          "$OEC_PYTHON" tools/prepare_media_models.py env-audit
+          rc=$?
+          echo "ENV_AUDIT_EXIT_CODE=$rc"
+          # Missing inference packages are reported as a skip; fresh storage admission
+          # still gates every actual checkpoint write.
+          exit 0
+
+      - name: Aggregate fresh admission preflight
+        run: |
+          set -euo pipefail
+          "$OEC_PYTHON" tools/prepare_media_models.py plan --preflight
+
+      - name: Download checkpoint groups sequentially under managed storage
+        run: |
+          set -euo pipefail
+          "$OEC_PYTHON" tools/prepare_media_models.py download --model all
+
+      - name: Recheck model cache after downloads
+        if: always()
+        run: |
+          set +e
+          if [[ -n "${OEC_PYTHON:-}" ]]; then
+            "$OEC_PYTHON" tools/model_cache_manager.py status
+          else
+            echo "OEC_PYTHON was not selected; cache status unavailable."
+          fi
+
+      - name: Run live inference smoke jobs in existing runtimes
+        if: success()
+        run: |
+          set -euo pipefail
+          "$OEC_PYTHON" tools/run_media_model_smokes.py
+
+      - name: Final StorageManager status and latest logs
+        if: always()
+        run: |
+          set +e
+          if [[ -n "${OEC_PYTHON:-}" ]]; then
+            "$OEC_PYTHON" tools/prepare_media_models.py status
+          else
+            echo "No valid OEC Python selected; direct status command was not run."
+          fi
