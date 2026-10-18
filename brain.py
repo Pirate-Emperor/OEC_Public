@@ -39,8 +39,14 @@ class TheBrain:
         print("\n[THE BRAIN] Initializing Master Orchestrator on A100 Node...")
         self.config_path = config_path
         
-        self.jobs_dir = os.path.join(SYSTEM_DIRS['inputs'], "jobs")
-        os.makedirs(self.jobs_dir, exist_ok=True)
+        # New prompt jobs live under the configured outputs target; the old inputs/jobs
+        # directory is still counted and consumed for backward compatibility only.
+        self.jobs_dir = os.path.join(SYSTEM_DIRS["outputs"], "ltx_pipeline", "jobs")
+        self.legacy_jobs_dir = os.path.join(SYSTEM_DIRS["inputs"], "jobs")
+        with managed_storage_operation(
+            "outputs", required_gb=0.001, require_fresh_quota=True, minimum_free_gb=0.05
+        ):
+            os.makedirs(self.jobs_dir, exist_ok=True)
         
         self.load_config()
         self.is_running = True
@@ -138,8 +144,11 @@ class TheBrain:
 
     def get_current_job_count(self, use_case_id):
         """Counts how many pending jobs exist for a specific use case."""
-        pattern = os.path.join(self.jobs_dir, f"job_{use_case_id}_*.json")
-        return len(glob.glob(pattern))
+        pattern = f"job_{use_case_id}_*.json"
+        return sum(
+            len(glob.glob(os.path.join(folder, pattern)))
+            for folder in (self.jobs_dir, self.legacy_jobs_dir)
+        )
 
     def adjust_polling_interval(self, total_deficit):
         if total_deficit == 0:
@@ -237,8 +246,11 @@ class TheBrain:
         while self.is_running:
             self.load_config() 
             total_deficit = 0
-            
+            queue_write_failed = False
+
             for use_case in self.config["use_cases"]:
+                if queue_write_failed:
+                    break
                 current_count = self.get_current_job_count(use_case["id"])
                 target_count = use_case["target_queue_count"]
                 deficit = target_count - current_count
@@ -270,19 +282,47 @@ class TheBrain:
                             job_id = f"job_{use_case['id']}_{timestamp}_{uuid.uuid4().hex[:6]}.json"
                             job_path = os.path.join(self.jobs_dir, job_id)
                             
-                            with open(job_path, "w") as f:
-                                json.dump(job_data, f, indent=4)
-                                
+                            temp_job_path = job_path + f".{uuid.uuid4().hex}.tmp"
+                            try:
+                                # Hold the StorageManager lock through the atomic queue publication.
+                                with managed_storage_operation(
+                                    "outputs", required_gb=0.001, require_fresh_quota=True,
+                                    minimum_free_gb=0.05,
+                                ):
+                                    with open(temp_job_path, "x", encoding="utf-8") as handle:
+                                        json.dump(job_data, handle, indent=4)
+                                        handle.flush()
+                                        os.fsync(handle.fileno())
+                                    os.replace(temp_job_path, job_path)
+                            except Exception as exc:
+                                try:
+                                    os.remove(temp_job_path)
+                                except OSError:
+                                    pass
+                                print(
+                                    f"[THE BRAIN] Queue write blocked by StorageManager; "
+                                    f"no job was published: {type(exc).__name__}: {exc}"
+                                )
+                                queue_write_failed = True
+                                break
+
                             out_type = job_data.get("output_type", "video")
                             dur = job_data.get("duration", 5.0)
                             print(f"     + Queued [{out_type} | {dur}s]: {prompt_data['text'][:55]}...")
                             total_deficit += 1
                             deficit -= 1
+
+                        if queue_write_failed:
+                            break
                 else:
                     print(f"[THE BRAIN] {use_case['id']} queue is healthy ({current_count}/{target_count}).")
 
-            self.adjust_polling_interval(total_deficit)
-            
+            if queue_write_failed:
+                self.polling_interval = self.min_interval
+                print(f"[THE BRAIN] Storage gate blocked the queue; will retry in {int(self.polling_interval)} seconds.")
+            else:
+                self.adjust_polling_interval(total_deficit)
+
             for _ in range(int(self.polling_interval)):
                 if not self.is_running:
                     break

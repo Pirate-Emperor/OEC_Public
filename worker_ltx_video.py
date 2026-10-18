@@ -19,7 +19,7 @@ import numpy as np
 
 # STRICT DISK MANAGER IMPORT
 from purge_manager import DiskPurgeManager, ClusterPurgeManager
-from storage_manager import managed_storage_operation
+from storage_manager import managed_storage_operation, storage_preflight
 from storage_policy import BYTES_PER_GB, estimate_hf_repo_bytes
 
 os.environ["TORCH_COMPILE_DISABLE"] = "1"
@@ -87,13 +87,31 @@ RESOLUTIONS = {
 }
 
 from core_config import SYSTEM_DIRS, QUEUE_DB_PATH
-AIEROS_OUTPUT_DIR = Path(SYSTEM_DIRS['outputs']) / "videos"
-AIEROS_INPUT_DIR = Path(SYSTEM_DIRS['inputs']) / "images"
-JOB_DIR = Path(SYSTEM_DIRS['inputs']) / "jobs"
+AIEROS_OUTPUT_DIR = Path(SYSTEM_DIRS["outputs"]) / "videos"
+PIPELINE_ROOT = Path(SYSTEM_DIRS["outputs"]) / "ltx_pipeline"
+AIEROS_INPUT_DIR = PIPELINE_ROOT / "inputs"
+JOB_DIR = PIPELINE_ROOT / "jobs"
+# Pending jobs from the legacy path are still consumed; new jobs are written under outputs.
+LEGACY_JOB_DIR = Path(SYSTEM_DIRS["inputs"]) / "jobs"
 
-AIEROS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-AIEROS_INPUT_DIR.mkdir(parents=True, exist_ok=True)
-JOB_DIR.mkdir(parents=True, exist_ok=True)
+
+def _ensure_ltx_managed_dirs(include_inputs: bool = False) -> None:
+    """Create worker queue/input directories only after fresh managed-output admission."""
+    with managed_storage_operation(
+        "outputs", required_gb=0.001, require_fresh_quota=True, minimum_free_gb=0.05
+    ):
+        AIEROS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        JOB_DIR.mkdir(parents=True, exist_ok=True)
+        if include_inputs:
+            AIEROS_INPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _managed_ltx_job_rename(source: str | os.PathLike[str], destination: str | os.PathLike[str]) -> None:
+    """Guard job-state renames with the same fresh quota/outputs lock as queue writes."""
+    with managed_storage_operation(
+        "outputs", required_gb=0.001, require_fresh_quota=True, minimum_free_gb=0.05
+    ):
+        os.replace(source, destination)
 
 class DualLogger:
     """Writes to both the screen buffer and a text file simultaneously."""
@@ -315,6 +333,7 @@ def generate_asset(pipeline, target_gpu_id, input_image, prompt: str, duration: 
     current_seed = random.randint(0, MAX_SEED) if randomize_seed else int(seed)
     
     for attempt, (w, h) in enumerate(resolutions_to_try):
+        temp_image_path = None
         try:
             import gc
             gc.collect()
@@ -324,7 +343,19 @@ def generate_asset(pipeline, target_gpu_id, input_image, prompt: str, duration: 
             h = int(round(h / 64.0)) * 64
             
             num_frames = ((int(duration * fps) - 1 + 7) // 8) * 8 + 1
-            
+            output_budget_gb = _estimate_output_gb(duration, output_type)
+            output_min_free_gb = max(0.05, float(os.environ.get("AIEROS_OUTPUT_MIN_FREE_GB", "0.05")))
+            admitted, admission_reason = storage_preflight(
+                "outputs", required_gb=output_budget_gb, require_fresh_quota=True,
+                minimum_free_gb=output_min_free_gb,
+            )
+            if not admitted:
+                print(
+                    f"[GPU {target_gpu_id}] Refusing expensive LTX inference before model execution: "
+                    f"{admission_reason}"
+                )
+                return None, None, current_seed
+
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             base_filename = f"{timestamp}_{output_type}_{MODEL_TYPE}"
             print(f"[GPU {target_gpu_id}] Generating: {w}x{h}, {num_frames} frames ({duration}s @ {fps}fps), seed={current_seed}, type={output_type}")
@@ -332,11 +363,19 @@ def generate_asset(pipeline, target_gpu_id, input_image, prompt: str, duration: 
             images = []
             if input_image is not None:
                 input_filename = f"{timestamp}_{OUTPUT_TYPE_IMAGE}_input_{MODEL_TYPE}.jpg"
-                temp_image_path = AIEROS_INPUT_DIR / input_filename
-                if hasattr(input_image, "save"): 
-                    input_image.save(temp_image_path)
-                else: 
-                    temp_image_path = Path(input_image)
+                if hasattr(input_image, "save"):
+                    temp_image_path = AIEROS_INPUT_DIR / input_filename
+                    with managed_storage_operation(
+                        "outputs", required_gb=0.02, require_fresh_quota=True, minimum_free_gb=0.05
+                    ):
+                        AIEROS_INPUT_DIR.mkdir(parents=True, exist_ok=True)
+                        input_image.save(temp_image_path)
+                else:
+                    temp_image_path = None
+                    source_image_path = Path(input_image)
+                    if not source_image_path.is_file():
+                        raise FileNotFoundError(f"LTX conditioning image does not exist: {source_image_path}")
+                    temp_image_path = source_image_path
                 images = [ImageConditioningInput(path=str(temp_image_path), frame_idx=0, strength=1.0)]
 
             tiling_config = TilingConfig.default()
@@ -351,9 +390,8 @@ def generate_asset(pipeline, target_gpu_id, input_image, prompt: str, duration: 
             output_video_path = AIEROS_OUTPUT_DIR / f"{base_filename}.mp4"
             output_json_path = AIEROS_OUTPUT_DIR / f"{base_filename}_info.json"
 
-            output_budget_gb = _estimate_output_gb(duration, output_type)
             print(
-                f"[GPU {target_gpu_id}] Output storage budget: "
+                f"[GPU {target_gpu_id}] Admitted output storage budget: "
                 f"{output_budget_gb:.3f} GB for this take"
             )
 
@@ -374,9 +412,15 @@ def generate_asset(pipeline, target_gpu_id, input_image, prompt: str, duration: 
             with managed_storage_operation(
                 "outputs",
                 required_gb=output_budget_gb,
-                require_fresh_quota=False,
-                minimum_free_gb=float(os.environ.get("AIEROS_OUTPUT_MIN_FREE_GB", "0.05")),
+                require_fresh_quota=True,
+                minimum_free_gb=output_min_free_gb,
             ):
+                admitted, admission_reason = storage_preflight(
+                    "outputs", required_gb=output_budget_gb, require_fresh_quota=True,
+                    minimum_free_gb=output_min_free_gb,
+                )
+                if not admitted:
+                    raise RuntimeError(f"LTX output write blocked inside managed operation: {admission_reason}")
                 encode_video(
                     video=video,
                     fps=fps,
@@ -412,6 +456,18 @@ def generate_asset(pipeline, target_gpu_id, input_image, prompt: str, duration: 
             torch.cuda.empty_cache()
             print(f"[SYSTEM] Generation failed. Dumped VRAM cache to prevent hoarding on GPU {target_gpu_id}.")
             return None, None, current_seed
+        finally:
+            # Delete only input images created by this worker, under managed storage control.
+            if temp_image_path is not None and temp_image_path != Path(input_image) if input_image is not None and not hasattr(input_image, "save") else False:
+                pass
+            if temp_image_path is not None and hasattr(input_image, "save") and temp_image_path.is_file():
+                try:
+                    with managed_storage_operation(
+                        "outputs", required_gb=0.001, require_fresh_quota=True, minimum_free_gb=0.05
+                    ):
+                        temp_image_path.unlink(missing_ok=True)
+                except Exception as cleanup_error:
+                    print(f"[SYSTEM] Temporary LTX input cleanup deferred by StorageManager: {type(cleanup_error).__name__}: {cleanup_error}")
             
     return None, None, current_seed
 
@@ -426,8 +482,11 @@ def worker_process(gpu_id, sync_barrier=None, master_gpu="0", should_purge=True,
     # FIX: Robustly separated queue submission directly to PENDING_QA, bypassing external daemons.
     def submit_to_qa_queue(vid_path, json_path):
         try:
-            with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                conn.execute('''CREATE TABLE IF NOT EXISTS assets (
+            with managed_storage_operation(
+                "outputs", required_gb=0.001, require_fresh_quota=True, minimum_free_gb=0.05
+            ):
+                with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
+                    conn.execute('''CREATE TABLE IF NOT EXISTS assets (
                                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                                     asset_path TEXT NOT NULL,
                                     json_path TEXT NOT NULL,
@@ -435,12 +494,12 @@ def worker_process(gpu_id, sync_barrier=None, master_gpu="0", should_purge=True,
                                     status TEXT DEFAULT 'PENDING_UPLOAD',
                                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                                 )''')
-                size = os.path.getsize(vid_path) + os.path.getsize(json_path)
-                conn.execute(
-                    "INSERT INTO assets (asset_path, json_path, status, total_size_bytes) VALUES (?, ?, 'PENDING_QA', ?)",
-                    (vid_path, json_path, size)
-                )
-                print(f"[GPU {gpu_id}] Asset submitted to QA Node (Status: PENDING_QA)")
+                    size = os.path.getsize(vid_path) + os.path.getsize(json_path)
+                    conn.execute(
+                        "INSERT INTO assets (asset_path, json_path, status, total_size_bytes) VALUES (?, ?, 'PENDING_QA', ?)",
+                        (vid_path, json_path, size)
+                    )
+                    print(f"[GPU {gpu_id}] Asset submitted to QA Node (Status: PENDING_QA)")
         except Exception as e:
             print(f"[GPU {gpu_id}] Database Error submitting to QA queue: {e}")
 
@@ -480,7 +539,9 @@ def worker_process(gpu_id, sync_barrier=None, master_gpu="0", should_purge=True,
     while True:
         try:
             job_files = glob.glob(str(JOB_DIR / "*.json"))
-            job_files = [f for f in job_files if f.endswith(".json")]
+            if LEGACY_JOB_DIR.is_dir():
+                job_files += glob.glob(str(LEGACY_JOB_DIR / "*.json"))
+            job_files = sorted(set(f for f in job_files if f.endswith(".json")))
             
             job_files.sort() 
             
@@ -492,7 +553,7 @@ def worker_process(gpu_id, sync_barrier=None, master_gpu="0", should_purge=True,
             active_processing_file = target_job + ".processing"
             
             try:
-                os.rename(target_job, active_processing_file)
+                _managed_ltx_job_rename(target_job, active_processing_file)
             except FileNotFoundError:
                 active_processing_file = None
                 continue
@@ -535,19 +596,19 @@ def worker_process(gpu_id, sync_barrier=None, master_gpu="0", should_purge=True,
                 print(f"[GPU {gpu_id}] Job completed ({success_count}/{num_takes} successful)")
             else:
                 failed_path = active_processing_file.replace(".processing", ".failed")
-                os.rename(active_processing_file, failed_path)
+                _managed_ltx_job_rename(active_processing_file, failed_path)
                 print(f"[GPU {gpu_id}] FATAL: All takes failed. Job renamed to .failed")
                 
             active_processing_file = None
 
         except KeyboardInterrupt:
             if active_processing_file and os.path.exists(active_processing_file):
-                os.rename(active_processing_file, active_processing_file.replace(".processing", ""))
+                _managed_ltx_job_rename(active_processing_file, active_processing_file.replace(".processing", ""))
             break
         except Exception as e:
             print(f"[GPU {gpu_id}] Error processing job: {e}")
             if active_processing_file and os.path.exists(active_processing_file):
-                os.rename(active_processing_file, active_processing_file.replace(".processing", ".error"))
+                _managed_ltx_job_rename(active_processing_file, active_processing_file.replace(".processing", ".error"))
             active_processing_file = None
             time.sleep(5)
 
@@ -565,7 +626,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     AVAILABLE_GPUS = [g.strip() for g in args.gpus.split(",") if g.strip()]
-    
+
+    try:
+        _ensure_ltx_managed_dirs(include_inputs=True)
+    except Exception as exc:
+        print(f"[SYSTEM] LTX queue/input directory setup denied by StorageManager: {type(exc).__name__}: {exc}")
+        raise SystemExit(2)
+
     if args.clean_state:
         print("\n[SYSTEM] --clean-state triggered. Wiping existing Hugging Face caches for LTX and Gemma...")
         DiskPurgeManager.purge_hf_model("Lightricks/LTX-2.3")
@@ -573,12 +640,14 @@ if __name__ == "__main__":
         print("[SYSTEM] Clean state achieved. Proceeding to fresh download...\n")
 
     orphans = glob.glob(str(JOB_DIR / "*.processing"))
-    for orphan in orphans:
+    if LEGACY_JOB_DIR.is_dir():
+        orphans += glob.glob(str(LEGACY_JOB_DIR / "*.processing"))
+    for orphan in sorted(set(orphans)):
         try:
-            os.rename(orphan, orphan.replace(".processing", ""))
+            _managed_ltx_job_rename(orphan, orphan.replace(".processing", ""))
             print(f"[SYSTEM] Swept orphaned file back to queue: {os.path.basename(orphan)}")
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"[SYSTEM] Orphan recovery deferred by StorageManager for {os.path.basename(orphan)}: {type(exc).__name__}: {exc}")
 
     if args.mode == "GRADIO":
         target = get_best_gpu()
