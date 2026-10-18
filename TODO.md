@@ -1,6 +1,16 @@
 
 # OEC Active TODO
 
+## 2026-10-18 — A100 model downloads and utilization
+
+- [x] Added tools/prepare_media_models.py to read live storage_manager.py --status, tail the manager log, inventory model cache, inspect existing environments, aggregate-preflight model storage and download supported checkpoint groups with managed writes.
+- [x] Fixed HF cache verification to validate snapshot symlinks remain inside the repo cache and lead to nonempty weights. ACE-Step startup now verifies DiT, VAE, text-encoder and selected LM weight parts and checks both handler initialization results.
+- [x] Local bundle validation after these changes: Python compile passed; 19/19 CPU/mock tests passed. No real models were loaded.
+- [ ] Still requires execution on A100: run python tools/prepare_media_models.py status, then env-audit, then plan --preflight; only if aggregate preflight is positive, run download --model all. The current download plan estimates 21 GB for all groups plus a 2 GB positive headroom margin.
+- [ ] User-reported model directory: 209 GB / 280 GB used with about 71 GB nominal free and a 40 GB positive reserve handled by user-run StorageManager. The assistant cannot directly read or operate A100 from this session because no remote-shell connector or A100 filesystem mount is available; no daemon was started.
+- [ ] After weights arrive, select only existing environments that pass env-audit; install no packages into shared environments blindly. Run one live inference per chosen model and validate the artifact. Test purge/reload only after first-output acceptance.
+
+
 ## 2026-10-18 — Audio model services and explicit cache purge
 
 - [x] Added separate cache-first audio provider service for ACE-Step 1.5 (music), Kokoro-82M (English TTS), Whisper (transcription), and Qwen3-ASR 0.6B (multilingual transcription). Proposed loopback ports: 7870-7873.
