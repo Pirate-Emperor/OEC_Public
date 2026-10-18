@@ -69,3 +69,16 @@ The local suite validates the prototype API/job boundaries only. It does not pro
 - Local bundle validation after cache-symlink hardening: python -m py_compile passed; python -m unittest discover -s tests -v passed 19/19 CPU/mock tests in 0.671 s. No live A100 status, download, environment install or real inference was run because this session has no SSH/remote-shell connection and its container has no /nlsasfs or ~/OEC mount.
 
 - Added tools/media_services/smoke_client.py for a real loopback health → submit → poll → fetch → artifact-validation acceptance run for ACE-Step, Kokoro, Whisper and Qwen3-ASR. Result copies are written under the configured outputs area using a managed StorageManager write; the client rejects non-loopback URLs.
+
+
+## Live speech smoke and AudioGen runner investigation
+
+- Fixed \`storage_policy.py\` so the live Lustre quota parser accepts \`*\` on the used-KiB token when soft quota is exceeded. It preserves the numeric usage and explicitly parsed grace/hard-limit fields. Added the focused test \`test_live_lustre_quota_parser_accepts_soft_quota_asterisk_marker\` in \`tests/test_storage_policy.py\`; a targeted run of this new test remains to be confirmed.
+- Tightened the A100 speech workflow to use the per-model cache checker and fresh StorageManager quota admission, not the directory-only fallback. The live quota query now returns the actual group usage, soft limit, hard limit and active grace.
+- Actions run [39135140660](https://github.com/Killer4K-N/OEC/actions/runs/39135140660) passed end-to-end on \`oec-1\`: CPU/mock suites 10/10 and 10/10; Kokoro-82M WAV synthesis PASS; Whisper-Turbo transcription PASS; Qwen3-ASR-0.6B transcription PASS; ACE-Step SKIPPED because \`acestep\` is absent from all checked existing environments. No shared Conda packages were upgraded.
+- Kokoro: 4.7-second mono 24 kHz WAV, 225,644 bytes, synthesis 24.328 s; service startup plus inference 136.43 s.
+- Whisper: validated 57-byte text output, inference 11.851 s; service startup plus inference 46.90 s.
+- Qwen3-ASR: validated 57-byte text output exactly matching the Whisper output on the single generated clip, inference 28.711 s; startup plus inference 52.57 s. This does not measure WER or broad recognition quality.
+- Final storage status: models 220.72 GB / 280 GB with 60.04 GB reserve; quota soft limit is exceeded while grace is active, so writes were admitted only where they fit the live hard-limit headroom. Reported hard headroom was about 69.54 GB.
+- AudioGen harness was updated to add the OEC repository root to \`sys.path\`. Run [39134470674](https://github.com/Killer4K-N/OEC/actions/runs/39134470674) failed at notebook cell 1 with missing \`core_config\`. Run [39134976949](https://github.com/Killer4K-N/OEC/actions/runs/39134976949) then passed notebook cells 1–3 but was cancelled during cell 4 when a newer quota-parser revision triggered a successor run. Latest retry [39135140674](https://github.com/Killer4K-N/OEC/actions/runs/39135140674) was queued at the time of this entry; no AudioGen WAV acceptance is claimed.
+- No shared output was deleted. The speech-service smoke jobs shut down only the service processes that those jobs started.
