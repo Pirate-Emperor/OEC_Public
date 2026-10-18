@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-18T14:26:46.063Z",
+  "last_updated": "2026-10-18T17:19:57.671Z",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Live CUDA smoke on oec-1 accepted Kokoro-82M speech synthesis, Whisper-Turbo transcription, and Qwen3-ASR-0.6B transcription (3 passed, 0 failed, ACE-Step skipped). Strict live Lustre quota admission works after parsing the soft-overage asterisk marker. AudioGen notebook harness import path is fixed, but its first retry was cancelled before model-load acceptance and the latest retry remained queued at update time. The new focused parser unit test still requires a confirmed pass.",
+  "latest_summary": "AudioGen live A100 acceptance PASS (3-second valid WAV; cache hit; 20.763-second generation; 5.155 GiB peak allocated VRAM). Kokoro, Whisper-Turbo and Qwen3-ASR live speech chain PASS (3 providers, ACE-Step skipped). Focused quota regression passed 10 StoragePolicy + 7 snapshot tests after fixing Lustre soft-overage '*' parsing. TRELLIS/LTX live visual sidecar acceptance remains pending after an LTX StorageManager-area fix and a lower-cost TRELLIS fixture; prior TRELLIS timed out without GLB. OEC-Deploy was not changed; source/build CI passed, while GUI automation's hero-text assertion failed despite a screenshot that visibly contains the home hero. Actual live OEC-Play server health is not verified. Added a startup/chunking runbook.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -2961,42 +2961,175 @@
       ]
     },
     {
-      "id": "EXP-2026-10-18-AUDIOGEN-NOTEBOOK-RUNS-UP-TO-QUEUED-RETRY",
+      "id": "EXP-2026-10-18-AUDIOGEN-A100-LIVE-ACCEPTANCE",
       "date": "2026-10-18",
-      "category": "AudioCraft notebook live execution and harness debugging",
-      "approach": "Execute the existing AudioGen Jupyter notebook in phase1 on oec-1 using the headless acceptance harness and validate a generated WAV when it becomes available.",
-      "reason": "Resolve the user's pre-existing AudioCraft/AudioGen runtime errors and establish an actual sound-effects pipeline.",
+      "category": "live AudioCraft AudioGen notebook acceptance on A100",
+      "approach": "Execute the existing pipeline_audiocraft.ipynb code cells top-to-bottom in the phase1 Conda environment using a headless runner-temp output path, then inspect the produced WAV with soundfile and NumPy for container decode, finite samples, duration and non-silence.",
+      "reason": "Verify the pre-existing AudioCraft error is fixed and prove that the actual model loads and generates an artifact on the assigned A100.",
       "parameters": {
-        "phase1_python": "3.9.25",
+        "run_id": 39135140674,
+        "runner": "oec-1",
+        "hostname": "scn30-mn",
+        "environment": "phase1",
+        "python": "3.9.25",
         "torch": "2.1.0+cu118",
+        "cuda": "11.8",
         "audiocraft": "1.3.0",
-        "visible_gpus": 8,
-        "run_ids": [
-          39134470674,
-          39134829098,
-          39134976949,
-          39135140674
+        "gradio": "4.44.1",
+        "numpy": "1.26.4",
+        "transformers": "4.39.3",
+        "model_id": "facebook/audiogen-medium",
+        "execution_mode": "headless; runner-temp output only",
+        "prompt": "A short cinematic metallic sci-fi impact with a low bass resonance",
+        "duration_seconds": 3
+      },
+      "results": {
+        "status": "PASS",
+        "executed_cells": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "notebook_execution_seconds": 61.147,
+        "model_cache": "HIT; no model download",
+        "model_load": "PASS",
+        "generation_seconds": 20.763,
+        "wav_bytes": 96078,
+        "sample_rate_hz": 16000,
+        "channels": 1,
+        "duration_seconds": 3,
+        "peak_amplitude": 1,
+        "rms_amplitude": 0.28960469365119934,
+        "gpu_peak_allocated_gib": 5.155,
+        "gpu_peak_reserved_gib": 5.387,
+        "wav_sha256": "d4cd48e45890ec2668321a6dfbf95b3e57f3541b9d7cb414afe484cd349805cc",
+        "pip_check_warning": "thinc 8.3.6 requires numpy>=2.0, but phase1 has numpy 1.26.4; warning only, AudioCraft import and generation passed; no packages were changed",
+        "shared_outputs_written": false,
+        "artifact_url": "https://github.com/Killer4K-N/OEC/actions/runs/39135140674/artifacts/12140085687"
+      },
+      "interpretation": "The repaired notebook harness passed all code cells, used the existing cached AudioGen snapshot, loaded the model on an A100 and generated a valid, audible-looking 3-second WAV (nonzero peak/RMS and finite samples). This is one SFX smoke, not a quality/robustness benchmark.",
+      "limitations": [
+        "One short prompt/output only; no listening-panel, prompt-adherence or multi-seed quality evaluation yet.",
+        "Output was runner-temp and not written to shared persistent outputs.",
+        "A non-fatal pip check conflict remains between thinc 8.3.6 and the pinned NumPy 1.26.4 stack; do not repair by changing shared phase1 packages.",
+        "AudioGen weights are research-only pending a commercial-rights review."
+      ],
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/39135140674",
+        "https://github.com/Killer4K-N/OEC/actions/runs/39135140674/artifacts/12140085687"
+      ]
+    },
+    {
+      "id": "EXP-2026-10-18-LTX-TRELLIS-SIDECAR-FIX-AND-RETEST",
+      "date": "2026-10-18",
+      "category": "cache-only TRELLIS/LTX sidecar acceptance and storage-gate correction",
+      "approach": "Inspect the previous cache-only sidecar smoke artifact, compare LTX loader admission with the active OEC StorageManager targets, correct only the OEC sidecar, add a regression, lower the synthetic TRELLIS smoke mesh/texture budget, and queue a new live A100 acceptance run.",
+      "reason": "Avoid calling a cache-present model ready until it completes one real request and emits a structurally valid artifact; make storage admission align with the actual configured managed target.",
+      "parameters": {
+        "previous_run_id": 39142905429,
+        "old_running_run_id": 39143306660,
+        "latest_retry_run_id": 39148645009,
+        "runner": "oec-1",
+        "LTX_model_snapshot": "cached in phase1_ltx",
+        "TRELLIS_smoke_payload": {
+          "max_image_size": 512,
+          "texture_size": 512,
+          "decimation_target": 5000
+        }
+      },
+      "results": {
+        "prior_trellis": "FAIL: service model-loaded, job stayed at 5% until 1500s timeout; no GLB artifact validated",
+        "prior_ltx": "FAIL: OEC inputs storage admission denied because inputs is not a configured logical StorageManager target; cache preflight itself passed",
+        "source_fix": "LTX adapter now checks/creates only configured outputs target; runtime load failure includes private traceback",
+        "regression_tests_added": true,
+        "latest_updated_branch_smoke": "pending at record time",
+        "current_trellis_glb": "NOT ACCEPTED",
+        "current_ltx_mp4": "NOT ACCEPTED"
+      },
+      "interpretation": "The prior failure exposed an adapter configuration defect for LTX and an unresolved TRELLIS long-running generation issue. The smaller smoke payload is intended only for acceptance latency, and does not modify production quality defaults.",
+      "limitations": [
+        "Latest-revision live test has not returned a terminal result.",
+        "TRELLIS cache presence and service-ready are not proof of valid GLB generation.",
+        "LTX fix has a regression test but still needs a current A100 live /health + job + MP4 decode pass."
+      ],
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/39142905429",
+        "https://github.com/Killer4K-N/OEC/actions/runs/39143306660",
+        "https://github.com/Killer4K-N/OEC/actions/runs/39148645009"
+      ]
+    },
+    {
+      "id": "EXP-2026-10-18-OECDEPLOY-READONLY-APPIMAGE-GUI-AND-HEALTH-AUDIT",
+      "date": "2026-10-18",
+      "category": "read-only OEC-Deploy release and server-readiness audit",
+      "approach": "Inspect OEC-Deploy source CI, AppImage build, new Xvfb GUI review, server launcher and media-service bridge without editing OEC-Deploy or attempting a new server start.",
+      "reason": "Distinguish a valid packaged client from a running backend and report actionable next checks without touching the deployment repository.",
+      "parameters": {
+        "source_ci_run_id": 39120715995,
+        "appimage_build_run_id": 39120715944,
+        "gui_review_run_id": 39148052034,
+        "branch": "hpc-dgx-deployment",
+        "latest_branch_head": "fd315ae957e1c66c68ae9f17013591ce6e8dd6c4",
+        "server_port": 7987,
+        "server_expected_endpoints": [
+          "/health",
+          "/api/media-services"
         ]
       },
       "results": {
-        "runner_environment_probe": "PASS",
-        "notebook_static_tests": "6/6 PASS",
-        "run_39134470674": "FAILED at notebook cell 1: ModuleNotFoundError core_config; no model-load marker",
-        "run_39134829098": "FAILED at notebook cell 1 with the same missing import; predecessor before sys.path fix",
-        "run_39134976949": "notebook cells 1-3 PASS after sys.path fix; cancelled in cell 4 when the quota-parser revision triggered a newer run",
-        "run_39135140674": "QUEUED at the time of ledger update",
-        "audiogen_model_load": "NOT CONFIRMED",
-        "generated_wav": "NOT CONFIRMED"
+        "source_ci": "PASS",
+        "appimage_build": "PASS",
+        "appimage_checksum_and_elf_validation": "PASS",
+        "gui_review": "FAIL: DevTools screenshot timed out; DOM probe read empty body and failed expected hero text",
+        "screenshot_visual_inspection": "home hero is visibly rendered in captured screenshot",
+        "live_server_health": "NOT CHECKED/NOT CLAIMED",
+        "oec_deploy_code_modified": false
       },
-      "interpretation": "Harness import failures have been resolved in the source, but no completed AudioGen model-load or output acceptance is yet evidenced. The queued retry is the next acceptance gate.",
+      "interpretation": "The GUI failure is likely a browser automation/readiness/DOM probe false negative because the saved screen visibly contains the expected hero. It is not evidence that OEC-Play's live server is online, and this test explicitly did not connect to the server.",
       "limitations": [
-        "Do not count a cancelled run as a failed model experiment or as a pass.",
-        "No inference quality, output audio or model-download claim is made until a completed report with AUDIOGEN_NOTEBOOK_SMOKE=PASS exists."
+        "Actual production /health and /api/media-services have not been run from the target allocation in this session.",
+        "The current source CI/build runs are older than the GUI test branch head.",
+        "Service sidecar URLs must remain Not configured until current OEC TRELLIS/LTX live artifact acceptance passes."
       ],
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/39134470674",
-        "https://github.com/Killer4K-N/OEC/actions/runs/39134976949",
-        "https://github.com/Killer4K-N/OEC/actions/runs/39135140674"
+        "https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39120715995",
+        "https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39120715944",
+        "https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39148052034"
+      ]
+    },
+    {
+      "id": "EXP-2026-10-18-BRAIN-QUEUE-DAEMON-RUNBOOK",
+      "date": "2026-10-18",
+      "category": "production pipeline startup and chunking documentation",
+      "approach": "Inspect brain_config.json, brain.py queue writer, worker_ltx_video.py queue consumer, qa_compliance_worker.py and hf_upload_daemon.py entry points; document separate commands, readiness checks and safety constraints.",
+      "reason": "Make the production pipeline hand-off reproducible while preserving single-instance daemon safety and distinguishing prompt batching from video temporal tiling.",
+      "parameters": {
+        "config": "brain_config.json",
+        "max_batch_size": 10,
+        "polling_interval_seconds": 1800,
+        "min_polling_interval": 300,
+        "max_polling_interval": 14400,
+        "queue_targets": {
+          "ltx_2_3_commercial_broll": 50,
+          "ltx_2_3_vfx_elements": 30,
+          "ltx_2_3_motion_backgrounds": 20
+        },
+        "per_prompt_job_json": true,
+        "worker_command": "python worker_ltx_video.py --gpus 1,2,3 --cluster-gpus 11 --no-purge"
+      },
+      "results": {
+        "runbook": "docs/PIPELINE_DAEMONS_AND_MEDIA_SERVICE_RUNBOOK.md",
+        "brain_queue_regressions": "PASS in the workflow preflight",
+        "sustained_brain_to_ltx_to_qa_to_upload_pipeline": "NOT RUN AS ONE CONTINUOUS LIVE RUN",
+        "oec_deploy_server_online": "NOT VERIFIED"
+      },
+      "interpretation": "The queue config chunks LLM prompt requests at no more than ten per call and publishes one JSON file per accepted prompt. This does not mean each final video is split into ten independent outputs.",
+      "limitations": [
+        "Brain and QA environment assignments must be verified on the actual allocation before startup.",
+        "Do not start duplicate daemons or launch all GPU models onto one device.",
+        "The operator must verify the actual OEC-Play host with /health and /api/media-services."
       ]
     }
   ]
