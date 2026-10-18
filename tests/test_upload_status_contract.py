@@ -62,6 +62,12 @@ class UploadStatusContractTests(unittest.TestCase):
         with sqlite3.connect(self.db_path) as conn:
             self.assertEqual(rollback_upload_batch(conn, []), 0)
 
+    def test_worker_queue_default_matches_the_upload_pending_contract(self):
+        source = Path(__file__).resolve().parents[1] / "worker_ltx_video.py"
+        worker_source = source.read_text(encoding="utf-8")
+        self.assertIn("status TEXT DEFAULT 'PENDING',", worker_source)
+        self.assertNotIn("status TEXT DEFAULT 'PENDING_UPLOAD',", worker_source)
+
     def test_duplicate_ids_and_missing_qa_row_fail_closed(self):
         with sqlite3.connect(self.db_path) as conn:
             with self.assertRaises(ValueError):

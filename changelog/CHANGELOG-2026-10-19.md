@@ -10,3 +10,5 @@
 - Preserved later failures independently: audio bootstrap run 39149243881 failed before setup when StorageManager refused output-reserve resizing during an active managed operation; no packages were installed. Visual run 39149240005 loaded TRELLIS but returned HTTP 507 on job admission because outputs was already under managed operation; LTX did not become ready/model_loaded in its 20-minute wait.
 - Tests added in this source commit have not been executed. No model download, dependency install, purge, persistent-service launch, training, OEC-Play launch, release build, or PDF build was performed. The OEC-Play server health remains unverified.
 - Next gates: execute the new tests via an already-approved $0 route, check fresh quota and identify the exact StorageManager lease owner, then stage one cache-only model at a time and validate real artifacts. Do not bypass or purge an active manager lease.
+
+- Follow-up: aligned worker_ltx_video.py's schema default to PENDING and added a static contract regression; tests not executed, existing DB untouched.

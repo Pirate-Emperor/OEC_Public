@@ -431,3 +431,8 @@ Candidate source commit [f52aae4](https://github.com/Killer4K-N/OEC/commit/f52aa
 - Adds tests/test_oec_service_manager_media.py and tests/test_upload_status_contract.py for pure launch-spec/guard behavior and a disposable SQLite producer→selector→recovery/rollback lifecycle.
 
 This is an unmerged candidate branch. These new tests were authored but not executed, and the live service manager did not start any process. No GitHub Actions workflow was deliberately triggered; the candidate branch is outside the current workflow push filters. No model downloads, package installation, reserve operations, purge, training, or OEC-Play server launch were performed. Current storage telemetry must be refreshed before a future service start; do not bypass an active manager lease. The OEC-Play /health status and a continuous brain→QA→uploader run remain unverified.
+
+
+### Queue schema consistency follow-up
+
+A post-change source read found the LTX worker's CREATE TABLE default was still PENDING_UPLOAD; it is now PENDING, matching the canonical status used by QA and the uploader. The offline contract test has an added static regression assertion. Tests remain unexecuted; no existing shared SQLite database was migrated or modified.

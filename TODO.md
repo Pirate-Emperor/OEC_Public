@@ -290,3 +290,9 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - [ ] Run one cache-only provider at a time, confirm health and validated audio/text/GLB/MP4 artifacts. No persistent service was started by this update.
 - [ ] Verify the actual OEC-Play server /health and /api/media-services from its dedicated environment; current live-server status remains unverified.
 - [ ] Integrate speech/music job types into brain.py and brain_config.json only after service contracts and artifact metadata are validated. Existing video prompt-batch limits are not audio/music chunking semantics.
+
+
+## 2026-10-19 — queue schema consistency follow-up
+
+- [x] Aligned worker_ltx_video.py's new-database status default to PENDING, matching the canonical QA/uploader status; added a static regression assertion. Existing shared SQLite databases were not changed or migrated.
+- [ ] The static schema assertion and disposable SQLite lifecycle tests remain authored but not executed.

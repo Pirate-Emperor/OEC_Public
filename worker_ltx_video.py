@@ -491,7 +491,7 @@ def worker_process(gpu_id, sync_barrier=None, master_gpu="0", should_purge=True,
                                     asset_path TEXT NOT NULL,
                                     json_path TEXT NOT NULL,
                                     total_size_bytes INTEGER NOT NULL,
-                                    status TEXT DEFAULT 'PENDING_UPLOAD',
+                                    status TEXT DEFAULT 'PENDING',
                                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                                 )''')
                     size = os.path.getsize(vid_path) + os.path.getsize(json_path)

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-18T19:21:01.375Z",
+  "last_updated": "2026-10-19",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Historical one-shot passes: AudioGen run 39135140674; Kokoro→Whisper Turbo/Qwen3-ASR run 39135140660; ACE-Step skipped because its package is absent. Later bootstrap 39149243881 failed before runtime setup because StorageManager refused reserve resizing during an active operation, with no packages installed. Latest visual sidecar run 39149240005 loaded TRELLIS but its job submission failed HTTP 507 because outputs was locked; LTX did not reach ready/model_loaded. Candidate commit f52aae4 adds safe cache-only sidecar supervision, shared workflow serialization, and a canonical QA upload-pending status with offline test sources. Those new tests have not been executed. OEC-Play server health remains unverified.",
+  "latest_summary": "Historical one-shot passes: AudioGen run 39135140674; Kokoro→Whisper Turbo/Qwen3-ASR run 39135140660; ACE-Step skipped because its package is absent. Later bootstrap 39149243881 failed before runtime setup because StorageManager refused reserve resizing during an active operation, with no packages installed. Latest visual sidecar run 39149240005 loaded TRELLIS but its job submission failed HTTP 507 because outputs was locked; LTX did not reach ready/model_loaded. Candidate commit f52aae4 adds safe cache-only sidecar supervision, shared workflow serialization, and a canonical QA upload-pending status with offline test sources. Those new tests have not been executed. OEC-Play server health remains unverified. Follow-up: worker_ltx_video.py's new-database default now matches canonical PENDING; static regression added, tests unexecuted.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -3230,7 +3230,8 @@
           "tests/test_upload_status_contract.py",
           ".github/workflows/oec-a100-media-model-bootstrap.yml",
           ".github/workflows/oec-audiogen-notebook-smoke.yml",
-          ".github/workflows/oec-visual-media-sidecar-smoke.yml"
+          ".github/workflows/oec-visual-media-sidecar-smoke.yml",
+          "worker_ltx_video.py"
         ],
         "test_status": "AUTHORED_NOT_EXECUTED",
         "actions_run_triggered": false,
@@ -3240,6 +3241,33 @@
         "Unmerged candidate only; no CI or GPU live acceptance was executed.",
         "ACE-Step package/runtime still needs separate isolated setup.",
         "Persistent OEC-Play server health and a continuous brain→QA→uploader run remain unverified."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-19-WORKER-QUEUE-DEFAULT-CONSISTENCY",
+      "category": "SQLite queue schema status consistency",
+      "method": "Inspect worker schema default, QA success transition and uploader selector; align the default and add static regression.",
+      "rationale": "Keep new queue schemas aligned with the canonical upload-pending state.",
+      "parameters": {
+        "previous_worker_default": "PENDING_UPLOAD",
+        "canonical_upload_pending": "PENDING",
+        "actions_triggered": false,
+        "shared_db_migrated": false
+      },
+      "environment": {
+        "repository": "Killer4K-N/OEC",
+        "branch": "fix/media-stack-supervision-20261019"
+      },
+      "results": {
+        "status": "SOURCE_UPDATED_TEST_NOT_EXECUTED",
+        "worker_schema_default": "PENDING",
+        "qa_transition": "PENDING",
+        "uploader_query": "PENDING",
+        "regression_added": true
+      },
+      "limitations": [
+        "No existing shared database was changed or migrated.",
+        "Static and temporary SQLite tests remain unexecuted."
       ]
     }
   ]
