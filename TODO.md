@@ -1,5 +1,16 @@
 # OEC Active TODO
 
+## 2026-10-18 — TRELLIS/LTX media sidecars and model-cache policy
+
+- [x] Audited current model/cache code and the OEC-Deploy media-service contract. Confirmed the disk purger deletes Hugging Face cache folders; it does not unload model tensors from VRAM. TRELLIS and FLUX retain cache by current policy. The established multi-node LTX launch uses `--no-purge`; leave production policy unchanged until post-purge repeated-inference checks pass.
+- [x] Added cache-only controls to the LTX loader on this feature branch: `allow_download=False` prevents missing model files from being downloaded, and `preserve_cuda_visible_devices=True` preserves the scheduler allocation. Legacy worker defaults are unchanged.
+- [x] Built a local prototype under `tools/media_services/` for separate loopback JSON job APIs: TRELLIS image-to-GLB on port 7868 and LTX text/image-to-MP4 on port 7869. The prototype uses bounded queues, quota-gated writes, job status, temporary-input cleanup, result metadata and GLB/MP4 validation. See downloadable prototype archive in the chat; do not claim these local prototype files are in GitHub yet.
+- [x] Local tests: `python -m py_compile tools/media_services/common.py tools/media_services/trellis_api.py tools/media_services/ltx_api.py tests/test_media_service_api.py` passed; `python -m unittest discover -s tests -p 'test_media_service_api.py' -v` passed 8/8 CPU/mock tests (2026-10-18). No model weights were downloaded, no GPU inference was run, no shared cache was purged, and no Actions workflow was triggered.
+- [ ] Transfer and review the prototype source files into this branch, then rerun these tests from the branch checkout. Do not configure OEC-Play URLs until both real model services pass health and authorized live artifact checks.
+- [ ] In a later authorized allocation, run the cache-purge acceptance sequence per model: record bytes, full-load marker, first artifact, delete only that exact model cache folder, generate again with the same resident pipeline, reopen output, then test a clean restart/reload. Do not enable purge by default before that evidence.
+- [ ] Candidate model shortlist: ACE-Step 1.5 for music generation; Kokoro-82M for lightweight English TTS; SenseVoice/Whisper for speech input; Hunyuan3D-2.1 as a later TRELLIS baseline. MusicGen/AudioGen remain research-only until the CC-BY-NC model-weight terms are acceptable for the intended product.
+- [ ] Remaining project deadline could not be recovered from an authoritative start/deadline record during this pass; do not restart or invent the original 15-day clock.
+
 ## 2026-10-16 — latest notebook acceptance and frozen-weight audit
 
 - [x] Executed the actual final UI cells on designated \`oec-1\` in [run 38912593770](https://github.com/Killer4K-N/OEC/actions/runs/38912593770): FLUX-only generation, TRELLIS-only GLB generation, combined-notebook FLUX generation and combined TRELLIS app startup. Artifact: [12052395126](https://github.com/Killer4K-N/OEC/actions/runs/38912593770/artifacts/12052395126).
