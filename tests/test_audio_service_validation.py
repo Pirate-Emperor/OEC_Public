@@ -1,0 +1,72 @@
+"""Cache-path and request validation tests; no model download or GPU use."""
+from __future__ import annotations
+import os
+import tempfile
+from pathlib import Path
+import sys
+import unittest
+from unittest import mock
+from contextlib import nullcontext
+
+_TEST_HOME = tempfile.mkdtemp(prefix="oec-audio-test-home-")
+os.environ["HOME"] = _TEST_HOME
+os.environ["AIEROS_BASE_DIR"] = str(Path(_TEST_HOME) / "oec")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+TOOLS_DIR = REPO_ROOT / "tools"
+MEDIA_DIR = TOOLS_DIR / "media_services"
+for entry in (str(REPO_ROOT), str(TOOLS_DIR), str(MEDIA_DIR)):
+    if entry not in sys.path: sys.path.insert(0, entry)
+import audio_api
+import model_cache
+
+class AudioValidationTests(unittest.TestCase):
+    def test_ace_step_request_is_bounded(self):
+        provider = audio_api.AudioProvider("ace-step", require_cuda=False)
+        normalized = provider.validate_request({"prompt": "calm ambient piano"})
+        self.assertEqual(normalized["parameters"]["duration_seconds"], 30.0)
+        with self.assertRaises(audio_api.RequestError): provider.validate_request({"prompt": "x" * 513})
+        with self.assertRaises(audio_api.RequestError):
+            provider.validate_request({"prompt": "music", "parameters": {"duration_seconds": 181}})
+
+    def test_kokoro_voice_is_allowlisted(self):
+        provider = audio_api.AudioProvider("kokoro", require_cuda=False)
+        self.assertEqual(provider.validate_request({"prompt": "Welcome to the world"})["parameters"]["voice"], "af_heart")
+        with self.assertRaises(audio_api.RequestError):
+            provider.validate_request({"prompt": "hello", "parameters": {"voice": "../secret"}})
+
+    def test_whisper_requires_audio_input_and_valid_options(self):
+        provider = audio_api.AudioProvider("whisper", whisper_size="turbo", require_cuda=False)
+        normalized = provider.validate_request({"task": "transcribe", "parameters": {"language": "en"}})
+        self.assertTrue(normalized["expects_audio"])
+        with self.assertRaises(audio_api.RequestError): provider.validate_request({"task": "translate"})
+        with self.assertRaises(audio_api.RequestError):
+            provider.validate_request({"task": "transcribe", "parameters": {"temperature": 2}})
+
+    def test_qwen_asr_accepts_transcribe_task(self):
+        provider = audio_api.AudioProvider("qwen3-asr", require_cuda=False)
+        result = provider.validate_request({"task": "transcribe", "parameters": {"language": "hi"}})
+        self.assertTrue(result["expects_audio"])
+        self.assertEqual(result["parameters"]["language"], "hi")
+
+    def test_all_cache_targets_are_model_subdirectories(self):
+        root = model_cache.MODELS_ROOT.resolve()
+        for paths in model_cache.model_targets().values():
+            for path in paths:
+                resolved = path.resolve()
+                self.assertNotEqual(resolved, root)
+                self.assertIn(root, resolved.parents)
+                self.assertNotEqual(resolved.name, ".storage_reserve.bin")
+
+    def test_runtime_lock_blocks_same_model_then_releases(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with mock.patch.object(model_cache, "LOCK_ROOT", Path(folder)), \
+                 mock.patch.dict(sys.modules, {"storage_manager": mock.Mock(managed_storage_operation=mock.Mock(side_effect=lambda *a, **kw: nullcontext()))}):
+                lock = model_cache.RuntimeLock("kokoro")
+                lock.acquire()
+                self.assertEqual(model_cache.read_lock("kokoro")["state"], "active")
+                with self.assertRaises(RuntimeError): model_cache.RuntimeLock("kokoro").acquire()
+                lock.release()
+                self.assertIsNone(model_cache.read_lock("kokoro"))
+
+if __name__ == "__main__":
+    unittest.main()
