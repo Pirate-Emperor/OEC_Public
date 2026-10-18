@@ -240,16 +240,17 @@ class MediaServiceApiTests(unittest.TestCase):
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         base = f"http://127.0.0.1:{server.server_port}"
+        local_http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         try:
-            with urllib.request.urlopen(base + "/health", timeout=2) as response:
+            with local_http.open(base + "/health", timeout=2) as response:
                 body = json.loads(response.read())
                 self.assertTrue(body["ready"])
             request = urllib.request.Request(base + "/v1/jobs", data=b'{"task":"test"}', headers={"Content-Type": "application/json"}, method="POST")
-            with urllib.request.urlopen(request, timeout=2) as response:
+            with local_http.open(request, timeout=2) as response:
                 accepted = json.loads(response.read())
                 self.assertEqual(response.status, 202)
             with self.assertRaises(urllib.error.HTTPError) as err:
-                urllib.request.urlopen(base + "/v1/jobs/job_unknownunknown", timeout=2)
+                local_http.open(base + "/v1/jobs/job_unknownunknown", timeout=2)
             self.assertEqual(err.exception.code, 404)
             self.assertIn("job_id", accepted)
         finally:
