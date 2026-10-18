@@ -21,7 +21,7 @@ permissions:
 
 concurrency:
   group: oec-audiogen-notebook-live-smoke
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   audiogen-live-smoke:
@@ -53,7 +53,7 @@ jobs:
           }
           # Use the host's live reserve/target policy, not a stale repository default.
           install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
-          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -c 'import sys, torch, importlib.metadata as m; from audiocraft.models import AudioGen; from audiocraft.data.audio import audio_write; print("ENV=phase1"); print("PYTHON="+sys.version.split()[0]); print("TORCH="+torch.__version__); print("CUDA="+str(torch.version.cuda)); print("CUDA_AVAILABLE="+str(torch.cuda.is_available())); print("AUDIOCRAFT="+m.version("audiocraft")); print("TORCHVISION="+m.version("torchvision")); print("TORCHAUDIO="+m.version("torchaudio")); assert torch.cuda.is_available(), "CUDA is not available in phase1"'
+          timeout 180s "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -c 'import sys, torch, importlib.metadata as m; print("ENV=phase1"); print("PYTHON="+sys.version.split()[0]); print("TORCH="+torch.__version__); print("CUDA="+str(torch.version.cuda)); print("CUDA_AVAILABLE="+str(torch.cuda.is_available())); print("AUDIOCRAFT="+m.version("audiocraft")); print("TORCHVISION="+m.version("torchvision")); print("TORCHAUDIO="+m.version("torchaudio")); assert torch.cuda.is_available(), "CUDA is not available in phase1"'
           nvidia-smi
 
       - name: Compile notebook harness and run offline notebook regressions
@@ -74,7 +74,7 @@ jobs:
           set -euo pipefail
           export OEC_AUDIOGEN_SMOKE_DIR="$RUNNER_TEMP/oec-audiogen-smoke"
           export OEC_AUDIOGEN_HEADLESS_SMOKE=1
-          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python tools/run_audiogen_notebook_smoke.py 2>&1 | tee "$OEC_AUDIOGEN_SMOKE_DIR/notebook-execution.log"
+          timeout 1200s "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python tools/run_audiogen_notebook_smoke.py 2>&1 | tee "$OEC_AUDIOGEN_SMOKE_DIR/notebook-execution.log"
 
       - name: Final read-only StorageManager status
         if: always()
