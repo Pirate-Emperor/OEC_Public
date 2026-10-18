@@ -13,6 +13,7 @@ import json
 import os
 import subprocess
 import sys
+import shutil
 import urllib.request
 from collections import deque
 from pathlib import Path
@@ -156,6 +157,55 @@ def _manager_processes() -> list[str]:
         return []
 
 
+def environment_audit() -> int:
+    """Inspect selected pre-existing Conda envs without installing or importing models."""
+    conda = shutil.which("conda")
+    if not conda:
+        candidate = Path.home() / "Conda" / "bin" / "conda"
+        if candidate.is_file():
+            conda = str(candidate)
+    if not conda:
+        print("Conda executable was not found; no environment was created or changed.")
+        return 2
+    try:
+        listing = subprocess.run([conda, "env", "list", "--json"], text=True, capture_output=True,
+                                 timeout=20, check=True)
+        prefixes = json.loads(listing.stdout).get("envs", [])
+    except Exception as exc:
+        print(f"Could not inspect Conda environments ({type(exc).__name__}: {exc}); no changes made.")
+        return 2
+    by_name = {Path(prefix).name: Path(prefix) for prefix in prefixes}
+    desired = ("phase1", "phase1_ltx", "phase2_3d")
+    audit_code = (
+        "import importlib.util as u, json, sys; "
+        "mods=['torch','huggingface_hub','acestep','kokoro','whisper','qwen_asr','soundfile','numpy']; "
+        "out={m:bool(u.find_spec(m)) for m in mods}; "
+        "print(json.dumps({'python':sys.version.split()[0],'packages':out}, sort_keys=True))"
+    )
+    results = []
+    for name in desired:
+        prefix = by_name.get(name)
+        if prefix is None:
+            results.append({"environment": name, "present": False, "status": "not found"})
+            continue
+        python = prefix / "bin" / "python"
+        if not python.is_file():
+            results.append({"environment": name, "present": True, "status": "python executable not found", "prefix": str(prefix)})
+            continue
+        try:
+            proc = subprocess.run([str(python), "-c", audit_code], text=True, capture_output=True,
+                                  timeout=20, check=False)
+            results.append({"environment": name, "present": True, "prefix": str(prefix),
+                            "returncode": proc.returncode, "report": proc.stdout.strip(),
+                            "stderr": proc.stderr[-2000:] if proc.returncode else ""})
+        except Exception as exc:
+            results.append({"environment": name, "present": True, "prefix": str(prefix),
+                            "status": f"audit failed: {type(exc).__name__}: {exc}"})
+    print(json.dumps({"conda": conda, "environments": results,
+                      "no_environment_created_or_modified": True}, indent=2))
+    return 0 if any(item.get("present") for item in results) else 2
+
+
 def status() -> int:
     print("== StorageManager process(es) (read-only process-list inspection) ==")
     process_list = _manager_processes()
@@ -282,6 +332,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("status", help="read StorageManager CLI status/log and model cache inventory")
+    commands.add_parser("env-audit", help="inspect existing model environments without installing anything")
     plan = commands.add_parser("plan", help="show download list and per-model size budgets; no downloads")
     plan.add_argument("--preflight", action="store_true", help="run aggregate live quota admission without downloading")
     download = commands.add_parser("download", help="download model files one at a time through StorageManager")
@@ -289,6 +340,8 @@ def main() -> int:
     args = parser.parse_args()
     if args.command == "status":
         return status()
+    if args.command == "env-audit":
+        return environment_audit()
     if args.command == "plan":
         plan_rows = []
         for name in DOWNLOAD_ORDER:
