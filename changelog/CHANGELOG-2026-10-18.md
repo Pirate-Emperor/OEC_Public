@@ -60,3 +60,10 @@ The local suite validates the prototype API/job boundaries only. It does not pro
 - Final source review confirms the managed outputs gate covers actual TRELLIS GLB, LTX MP4/metadata and ACE-Step music generation. ACE-Step defaults to the official 0.6B LM option for the first resource-conscious smoke test; no inference has been run.
 
 - Added a cache-only ACE-Step readiness guard requiring weight files for the selected DiT, VAE and LM folders; a metadata-only folder is not treated as a complete local model cache. Regression coverage added for this check.
+
+## Follow-up — download/bootstrap workflow and current storage reading
+
+- Added tools/prepare_media_models.py: status shows read-only storage_manager.py --status, the latest 60 lines of the manager log and cache inventory; env-audit inspects existing phase1, phase1_ltx and phase2_3d packages without installation; plan --preflight checks the aggregate model budget; download --model all transfers one checkpoint group at a time with live fresh quota admission and an in-lock managed write.
+- Planned groups are Kokoro-82M, Whisper turbo, Qwen3-ASR 0.6B, ACE-Step 1.5 core (without the unused bundled 1.7B LM), and separate ACE-Step 0.6B LM. Estimated aggregate admission is 21 GB plus 2 GB free-space margin. The script verifies the Whisper SHA-256 and validates HF model weight files. It does not start the StorageManager daemon, install Python dependencies, create Conda environments, purge any cache, read the reserve file directly or launch a GPU.
+- Latest operator-supplied model-directory reading: 209 GB used of a 280 GB target; around 71 GB nominal remaining, with a positive 40 GB reserve managed by the user. Earlier group-quota telemetry was reported separately; neither reading was collected directly by the assistant.
+- Local bundle validation after cache-symlink hardening: python -m py_compile passed; python -m unittest discover -s tests -v passed 19/19 CPU/mock tests in 0.671 s. No live A100 status, download, environment install or real inference was run because this session has no SSH/remote-shell connection and its container has no /nlsasfs or ~/OEC mount.
