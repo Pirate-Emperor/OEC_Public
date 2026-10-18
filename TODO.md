@@ -245,3 +245,5 @@ Tracking only on main: model/source changes remain on review branch fix/flux-tre
 - [ ] Separate follow-up — audit qa_compliance_worker.py import/CUDA visibility order in a focused change; no QA worker or queue was modified here.
 
 Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep main source unchanged unless a code merge is explicitly authorized.
+
+- [x] Added tools/media_services/smoke_client.py to run a live loopback model job and validate/save the artifact through managed outputs storage; no live inference has been run by the assistant.
