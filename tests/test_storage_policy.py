@@ -90,6 +90,8 @@ class StoragePolicyTests(unittest.TestCase):
                 {
                     "quota_snapshot_path": str(quota_path),
                     "quota_snapshot_max_age_seconds": 60,
+                    # This case tests its file-backed fixture, not the runner's live Lustre quota.
+                    "live_lustre_quota": False,
                 }
             )
             ok, reason = policy.preflight(
