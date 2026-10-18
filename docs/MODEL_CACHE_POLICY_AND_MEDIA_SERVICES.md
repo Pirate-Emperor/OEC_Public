@@ -56,3 +56,46 @@ Start with deterministic task routing from a requested task to a compatible prov
 ## Current test status (2026-10-18)
 
 Local compile check passed; the CPU/mock sidecar API suite passed 8/8 tests. Live TRELLIS/LTX inference, model downloads, clean restart, cache purge and OEC-Play integration were not run. Hard process-level timeout enforcement for a GPU call that never returns is not yet implemented. The adapter modules and CPU/mock tests are now committed on the isolated feature branch, but the remote branch was not independently checked out and re-tested after transfer. Live model load/inference and client integration remain unverified.
+
+
+## New audio-model sidecar
+
+The separate \`tools/media_services/audio_api.py\` supports four capability-specific providers, one per process:
+
+| Provider | Capability | Cache target under \`SYSTEM_DIRS["models"]\` | Loopback port |
+|---|---|---|---:|
+| ACE-Step 1.5 | Prompt-to-music / soundtracks | \`ace-step-1.5/\` | 7870 |
+| Kokoro-82M | English speech synthesis | \`hub/models--hexgrad--Kokoro-82M/\` | 7871 |
+| Whisper | Transcription | \`whisper/<size>/\` | 7872 |
+| Qwen3-ASR 0.6B | Multilingual transcription | \`hub/models--Qwen--Qwen3-ASR-0.6B/\` | 7873 |
+
+Model cache is rooted at OEC \`AIEROS_MODELS_DIR\` (or its configured fallback). Whisper has an explicit \`download_root\`; ACE-Step sets \`ACESTEP_CHECKPOINTS_DIR\`; Hugging Face providers use OEC \`HF_HOME\`. Download is disabled unless the operator supplies \`--allow-download\`, and that mode requires the current StorageManager model preflight plus an in-lock managed write. Do not move model files to \`~/.cache\`, \`/tmp\`, scratch, or any unreserved directory as a workaround.
+
+The assistant did not start StorageManager. The operator supplied the fresh \`quota_check\` baseline for 2026-10-18: 2.14 TB project occupancy, 2.15 TB soft limit and 2.25 TB hard limit; 1836 GitHub Actions minutes were reported used. That is user-supplied telemetry, not a measurement fetched by these code tests. Model loads/writes still use the running OEC StorageManager gate.
+
+Example commands assume environments provisioned by the operator; no environment is created or changed automatically:
+
+\`\`\`bash
+python "$HOME/OEC/tools/model_cache_manager.py" status
+conda run -n phase1_ace_step python "$HOME/OEC/tools/media_services/audio_api.py" --model ace-step --host 127.0.0.1 --port 7870
+conda run -n phase1_kokoro python "$HOME/OEC/tools/media_services/audio_api.py" --model kokoro --host 127.0.0.1 --port 7871
+conda run -n phase1_whisper python "$HOME/OEC/tools/media_services/audio_api.py" --model whisper --whisper-size turbo --host 127.0.0.1 --port 7872
+conda run -n phase1_qwen_asr python "$HOME/OEC/tools/media_services/audio_api.py" --model qwen3-asr --host 127.0.0.1 --port 7873
+\`\`\`
+
+The four environment names are proposed isolation points, not a claim that they exist. Audit environment/package state before installing. The API exposes the shared health/job/result routes and accepts bounded \`audio_base64\` transcribe requests. These services are isolated adapters, not a live client/UI integration.
+
+### Explicit per-model cache purge
+
+\`tools/model_cache_manager.py status\` reports model-specific cache locations, approximate disk use and runtime locks. Purge requires a named model and \`--confirm\`, routes deletion through OEC \`DiskPurgeManager\`, and refuses unsafe paths, active locks, or remote/unknown locks. Example, only after stopping the exact service and checking no active lock remains:
+
+\`\`\`bash
+python "$HOME/OEC/tools/model_cache_manager.py" purge kokoro --confirm
+python "$HOME/OEC/tools/model_cache_manager.py" purge whisper-turbo --confirm
+\`\`\`
+
+No purge runs automatically. The cache manager never reads, removes, shrinks or moves \`.storage_reserve.bin\`. All checkpoint targets are strictly below the configured models root. Job state, temporary inputs, lock records and generated artefacts live under the configured, StorageManager-managed outputs root because the current config defines \`models\` and \`outputs\` logical targets, not separate \`cache\`/\`inputs\` targets.
+
+Disk-purge safety does not prove model reload works. Before declaring a model purge-safe, record its original size; produce and reopen a first artifact; delete only that model-owned folder; test a second artifact using the resident pipeline; then separately stop/restart and verify clean reload. Record latency, VRAM, bytes reclaimed and any lazy cache reads. The current code does not automatically unload idle models; stop the corresponding sidecar to release its runtime lock and model references.
+
+No Conda environment was installed, no model weight downloaded, no GPU run, no storage daemon was started, no cache purged and no GitHub Actions workflow was triggered as part of this source/CPU-test work.
