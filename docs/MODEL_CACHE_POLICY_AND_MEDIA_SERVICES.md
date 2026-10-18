@@ -17,7 +17,7 @@ Use a per-model cache policy: retain (default), candidate (not approved), purge-
 
 Before approving purge for any model, record the exact repository/cache directory and disk usage; verify full load; produce and reopen a first artifact; delete only that model's own cache subdirectory; produce a second artifact with the same resident pipeline; reopen it; then separately test a fresh restart/reload. Record runtime revision, settings, peak VRAM, time, disk reclaimed, and any lazy disk access. This is an acceptance protocol, not a statement that these tests have passed.
 
-The adapter prototypes keep model caches and delete only their own temporary per-job image inputs. Generated result retention is separate from model-cache retention and must never remove existing user assets.
+The adapter prototypes keep model caches and delete only their own temporary per-job image inputs. The current job-timeout check detects an overrun after inference returns; it does not interrupt a hung in-process CUDA call. Hard cancellation requires process-level supervision and remains an acceptance item. Generated result retention is separate from model-cache retention and must never remove existing user assets.
 
 ## Sidecar API design
 
@@ -55,4 +55,4 @@ Start with deterministic task routing from a requested task to a compatible prov
 
 ## Current test status (2026-10-18)
 
-Local compile check passed; the CPU/mock sidecar API suite passed 8/8 tests. Live TRELLIS/LTX inference, model downloads, clean restart, cache purge and OEC-Play integration were not run. The adapter source remains a local prototype archive until it is transferred and reviewed on this branch.
+Local compile check passed; the CPU/mock sidecar API suite passed 8/8 tests. Live TRELLIS/LTX inference, model downloads, clean restart, cache purge and OEC-Play integration were not run. Hard process-level timeout enforcement for a GPU call that never returns is not yet implemented. The adapter source remains a local prototype archive until it is transferred and reviewed on this branch.
