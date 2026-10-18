@@ -74,6 +74,29 @@ class AudioValidationTests(unittest.TestCase):
                 self.assertIn(root, resolved.parents)
                 self.assertNotEqual(resolved.name, ".storage_reserve.bin")
 
+    def test_huggingface_cache_guard_accepts_internal_snapshot_symlink(self):
+        with tempfile.TemporaryDirectory() as folder:
+            repo = Path(folder) / "models--hexgrad--Kokoro-82M"
+            blob = repo / "blobs" / "deadbeef"
+            snapshot = repo / "snapshots" / "revision" / "model.safetensors"
+            blob.parent.mkdir(parents=True)
+            snapshot.parent.mkdir(parents=True)
+            blob.write_bytes(b"weight-data")
+            snapshot.symlink_to(blob)
+            with mock.patch.object(model_cache, "model_targets", return_value={"kokoro": [repo]}):
+                self.assertTrue(model_cache.hf_cache_has_weights("kokoro"))
+
+    def test_huggingface_cache_guard_rejects_escaping_symlink(self):
+        with tempfile.TemporaryDirectory() as folder, tempfile.TemporaryDirectory() as outside:
+            repo = Path(folder) / "models--Qwen--Qwen3-ASR-0.6B"
+            snapshot = repo / "snapshots" / "revision" / "model.safetensors"
+            snapshot.parent.mkdir(parents=True)
+            external = Path(outside) / "model.safetensors"
+            external.write_bytes(b"weight-data")
+            snapshot.symlink_to(external)
+            with mock.patch.object(model_cache, "model_targets", return_value={"qwen3-asr-0.6b": [repo]}):
+                self.assertFalse(model_cache.hf_cache_has_weights("qwen3-asr-0.6b"))
+
     def test_runtime_lock_blocks_same_model_then_releases(self):
         with tempfile.TemporaryDirectory() as folder:
             with mock.patch.object(model_cache, "LOCK_ROOT", Path(folder)), \
