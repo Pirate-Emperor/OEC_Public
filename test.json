@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-18T17:19:57.671Z",
+  "last_updated": "2026-10-18T19:21:01.375Z",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "AudioGen live A100 acceptance PASS (3-second valid WAV; cache hit; 20.763-second generation; 5.155 GiB peak allocated VRAM). Kokoro, Whisper-Turbo and Qwen3-ASR live speech chain PASS (3 providers, ACE-Step skipped). Focused quota regression passed 10 StoragePolicy + 7 snapshot tests after fixing Lustre soft-overage '*' parsing. TRELLIS/LTX live visual sidecar acceptance remains pending after an LTX StorageManager-area fix and a lower-cost TRELLIS fixture; prior TRELLIS timed out without GLB. OEC-Deploy was not changed; source/build CI passed, while GUI automation's hero-text assertion failed despite a screenshot that visibly contains the home hero. Actual live OEC-Play server health is not verified. Added a startup/chunking runbook.",
+  "latest_summary": "Historical one-shot passes: AudioGen run 39135140674; Kokoro→Whisper Turbo/Qwen3-ASR run 39135140660; ACE-Step skipped because its package is absent. Later bootstrap 39149243881 failed before runtime setup because StorageManager refused reserve resizing during an active operation, with no packages installed. Latest visual sidecar run 39149240005 loaded TRELLIS but its job submission failed HTTP 507 because outputs was locked; LTX did not reach ready/model_loaded. Candidate commit f52aae4 adds safe cache-only sidecar supervision, shared workflow serialization, and a canonical QA upload-pending status with offline test sources. Those new tests have not been executed. OEC-Play server health remains unverified.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -3130,6 +3130,116 @@
         "Brain and QA environment assignments must be verified on the actual allocation before startup.",
         "Do not start duplicate daemons or launch all GPU models onto one device.",
         "The operator must verify the actual OEC-Play host with /health and /api/media-services."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-18-AUDIO-RUNTIME-BOOTSTRAP-LOCK",
+      "category": "audio runtime preparation follow-up",
+      "method": "Inspect the job-level log for the latest model bootstrap attempt and capture only actual step/job outcomes.",
+      "rationale": "Separate earlier one-shot speech/audio acceptance from the later attempt to provision persistent runtime packages.",
+      "parameters": {
+        "workflow_run_id": 39149243881,
+        "downloads_allowed": false,
+        "package_installs_attempted": false
+      },
+      "environment": {
+        "runner": "oec-1",
+        "hostname": "scn30-mn",
+        "source_branch": "feat/media-service-sidecars-20261018"
+      },
+      "results": {
+        "status": "FAIL_BEFORE_SETUP",
+        "cached_weights": {
+          "kokoro": "present",
+          "whisper_turbo": "present",
+          "qwen3_asr": "present"
+        },
+        "failure": "StorageManager refused to resize outputs reserve during an active managed operation/lease",
+        "packages_installed": 0,
+        "services_started": 0
+      },
+      "limitations": [
+        "This later failure does not invalidate runs 39135140660 and 39135140674.",
+        "The manager lease was not bypassed and reserve files were not accessed directly."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-18-VISUAL-SIDECAR-ACCEPTANCE",
+      "category": "cache-only TRELLIS/LTX live sidecar acceptance",
+      "method": "Inspect the latest completed visual sidecar job logs and its machine-readable acceptance summary.",
+      "rationale": "Distinguish model cache/load readiness from accepted job submission and valid output artifacts.",
+      "parameters": {
+        "workflow_run_id": 39149240005,
+        "trellis_port": 17868,
+        "ltx_port": 17869,
+        "downloads_allowed": false
+      },
+      "environment": {
+        "runner": "oec-1",
+        "hostname": "scn30-mn",
+        "source_branch": "feat/media-service-sidecars-20261018"
+      },
+      "results": {
+        "status": "FAIL",
+        "trellis": {
+          "cache_preflight": "PASS",
+          "model_pipeline_load": "PASS",
+          "job_submit_http_status": 507,
+          "failure": "outputs had an active managed operation",
+          "valid_glb": "NOT_PRODUCED"
+        },
+        "ltx": {
+          "cache_preflight": "PASS",
+          "ready": false,
+          "model_loaded": false,
+          "health_wait_seconds": 1200,
+          "failure": "model runtime could not be loaded; exact exception unavailable in the returned summary",
+          "valid_mp4": "NOT_PRODUCED"
+        }
+      },
+      "limitations": [
+        "Do not treat a cache hit or a loaded model as end-to-end generation acceptance.",
+        "Do not retry until the active managed operation and fresh quota state are resolved."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-19-SERVICE-SUPERVISION-QA-STATUS-CANDIDATE",
+      "category": "media service lifecycle and QA upload-state contract candidate",
+      "method": "Extend the existing managed process supervisor, add pure no-GPU tests, centralize asset status operations, and serialize workflows that share oec-1.",
+      "rationale": "Prevent overlapping model/storage workflows and make QA-success rows visible to the uploader's actual selection query.",
+      "parameters": {
+        "base_commit": "e84d7123cf199e08748d3bdd825a1561cf46ff5a",
+        "candidate_commit": "f52aae4dfac62d67f75401f7fb643e4a47a63b43",
+        "branch": "fix/media-stack-supervision-20261019",
+        "workflow_concurrency_group": "oec-media-gpu-storage-serial",
+        "downloads_allowed": false
+      },
+      "environment": {
+        "repository": "Killer4K-N/OEC",
+        "runtime_validation": "not run"
+      },
+      "results": {
+        "status": "SOURCE_CANDIDATE_COMMITTED",
+        "new_or_modified_files": [
+          "tools/oec_service_manager.py",
+          "tools/README_media_stack.md",
+          "tests/test_oec_service_manager_media.py",
+          "asset_status.py",
+          "qa_compliance_worker.py",
+          "hf_upload_daemon.py",
+          "tests/test_upload_status_contract.py",
+          ".github/workflows/oec-a100-media-model-bootstrap.yml",
+          ".github/workflows/oec-audiogen-notebook-smoke.yml",
+          ".github/workflows/oec-visual-media-sidecar-smoke.yml"
+        ],
+        "test_status": "AUTHORED_NOT_EXECUTED",
+        "actions_run_triggered": false,
+        "live_services_started": false
+      },
+      "limitations": [
+        "Unmerged candidate only; no CI or GPU live acceptance was executed.",
+        "ACE-Step package/runtime still needs separate isolated setup.",
+        "Persistent OEC-Play server health and a continuous brain→QA→uploader run remain unverified."
       ]
     }
   ]

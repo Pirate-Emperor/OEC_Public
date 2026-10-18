@@ -1,0 +1,12 @@
+# Changelog — 19 October 2026
+
+## Media services, StorageManager safety and QA/upload hand-off
+
+- Added candidate supervisor support for existing audio/TTS/ASR and TRELLIS/LTX sidecar APIs in tools/oec_service_manager.py. Startup requires fresh GPU inventory, no compute PID on the chosen physical GPU, a free loopback port, an importable runtime and the expected Python environment. APIs bind to 127.0.0.1, offline flags are set, and --allow-download is never passed.
+- Added tools/README_media_stack.md and pure no-GPU supervisor tests. Added asset_status.py so QA and uploader share one pending state plus an offline SQLite lifecycle test for QA success, selector visibility, ARCHIVING recovery and rollback.
+- Made the AudioGen bootstrap, AudioGen notebook smoke and TRELLIS/LTX sidecar workflows share concurrency group oec-media-gpu-storage-serial with cancel-in-progress=false. They share oec-1 model/GPU and StorageManager state; independent groups allowed potential overlap while managing output operations.
+- The source update is candidate commit f52aae4 on fix/media-stack-supervision-20261019, based on feat/media-service-sidecars-20261018. This candidate branch name is outside the current workflows' push branch filters; no Actions run was triggered by the source update.
+- Preserved earlier live passes: AudioGen run 39135140674 generated a valid 3-second mono 16 kHz WAV; speech run 39135140660 passed Kokoro, Whisper Turbo and Qwen3-ASR on one controlled clip. ACE-Step was skipped because its runtime package was absent.
+- Preserved later failures independently: audio bootstrap run 39149243881 failed before setup when StorageManager refused output-reserve resizing during an active managed operation; no packages were installed. Visual run 39149240005 loaded TRELLIS but returned HTTP 507 on job admission because outputs was already under managed operation; LTX did not become ready/model_loaded in its 20-minute wait.
+- Tests added in this source commit have not been executed. No model download, dependency install, purge, persistent-service launch, training, OEC-Play launch, release build, or PDF build was performed. The OEC-Play server health remains unverified.
+- Next gates: execute the new tests via an already-approved $0 route, check fresh quota and identify the exact StorageManager lease owner, then stage one cache-only model at a time and validate real artifacts. Do not bypass or purge an active manager lease.

@@ -278,3 +278,15 @@ Tracking only on main: model/source changes remain on review branch fix/flux-tre
 Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep main source unchanged unless a code merge is explicitly authorized.
 
 - [x] Added tools/media_services/smoke_client.py to run a live loopback model job and validate/save the artifact through managed outputs storage; no live inference has been run by the assistant.
+
+
+## 2026-10-19 — media supervision and QA upload-state candidate
+
+- [x] Preserved historical live passes: AudioGen generated a valid 3-second mono 16 kHz WAV in run 39135140674; run 39135140660 passed one controlled Kokoro → Whisper Turbo/Qwen3-ASR speech chain. ACE-Step was skipped because its package was absent.
+- [x] Preserved later failure evidence: audio bootstrap run 39149243881 did not reach package installation because StorageManager refused output-reserve resizing during an active managed operation; no packages were installed. Visual sidecar run 39149240005 loaded TRELLIS but the job request failed HTTP 507 because outputs had an active managed operation; LTX did not reach ready/model_loaded within 20 minutes.
+- [x] Candidate commit [f52aae4](https://github.com/Killer4K-N/OEC/commit/f52aae4dfac62d67f75401f7fb643e4a47a63b43) adds the local media service supervisor, safe GPU/port/import gates, loopback health probe, shared workflow serialization, a canonical QA/upload status helper, and two regression test files.
+- [ ] Run the new unit and temporary-SQLite tests using an already-authorized, verified $0 route. These tests have been authored but not executed in this candidate update.
+- [ ] Before model start, obtain fresh quota/StorageManager status and identify the active lease owner using the sanctioned manager interface. Never resize reserves during active operations or run purge to clear a lock.
+- [ ] Run one cache-only provider at a time, confirm health and validated audio/text/GLB/MP4 artifacts. No persistent service was started by this update.
+- [ ] Verify the actual OEC-Play server /health and /api/media-services from its dedicated environment; current live-server status remains unverified.
+- [ ] Integrate speech/music job types into brain.py and brain_config.json only after service contracts and artifact metadata are validated. Existing video prompt-batch limits are not audio/music chunking semantics.
