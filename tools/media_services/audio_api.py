@@ -40,7 +40,7 @@ class AudioProvider(MediaProvider):
     max_prompt_chars = 2500
 
     def __init__(self, model: str, allow_download: bool = False, whisper_size: str = "turbo",
-                 ace_config: str = "acestep-v15-turbo", ace_lm: str = "acestep-5Hz-lm-1.7B",
+                 ace_config: str = "acestep-v15-turbo", ace_lm: str = "acestep-5Hz-lm-0.6B",
                  kokoro_voice: str = "af_heart", require_cuda: bool = True):
         super().__init__(allow_download=allow_download)
         if model not in {"ace-step", "kokoro", "whisper", "qwen3-asr"}:
@@ -193,6 +193,8 @@ class AudioProvider(MediaProvider):
             cfg = h["GenerationConfig"](batch_size=1, use_random_seed=params["seed"] < 0, audio_format="flac")
             output_budget = max(0.05, params["duration_seconds"] * 0.0015)
             with managed_write("outputs", output_budget, minimum_free_gb=0.05):
+                output_budget = max(0.05, params["duration_seconds"] * 0.0015)
+            with managed_write("outputs", output_budget, minimum_free_gb=0.05):
                 result = h["generate_music"](h["dit"], h["llm"], gp, cfg, save_dir=str(output_dir))
             audios = getattr(result, "audios", None)
             if not getattr(result, "success", False) or not audios: raise RuntimeError("ACE-Step did not return a successful audio result")
@@ -246,7 +248,7 @@ def main() -> int:
     parser.add_argument("--allow-download", action="store_true", help="allow downloads after StorageManager admission; default cache-only")
     parser.add_argument("--whisper-size", choices=("tiny", "base", "small", "medium", "large-v3", "turbo"), default="turbo")
     parser.add_argument("--ace-config", default="acestep-v15-turbo")
-    parser.add_argument("--ace-lm", default="acestep-5Hz-lm-1.7B")
+    parser.add_argument("--ace-lm", default="acestep-5Hz-lm-0.6B")
     parser.add_argument("--kokoro-voice", default="af_heart")
     parser.add_argument("--allow-cpu", action="store_true", help="allow CPU inference if CUDA is unavailable")
     args = parser.parse_args()
