@@ -1,0 +1,56 @@
+name: OEC focused live-quota parser regression
+
+run-name: "OEC StoragePolicy quota regression - ${{ github.ref_name }}"
+
+on:
+  push:
+    branches:
+      - feat/media-service-sidecars-20261018
+    paths:
+      - ".github/workflows/oec-storage-policy-regression.yml"
+      - "storage_policy.py"
+      - "storage_manager.py"
+      - "tools/quota_snapshot.py"
+      - "tests/test_storage_policy.py"
+      - "tests/test_quota_snapshot.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-storage-policy-regression
+  cancel-in-progress: false
+
+jobs:
+  focused-quota-regression:
+    runs-on: [self-hosted, linux, x64, oec-1]
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout OEC feature branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify assigned runner and existing Python environment
+        run: |
+          set -euo pipefail
+          test "${RUNNER_NAME:-unknown}" = "oec-1" || {
+            echo "::error::Expected oec-1, got ${RUNNER_NAME:-unknown}"
+            exit 2
+          }
+          test -x "$HOME/Conda/condabin/conda"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1             python -c 'import sys; print("ENV=phase1"); print("PYTHON="+sys.version.split()[0])'
+
+      - name: Compile focused storage/quota source
+        run: |
+          set -euo pipefail
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1             python -m py_compile storage_policy.py storage_manager.py tools/quota_snapshot.py tests/test_storage_policy.py tests/test_quota_snapshot.py
+
+      - name: Run StoragePolicy and quota snapshot regression suites
+        run: |
+          set -euo pipefail
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1             python -m unittest -v tests.test_storage_policy tests.test_quota_snapshot
