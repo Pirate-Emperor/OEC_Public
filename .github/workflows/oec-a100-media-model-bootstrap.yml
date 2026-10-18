@@ -30,7 +30,7 @@ concurrency:
 jobs:
   inspect-download-smoke:
     # Self-hosted only: never substitute ubuntu-latest or a billable hosted runner.
-    runs-on: [self-hosted, linux, x64, gpu, a100]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
     timeout-minutes: 90
     defaults:
       run:
@@ -79,9 +79,11 @@ jobs:
           fi
           echo "OEC_PYTHON=$selected" >> "$GITHUB_ENV"
           "$selected" --version
+          test "${RUNNER_NAME:-unknown}" = "oec-1" || { echo "::error::Expected oec-1 A100 runner, got ${RUNNER_NAME:-unknown}"; exit 52; }
           echo "Runner host: $(hostname)"
+          echo "Runner name: $RUNNER_NAME"
           echo "Python: $selected"
-          nvidia-smi || true
+          nvidia-smi
 
       - name: Read current StorageManager status, log tail and cached models
         run: |
