@@ -1,0 +1,93 @@
+name: OEC AudioGen A100 notebook live smoke
+
+run-name: "OEC AudioGen phase1 live smoke - ${{ github.ref_name }}"
+
+on:
+  push:
+    branches:
+      - feat/media-service-sidecars-20261018
+    paths:
+      - ".github/workflows/oec-audiogen-notebook-smoke.yml"
+      - "pipeline_audiocraft.ipynb"
+      - "tools/run_audiogen_notebook_smoke.py"
+      - "tests/test_audiocraft_notebook_static.py"
+      - "storage_manager.py"
+      - "storage_policy.py"
+      - "storage_config.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-audiogen-notebook-live-smoke
+  cancel-in-progress: false
+
+jobs:
+  audiogen-live-smoke:
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout OEC feature branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify designated runner, phase1 CUDA environment, and current storage configuration
+        run: |
+          set -euo pipefail
+          test "${RUNNER_NAME:-unknown}" = "oec-1" || {
+            echo "::error::Expected the dedicated oec-1 A100 runner; got ${RUNNER_NAME:-unknown}."
+            exit 2
+          }
+          test -f "$HOME/Conda/condabin/conda" || {
+            echo "::error::Conda executable not found; no packages or model files were changed."
+            exit 2
+          }
+          test -f "$HOME/OEC/storage_config.json" || {
+            echo "::error::Current live OEC storage_config.json is unavailable; no model write is allowed."
+            exit 2
+          }
+          # Use the host's live reserve/target policy, not a stale repository default.
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -c 'import sys, torch, importlib.metadata as m; from audiocraft.models import AudioGen; from audiocraft.data.audio import audio_write; print("ENV=phase1"); print("PYTHON="+sys.version.split()[0]); print("TORCH="+torch.__version__); print("CUDA="+str(torch.version.cuda)); print("CUDA_AVAILABLE="+str(torch.cuda.is_available())); print("AUDIOCRAFT="+m.version("audiocraft")); print("TORCHVISION="+m.version("torchvision")); print("TORCHAUDIO="+m.version("torchaudio")); assert torch.cuda.is_available(), "CUDA is not available in phase1"'
+          nvidia-smi
+
+      - name: Compile notebook harness and run offline notebook regressions
+        run: |
+          set -euo pipefail
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -m py_compile tools/run_audiogen_notebook_smoke.py storage_manager.py storage_policy.py
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -m unittest discover -s tests -p 'test_audiocraft_notebook_static.py' -v
+
+      - name: Capture live StorageManager status
+        run: |
+          set -euo pipefail
+          export OEC_AUDIOGEN_SMOKE_DIR="$RUNNER_TEMP/oec-audiogen-smoke"
+          mkdir -p "$OEC_AUDIOGEN_SMOKE_DIR"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python storage_manager.py --status 2>&1 | tee "$OEC_AUDIOGEN_SMOKE_DIR/storage-status.log"
+
+      - name: Execute AudioGen notebook cells and generate one acceptance WAV
+        run: |
+          set -euo pipefail
+          export OEC_AUDIOGEN_SMOKE_DIR="$RUNNER_TEMP/oec-audiogen-smoke"
+          export OEC_AUDIOGEN_HEADLESS_SMOKE=1
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python tools/run_audiogen_notebook_smoke.py 2>&1 | tee "$OEC_AUDIOGEN_SMOKE_DIR/notebook-execution.log"
+
+      - name: Final read-only StorageManager status
+        if: always()
+        run: |
+          set +e
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python storage_manager.py --status 2>&1 | tee "$RUNNER_TEMP/oec-audiogen-smoke/final-storage-status.log"
+          exit 0
+
+      - name: Upload smoke report, logs, and generated WAV if available
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-audiogen-a100-smoke-${{ github.run_id }}
+          path: ${{ runner.temp }}/oec-audiogen-smoke/
+          if-no-files-found: warn
+          retention-days: 3
