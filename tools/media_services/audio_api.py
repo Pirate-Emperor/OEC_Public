@@ -191,7 +191,9 @@ class AudioProvider(MediaProvider):
                 duration=params["duration_seconds"], seed=params["seed"], inference_steps=params["steps"], bpm=params["bpm"],
                 vocal_language=params["language"])
             cfg = h["GenerationConfig"](batch_size=1, use_random_seed=params["seed"] < 0, audio_format="flac")
-            result = h["generate_music"](h["dit"], h["llm"], gp, cfg, save_dir=str(output_dir))
+            output_budget = max(0.05, params["duration_seconds"] * 0.0015)
+            with managed_write("outputs", output_budget, minimum_free_gb=0.05):
+                result = h["generate_music"](h["dit"], h["llm"], gp, cfg, save_dir=str(output_dir))
             audios = getattr(result, "audios", None)
             if not getattr(result, "success", False) or not audios: raise RuntimeError("ACE-Step did not return a successful audio result")
             source = Path(audios[0]["path"]).resolve()
