@@ -1,6 +1,22 @@
 
 # OEC Active TODO
 
+## 2026-10-18 — Live speech services and AudioGen notebook follow-through
+
+- [x] **Live speech pipeline accepted on the assigned `oec-1` A100 runner** in [Actions run 39135140660](https://github.com/Killer4K-N/OEC/actions/runs/39135140660). The job completed successfully. The API/validation and media-service CPU/mock suites passed **10/10 + 10/10**.
+- [x] Fresh quota telemetry is now parsed correctly when Lustre marks the used-KiB number with an asterisk. Strict StorageManager admission passed using the explicitly active soft-quota grace period and available hard-limit headroom; no directory-only fallback was used.
+- [x] The downloader verified cached weights for Kokoro-82M, Whisper-Turbo, and Qwen3-ASR-0.6B. No model-weight download was needed for those three providers.
+- [x] Isolated `oec-audio-py311` runtime checks and setup completed under StorageManager control; no shared `phase1` packages were upgraded.
+- [x] Kokoro speech synthesis passed on CUDA: generated a valid 24 kHz mono WAV, 4.7 seconds, 225,644 bytes; inference time 24.328 seconds; service startup plus inference 136.43 seconds.
+- [x] Whisper-Turbo transcription passed on CUDA: it transcribed the generated acceptance audio to valid text, 57 bytes, one segment; inference time 11.851 seconds; startup plus inference 46.90 seconds.
+- [x] Qwen3-ASR-0.6B transcription passed on CUDA: valid text, 57 bytes; it matched the Whisper output for this single test clip; inference time 28.711 seconds; startup plus inference 52.57 seconds.
+- [ ] ACE-Step music generation remains **SKIPPED**: none of the checked existing environments had the `acestep` package. The workflow deliberately did not install it into the shared environments.
+- [x] AudioGen notebook harness fix: the repo root is now added to `sys.path` before executing the notebook. The subsequent run reached code cell 4 after cells 1–3 passed, but run [39134976949](https://github.com/Killer4K-N/OEC/actions/runs/39134976949) was cancelled by the newer quota-parser commit before a model-load or WAV-acceptance marker was captured.
+- [ ] Latest AudioGen retry [39135140674](https://github.com/Killer4K-N/OEC/actions/runs/39135140674) was still queued on `oec-1` at the time of this update. Do not count notebook inference or AudioGen output as passed until that run produces a complete acceptance report.
+- [ ] Run the new `test_live_lustre_quota_parser_accepts_soft_quota_asterisk_marker` regression method in a focused runner-side suite. The regression source is present, but it has not yet been confirmed by that suite.
+- [ ] After AudioGen notebook acceptance, optionally connect it as a separate service provider; the current audio API still exposes Kokoro, Whisper, Qwen3-ASR and ACE-Step, not AudioGen.
+
+
 ## 2026-10-18 — A100 model downloads and utilization
 
 - [x] Added tools/prepare_media_models.py to read live storage_manager.py --status, tail the manager log, inventory model cache, inspect existing environments, aggregate-preflight model storage and download supported checkpoint groups with managed writes.
