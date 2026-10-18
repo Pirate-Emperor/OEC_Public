@@ -1,11 +1,54 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T21:15:20.823+05:30",
+  "last_updated": "2026-10-18T06:49:20.143Z",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Latest-cell validation run 38912593770 passed four targeted OEC notebook modes on oec-1: FLUX-only PNG generation, TRELLIS-only GLB generation, combined-notebook FLUX generation, and combined TRELLIS startup only. All are cache-only/local-scratch checks; combined TRELLIS generation and a joined end-to-end world-generation path remain unverified. Frozen-weight read-only audit 38924202279 completed with semantic status BLOCKED; no training or downloads started. Main is tracking-only; OEC code changes remain on fix/flux-trellis-pipeline-20261015.",
+  "latest_summary": "2026-10-18 local prototype tests passed 8/8 using a fake provider and small GLB/MP4/image fixtures; Python compilation passed. This demonstrates bounded HTTP job lifecycle and payload/artifact validation only. No live model inference, downloads, shared-storage mutation, cache purge or GitHub Actions were run. TRELLIS/LTX adapters remain prototype files in the downloadable archive until source transfer and independent review.",
   "experiments": [
+    {
+      "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
+      "date": "2026-10-18",
+      "category": "local CPU-only API and artifact-fixture regression",
+      "approach": "Compile the proposed shared sidecar service, TRELLIS adapter, LTX adapter and unittest file; run isolated API tests with a fake provider and small local fixtures.",
+      "reason": "Validate job queuing/status/result routing, health readiness, request/image checks, and GLB/MP4 container guards before any authorized GPU use.",
+      "parameters": {
+        "commands": [
+          "python -m py_compile tools/media_services/common.py tools/media_services/trellis_api.py tools/media_services/ltx_api.py tests/test_media_service_api.py",
+          "python -m unittest discover -s tests -p 'test_media_service_api.py' -v"
+        ],
+        "compute": "Local CPU only; fake provider; small synthetic/local test fixtures",
+        "model_downloads": false,
+        "gpu_inference": false,
+        "shared_cache_purge": false,
+        "github_actions_triggered": false
+      },
+      "results": {
+        "compile": "PASS",
+        "tests_passed": 8,
+        "tests_failed": 0,
+        "tests_errored": 0,
+        "duration_seconds": 0.66,
+        "test_names": [
+          "test_glb_validation_requires_nonempty_mesh_accessors",
+          "test_health_is_not_ready_until_model_loaded",
+          "test_http_routes_return_health_status_and_not_found",
+          "test_image_payload_validation_rejects_bad_base64_and_bad_image",
+          "test_invalid_request_and_queue_saturation",
+          "test_mp4_structure_validation",
+          "test_result_not_ready_and_unknown_result",
+          "test_submit_status_and_result_lifecycle"
+        ]
+      },
+      "interpretation": "The mock/fixture API contract passes its initial local regression suite. It does not prove that a live TRELLIS or LTX runtime loads, generates a valid real artifact, or works from the OEC-Play client.",
+      "limitations": [
+        "Adapters are in a local prototype archive and are not yet committed to this repository.",
+        "No live GPU inference, model load, download, storage admission on the cluster, or client-to-sidecar integration was tested.",
+        "MP4 fixture validation is a basic container test; production output must additionally be read by ffprobe or a decoder on the assigned LTX environment.",
+        "Cache purge after load remains disabled in the adapter prototypes."
+      ],
+      "artifact": "OEC_media_service_sidecars_2026-10-18.zip (downloadable in the corresponding project chat)"
+    },
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
       "date": "2026-10-09",
