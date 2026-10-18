@@ -176,6 +176,42 @@ class MediaServiceApiTests(unittest.TestCase):
         with self.assertRaises(common.RequestError):
             common.image_bytes_to_png(base64.b64encode(b"not an image").decode())
 
+    def test_audio_payload_validation_accepts_wav_signature_and_rejects_bad_base64(self):
+        wav = b"RIFF" + b"\x00\x00\x00\x00" + b"WAVE" + b"fmt " + b"\x00" * 16
+        decoded, extension = common.audio_bytes_with_extension(base64.b64encode(wav).decode())
+        self.assertEqual(extension, "wav")
+        self.assertEqual(decoded, wav)
+        with self.assertRaises(common.RequestError):
+            common.audio_bytes_with_extension("%%%not-base64%%")
+        with self.assertRaises(common.RequestError):
+            common.audio_bytes_with_extension(base64.b64encode(b"not audio").decode())
+
+    def test_audio_upload_is_saved_as_validated_container(self):
+        class AudioProvider(FakeProvider):
+            def validate_request(inner_self, payload):
+                return {"task": "transcribe", "expects_audio": True}
+
+            def run_job(inner_self, job_id, request, input_file):
+                self.assertIsNotNone(input_file)
+                self.assertEqual(input_file.suffix, ".wav")
+                self.assertTrue(input_file.read_bytes().startswith(b"RIFF"))
+                path = inner_self.output_root / f"{job_id}.txt"
+                path.write_text("test transcript\n", encoding="utf-8")
+                return path, {"test": True}
+
+        service = self.new_service(AudioProvider())
+        try:
+            wav = b"RIFF" + b"\x00\x00\x00\x00" + b"WAVE" + b"fmt " + b"\x00" * 16
+            accepted = service.submit({"task": "transcribe", "audio_base64": base64.b64encode(wav).decode()})
+            deadline = time.time() + 3
+            status = service.get_job(accepted["job_id"])
+            while status and status["status"] not in {"succeeded", "failed"} and time.time() < deadline:
+                time.sleep(0.01)
+                status = service.get_job(accepted["job_id"])
+            self.assertEqual(status["status"], "succeeded")
+        finally:
+            service.stop()
+
     def test_glb_validation_requires_nonempty_mesh_accessors(self):
         with tempfile.TemporaryDirectory() as folder:
             good = Path(folder) / "good.glb"
