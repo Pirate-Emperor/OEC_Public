@@ -4,13 +4,13 @@
 
 The current audit separates three different controls: disk-cache purge, live model unload and CUDA allocator cleanup. OEC's filesystem purger only removes cache files; GPU-memory release requires dropping live pipeline/engine references and cleaning device state. Keep cache purge disabled for TRELLIS, FLUX and the new LTX sidecar until a second inference succeeds after deletion of that exact model cache folder. The existing production LTX launch uses `--no-purge`.
 
-An isolated local prototype now exists in the downloadable `OEC_media_service_sidecars_2026-10-18.zip` archive. It provides a bounded JSON job API design for TRELLIS image-to-GLB on loopback port 7868 and LTX text/image-to-MP4 on loopback port 7869, keeping their CUDA stacks separate from OEC-Play's Waypoint server. Local compile checks passed and the fake-provider/fixture suite passed 8/8 tests. These tests demonstrate API/job validation and artifact-fixture checks only; no TRELLIS/LTX inference, model download, quota-changing write, or live OEC-Play service integration occurred. The timeout check notices overruns only after inference returns; hard termination of a hung CUDA call needs process-level supervision and remains unfinished. Adapter files in the archive are not yet committed to this repository.
+Source files for the TRELLIS and LTX sidecars are now committed on the isolated `feat/media-service-sidecars-20261018` branch: `tools/media_services/common.py`, `trellis_api.py`, `ltx_api.py`, `__init__.py`, and `tests/test_media_service_api.py`. The companion ZIP is a convenient snapshot. Local compile checks passed and the fake-provider/fixture suite passed 8/8 tests against the local prototype. This demonstrates API/job validation and artifact-fixture checks only; no TRELLIS/LTX inference, model download, quota-changing write, or live OEC-Play service integration occurred. The timeout check notices overruns only after inference returns; hard termination of a hung CUDA call needs process-level supervision and remains unfinished. The branch source was not independently checked out and re-tested after transfer.
 
 Additional model triage favors ACE-Step 1.5 for music generation, Kokoro-82M for lightweight English speech, SenseVoice/Whisper for speech input, and Hunyuan3D-2.1 as a later geometry baseline. MusicGen/AudioGen weights should remain research-only until their CC-BY-NC 4.0 weight terms are acceptable for the intended product. Provider routing remains deterministic orchestration, not a trained MoE.
 
 The original 15-day project deadline could not be recovered from an authoritative start/deadline record in this pass; no remaining-days figure is asserted.
 
-**Last updated:** 2026-10-18T12:23:07.763+05:30 (Asia/Kolkata)
+**Last updated:** 2026-10-18T12:30:32.136+05:30 (Asia/Kolkata)
 **Branch:** `feat/media-service-sidecars-20261018` (isolated implementation and tracking branch; not merged to main).
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
