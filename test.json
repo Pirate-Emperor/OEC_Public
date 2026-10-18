@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-18T07:00:40.947Z",
+  "last_updated": "2026-10-18T09:02:28.123Z",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "2026-10-18 local compile check and CPU/mock sidecar API suite passed 8/8 using a fake provider and small GLB/MP4/image fixtures. Sidecar source and tests have since been committed on feat/media-service-sidecars-20261018, but a fresh checkout of the remote branch has not been tested separately. No live model inference, downloads, shared-storage mutation, cache purge or GitHub Actions were run. The timeout currently detects overruns only after a provider call returns.",
+  "latest_summary": "Audio model adapters for ACE-Step 1.5, Kokoro-82M, Whisper and Qwen3-ASR 0.6B, plus per-model cache/purge guards, were added on the isolated OEC feature branch. Local compile and CPU/mock checks passed 16/16. No model weights were downloaded, no GPU or StorageManager daemon was run by the assistant, no cache was purged and no GitHub Actions was triggered. Live model behavior, license/dependency audit on installed stacks, output quality, VRAM/latency and post-purge reload remain unverified. Operator-supplied quota_check baseline on 2026-10-18: 2.14 TB project occupancy, 2.15 TB soft limit, 2.25 TB hard limit; 1836 GitHub Actions minutes reported used. The assistant did not start StorageManager or obtain a live A100 reading.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -2782,6 +2782,61 @@
         "https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38924202279"
       ],
       "follow_up": "Keep the result as component-level cache-only evidence. The combined TRELLIS notebook needs a separate live generate request and exact output inspection before the combined path is claimed. Continue blocking managed storage writes and model/data downloads until a fresh quota snapshot and normal storage admission are approved. Resolve the independent oec-freeze blockers before any real-model PEFT experiment."
+    },
+    {
+      "id": "EXP-2026-10-18-AUDIO-SIDECARS-CACHE-GUARDS-CPU",
+      "date": "2026-10-18",
+      "category": "local CPU-only adapter and cache-safety validation",
+      "approach": "Compile the media API and audio provider sources, then run the OEC service unittest suite with fake providers and small fixtures.",
+      "reason": "Confirm request validation, audio payload handling, configured model-root confinement, per-model runtime locking and managed output paths before any live model or download.",
+      "parameters": {
+        "commands": [
+          "python -m py_compile tools/media_services/common.py tools/media_services/model_cache.py tools/media_services/audio_api.py tools/media_services/trellis_api.py tools/media_services/ltx_api.py tools/model_cache_manager.py tests/test_media_service_api.py tests/test_audio_service_validation.py",
+          "python -m unittest discover -s tests -v"
+        ],
+        "compute": "Local CPU only; fake provider and unit-level fixtures",
+        "audio_models": [
+          "ACE-Step 1.5",
+          "Kokoro-82M",
+          "Whisper turbo (request validation only)",
+          "Qwen3-ASR 0.6B (request validation only)"
+        ],
+        "model_downloads": false,
+        "dependency_installs": false,
+        "gpu_inference": false,
+        "storage_manager_started_by_assistant": false,
+        "storage_quota_write": false,
+        "shared_cache_purge": false,
+        "reserve_file_access": false,
+        "github_actions_triggered": false,
+        "operator_supplied_quota_baseline": {
+          "date": "2026-10-18",
+          "project_occupancy_TB": 2.14,
+          "soft_limit_TB": 2.15,
+          "hard_limit_TB": 2.25,
+          "github_actions_minutes_reported_used": 1836,
+          "source": "user-supplied quota_check output, not directly read by this experiment"
+        }
+      },
+      "results": {
+        "compile": "PASS",
+        "tests_passed": 16,
+        "tests_failed": 0,
+        "tests_errored": 0,
+        "duration_seconds": 0.65,
+        "live_model_loading": "NOT_RUN",
+        "generated_audio_or_transcript_artifact": "NOT_RUN",
+        "direct_storage_manager_status": "NOT_RUN",
+        "fresh_checkout_test": "NOT_RUN",
+        "cache_purge_and_reload": "NOT_RUN"
+      },
+      "interpretation": "The CPU/mock suite supports correctness of the tested API, request bounds, cache path selection and runtime-lock behavior. It does not prove model API compatibility in the installed environments, real inference, output quality, resource fit or purge safety.",
+      "next_steps": [
+        "Inspect intended pre-existing isolated Conda environments and cached model files.",
+        "Use the already-running StorageManager to confirm current admission before any model write or service start.",
+        "Run one authorized smoke test per model and record artefact, model revision, latency, peak VRAM and output validation.",
+        "Test exact-folder cache purge only after stopping the service; verify resident inference after purge and then a separate restart/reload before approving that model's purge policy."
+      ]
     }
   ]
 }
