@@ -1,6 +1,6 @@
 name: OEC A100 model download and live smoke
 
-run-name: "OEC A100 model bootstrap - ${{ github.ref_name }}"
+run-name: "OEC A100 model bootstrap - \${{ github.ref_name }}"
 
 on:
   push:
@@ -29,7 +29,6 @@ concurrency:
 
 jobs:
   inspect-download-smoke:
-    # Self-hosted only: never substitute ubuntu-latest or a billable hosted runner.
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
     timeout-minutes: 90
     defaults:
@@ -38,6 +37,8 @@ jobs:
     steps:
       - name: Checkout OEC feature branch
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Select existing Python with StorageManager and Hugging Face tools
         run: |
@@ -51,41 +52,34 @@ jobs:
             echo "::error::Conda was not found. No installs or downloads were attempted."
             exit 2
           fi
-
-          # Use the host's current storage policy, including the operator's reserve/target
-          # changes, rather than blindly using the committed default storage_config.json.
           if [[ ! -f "$HOME/OEC/storage_config.json" ]]; then
-            echo "::error::Could not find $HOME/OEC/storage_config.json to confirm the live model target/reserve policy."
+            echo "::error::Could not find $HOME/OEC/storage_config.json; no model write is allowed."
             exit 2
           fi
           install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
-
           selected=""
           for name in oec_deploy phase1 phase1_ltx phase2_3d; do
             py="$(conda run --no-capture-output -n "$name" python -c 'import sys; print(sys.executable)' 2>/dev/null | tail -n 1 || true)"
-            if [[ -z "$py" || ! -x "$py" ]]; then
-              continue
-            fi
+            if [[ -z "$py" || ! -x "$py" ]]; then continue; fi
             if "$py" -c 'import huggingface_hub, core_config; from storage_manager import storage_preflight, managed_storage_operation' >/dev/null 2>&1; then
               selected="$py"
               echo "SELECTED_ENV=$name"
               break
             fi
           done
-
           if [[ -z "$selected" ]]; then
-            echo "::error::No existing Conda environment can import OEC StorageManager and huggingface_hub. No dependencies were installed and no model files were downloaded."
+            echo "::error::No existing Conda environment can import OEC StorageManager and huggingface_hub. No installs or model downloads were attempted."
             exit 2
           fi
           echo "OEC_PYTHON=$selected" >> "$GITHUB_ENV"
           "$selected" --version
-          test "${RUNNER_NAME:-unknown}" = "oec-1" || { echo "::error::Expected oec-1 A100 runner, got ${RUNNER_NAME:-unknown}"; exit 52; }
+          test "\${RUNNER_NAME:-unknown}" = "oec-1" || { echo "::error::Expected oec-1 A100 runner, got \${RUNNER_NAME:-unknown}"; exit 52; }
           echo "Runner host: $(hostname)"
           echo "Runner name: $RUNNER_NAME"
           echo "Python: $selected"
           nvidia-smi
 
-      - name: Compile and run CPU/mock regressions before storage changes
+      - name: Compile and run CPU/mock regressions before any storage writes
         run: |
           set -euo pipefail
           "$OEC_PYTHON" -m py_compile tools/prepare_media_models.py tools/run_media_model_smokes.py tools/media_services/common.py tools/media_services/model_cache.py tools/media_services/audio_api.py tools/media_services/smoke_client.py tools/model_cache_manager.py tests/test_media_service_api.py tests/test_audio_service_validation.py
@@ -97,54 +91,60 @@ jobs:
           set -euo pipefail
           "$OEC_PYTHON" tools/prepare_media_models.py status
 
-      - name: Audit existing inference environments
+      - name: Audit existing inference environments without installing packages
         run: |
           set +e
           "$OEC_PYTHON" tools/prepare_media_models.py env-audit
           rc=$?
           echo "ENV_AUDIT_EXIT_CODE=$rc"
-          # Missing inference packages are reported as a skip; fresh storage admission
-          # still gates every actual checkpoint write.
           exit 0
 
-      - name: Aggregate models-target plus positive-reserve preflight
+      - name: Download speech checkpoint groups sequentially with strict live admission
         run: |
           set -euo pipefail
-          "$OEC_PYTHON" tools/prepare_media_models.py plan --preflight --use-manager-directory-only --reserve-floor-gb 40
+          # The downloader checks cache completeness first; missing weights must pass fresh quota admission.
+          for model in kokoro whisper-turbo qwen3-asr-0.6b; do
+            echo "SPEECH_MODEL_START=$model"
+            "$OEC_PYTHON" tools/prepare_media_models.py download --model "$model"
+            echo "SPEECH_MODEL_FINISH=$model"
+          done
 
-      - name: Download checkpoint groups sequentially under managed storage
+      - name: Admit isolated speech runtime dependency setup
+        if: success()
         run: |
           set -euo pipefail
-          "$OEC_PYTHON" tools/prepare_media_models.py download --model all --use-manager-directory-only --reserve-floor-gb 40
+          "$OEC_PYTHON" -c 'from storage_manager import storage_preflight; ok, reason = storage_preflight("models", required_gb=1.5, require_fresh_quota=True, minimum_free_gb=2.0); print("AUDIO_RUNTIME_STORAGE_ADMISSION=" + str(bool(ok)) + " reason=" + str(reason)); raise SystemExit(0 if ok else 2)'
 
-      - name: Recheck model cache after downloads
-        if: always()
-        run: |
-          set +e
-          if [[ -n "${OEC_PYTHON:-}" ]]; then
-            "$OEC_PYTHON" tools/model_cache_manager.py status
-          else
-            echo "OEC_PYTHON was not selected; cache status unavailable."
-          fi
-
-      - name: Prepare isolated audio runtimes and verify output reserve
+      - name: Prepare isolated speech runtime and verify output reserve
         if: success()
         run: |
           set -euo pipefail
           "$OEC_PYTHON" tools/prepare_media_runtime.py
 
-      - name: Run live inference smoke jobs in existing runtimes
+      - name: Run live speech inference smoke jobs
         if: success()
         run: |
           set -euo pipefail
           "$OEC_PYTHON" tools/run_media_model_smokes.py
 
+      - name: Recheck model cache after downloads
+        if: always()
+        run: |
+          set +e
+          if [[ -n "\${OEC_PYTHON:-}" ]]; then
+            "$OEC_PYTHON" tools/model_cache_manager.py status
+          else
+            echo "OEC_PYTHON was not selected; cache status unavailable."
+          fi
+          exit 0
+
       - name: Final StorageManager status and latest logs
         if: always()
         run: |
           set +e
-          if [[ -n "${OEC_PYTHON:-}" ]]; then
+          if [[ -n "\${OEC_PYTHON:-}" ]]; then
             "$OEC_PYTHON" tools/prepare_media_models.py status
           else
             echo "No valid OEC Python selected; direct status command was not run."
           fi
+          exit 0

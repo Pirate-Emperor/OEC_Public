@@ -123,8 +123,8 @@ def _run_provider(provider: str, python: Path, audio_path: Path | None, log_dir:
     env["PATH"] = str(python.parent) + os.pathsep + env.get("PATH", "")
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONPATH"] = str(ROOT) + os.pathsep + str(MEDIA) + os.pathsep + env.get("PYTHONPATH", "")
-    # Enabled only after prepare_media_runtime verifies the directory budget and reserve.
-    env["OEC_USE_MANAGER_DIRECTORY_ONLY"] = "1"
+    # Do not fall back to directory-only admission for shared model/output writes.
+    env["OEC_USE_MANAGER_DIRECTORY_ONLY"] = "0"
     command = [str(python), str(MEDIA / "audio_api.py"), "--model", provider, "--host", "127.0.0.1", "--port", str(port)]
     print(f"SMOKE_START provider={provider} environment_python={python} port={port}", flush=True)
     started = time.monotonic()
