@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-18T06:49:20.143Z",
+  "last_updated": "2026-10-18T06:53:00.849Z",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
   "latest_summary": "2026-10-18 local prototype tests passed 8/8 using a fake provider and small GLB/MP4/image fixtures; Python compilation passed. This demonstrates bounded HTTP job lifecycle and payload/artifact validation only. No live model inference, downloads, shared-storage mutation, cache purge or GitHub Actions were run. TRELLIS/LTX adapters remain prototype files in the downloadable archive until source transfer and independent review.",
@@ -45,7 +45,8 @@
         "Adapters are in a local prototype archive and are not yet committed to this repository.",
         "No live GPU inference, model load, download, storage admission on the cluster, or client-to-sidecar integration was tested.",
         "MP4 fixture validation is a basic container test; production output must additionally be read by ffprobe or a decoder on the assigned LTX environment.",
-        "Cache purge after load remains disabled in the adapter prototypes."
+        "Cache purge after load remains disabled in the adapter prototypes.",
+        "The configured timeout is checked after a provider call returns; a hung in-process CUDA inference call is not forcibly terminated. Process-level timeout supervision remains to be implemented."
       ],
       "artifact": "OEC_media_service_sidecars_2026-10-18.zip (downloadable in the corresponding project chat)"
     },
