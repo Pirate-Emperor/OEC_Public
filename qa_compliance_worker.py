@@ -22,6 +22,7 @@ from PIL import Image
 from purge_manager import DiskPurgeManager
 from storage_manager import managed_storage_operation
 from storage_policy import BYTES_PER_GB, estimate_hf_repo_bytes
+from asset_status import mark_upload_pending
 
 # ==============================================================================
 # 2. GLOBAL LOGGING & CRASH CATCHER (Must be defined first)
@@ -361,10 +362,7 @@ def process_qa_queue(purge_after_load=True):
                         
                     new_size = os.path.getsize(raw_vid_path) + os.path.getsize(json_path)
                     with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                        conn.execute(
-                            "UPDATE assets SET status = 'PENDING_UPLOAD', total_size_bytes = ? WHERE id = ?", 
-                            (new_size, record_id)
-                        )
+                        mark_upload_pending(conn, record_id, new_size)
                     print(f"[QA-NODE] QA Complete. Asset handed over to HF Upload Daemon.")
                 else:
                     print(f"[QA-NODE] Quality Improver failed. Rejecting asset.")

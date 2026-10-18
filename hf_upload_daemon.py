@@ -16,6 +16,7 @@ from huggingface_hub import HfApi
 # 1. IMPORT CORE CONFIG
 from core_config import UPLOAD_BATCH_SIZE_GB, HF_DATASET_REPO, QUEUE_DB_PATH, SYSTEM_DIRS
 from storage_manager import storage_preflight_path, managed_storage_operation
+from asset_status import fetch_pending_upload_rows, recover_archiving_rows, rollback_upload_batch
 
 log_path = os.path.join(SYSTEM_DIRS['logs'], "upload_daemon.log")
 logging.basicConfig(
@@ -173,9 +174,9 @@ class HFUploadDaemon:
             # --- FIX 2: DB ROLLBACK RUNS ONLY ONCE AT STARTUP ---
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute("UPDATE assets SET status = 'PENDING' WHERE status = 'ARCHIVING'")
-                if cursor.rowcount > 0:
-                    logging.info(f"Recovered {cursor.rowcount} assets stuck in 'ARCHIVING' state from a previous proxy crash.")
+                recovered = recover_archiving_rows(conn)
+                if recovered > 0:
+                    logging.info(f"Recovered {recovered} assets stuck in 'ARCHIVING' state from a previous proxy crash.")
                 conn.commit()
                 
         except Exception as e:
@@ -185,12 +186,7 @@ class HFUploadDaemon:
         now = time.time()
 
         with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT id, asset_path, json_path, total_size_bytes, timestamp "
-                "FROM assets WHERE status = 'PENDING' ORDER BY id ASC"
-            )
-            rows = cursor.fetchall()
+            rows = fetch_pending_upload_rows(conn)
 
             batch_ids, batch_files = [], []
             current_size = 0
@@ -350,7 +346,7 @@ class HFUploadDaemon:
                 if batch_ids:
                     logging.info(f"Safety Net: Rolling back {len(batch_ids)} records to PENDING so they aren't lost.")
                     with sqlite3.connect(self.db_path) as conn:
-                        conn.execute(f"UPDATE assets SET status = 'PENDING' WHERE id IN ({','.join(map(str, batch_ids))})")
+                        rollback_upload_batch(conn, batch_ids)
                 if tar_path and os.path.exists(tar_path):
                     os.remove(tar_path)
                     

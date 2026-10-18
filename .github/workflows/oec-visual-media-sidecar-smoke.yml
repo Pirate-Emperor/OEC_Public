@@ -25,9 +25,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: oec-visual-media-sidecar-smoke
-  # A newer code revision must replace a stale, long-running GPU acceptance job.
-  cancel-in-progress: true
+  # Shared oec-1 GPU and StorageManager state: serialize all media jobs.
+  group: oec-media-gpu-storage-serial
+  cancel-in-progress: false
 
 jobs:
   sequential-visual-model-acceptance:

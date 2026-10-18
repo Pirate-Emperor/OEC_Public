@@ -20,8 +20,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: oec-audiogen-notebook-live-smoke
-  cancel-in-progress: true
+  # Shared oec-1 GPU and StorageManager state: serialize all media jobs.
+  group: oec-media-gpu-storage-serial
+  cancel-in-progress: false
 
 jobs:
   audiogen-live-smoke:
