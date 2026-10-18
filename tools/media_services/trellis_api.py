@@ -103,17 +103,18 @@ class TrellisProvider(MediaProvider):
         output_path = safe_child(job_dir, f"{job_id}.glb")
         params = request["parameters"]
         start = time.monotonic()
-        generated = self.module.generate_glb(
-            image=image,
-            pipeline=self.pipeline,
-            o_voxel=self.runtime["o_voxel"],
-            system_dirs=dirs,
-            output_dir=None,
-            output_path=output_path,
-            max_image_size=params["max_image_size"],
-            decimation_target=params["decimation_target"],
-            texture_size=params["texture_size"],
-        )
+        with managed_write("outputs", 0.25, minimum_free_gb=0.05):
+            generated = self.module.generate_glb(
+                image=image,
+                pipeline=self.pipeline,
+                o_voxel=self.runtime["o_voxel"],
+                system_dirs=dirs,
+                output_dir=None,
+                output_path=output_path,
+                max_image_size=params["max_image_size"],
+                decimation_target=params["decimation_target"],
+                texture_size=params["texture_size"],
+            )
         path = Path(generated).resolve()
         geometry = validate_glb(path)
         return path, {
