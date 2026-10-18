@@ -33,7 +33,7 @@ The local suite validates the prototype API/job boundaries only. It does not pro
 
 
 ## Companion OEC-Deploy status observed read-only
-- On `hpc-dgx-deployment`, source CI run [391062060](https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39106015325) failed at client lint/type-check with `better-tailwindcss/enforce-consistent-line-wrapping` errors; Python source-validation steps passed. A newer source CI run [39106225707](https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39106225707) was still in progress at the last inspection, and persistent-checkout sync [39106225689](https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39106225689) was queued. This session did not edit OEC_Deploy, trigger, cancel or duplicate those workflows.
+- On `hpc-dgx-deployment`, source CI run [39106015325](https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39106015325) failed at client lint/type-check with `better-tailwindcss/enforce-consistent-line-wrapping` errors; Python source-validation steps passed. A newer source CI run [39106225707](https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39106225707) was still in progress at the last inspection, and persistent-checkout sync [39106225689](https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39106225689) was queued. This session did not edit OEC_Deploy, trigger, cancel or duplicate those workflows.
 
 ## Next actions
 1. Review the committed sidecar files and rerun the CPU/mock suite from a fresh checkout of this feature branch.
