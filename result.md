@@ -1,5 +1,16 @@
 # OEC Significant Results
 
+## 2026-10-18 follow-up — audio model service and managed cache paths
+
+Added isolated service adapters for ACE-Step 1.5 music generation, Kokoro-82M TTS, Whisper transcription and Qwen3-ASR 0.6B multilingual transcription. Their default ports are 7870-7873 on loopback only. Download remains opt-in; checkpoints use the configured OEC model directory. Added a read/status and explicit per-model purge utility using the existing OEC DiskPurgeManager with runtime-lock checks. The shared media service now places persistent job status and temporary uploaded inputs under the configured outputs target because the current StorageManager config exposes models and outputs as its logical targets.
+
+Local checks on the working source: Python compilation passed; 16/16 CPU/mock tests passed. The tests cover request bounds, voice selection, transcription options, audio container/base64 handling, job upload lifecycle, cache-root confinement and locks. These tests do not load a real model or assess generated music, voice quality, language accuracy, VRAM or latency. The connected feature branch files were read/written through the GitHub integration; a fresh checkout was not run here.
+
+Operator-supplied quota_check baseline on 2026-10-18: 2.14 TB project occupancy, 2.15 TB soft limit, 2.25 TB hard limit; 1836 GitHub Actions minutes reported used. The assistant did not start StorageManager or obtain a live A100 reading.
+
+No StorageManager daemon, model download, environment install, GPU inference, purge, reserve-file access, or GitHub Actions run was performed by this source implementation. Model-specific purge is still unapproved until first-output, post-purge resident inference and independent clean-restart/reload acceptance all pass. The original 15-day project duration is not recomputed here.
+
+
 ## 2026-10-18 — Media-service prototype and model-cache policy
 
 The current audit separates three different controls: disk-cache purge, live model unload and CUDA allocator cleanup. OEC's filesystem purger only removes cache files; GPU-memory release requires dropping live pipeline/engine references and cleaning device state. Keep cache purge disabled for TRELLIS, FLUX and the new LTX sidecar until a second inference succeeds after deletion of that exact model cache folder. The existing production LTX launch uses `--no-purge`.
