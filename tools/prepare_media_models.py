@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import shutil
@@ -131,6 +132,95 @@ def _is_complete(model: str) -> bool:
     return False
 
 
+def _models_config() -> tuple[dict[str, Any], dict[str, Any]]:
+    config_path = ROOT / "storage_config.json"
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"cannot read active storage_config.json ({type(exc).__name__})") from exc
+    entry = next((item for item in config.get("directories", []) if item.get("name") == "models"), None)
+    if not isinstance(entry, dict):
+        raise RuntimeError("models logical storage directory is missing from storage_config.json")
+    return config, entry
+
+
+def _read_model_storage_status() -> dict[str, Any]:
+    command = [sys.executable, str(ROOT / "storage_manager.py"), "--status"]
+    try:
+        proc = subprocess.run(command, cwd=str(ROOT), text=True, capture_output=True, timeout=30, check=False)
+    except Exception as exc:
+        raise RuntimeError(f"StorageManager status could not run ({type(exc).__name__})") from exc
+    if proc.returncode:
+        raise RuntimeError(f"StorageManager --status failed: {proc.stderr[-2000:]}")
+    match = re.search(
+        r"\[models\]\s+state=(\w+)\s+actual=([\d.]+)\s+GB\s*/\s*([\d.]+)\s+GB\s+reserve=([\d.]+)\s+GB",
+        proc.stdout,
+    )
+    if not match:
+        raise RuntimeError("could not parse the live [models] status row; refusing capacity assumptions")
+    state, actual, target, reserve = match.groups()
+    return {"state": state.upper(), "actual_gb": float(actual), "target_gb": float(target),
+            "reserve_gb": float(reserve), "stdout": proc.stdout, "stderr": proc.stderr}
+
+
+def _effective_reserve_floor(requested_gb: float) -> float:
+    config, models = _models_config()
+    minimum = float(models.get("minimum_reserve_gb", config.get("minimum_reserve_gb", 0.25)))
+    configured_target = models.get("reserve_target_gb")
+    floor = max(float(requested_gb), minimum)
+    if configured_target is not None:
+        floor = max(floor, float(configured_target))
+    if floor <= 0:
+        raise RuntimeError("refusing zero or negative model reserve")
+    return floor
+
+
+def _manager_directory_capacity(required_gb: float, reserve_floor_gb: float, *, resize_reserve: bool) -> dict[str, Any]:
+    """Admit against the live OEC models target, reserving positive capacity."""
+    status = _read_model_storage_status()
+    reserve_floor_gb = _effective_reserve_floor(reserve_floor_gb)
+    state, actual, target, reserve = status["state"], status["actual_gb"], status["target_gb"], status["reserve_gb"]
+    if state not in {"NORMAL", "WARNING"}:
+        raise RuntimeError(f"OEC models directory state is {state}; refusing new model writes")
+    projected = actual + float(required_gb) + MINIMUM_FREE_GB + reserve_floor_gb
+    if projected > target + 0.01:
+        raise RuntimeError(
+            f"models budget denied: content={actual:.2f} GB + download={required_gb:.2f} GB "
+            f"+ margin={MINIMUM_FREE_GB:.2f} GB + positive reserve={reserve_floor_gb:.2f} GB "
+            f"exceeds target={target:.2f} GB"
+        )
+    if reserve + 0.1 < reserve_floor_gb:
+        raise RuntimeError(
+            f"current reserve {reserve:.2f} GB is below the required positive reserve "
+            f"{reserve_floor_gb:.2f} GB; reserve growth remains quota-gated"
+        )
+
+    resized = False
+    if resize_reserve and reserve > reserve_floor_gb + 0.1:
+        command = [sys.executable, str(ROOT / "storage_manager.py"), "--set-reserve-gb", "models",
+                   "--reserve-gb", f"{reserve_floor_gb:.3f}"]
+        proc = subprocess.run(command, cwd=str(ROOT), text=True, capture_output=True, timeout=60, check=False)
+        print("RESERVE_RESIZE_COMMAND=" + json.dumps({"returncode": proc.returncode,
+              "stdout": proc.stdout[-2000:], "stderr": proc.stderr[-2000:]}, ensure_ascii=False), flush=True)
+        if proc.returncode:
+            raise RuntimeError("sanctioned StorageManager reserve shrink failed; no model downloads were started")
+        status = _read_model_storage_status()
+        state, actual, target, reserve = status["state"], status["actual_gb"], status["target_gb"], status["reserve_gb"]
+        resized = True
+        if state not in {"NORMAL", "WARNING"} or abs(reserve - reserve_floor_gb) > 0.15:
+            raise RuntimeError(
+                f"post-resize status did not verify the reserve floor "
+                f"(state={state}, reserve={reserve:.2f} GB, requested={reserve_floor_gb:.2f} GB)"
+            )
+    projected_after = actual + float(required_gb) + MINIMUM_FREE_GB + reserve
+    if projected_after > target + 0.01:
+        raise RuntimeError(f"post-resize budget failed: projected={projected_after:.2f} GB target={target:.2f} GB")
+    return {"state": state, "content_gb": actual, "target_gb": target, "reserve_gb": reserve,
+            "required_download_gb": float(required_gb), "safety_margin_gb": MINIMUM_FREE_GB,
+            "projected_total_after_download_and_reserve_gb": projected_after,
+            "reserve_floor_gb": reserve_floor_gb, "reserve_resized": resized}
+
+
 def _storage_manager_status() -> dict[str, Any]:
     """Invoke the existing CLI's read-only --status command; never start daemon mode."""
     command = [sys.executable, str(ROOT / "storage_manager.py"), "--status"]
@@ -233,7 +323,7 @@ def status() -> int:
     return 0 if manager.get("returncode", 1) == 0 else 2
 
 
-def _download_hf_cache(model: str) -> dict[str, Any]:
+def _download_hf_cache(model: str, *, manager_directory_only: bool = False) -> dict[str, Any]:
     try:
         from huggingface_hub import snapshot_download
     except ImportError as exc:
@@ -243,12 +333,13 @@ def _download_hf_cache(model: str) -> dict[str, Any]:
     target = MODEL_SPECS["target"] if spec["kind"] == "hf-local" else None
     before = _bytes(target) if target else _bytes(HUB_CACHE / ("models--" + repo_id.replace("/", "--")))
     required_gb = float(spec["required_gb"])
-    ok, reason = storage_preflight("models", required_gb, require_fresh_quota=True, minimum_free_gb=MINIMUM_FREE_GB)
+    require_fresh = not manager_directory_only
+    ok, reason = storage_preflight("models", required_gb, require_fresh_quota=require_fresh, minimum_free_gb=MINIMUM_FREE_GB)
     print(json.dumps({"model": model, "preflight_ok": bool(ok), "reason": str(reason),
                       "estimated_required_gb": required_gb, "minimum_free_gb": MINIMUM_FREE_GB}, indent=2))
     if not ok:
         raise RuntimeError(f"StorageManager denied {model}: {reason}")
-    with managed_storage_operation("models", required_gb=required_gb, require_fresh_quota=True,
+    with managed_storage_operation("models", required_gb=required_gb, require_fresh_quota=require_fresh,
                                    minimum_free_gb=MINIMUM_FREE_GB):
         if target:
             target_root = MODELS_ROOT.resolve()
@@ -269,7 +360,7 @@ def _download_hf_cache(model: str) -> dict[str, Any]:
             "bytes_added_estimate": max(0, after - before)}
 
 
-def _download_whisper(model: str = "whisper-turbo") -> dict[str, Any]:
+def _download_whisper(model: str = "whisper-turbo", *, manager_directory_only: bool = False) -> dict[str, Any]:
     url, required_gb = WHISPER_MODELS["turbo"]
     target_dir = MODELS_ROOT / "whisper" / "turbo"
     filename = Path(url).name
@@ -278,7 +369,8 @@ def _download_whisper(model: str = "whisper-turbo") -> dict[str, Any]:
     if target.is_file() and not target.is_symlink() and _sha256(target) == expected_sha256:
         return {"model": model, "status": "already_cached_and_sha256_verified", "path": str(target), "bytes": target.stat().st_size}
 
-    ok, reason = storage_preflight("models", required_gb, require_fresh_quota=True, minimum_free_gb=MINIMUM_FREE_GB)
+    require_fresh = not manager_directory_only
+    ok, reason = storage_preflight("models", required_gb, require_fresh_quota=require_fresh, minimum_free_gb=MINIMUM_FREE_GB)
     print(json.dumps({"model": model, "preflight_ok": bool(ok), "reason": str(reason),
                       "estimated_required_gb": required_gb, "minimum_free_gb": MINIMUM_FREE_GB}, indent=2))
     if not ok:
@@ -287,7 +379,7 @@ def _download_whisper(model: str = "whisper-turbo") -> dict[str, Any]:
     resolved = target.resolve()
     if target.is_symlink() or resolved == root or root not in resolved.parents:
         raise RuntimeError(f"Unsafe Whisper target path: {target}")
-    with managed_storage_operation("models", required_gb=required_gb, require_fresh_quota=True,
+    with managed_storage_operation("models", required_gb=required_gb, require_fresh_quota=require_fresh,
                                    minimum_free_gb=MINIMUM_FREE_GB):
         target_dir.mkdir(parents=True, exist_ok=True)
         partial = target.with_suffix(target.suffix + ".part")
@@ -312,7 +404,7 @@ def _download_whisper(model: str = "whisper-turbo") -> dict[str, Any]:
             "bytes": target.stat().st_size, "sha256_verified": True}
 
 
-def download_model(model: str) -> dict[str, Any]:
+def download_model(model: str, *, manager_directory_only: bool = False) -> dict[str, Any]:
     if model not in MODEL_SPECS:
         raise ValueError(f"unknown model {model!r}")
     if _is_complete(model):
@@ -324,8 +416,8 @@ def download_model(model: str) -> dict[str, Any]:
             target = model_targets()[model][0]
         return {"model": model, "status": "already_cached_and_weight_check_passed", "bytes": _bytes(target)}
     if model == "whisper-turbo":
-        return _download_whisper(model)
-    return _download_hf_cache(model)
+        return _download_whisper(model, manager_directory_only=manager_directory_only)
+    return _download_hf_cache(model, manager_directory_only=manager_directory_only)
 
 
 def main() -> int:
@@ -334,9 +426,17 @@ def main() -> int:
     commands.add_parser("status", help="read StorageManager CLI status/log and model cache inventory")
     commands.add_parser("env-audit", help="inspect existing model environments without installing anything")
     plan = commands.add_parser("plan", help="show download list and per-model size budgets; no downloads")
-    plan.add_argument("--preflight", action="store_true", help="run aggregate live quota admission without downloading")
+    plan.add_argument("--preflight", action="store_true", help="run aggregate admission without downloading")
+    plan.add_argument("--use-manager-directory-only", action="store_true",
+                      help="allow directory-target admission if manager quota telemetry is unavailable")
+    plan.add_argument("--reserve-floor-gb", type=float, default=40.0,
+                      help="positive models reserve to keep under the configured models target")
     download = commands.add_parser("download", help="download model files one at a time through StorageManager")
     download.add_argument("--model", choices=(*MODEL_SPECS.keys(), "all"), required=True)
+    download.add_argument("--use-manager-directory-only", action="store_true",
+                          help="allow directory-target admission if manager quota telemetry is unavailable")
+    download.add_argument("--reserve-floor-gb", type=float, default=40.0,
+                          help="positive models reserve to keep under the configured models target")
     args = parser.parse_args()
     if args.command == "status":
         return status()
@@ -354,30 +454,55 @@ def main() -> int:
                           "missing_models": missing, "estimated_remaining_download_gb": estimate,
                           "minimum_free_gb": MINIMUM_FREE_GB}, indent=2, default=str))
         if args.preflight and estimate > 0:
-            ok, reason = storage_preflight("models", estimate, require_fresh_quota=True,
-                                           minimum_free_gb=MINIMUM_FREE_GB)
-            print(json.dumps({"aggregate_preflight_ok": bool(ok), "estimated_required_gb": estimate,
-                              "minimum_free_gb": MINIMUM_FREE_GB, "reason": str(reason),
-                              "no_download_performed": True}, indent=2))
-            return 0 if ok else 2
+            try:
+                budget = None
+                if args.use_manager_directory_only:
+                    budget = _manager_directory_capacity(estimate, args.reserve_floor_gb, resize_reserve=False)
+                    ok, reason = storage_preflight("models", estimate, require_fresh_quota=False,
+                                                   minimum_free_gb=MINIMUM_FREE_GB)
+                else:
+                    ok, reason = storage_preflight("models", estimate, require_fresh_quota=True,
+                                                   minimum_free_gb=MINIMUM_FREE_GB)
+                print(json.dumps({"aggregate_preflight_ok": bool(ok), "estimated_required_gb": estimate,
+                                  "minimum_free_gb": MINIMUM_FREE_GB, "manager_directory_budget": budget,
+                                  "reason": str(reason), "no_download_performed": True}, indent=2), flush=True)
+                return 0 if ok else 2
+            except Exception as exc:
+                print(json.dumps({"aggregate_preflight_ok": False, "estimated_required_gb": estimate,
+                                  "manager_directory_budget_error": f"{type(exc).__name__}: {exc}",
+                                  "no_download_performed": True}, indent=2), flush=True)
+                return 2
         return 0
     selections = DOWNLOAD_ORDER if args.model == "all" else (args.model,)
     missing = [name for name in selections if not _is_complete(name)]
-    if len(missing) > 1:
+    if missing:
         aggregate_gb = sum(float(MODEL_SPECS[name]["required_gb"]) for name in missing)
-        ok, reason = storage_preflight("models", aggregate_gb, require_fresh_quota=True,
-                                       minimum_free_gb=MINIMUM_FREE_GB)
-        print(json.dumps({"aggregate_preflight_ok": bool(ok), "models_to_fetch": missing,
-                          "estimated_required_gb": aggregate_gb, "minimum_free_gb": MINIMUM_FREE_GB,
-                          "reason": str(reason)}, indent=2), flush=True)
-        if not ok:
-            print("Aggregate StorageManager preflight denied the batch; no files were downloaded.", file=sys.stderr)
+        try:
+            budget = None
+            if args.use_manager_directory_only:
+                budget = _manager_directory_capacity(aggregate_gb, args.reserve_floor_gb, resize_reserve=True)
+                ok, reason = storage_preflight("models", aggregate_gb, require_fresh_quota=False,
+                                               minimum_free_gb=MINIMUM_FREE_GB)
+            else:
+                ok, reason = storage_preflight("models", aggregate_gb, require_fresh_quota=True,
+                                               minimum_free_gb=MINIMUM_FREE_GB)
+            print(json.dumps({"aggregate_preflight_ok": bool(ok), "models_to_fetch": missing,
+                              "estimated_required_gb": aggregate_gb, "minimum_free_gb": MINIMUM_FREE_GB,
+                              "manager_directory_budget": budget, "reason": str(reason)}, indent=2), flush=True)
+            if not ok:
+                print("Aggregate StorageManager preflight denied the batch; no files were downloaded.", file=sys.stderr)
+                return 2
+        except Exception as exc:
+            print(json.dumps({"aggregate_preflight_ok": False, "models_to_fetch": missing,
+                              "estimated_required_gb": aggregate_gb,
+                              "manager_directory_budget_error": f"{type(exc).__name__}: {exc}",
+                              "no_download_performed": True}, indent=2), file=sys.stderr, flush=True)
             return 2
     result_rows = []
     for name in selections:
         print(f"\n=== {name}: {MODEL_SPECS[name]['summary']} ===", flush=True)
         try:
-            row = download_model(name)
+            row = download_model(name, manager_directory_only=args.use_manager_directory_only)
         except Exception as exc:
             print(json.dumps({"model": name, "status": "FAILED", "error": f"{type(exc).__name__}: {exc}"}, indent=2), file=sys.stderr)
             print("Stopped without starting any additional downloads. Rerun the selected model after resolving this error.", file=sys.stderr)
