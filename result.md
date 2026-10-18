@@ -8,9 +8,13 @@ Source files for the TRELLIS and LTX sidecars are now committed on the isolated 
 
 Additional model triage favors ACE-Step 1.5 for music generation, Kokoro-82M for lightweight English speech, SenseVoice/Whisper for speech input, and Hunyuan3D-2.1 as a later geometry baseline. MusicGen/AudioGen weights should remain research-only until their CC-BY-NC 4.0 weight terms are acceptable for the intended product. Provider routing remains deterministic orchestration, not a trained MoE.
 
+
+
+The existing experiment ledger also distinguishes prior FLUX/TRELLIS artifact runs from LTX service readiness: the 15 October OEC background-pipeline static suite passed, but it explicitly records `live_ltx_service_start=NOT_RUN`. Therefore the new LTX sidecar must be treated as unverified until it loads on the assigned runtime and produces an MP4 that can be read by ffprobe/a decoder. Historical FLUX/TRELLIS output evidence is linked in the existing result history; this pass did not reproduce those GPU runs.
+
 The original 15-day project deadline could not be recovered from an authoritative start/deadline record in this pass; no remaining-days figure is asserted.
 
-**Last updated:** 2026-10-18T12:33:14.845+05:30 (Asia/Kolkata)
+**Last updated:** 2026-10-18T12:34:42.324+05:30 (Asia/Kolkata)
 **Branch:** `feat/media-service-sidecars-20261018` (isolated implementation and tracking branch; not merged to main).
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
