@@ -225,7 +225,7 @@ def _run_job(provider: str, url: str, out_dir: Path, timeout_seconds: int) -> di
             "filename": image_path.name,
             "prompt": "A simple amber sphere on a blue-grey studio background",
             "image_base64": base64.b64encode(image_path.read_bytes()).decode("ascii"),
-            "parameters": {"max_image_size": 512, "texture_size": 1024, "decimation_target": 30000},
+            "parameters": {"max_image_size": 512, "texture_size": 512, "decimation_target": 5000},
         }
         expected_extension = "glb"
     else:
