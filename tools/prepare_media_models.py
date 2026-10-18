@@ -212,10 +212,15 @@ def _manager_directory_capacity(required_gb: float, reserve_floor_gb: float, *, 
                 f"post-resize status did not verify the reserve floor "
                 f"(state={state}, reserve={reserve:.2f} GB, requested={reserve_floor_gb:.2f} GB)"
             )
-    projected_after = actual + float(required_gb) + MINIMUM_FREE_GB + reserve
+    # A read-only plan budgets against the reserve floor that the download command
+    # will apply through StorageManager. Only a download command actually shrinks it.
+    planned_reserve = reserve if resize_reserve else reserve_floor_gb
+    projected_after = actual + float(required_gb) + MINIMUM_FREE_GB + planned_reserve
     if projected_after > target + 0.01:
-        raise RuntimeError(f"post-resize budget failed: projected={projected_after:.2f} GB target={target:.2f} GB")
+        raise RuntimeError(f"directory budget failed: projected={projected_after:.2f} GB target={target:.2f} GB")
     return {"state": state, "content_gb": actual, "target_gb": target, "reserve_gb": reserve,
+            "planned_reserve_after_download_gb": planned_reserve,
+            "reserve_resize_needed": reserve > reserve_floor_gb + 0.1,
             "required_download_gb": float(required_gb), "safety_margin_gb": MINIMUM_FREE_GB,
             "projected_total_after_download_and_reserve_gb": projected_after,
             "reserve_floor_gb": reserve_floor_gb, "reserve_resized": resized}
