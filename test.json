@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-18T09:46:37.358Z",
+  "last_updated": "2026-10-18T14:26:46.063Z",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "OEC feature branch includes guarded model download/status tools and live inference acceptance client, plus isolated ACE-Step, Kokoro, Whisper, Qwen3-ASR, TRELLIS and LTX services. Local compile passed; 19/19 CPU/mock tests passed. The downloader and smoke client were compiled only, not run on A100. The assistant could not read the current storage manager log directly because there is no SSH/remote-shell connector or A100 mount in this session. Latest user-provided model directory reading: 209 GB of 280 GB used, about 71 GB nominal free; 40 GB reserve is managed by the user-run daemon. No actual model downloads, dependency installation, GPU inference, cache purge or GitHub Actions were started.",
+  "latest_summary": "Live CUDA smoke on oec-1 accepted Kokoro-82M speech synthesis, Whisper-Turbo transcription, and Qwen3-ASR-0.6B transcription (3 passed, 0 failed, ACE-Step skipped). Strict live Lustre quota admission works after parsing the soft-overage asterisk marker. AudioGen notebook harness import path is fixed, but its first retry was cancelled before model-load acceptance and the latest retry remained queued at update time. The new focused parser unit test still requires a confirmed pass.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -2851,6 +2851,152 @@
         "Run python tools/prepare_media_models.py plan --preflight. Only if aggregate live admission passes, run python tools/prepare_media_models.py download --model all; each model transfer rechecks fresh admission under the managed write lock.",
         "Use the environment audit to select existing runtimes, then run one live smoke test per model with tools/media_services/smoke_client.py and retain the output acceptance report.",
         "Only test exact model-folder purge after first inference; require resident second inference and separate clean restart/reload before approving purge."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-18-STORAGE-LUSTRE-ASTERISK-PARSER-LIVE",
+      "date": "2026-10-18",
+      "category": "live quota parsing and conservative storage admission",
+      "approach": "Read current StorageManager status and live Lustre group quota on oec-1 after correcting parsing of the soft-quota asterisk marker. Then run the strict media-model bootstrap and record the admission reason.",
+      "reason": "Prevent a valid quota row from being treated as missing exactly when actual usage exceeds the soft quota.",
+      "parameters": {
+        "runner": "oec-1",
+        "host": "scn30-mn",
+        "quota_group": "lmedge",
+        "lfs_used_kib": 2181235744,
+        "soft_quota_kib": 2147483648,
+        "hard_limit_kib": 2254857830,
+        "grace": "6d18h23m10s",
+        "parser_accepts_used_asterisk": true
+      },
+      "results": {
+        "live_lustre_quota_parsing": "PASS",
+        "audio_runtime_storage_admission": "PASS",
+        "admission_rule": "soft quota exceeded, explicit grace active, operation fits hard-limit headroom",
+        "final_models_usage_gb": 220.72,
+        "models_target_gb": 280,
+        "models_reserve_gb": 60.04,
+        "hard_quota_headroom_gb_approx": 69.54,
+        "focused_new_parser_unit_test": "ADDED; RUN NOT YET CONFIRMED"
+      },
+      "interpretation": "The prior unavailable-quota result was caused by parser rejection of Lustre's asterisk marker. The fix restored valid telemetry without weakening the admission rule or using filesystem free space as quota headroom.",
+      "limitations": [
+        "Grace-period admission remains conditional on live, explicit grace and hard headroom.",
+        "The newly added parser unit test still requires an explicit focused-suite pass."
+      ],
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/39135140660"
+      ]
+    },
+    {
+      "id": "EXP-2026-10-18-SPEECH-THREE-PROVIDER-LIVE-ACCEPTANCE",
+      "date": "2026-10-18",
+      "category": "live CUDA audio API acceptance",
+      "approach": "On oec-1, check cached checkpoints and strict StorageManager admission, prepare an isolated existing audio runtime, start each loopback service, wait for healthy/model-loaded status, submit one controlled request, poll to terminal success, and validate the returned WAV or transcript. Stop only each service process launched by this test.",
+      "reason": "Establish a real end-to-end path for NPC speech output and speech input before larger quality experiments.",
+      "parameters": {
+        "run_id": 39135140660,
+        "runner": "oec-1",
+        "host": "scn30-mn",
+        "runtime": "/nlsasfs/home/lmedge/rahkus/.local/venvs/oec-audio-py311/bin/python",
+        "test_suites": {
+          "test_media_service_api": 10,
+          "test_audio_service_validation": 10
+        },
+        "providers": {
+          "kokoro": {
+            "model": "Kokoro-82M",
+            "voice": "af_heart",
+            "device": "cuda",
+            "sample_rate_hz": 24000,
+            "channels": 1,
+            "frames": 112800,
+            "duration_seconds": 4.7,
+            "artifact_bytes": 225644,
+            "synthesis_seconds": 24.328,
+            "startup_plus_inference_seconds": 136.43
+          },
+          "whisper": {
+            "model": "OpenAI Whisper turbo",
+            "device": "cuda",
+            "artifact_bytes": 57,
+            "transcription_seconds": 11.851,
+            "startup_plus_inference_seconds": 46.9
+          },
+          "qwen3_asr": {
+            "model": "Qwen3-ASR-0.6B",
+            "device": "cuda",
+            "artifact_bytes": 57,
+            "transcription_seconds": 28.711,
+            "startup_plus_inference_seconds": 52.57
+          }
+        }
+      },
+      "results": {
+        "workflow": "SUCCESS",
+        "providers_passed": 3,
+        "providers_failed": 0,
+        "providers_skipped": 1,
+        "passed_provider_names": [
+          "kokoro",
+          "whisper",
+          "qwen3-asr"
+        ],
+        "skipped_provider": "ace-step",
+        "skip_reason": "acestep package is missing in phase1, phase1_ltx and phase2_3d; no packages installed into shared Conda environments",
+        "storage_admission": "PASS through live Lustre quota and managed operation",
+        "whisper_and_qwen_output_match": true,
+        "transcription_text": "Welcome to OEC. This is a model service acceptance test.",
+        "cache_weights": "All three speech checkpoints already cached and non-empty; no model-weight downloads were necessary"
+      },
+      "interpretation": "Validates one short speech-generation request followed by two recognizers on the generated audio. It is an end-to-end pipeline acceptance result, not a broad speech-quality or WER benchmark.",
+      "limitations": [
+        "Only one English test utterance and one generated WAV were used.",
+        "Matching Whisper/Qwen output on one clip is not evidence of broad transcription accuracy.",
+        "ACE-Step music generation remains untested.",
+        "Actions uploaded no artifact archive; evidence is in the job acceptance logs and managed output files."
+      ],
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/39135140660"
+      ]
+    },
+    {
+      "id": "EXP-2026-10-18-AUDIOGEN-NOTEBOOK-RUNS-UP-TO-QUEUED-RETRY",
+      "date": "2026-10-18",
+      "category": "AudioCraft notebook live execution and harness debugging",
+      "approach": "Execute the existing AudioGen Jupyter notebook in phase1 on oec-1 using the headless acceptance harness and validate a generated WAV when it becomes available.",
+      "reason": "Resolve the user's pre-existing AudioCraft/AudioGen runtime errors and establish an actual sound-effects pipeline.",
+      "parameters": {
+        "phase1_python": "3.9.25",
+        "torch": "2.1.0+cu118",
+        "audiocraft": "1.3.0",
+        "visible_gpus": 8,
+        "run_ids": [
+          39134470674,
+          39134829098,
+          39134976949,
+          39135140674
+        ]
+      },
+      "results": {
+        "runner_environment_probe": "PASS",
+        "notebook_static_tests": "6/6 PASS",
+        "run_39134470674": "FAILED at notebook cell 1: ModuleNotFoundError core_config; no model-load marker",
+        "run_39134829098": "FAILED at notebook cell 1 with the same missing import; predecessor before sys.path fix",
+        "run_39134976949": "notebook cells 1-3 PASS after sys.path fix; cancelled in cell 4 when the quota-parser revision triggered a newer run",
+        "run_39135140674": "QUEUED at the time of ledger update",
+        "audiogen_model_load": "NOT CONFIRMED",
+        "generated_wav": "NOT CONFIRMED"
+      },
+      "interpretation": "Harness import failures have been resolved in the source, but no completed AudioGen model-load or output acceptance is yet evidenced. The queued retry is the next acceptance gate.",
+      "limitations": [
+        "Do not count a cancelled run as a failed model experiment or as a pass.",
+        "No inference quality, output audio or model-download claim is made until a completed report with AUDIOGEN_NOTEBOOK_SMOKE=PASS exists."
+      ],
+      "supporting_urls": [
+        "https://github.com/Killer4K-N/OEC/actions/runs/39134470674",
+        "https://github.com/Killer4K-N/OEC/actions/runs/39134976949",
+        "https://github.com/Killer4K-N/OEC/actions/runs/39135140674"
       ]
     }
   ]
