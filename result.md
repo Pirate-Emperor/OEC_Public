@@ -10,8 +10,8 @@ Additional model triage favors ACE-Step 1.5 for music generation, Kokoro-82M for
 
 The original 15-day project deadline could not be recovered from an authoritative start/deadline record in this pass; no remaining-days figure is asserted.
 
-**Last updated:** 2026-10-16T21:15:20.823+05:30 (Asia/Kolkata)
-**Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
+**Last updated:** 2026-10-18T12:21:26.846+05:30 (Asia/Kolkata)
+**Branch:** `feat/media-service-sidecars-20261018` (isolated implementation and tracking branch; not merged to main).
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
 
 ## Current status
