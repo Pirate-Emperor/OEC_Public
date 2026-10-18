@@ -28,7 +28,12 @@ Audit load/purge safety and make progress toward OEC-Play media-service integrat
 - Added `tools/media_services/common.py`, `trellis_api.py`, `ltx_api.py`, package initializer, and `tests/test_media_service_api.py` to this branch after the local prototype suite passed. These remote source files have not been independently re-tested from a fresh branch checkout. This did not trigger GitHub Actions.
 
 ## Interpretation and limitations
-The local suite validates the prototype API/job boundaries only. It does not prove either model runs in the proposed sidecar or that real GLB/MP4 outputs pass end-to-end acceptance. The current timeout check only catches an overrun after inference returns; a hung in-process CUDA call is not forcibly interrupted. Hard timeout enforcement via process supervision remains open. The model adapter files must first be transferred into the repository and reviewed, then tested in their assigned environments after fresh storage and allocation checks.
+The local suite validates the prototype API/job boundaries only. It does not prove either model runs in the proposed sidecar or that real GLB/MP4 outputs pass end-to-end acceptance. The source files are now on this isolated feature branch but have not been independently re-tested from a fresh checkout. The current timeout check only catches an overrun after inference returns; a hung in-process CUDA call is not forcibly interrupted. Hard timeout enforcement via process supervision remains open. Live tests still require their assigned environments, fresh storage admission and an authorized allocation.
+
+
+
+## Companion OEC-Deploy status observed read-only
+- On `hpc-dgx-deployment`, source CI run [391062060](https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39106015325) failed at client lint/type-check with `better-tailwindcss/enforce-consistent-line-wrapping` errors; Python source-validation steps passed. A newer source CI run [39106225707](https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39106225707) was still in progress at the last inspection, and persistent-checkout sync [39106225689](https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39106225689) was queued. This session did not edit OEC_Deploy, trigger, cancel or duplicate those workflows.
 
 ## Next actions
 1. Review the committed sidecar files and rerun the CPU/mock suite from a fresh checkout of this feature branch.
