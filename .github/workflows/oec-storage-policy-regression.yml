@@ -53,4 +53,5 @@ jobs:
       - name: Run StoragePolicy and quota snapshot regression suites
         run: |
           set -euo pipefail
-          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1             python -m unittest -v tests.test_storage_policy tests.test_quota_snapshot
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -m unittest discover -s tests -p 'test_storage_policy.py' -v
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -m unittest discover -s tests -p 'test_quota_snapshot.py' -v
