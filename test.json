@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-19T20:59:00+05:30",
+  "last_updated": "2026-10-19T21:05:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Latest completed static acceptance 39277515469 passed 84 tests, compilation and four notebook JSON checks. New QA regression hardening committed at 249b34e (separate .mp4/.webm/.avi frame output; fresh StorageManager quota for transcode) with executable isolated tests at 486e467; current-head CI 39278190899 is queued, so those two latest tests are pending rather than passed. Commit a7b513b narrows future model-bootstrap triggers for QA/upload-only edits. Bootstrap 39277286186 remains in progress with logs currently unavailable and a prior duplicate 39278145617 queued; do not infer model-inference results. No live Qwen2-VL QA or HF upload.",
+  "latest_summary": "Current QA frame-path/transcode quota hardening passed the current-head static workflow 39278190899 at commit 486e467d8bb2: 86 tests total, py_compile, four notebook JSON checks, no ResourceWarning. Executable mocked-ffmpeg tests passed for .mp4/.webm/.avi and confirmed source bytes remain unchanged; fresh transcode quota guard passed. Latest A100 bootstrap 39277286186 ended FAILURE after three live speech smokes passed and ACE-Step checkpoint/runtime preparation passed; ACE-Step generation was blocked by no eligible idle A100, no song. A newer bootstrap 39278145617 remains in progress on oec-1; no result assumed. No live Qwen2-VL QA or remote HF upload.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -4055,14 +4055,20 @@
         "gpu": "not used"
       },
       "results": {
-        "status": "PENDING_CI",
+        "status": "PASS_STATIC_REGRESSION",
         "source_change_committed": true,
         "tests_added": 2,
         "latest_complete_suite": {
-          "run_id": 39277515469,
-          "status": "PASS",
-          "tests": 84,
-          "sha": "620ab348a16f468124db6610ac3eab2308446f40"
+          "run_id": 39278190899,
+          "job_id": 118147459705,
+          "url": "https://github.com/CalamityStriker/OEC/actions/runs/39278190899",
+          "sha": "486e467d8bb2b178c5b6501a376c9295b03708a3",
+          "status": "success",
+          "tests": 86,
+          "python": "3.11.17",
+          "notebook_json": "PASS",
+          "py_compile": "PASS",
+          "resource_warning": "NONE"
         },
         "current_head_suite": {
           "run_id": 39278190899,
@@ -4070,16 +4076,77 @@
           "sha": "486e467d8bb2b178c5b6501a376c9295b03708a3"
         },
         "actual_qa_inference": "NOT_RUN",
-        "source_asset_mutation_test": "NOT_YET_RUN_IN_CI",
-        "transcode_quota_guard_test": "NOT_YET_RUN_IN_CI"
+        "source_asset_mutation_test": "PASS_MOCKED_FFMPEG_FOR_MP4_WEBM_AVI_INPUTS_PRESERVED",
+        "transcode_quota_guard_test": "PASS_STATIC_SOURCE_ASSERTION",
+        "actual_hf_upload": "NOT_RUN"
       },
-      "interpretation": "The previous 84-test run passed but predates this patch. The two regression tests are designed and committed, but must not be called passed until the current-head workflow finishes.",
+      "interpretation": "The newly added QA frame-path tests passed on current source/test SHA 486e467. The function was executed in isolation with mocked ffmpeg and no model import; source media bytes were unchanged for .mp4/.webm/.avi. Transcode quota enforcement was statically validated. This does not validate live Qwen2-VL QA, storage telemetry on an actual host, or upload.",
       "limitations": [
-        "No Qwen2-VL model is loaded or run by these tests.",
-        "No shared source asset was used.",
-        "Fresh StorageManager telemetry, actual policy decision, upload and OEC-Play are still separate acceptance gates."
+        "No live Qwen2-VL model inference or compliance decision.",
+        "No actual transcode output from ffmpeg; this was a mocked executable path test.",
+        "Fresh live StorageManager quota is still required at runtime.",
+        "No remote Hugging Face upload."
       ],
       "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39278190899"
+    },
+    {
+      "id": "EXP-2026-10-19-SPEECH-ACE-STEP-BOOTSTRAP-39277286186",
+      "date": "2026-10-19",
+      "category": "Sequential live speech-provider acceptance and isolated ACE-Step runtime/generation gate",
+      "approach": "Run the existing oec-1 bootstrap job through cache/runtime checks, sequential speech inference smokes, checkpoint validation, isolated ACE-Step runtime preparation and the required CUDA generation smoke.",
+      "reason": "Re-verify speech providers and distinguish ACE-Step cache/runtime readiness from a generated audio artifact.",
+      "parameters": {
+        "workflow_run_id": 39277286186,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39277286186",
+        "job_id": 118144848005,
+        "branch": "fix/media-stack-supervision-20261019",
+        "source_sha": "227c6eb32409d1010926a3ec6f36c7bcddc1c625",
+        "runner": "oec-1",
+        "speech_results": {
+          "kokoro": {
+            "status": "PASS",
+            "startup_plus_inference_seconds": 44.53
+          },
+          "whisper": {
+            "status": "PASS",
+            "startup_plus_inference_seconds": 26.47
+          },
+          "qwen3_asr": {
+            "status": "PASS",
+            "startup_plus_inference_seconds": 30.66
+          }
+        },
+        "ace_step": {
+          "checkpoint_manifest_complete": true,
+          "runtime_status": "PASS",
+          "source_commit": "ca1e85fe9430179831e6bc6be790c332190a3866",
+          "python": "3.12",
+          "torch": "2.10.0+cu128",
+          "cuda": "12.8",
+          "gpu": "NVIDIA A100-SXM4-40GB",
+          "shared_torch_mutated": false,
+          "generation_error": "GPU admission failed: RuntimeError: no idle A100 available; no ACE-Step process was started"
+        }
+      },
+      "environment": {
+        "runner": "oec-1",
+        "execution_type": "GPU preflight and live speech; ACE-Step isolated runtime"
+      },
+      "results": {
+        "status": "PARTIAL_PASS_ACE_GENERATION_BLOCKED",
+        "speech_passed": 3,
+        "speech_failed": 0,
+        "ace_checkpoint_and_runtime": "PASS",
+        "ace_music_output": false,
+        "final_workflow_conclusion": "FAILURE"
+      },
+      "interpretation": "Kokoro, Whisper and Qwen3-ASR live service smokes passed, and ACE-Step runtime/checkpoint validation passed. Actual generation was not started because the existing selector found no eligible idle A100; the overall workflow failed and there is no music artifact.",
+      "limitations": [
+        "No ACE-Step generated audio.",
+        "The no-idle-A100 gate is an infrastructure blocker, not evidence of model quality failure.",
+        "Current GPU/process state may differ; no process was killed."
+      ],
+      "artifact": null
     }
   ]
 }
