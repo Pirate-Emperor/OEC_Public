@@ -1,6 +1,6 @@
 # OEC model-inference pipeline — continuation prompt
 
-**Evidence checkpoint:** 2026-10-19, 21:10 IST  
+**Evidence checkpoint:** 2026-10-19, 22:38 IST  
 **Primary repository:** [Killer4K-N/OEC](https://github.com/Killer4K-N/OEC)  
 **Implementation branch:** `fix/media-stack-supervision-20261019`  
 **Latest tested source/test SHA:** `85431311caf28e6e3ede293fdcc959f86419c402` (90-test pass in [run 39291422187](https://github.com/CalamityStriker/OEC/actions/runs/39291422187)). Newer feature-branch commits update experiment/status/docs only; no source-code changes after this tested SHA and no merge to main.  
