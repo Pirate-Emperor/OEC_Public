@@ -679,3 +679,33 @@ ACE-Step remains SKIPPED because its package is absent in all three checked Cond
 - Static tests now cover the QA non-MP4 source-preservation fix, transcode fresh-quota check, safe exact-row uploader, and opt-in resumable chunking.
 - Still not accepted: real Qwen2-VL compliant/rejected decision; actual Hugging Face archive or chunk upload/read-after-write; remote consumer assembly; sustained Brain→LTX worker→QA→queue→upload; live OEC-Play health; combined FLUX→TRELLIS artifact (latest run blocked by no idle A100); ACE-Step audio (same no-idle-A100 admission blocker); MusicGen inference (incomplete cache/proxy egress); academic report/PPT/poster rebuild and visual QA.
 - No real Hugging Face upload, reserve-file mutation, process termination, or main merge was performed. Fresh StorageManager / physical GPU admission remains mandatory before any future write or inference.
+
+
+## 2026-10-19T23:33 IST — Current-head 96-test pass; live E2E blocked safely by A100 ownership
+
+### Current static acceptance — PASS
+
+- [Run 39300850953](https://github.com/CalamityStriker/OEC/actions/runs/39300850953), job [118225345013](https://github.com/CalamityStriker/OEC/actions/runs/39300850953/job/118225345013), candidate SHA `80cc89480ee79f18d1ec7c101f97cfc310379ed1`, hosted Python 3.11.17, completed SUCCESS.
+- **96 tests passed**: TRELLIS notebook 12, TRELLIS CLI 5, AudioCraft notebook 6, storage write admission 6, inference/storage integration 7, Brain/LTX queue 5, upload status contract 5, uploader storage/chunking 11, E2E acceptance contract 6, StorageManager 10, StoragePolicy 10, quota snapshot 7, storage reservation 6. `py_compile` and four notebook JSON checks (16/15/10/6 cells) passed; no ResourceWarning.
+
+### Live end-to-end attempt — BLOCKED before model inference or writes
+
+- [E2E run 39300850928](https://github.com/CalamityStriker/OEC/actions/runs/39300850928), job [118225345452](https://github.com/CalamityStriker/OEC/actions/runs/39300850928/job/118225345452), source SHA `80cc89480ee79f18d1ec7c101f97cfc310379ed1`, assigned runner `oec-1`, completed FAILURE at the deliberate GPU admission gate. The harness compiled and verified assigned runner/environment, then found a compute process attached to all eight A100s and returned exit code 3 before StorageManager/HF-auth checks, LTX inference, Qwen2-VL QA, queue hand-off, upload or remote read-after-write.
+- Exact report artifact [12211286861](https://github.com/CalamityStriker/OEC/actions/runs/39300850928/artifacts/12211286861), 1,758 bytes, SHA-256 `662beaa9a52c82274a0b4997dd9a7995f94f3da1a904f9fffd890cbf8c339add`; downloaded and inspected at `/mnt/data/oec-e2e-acceptance-39300850928.zip`. Its `pipeline-report.json` has `status=BLOCKED`, `process_kill_attempted=false`, `shared_queue_used=false`, `remote_dataset_created=false`.
+- Current GPU ownership observation: PID `3347078`, executable `/nlsasfs/home/lmedge/rahkus/OEC/oec_deploy/v1/Biome/server-components/.venv/bin/python`, had CUDA compute contexts mapped to all 8 A100s with reported memory 8194 / 1072 / 974 / 1046 / 970 / 1212 / 1126 / 8986 MiB. This is a specific run snapshot, not a claim about any later state. It was not terminated or signalled. The correct action is for its owner/operator to release it through normal lifecycle; do not bypass the admission guard.
+- The two initial E2E runs [39300485256](https://github.com/CalamityStriker/OEC/actions/runs/39300485256) and [39300507195](https://github.com/CalamityStriker/OEC/actions/runs/39300507195) failed before any job was created (zero jobs); step-scoping the runner-temp environment fixed workflow validation. Run 39300850928 then correctly created the assigned runner job and blocked on resource ownership. All intermediate run failures remain recorded in GitHub history.
+
+### Existing accepted component evidence remains valid
+
+- Static/mock uploader acceptance, including the explicit `--once --asset-id ID --chunk-oversize` resume protocol, still passes in the 96-test run. It verifies bounded chunks, per-part/full SHA-256, skip-only-after-Hub-metadata-digest verification, manifest-last ordering, failure rollback/source retention and reassembly against a fake Hub. It is **not** a real Hugging Face upload or remote consumer verification.
+- Visual sidecar run [39278268411](https://github.com/CalamityStriker/OEC/actions/runs/39278268411) is terminal SUCCESS. Artifact [12198722285](https://github.com/CalamityStriker/OEC/actions/runs/39278268411/artifacts/12198722285) contains the actual TRELLIS GLB and LTX MP4, locally inspected. TRELLIS GLB 2,775,928 bytes, SHA-256 `e7a1a970edae002596a80fa47b19ad87e96ad82a8dfa3d4523ad65167435e875`; locally reopened via trimesh at 48,806 vertices/95,566 faces but not watertight. LTX H.264 MP4 242,547 bytes, SHA-256 `5d7d54de4354936f66867fecd19d20c0ab6972b5d997ca00c145ab0c1e54ec51`, 768×512, 2.083333 s, independently ffprobe-validated.
+- ACE-Step still has no music output because the previous bootstrap [39278145617](https://github.com/CalamityStriker/OEC/actions/runs/39278145617) failed at no-idle-A100 admission after speech-provider smokes passed. Combined FLUX→TRELLIS [39271901007](https://github.com/CalamityStriker/OEC/actions/runs/39271901007) has no accepted output from its attempt due its own safe GPU gate. MusicGen remains incomplete-cache/CDN-proxy blocked.
+- No live Qwen2-VL policy decision, real Hugging Face upload/read-after-write, separate-client chunk reassembly or joined Brain→worker→QA→upload→OEC-Play acceptance has occurred yet.
+
+### Next acceptance conditions
+
+1. Refresh current GPU inventory/process ownership and StorageManager status on the assigned host; do not act on the old PID snapshot without rereading it. Do not kill a process; wait for its owner’s normal release.
+2. Rerun the guarded E2E on `oec-1` only after the admission selector finds a safe idle A100. Then the script can proceed to read-only storage/repo/auth validation, live LTX generation, Qwen2-VL QA, one-row resumable upload and remote list/download/hash verification.
+3. If GPU availability stays blocked, continue independent deliverables (report/PPT/poster, Viewer audit, PaperDock source/build check) rather than attempting unsafe concurrent inference.
+
+Current branch remains `fix/media-stack-supervision-20261019`; latest tracker branch commit was `4335bc396b4b9063da58f3115477f4f7fe475fff`. Latest tested code SHA remains `80cc89480ee79f18d1ec7c101f97cfc310379ed1`; no merge to `main`.
