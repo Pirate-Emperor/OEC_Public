@@ -39,5 +39,21 @@ class FluxTrellisPipelineTests(unittest.TestCase):
             self.assertEqual(info["index_accessor_counts"],[3])
 
 
+
+    def test_glb_structure_rejects_wrong_declared_length(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"broken.glb"
+            doc={"meshes":[{"primitives":[{"attributes":{"POSITION":0},"indices":1}]}],
+                 "accessors":[{"count":3},{"count":3}]}
+            payload=json.dumps(doc,separators=(",",":")).encode()
+            payload += b" " * ((4-len(payload)%4)%4)
+            actual=20+len(payload)
+            # Declared file length differs from the actual bytes, even though the
+            # JSON mesh/accessors otherwise look structurally plausible.
+            raw=b"glTF"+struct.pack("<II",2,actual+1)+struct.pack("<II",len(payload),0x4E4F534A)+payload
+            path.write_bytes(raw)
+            with self.assertRaisesRegex(RuntimeError,"declared length"):
+                combined._inspect_glb_header(path)
+
 if __name__ == "__main__":
     unittest.main()
