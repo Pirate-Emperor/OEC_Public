@@ -64,7 +64,6 @@ sys.excepthook = global_exception_handler
 # ==============================================================================
 
 REJECTED_DIR = os.path.join(SYSTEM_DIRS['outputs'], "rejected")
-os.makedirs(REJECTED_DIR, exist_ok=True)
 
 class QANode:
     def __init__(self, gpu_id=0, purge_after_load=True):
@@ -371,7 +370,10 @@ def process_qa_queue(purge_after_load=True, gpu_id=0, asset_id=None, once=False)
 
             with open(json_path, 'r', encoding='utf-8') as handle:
                 metadata = json.load(handle)
-            frame_path, is_extracted = qa.extract_evaluation_frame(raw_vid_path)
+            with managed_storage_operation(
+                "outputs", required_gb=0.001, require_fresh_quota=True, minimum_free_gb=0.05
+            ):
+                frame_path, is_extracted = qa.extract_evaluation_frame(raw_vid_path)
             if frame_path:
                 analysis = qa.analyze_and_tag(frame_path)
                 if is_extracted:
