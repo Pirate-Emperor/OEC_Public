@@ -1,23 +1,29 @@
 # OEC pipeline, daemons, and media-service runbook
 
-**Evidence checkpoint:** 2026-10-18, Asia/Kolkata  
-**OEC source branch:** \`feat/media-service-sidecars-20261018\`  
+**Evidence checkpoint:** 2026-10-19T19:54+05:30, Asia/Kolkata  
+**OEC source branch:** \`fix/media-stack-supervision-20261019\` (current evidence; not merged to main)  
 **Scope:** OEC implementation and verification. OEC-Deploy is read-only in this task.
 
 This runbook separates confirmed live acceptance from commands that still require an operator to start services on the approved cluster allocation. A passing CI or a model's cached weights does **not** prove the production daemons are running or that OEC-Play can reach them.
 
 ## 1. Live model acceptance
 
-| Capability | Current evidence | Status / limitation |
+| Capability | Latest evidence | Status / limitation |
 |---|---|---|
-| AudioGen / sound effects | A100 run [39135140674](https://github.com/Killer4K-N/OEC/actions/runs/39135140674), phase1, A100-SXM4-40GB | **PASS** — 3-second WAV; cache hit; 20.763-second generation; 5.155 GiB peak allocated VRAM. |
-| Kokoro-82M TTS | A100 run [39135140660](https://github.com/Killer4K-N/OEC/actions/runs/39135140660) | **PASS** — real CUDA inference, valid 4.7-second/24 kHz mono WAV. |
-| Whisper-Turbo ASR | Same speech run | **PASS** — transcript produced from the Kokoro WAV. |
-| Qwen3-ASR-0.6B | Same speech run | **PASS** — transcript matched Whisper for this one English clip. This is not a broad WER benchmark. |
-| ACE-Step 1.5 music | Same speech run | **SKIPPED** — missing runtime package in the existing checked environments; no shared environment was upgraded. |
-| TRELLIS.2 image-to-3D | Prior visual run [39142905429](https://github.com/Killer4K-N/OEC/actions/runs/39142905429) | **NOT ACCEPTED** — model-loaded, but the synthetic image job stayed at 5% and timed out before a GLB was validated. A lower-cost retry is queued/in progress. |
-| LTX-2.3 text/image-to-video sidecar | Prior visual run [39142905429](https://github.com/Killer4K-N/OEC/actions/runs/39142905429) | **BLOCKED by adapter bug** — cache preflight passed, but the sidecar asked StorageManager to admit unconfigured logical areas \`inputs\` and \`cache\`. The adapter has been corrected to admit \`outputs\`, and startup error logs now include the private traceback; a fresh A100 acceptance run is still required. |
-| Main Brain → LTX worker → QA → HF upload production queue | Unit/mock and queue regression tests only | **NOT YET LIVE-ACCEPTED as one sustained production run.** The commands below are the intended launch sequence, not a claim that all processes are currently online. |
+| AudioGen / sound effects | [A100 run 39240127736](https://github.com/Killer4K-N/OEC/actions/runs/39240127736): validated 3-second mono 16 kHz WAV, 96,078 bytes, generation 26.737 s, peak allocated/reserved VRAM 5.155/5.385 GiB. | **PASS as a one-shot notebook smoke.** Not a persistent API provider. |
+| Kokoro-82M TTS | [A100 bootstrap 39268082165](https://github.com/CalamityStriker/OEC/actions/runs/39268082165): cache-only live smoke PASS, startup+inference 22.45 s. Earlier artifact validates a 4.7-second mono 24 kHz WAV. | **PASS for a controlled smoke.** Not a full application workflow. |
+| Whisper-Turbo ASR | [A100 bootstrap 39268082165](https://github.com/CalamityStriker/OEC/actions/runs/39268082165): live smoke PASS, startup+inference 18.47 s. | **PASS for a controlled input.** Broad WER not measured. |
+| Qwen3-ASR-0.6B | [A100 bootstrap 39268082165](https://github.com/CalamityStriker/OEC/actions/runs/39268082165): live smoke PASS, startup+inference 20.45 s. Prior controlled speech chain returned the same 56-character transcript as Whisper. | **PASS for a controlled input.** Broad WER not measured. |
+| ACE-Step 1.5 music | [Bootstrap run 39268082165](https://github.com/CalamityStriker/OEC/actions/runs/39268082165) prepared the full selected checkpoint set and isolated runtime; pinned source ca1e85fe9430179831e6bc6be790c332190a3866, isolated Python 3.12 / Torch 2.10.0+cu128 / CUDA 12.8; shared Torch unchanged. | **RUNTIME PREPARED; GENERATION BLOCKED.** Actual smoke failed closed because no eligible idle A100 was available; no music artifact was produced. |
+| TRELLIS.2 image-to-3D | Standalone [A100 run 39240127757](https://github.com/Killer4K-N/OEC/actions/runs/39240127757) validated GLB 2,742,900 bytes; FLUX→TRELLIS source suites passed 7/7 and 5/5 in [run 39267211597](https://github.com/CalamityStriker/OEC/actions/runs/39267211597). | **STANDALONE PASS; current FLUX→TRELLIS smoke BLOCKED** by the no-eligible-idle-A100 guard. Latest run produced no PNG/GLB; diagnostic artifact [12194310008](https://github.com/CalamityStriker/OEC/actions/runs/39267211597/artifacts/12194310008). |
+| LTX-2.3 text/image-to-video sidecar | Standalone [A100 run 39240127757](https://github.com/Killer4K-N/OEC/actions/runs/39240127757) validated a 242,547-byte H.264 MP4 (768×512, 2.083 s) with ffprobe. | **STANDALONE PASS.** The sustained Brain → queue worker → QA → uploader chain is still not live-accepted. |
+| MusicGen medium | [Run 39254306725](https://github.com/Killer4K-N/OEC/actions/runs/39254306725): 4/4 offline contracts passed; incomplete checkpoint and Hugging Face proxy failure (No route to host) prevented inference. | **BLOCKED BEFORE INFERENCE.** It is CC-BY-NC research-only unless separate commercial rights are established. Do not blindly repeat an expensive download. |
+| QA/compliance worker (Qwen2-VL) | Source GPU ordering fixed in qa_compliance_worker.py; --gpu now sets physical visibility before Torch import. Static test passed in 66-test [run 39268510242](https://github.com/CalamityStriker/OEC/actions/runs/39268510242). | **STATIC CONTRACT PASS; LIVE QA UNVERIFIED.** A live accept/reject decision on a real media artifact has not been captured. |
+| QA → archive → Hugging Face upload | Offline SQLite contract tests cover QA success → canonical PENDING, uploader selection, ARCHIVING recovery and targeted rollback. | **NOT END-TO-END ACCEPTED.** No fresh live upload receipt and post-upload dataset verification from this session. |
+| Brain → LTX worker → QA → HF upload | Runbook documents intended commands; components and independent smoke results do not prove the sustained queue path. | **NOT YET LIVE-ACCEPTED AS ONE PIPELINE.** Run a single short controlled job and verify each status/artifact transition before scaling. |
+| OEC-Play | OEC-Deploy feature validation runs are active/pending on their own branch; no server health request from this session. | **LIVE SERVER / CAPABILITY STATUS UNVERIFIED.** Keep adapters disabled unless their health and real artifact tests pass. |
+
+This table describes the latest evidence, not a promise that previously accepted model artifacts are available on the current host or that old quota observations authorize new writes. Recheck exact runner, GPU occupancy and StorageManager immediately before each live smoke.
 
 ## 2. What \`brain_config.json\` means for queue chunking
 
@@ -30,6 +36,14 @@ The active configuration has three use cases, with targets of 50 commercial B-ro
 - Brain's initial polling interval is 1,800 seconds, with configured minimum 300 and maximum 14,400 seconds. It adjusts polling based on queue deficit.
 
 Before large batches, first run a single short job end-to-end and inspect every transition in the shared queue/database and logs.
+
+### Upload batching is not individual-asset chunking
+
+The current hf_upload_daemon.py collects whole pending asset rows in pairs with their metadata JSON, stops at UPLOAD_BATCH_SIZE_GB or when the partial-batch age limit expires, writes a gzip-compressed tar archive into the configured cache, then calls the Hugging Face dataset API to upload that archive. On upload success it deletes the selected queue rows and local batch files; on failure it rolls the exact selected IDs back to PENDING.
+
+That code is multi-asset archive batching, not a resumable chunk protocol for a single very large file. brain_config.json system_settings.max_batch_size=10 is prompt/job batching. LTX's internal temporal/VAE chunk handling is separate. Do not claim per-file byte-range chunking, resume-on-interruption, or multipart upload unless a distinct implementation and tests are added. Current acceptance tests exercise disposable SQLite status transitions; they do not prove a real Hugging Face upload.
+
+Before a real upload, verify the target dataset repository and licence/consent constraints, confirm the expected AIEROS_HF_DATASET_REPO/authentication without printing tokens, then use a small run-scoped validated asset and check the returned upload receipt plus a read-after-write listing. Do not use --generate-dummy for acceptance.
 
 ## 3. Safe preflight before launching anything
 
@@ -87,10 +101,10 @@ The above is the documented worker invocation; it is **not** proof that all 11 c
 \`\`\`bash
 cd "$HOME/OEC"
 conda run --no-capture-output -n "$OEC_QA_ENV" \\
-  python "$HOME/OEC/qa_compliance_worker.py" --no-purge
+  python "$HOME/OEC/qa_compliance_worker.py" --no-purge --gpu "$OEC_QA_GPU"
 \`\`\`
 
-Set \`OEC_QA_ENV\` only after the dependency check. \`--no-purge\` avoids deleting the QA model cache; this is intentional.
+Set \`OEC_QA_ENV\` only after the dependency check. \`--no-purge\` avoids deleting the QA model cache; this is intentional. Set OEC_QA_GPU to the assigned physical GPU index after checking the active allocation and nvidia-smi; do not guess an index or share a device with another large model. The QA worker sets CUDA_VISIBLE_DEVICES before importing Torch.
 
 **HF upload daemon** — verify the configured dataset destination and Hugging Face authentication before starting it. \`--yes\` avoids an interactive create-repository prompt but still requires valid credentials.
 
@@ -179,4 +193,4 @@ Use \`http://127.0.0.1:7987\` via an approved SSH tunnel for the desktop client;
 
 Stop a process by pressing Ctrl+C in its own terminal or terminating its verified exact PID after confirming the command line. Do not run broad \`pkill -f\` patterns. After stopping the daemons, rerun \`storage_manager.py --status\` and preserve logs/results.
 
-The last accepted technical results are: AudioGen **PASS**; Kokoro, Whisper and Qwen3-ASR **PASS**; ACE-Step **SKIPPED**; TRELLIS and LTX JSON sidecars **not yet accepted as a two-model live pipeline** pending a completed new smoke run; Brain-to-LTX-to-QA-to-HF upload **not yet run as one sustained live end-to-end production pipeline**; live OEC-Deploy server **not verified online from this session**.
+Latest evidence checkpoint: 2026-10-19 19:54 IST. AudioGen, standalone TRELLIS, standalone LTX, Kokoro, Whisper and Qwen3-ASR each have a prior controlled live artifact PASS; the latest Kokoro/Whisper/Qwen3-ASR bootstrap smoke also passed. ACE-Step weights/runtime are prepared but live generation is blocked by the idle-A100 admission guard. FLUX→TRELLIS offline suites pass but its latest live attempt is blocked by the same GPU gate. MusicGen remains blocked by incomplete cached weights and unavailable Hugging Face proxy. QA GPU-selection ordering is statically tested, but live Qwen2-VL compliance decisions, the sustained Brain→worker→QA→tarball→Hugging Face upload chain, individual-file resumable chunking, and the live OEC-Play server remain unverified. The most recent OEC static/storage workflow (39268510242) passed 66 tests, compilation and four notebook JSON checks; it is not model inference.
