@@ -45,6 +45,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_upload_daemon_storage.py' -v
           python -m py_compile qa_compliance_worker.py tests/test_inference_storage_integration.py
           python -m py_compile hf_upload_daemon.py tests/test_upload_daemon_storage.py
+          python -m py_compile brain.py tests/test_brain_ltx_queue_storage.py
           python -m unittest discover -s tests -p 'test_storage_manager.py' -v
           python -m unittest discover -s tests -p 'test_storage_policy.py' -v
           python -m unittest discover -s tests -p 'test_quota_snapshot.py' -v
