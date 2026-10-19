@@ -130,15 +130,13 @@ jobs:
               python = prefix / "bin" / "python"
               row = {"name": name, "prefix": str(prefix), "python": str(python), "present": python.is_file()}
               if python.is_file():
-                  code = """import importlib.util, importlib.metadata, json, sys
-mods = %r
-dists = ["torch", "transformers", "qwen-vl-utils", "huggingface-hub", "torchvision", "av"]
-versions = {}
-for dist in dists:
-    try: versions[dist] = importlib.metadata.version(dist)
-    except importlib.metadata.PackageNotFoundError: versions[dist] = None
-print(json.dumps({"python": sys.version.split()[0], "packages": {m: bool(importlib.util.find_spec(m)) for m in mods}, "versions": versions, "executable": sys.executable}, sort_keys=True))
-""" % repr(modules)
+                  code = (
+                      "import importlib.util,json,sys; "
+                      f"mods={modules!r}; "
+                      "print(json.dumps({'python':sys.version.split()[0],"
+                      "'packages':{m:bool(importlib.util.find_spec(m)) for m in mods},"
+                      "'executable':sys.executable},sort_keys=True))"
+                  )
                   try:
                       check = subprocess.run([str(python), "-c", code], text=True, capture_output=True, timeout=20, check=False)
                       row.update({"returncode": check.returncode, "report": check.stdout.strip(), "stderr_tail": check.stderr[-1000:] if check.returncode else ""})
