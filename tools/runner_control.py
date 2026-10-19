@@ -362,7 +362,12 @@ def _github_request(
         raise RuntimeError(f"GitHub API {method} {endpoint} failed: {exc}") from exc
 
 
-def _github_runner_record(runner: Path, *, token: str | None = None) -> dict | None:
+def _github_runner_record(
+    runner: Path,
+    *,
+    token: str | None = None,
+    timeout: float = 20.0,
+) -> dict | None:
     auth = token or _github_auth_token()
     if not auth:
         return None
@@ -378,6 +383,7 @@ def _github_runner_record(runner: Path, *, token: str | None = None) -> dict | N
         "GET",
         f"repos/{repo}/actions/runners?per_page=100",
         auth,
+        timeout=timeout,
     )
     for item in payload.get("runners", []):
         if item.get("name") == name:
@@ -1170,6 +1176,13 @@ def status_runner(args: argparse.Namespace) -> None:
     if pids:
         print(f"PIDs      : {','.join(map(str, pids))}")
 
+    # A status command run on the node hosting an existing listener also seeds
+    # shared host metadata. Other login/compute nodes can then display this host
+    # without incorrectly inferring remote process state from their own /proc.
+    if configured and pids:
+        _write_runner_host_metadata(runner, pids[0], preserve_started_at=True)
+        print(f"Host info  : recorded for shared inventory ({socket.gethostname()})")
+
     record = None
     if configured:
         try:
@@ -1198,14 +1211,157 @@ def status_runner(args: argparse.Namespace) -> None:
 
 
 
-def list_runners(_: argparse.Namespace) -> None:
+_LIST_COLUMN_HEADERS = {
+    "name": "NAME",
+    "host": "HOST",
+    "process": "PROCESS",
+    "pid": "PID",
+    "github": "GITHUB",
+    "started": "STARTED",
+    "repo": "REPO",
+    "path": "PATH",
+    "source": "SOURCE",
+    "error": "API_ERR",
+}
+_LIST_COLUMN_CAPS = {
+    "name": 18,
+    "host": 21,
+    "process": 14,
+    "pid": 12,
+    "github": 18,
+    "started": 21,
+    "repo": 24,
+    "path": 28,
+    "source": 18,
+    "error": 22,
+}
+_LIST_DEFAULT_COLUMNS = ("name", "host", "process", "github")
+_LIST_ALL_COLUMNS = tuple(_LIST_COLUMN_HEADERS)
+_LIST_COLUMN_ALIASES = {
+    "runner": "name",
+    "node": "host",
+    "state": "process",
+    "status": "github",
+    "directory": "path",
+    "api_detail": "error",
+}
+
+
+def _list_columns(value: str | None) -> tuple[str, ...]:
+    raw = str(value or "name,host,process,github").strip().lower()
+    if raw == "all":
+        return _LIST_ALL_COLUMNS
+
+    requested = [part.strip() for part in raw.split(",") if part.strip()]
+    if not requested:
+        raise SystemExit(
+            "No list columns selected. Use --columns name,host,process,github "
+            "or --columns all."
+        )
+
+    result: list[str] = []
+    invalid: list[str] = []
+    for item in requested:
+        column = _LIST_COLUMN_ALIASES.get(item, item)
+        if column not in _LIST_COLUMN_HEADERS:
+            invalid.append(item)
+        elif column not in result:
+            result.append(column)
+    if invalid:
+        choices = ", ".join(_LIST_COLUMN_HEADERS)
+        raise SystemExit(
+            f"Unknown --columns value(s): {', '.join(invalid)}. "
+            f"Valid columns: {choices}; aliases: runner, node, state, status, directory, api_detail."
+        )
+    return tuple(result)
+
+
+def _compact_github_error(error: str) -> str:
+    """Reduce noisy network/API exceptions to a short, honest status label."""
+    lowered = error.lower()
+    if (
+        "name or service not known" in lowered
+        or "temporary failure in name resolution" in lowered
+        or "nodename nor servname" in lowered
+        or "getaddrinfo failed" in lowered
+    ):
+        return "API down (DNS)"
+    if "timed out" in lowered or "timeout" in lowered:
+        return "API down (timeout)"
+    if "connection refused" in lowered:
+        return "API down (refused)"
+    if "http 401" in lowered:
+        return "API auth failed (401)"
+    if "http 403" in lowered:
+        return "API no access (403)"
+    if "http 404" in lowered:
+        return "API 404 (repo/access)"
+    if "network is unreachable" in lowered:
+        return "API down (network)"
+    return "API unavailable"
+
+
+def _runner_table_cell(value: object, width: int) -> str:
+    text = str(value if value not in (None, "") else "—")
+    if len(text) <= width:
+        return text.ljust(width)
+    if width <= 1:
+        return text[:width]
+    return text[: width - 1] + "…"
+
+
+def _print_runner_table(rows: list[dict], columns: tuple[str, ...]) -> None:
+    headers = [_LIST_COLUMN_HEADERS[column] for column in columns]
+    terminal_width = max(40, shutil.get_terminal_size((110, 24)).columns)
+    separators_width = 3 * (len(columns) - 1)
+    available = max(sum(len(header) for header in headers), terminal_width - separators_width)
+
+    desired: dict[str, int] = {}
+    widths: dict[str, int] = {}
+    for column, header in zip(columns, headers):
+        widest = max([len(header)] + [len(str(row.get(column, "—"))) for row in rows])
+        desired[column] = max(len(header), min(_LIST_COLUMN_CAPS[column], widest))
+        widths[column] = len(header)
+
+    remaining = max(0, available - sum(widths.values()))
+    # Give spare terminal width to the most useful identity/state columns first.
+    priority = ("name", "host", "process", "github", "pid", "started", "repo", "path", "source", "error")
+    while remaining:
+        changed = False
+        for column in priority:
+            if column in widths and widths[column] < desired[column] and remaining:
+                widths[column] += 1
+                remaining -= 1
+                changed = True
+        if not changed:
+            break
+
+    print(" | ".join(_runner_table_cell(header, widths[column]) for column, header in zip(columns, headers)))
+    print("-+-".join("-" * widths[column] for column in columns))
+    for row in rows:
+        print(" | ".join(_runner_table_cell(row.get(column, "—"), widths[column]) for column in columns))
+
+
+def list_runners(args: argparse.Namespace) -> None:
     root = gpu_root()
     if not root.exists():
         print(f"No GPU runner directory: {root}")
         return
 
-    auth = _github_auth_token()
-    found = []
+    columns = _list_columns(getattr(args, "columns", None))
+    no_github = bool(getattr(args, "no_github", False))
+    show_details = bool(getattr(args, "details", False))
+    name_filters = getattr(args, "name", None) or []
+    if isinstance(name_filters, str):
+        name_filters = [name_filters]
+    requested_names = {
+        part.strip().lower().replace("-", "_")
+        for value in name_filters
+        for part in str(value).split(",")
+        if part.strip()
+    }
+
+    found: list[Path] = []
     for runner_file in root.rglob(".runner"):
         if runner_file.is_file() and runner_file.parent.name == "actions-runner":
             found.append(runner_file.parent)
@@ -1214,32 +1370,139 @@ def list_runners(_: argparse.Namespace) -> None:
         print(f"No configured runners under {root}")
         return
 
+    auth = "" if no_github else _github_auth_token()
+    github_errors_by_repo: dict[str, str] = {}
+    rows: list[dict] = []
     for runner in sorted(found):
-        pids = listener_pids(runner)
-        process_state = (
-            f"RUNNING_HERE pid={','.join(map(str, pids))}"
-            if pids
-            else "NOT_RUNNING_HERE"
-        )
-        if not auth:
-            host_text = _host_location_text(runner, pids)
-            print(
-                f"{runner} | PROCESS={process_state} | GITHUB=unknown "
-                f"(no GitHub API credential){host_text}"
-            )
+        configured_name, server_url = _runner_identity(runner)
+        directory_name = runner.parent.name
+        name = configured_name or directory_name.replace("-", "_")
+        normalized_name = name.lower().replace("-", "_")
+        normalized_directory = directory_name.lower().replace("-", "_")
+        if requested_names and normalized_name not in requested_names and normalized_directory not in requested_names:
             continue
-        try:
-            github = _github_runner_record(runner, token=auth)
-            github_state = _github_state_text(github)
-            host_text = _host_location_text(runner, pids, github)
-            print(
-                f"{runner} | PROCESS={process_state} | GITHUB={github_state}{host_text}"
-            )
-        except RuntimeError as exc:
-            host_text = _host_location_text(runner, pids)
-            print(
-                f"{runner} | PROCESS={process_state} | GITHUB=unavailable ({exc}){host_text}"
-            )
+
+        pids = listener_pids(runner)
+        host_info = _runner_host_info(runner)
+        local_hostname = socket.gethostname()
+        recorded_hostname = str(host_info.get("hostname") or "").strip()
+        github_record: dict | None = None
+        github_error = ""
+        repo = _github_repo_from_server_url(server_url) if server_url else ""
+        if no_github:
+            github_state = "not checked"
+            api_detail = "GitHub query skipped (--no-github)"
+        elif not auth:
+            github_state = "no token"
+            api_detail = "No recognized GitHub API credential was found."
+        else:
+            cache_key = repo or f"invalid:{runner}"
+            if cache_key in github_errors_by_repo:
+                github_error = github_errors_by_repo[cache_key]
+            else:
+                try:
+                    # Listing should stay responsive when API/DNS is degraded.
+                    github_record = _github_runner_record(runner, token=auth, timeout=5.0)
+                except RuntimeError as exc:
+                    github_error = str(exc)
+                    github_errors_by_repo[cache_key] = github_error
+            if github_error:
+                github_state = _compact_github_error(github_error)
+                api_detail = github_error
+            elif github_record is None:
+                github_state = "not registered"
+                api_detail = "Registry query returned no matching runner."
+            else:
+                github_state = _github_state_text(github_record)
+                api_detail = "—"
+
+        if pids:
+            host = f"{local_hostname} (here)"
+            process = "running here"
+            pid = ",".join(map(str, pids))
+        else:
+            host_is_online = bool(github_record and github_record.get("status") == "online")
+            if recorded_hostname:
+                host = recorded_hostname if host_is_online else f"{recorded_hostname} (last)"
+            else:
+                host = "unknown"
+            process = "not here"
+            remote_pid = host_info.get("listener_pid")
+            pid = f"{remote_pid}*" if remote_pid else "—"
+
+        started = (
+            host_info.get("started_at")
+            or host_info.get("log_updated_at")
+            or host_info.get("observed_at")
+            or "—"
+        )
+        path_text = str(runner.relative_to(root)) if runner.is_relative_to(root) else str(runner)
+        source = str(host_info.get("source") or "—")
+        rows.append({
+            "name": name,
+            "host": host,
+            "process": process,
+            "pid": pid,
+            "github": github_state,
+            "started": str(started),
+            "repo": repo or "—",
+            "path": path_text,
+            "source": source,
+            "error": github_state if github_error else ("no token" if not auth and not no_github else "—"),
+            "_full_path": str(runner),
+            "_repo_url": server_url or "",
+            "_pids": pids,
+            "_host_info": host_info,
+            "_github_error": github_error,
+            "_api_detail": api_detail,
+        })
+
+    if not rows:
+        print("No configured runners match --name.")
+        return
+
+    # Sort by the displayed runner name rather than the physical directory path.
+    rows.sort(key=lambda row: str(row["name"]).casefold())
+
+    print(
+        f"OEC runner inventory — {len(rows)} runner(s) — local node: {socket.gethostname()}"
+    )
+    _print_runner_table(rows, columns)
+
+    last_known_hosts = [
+        row["name"] for row in rows
+        if "(last)" in row["host"]
+    ]
+    if last_known_hosts:
+        print("HOST marked '(last)' is the last recorded host, not a confirmed current location.")
+    if any(str(row["pid"]).endswith("*") for row in rows):
+        print("PID marked '*' is the last recorded remote Listener PID, not a PID visible on this node.")
+
+    if any(row["process"] == "not here" for row in rows):
+        print("Note: 'not here' means no listener is visible on this node; it does not mean stopped.")
+
+    unavailable_count = sum(1 for row in rows if row["_github_error"])
+    if unavailable_count:
+        print(
+            f"GitHub API lookup failed for {unavailable_count} runner row(s); "
+            "this does not mean those runners are offline. Use --details for the full error."
+        )
+    elif not no_github and not auth:
+        print("GitHub status is unknown because no API credential was found; use --no-github for a local-only view.")
+
+    if show_details:
+        print("\nRunner details:")
+        for row in rows:
+            print(f"\n[{row['name']}]")
+            print(f"  Path:       {row['_full_path']}")
+            print(f"  Repository: {row['_repo_url'] or 'unknown'}")
+            print(f"  Host:       {row['host']}")
+            print(f"  Process:    {row['process']} (local PID(s): {','.join(map(str, row['_pids'])) or 'none'})")
+            print(f"  Started:    {row['started']}")
+            print(f"  Source:     {row['source']}")
+            print(f"  GitHub:     {row['github']}")
+            if row["_api_detail"] and row["_api_detail"] != "—":
+                print(f"  API detail: {row['_api_detail']}")
 
 def parser() -> argparse.ArgumentParser:
     examples = """
@@ -1532,13 +1795,52 @@ The setup/registration token is not a removal token.""",
 
     list_parser = sub.add_parser(
         "list",
-        help="List configured runners found recursively under OEC/gpu.",
+        help="Show a readable table of configured runners.",
         description=(
-            "Search OEC_ROOT/gpu/**/actions-runner/.runner and show each configured "
-            "runner with its local running/stopped state."
+            "List configured runners under OEC/gpu in a compact table. The default "
+            "columns are name, host, process, and GitHub state. A remote runner that "
+            "is not visible on this node is shown as 'not here', not as stopped."
         ),
-        epilog="Example:\n  python ~/OEC/tools/runner_control.py list",
+        epilog="""Examples:
+  # Compact default table
+  python ~/OEC/tools/runner_control.py list
+
+  # Choose exactly the columns you want
+  python ~/OEC/tools/runner_control.py list --columns name,host,github
+  python ~/OEC/tools/runner_control.py list --columns name,process,pid
+  python ~/OEC/tools/runner_control.py list --columns all
+
+  # Filter runners and/or avoid GitHub API requests
+  python ~/OEC/tools/runner_control.py list --name connector-1,connector-2
+  python ~/OEC/tools/runner_control.py list --no-github
+  python ~/OEC/tools/runner_control.py list --details
+""",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    list_parser.add_argument(
+        "--columns",
+        default="name,host,process,github",
+        metavar="COLS",
+        help=(
+            "Comma-separated columns: name,host,process,pid,github,started,repo,path,source,error; "
+            "use 'all' to show every column. Aliases: runner,node,state,status,directory,api_detail."
+        ),
+    )
+    list_parser.add_argument(
+        "--name",
+        action="append",
+        metavar="NAME[,NAME...]",
+        help="Show only the named runner(s); may be repeated or comma-separated.",
+    )
+    list_parser.add_argument(
+        "--no-github",
+        action="store_true",
+        help="Do not query GitHub; show local process and last-recorded host details only.",
+    )
+    list_parser.add_argument(
+        "--details",
+        action="store_true",
+        help="Print full paths and underlying GitHub/API diagnostics below the table.",
     )
     list_parser.set_defaults(func=list_runners)
 
