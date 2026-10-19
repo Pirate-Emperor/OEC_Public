@@ -326,13 +326,46 @@ def main() -> int:
             "status_before_qa": "PENDING_QA",
         }
 
-        # QA worker writes only to this explicit run-scoped DB. It never sweeps the shared queue.
-        import qa_compliance_worker as qa_worker
-        qa_worker.QUEUE_DB_PATH = str(run_db)
-        qa_outcome = qa_worker.process_qa_queue(
-            purge_after_load=False, gpu_id=int(gpu["selected_qa_gpu"]),
-            asset_id=asset_id, once=True,
-        )
+        # Run QA in an already-provisioned Python 3.11 environment that has Qwen2-VL
+        # dependencies. Never import QA in oec_deploy (which may not contain qwen_vl_utils),
+        # and fail closed on a missing cache instead of downloading model weights mid-smoke.
+        qa_python = Path(os.environ.get(
+            "OEC_QA_PYTHON",
+            str(Path.home() / "Conda" / "envs" / "phase1_ltx" / "bin" / "python"),
+        )).expanduser()
+        if not qa_python.is_file():
+            raise GateBlocked(f"existing QA Python runtime not found: {qa_python}")
+        qa_env = {
+            **os.environ,
+            "OEC_QA_CACHE_ONLY": "1",
+            "HF_HUB_OFFLINE": "1",
+            "TRANSFORMERS_OFFLINE": "1",
+        }
+        qa_log = report_root / "qa-worker.log"
+        qa_command = [
+            str(qa_python), str(ROOT / "qa_compliance_worker.py"),
+            "--once", "--asset-id", str(asset_id),
+            "--gpu", str(gpu["selected_qa_gpu"]),
+            "--no-purge", "--db-path", str(run_db),
+        ]
+        qa_process = run_logged(qa_command, qa_log, env=qa_env, timeout=1800)
+        report["qa_runtime"] = {
+            "python": str(qa_python),
+            "returncode": qa_process.returncode,
+            "cache_only": True,
+            "run_scoped_db": str(run_db),
+            "log": str(qa_log),
+        }
+        if qa_process.returncode == 0 and f"[QA_ONCE] PASS asset_id={asset_id} status=PENDING_UPLOAD" in qa_process.stdout:
+            qa_outcome = "PENDING_UPLOAD"
+        elif qa_process.returncode == 0 and f"[QA_ONCE] REJECTED asset_id={asset_id}" in qa_process.stdout:
+            qa_outcome = "REJECTED"
+        else:
+            raise RuntimeError(
+                "Qwen2-VL QA subprocess did not return a completed PASS/REJECTED marker; "
+                f"exit={qa_process.returncode}; stdout_tail={qa_process.stdout[-1500:]}; "
+                f"stderr_tail={qa_process.stderr[-1500:]}"
+            )
         report["qa_outcome"] = qa_outcome
         with sqlite3.connect(run_db) as conn:
             row = conn.execute(
