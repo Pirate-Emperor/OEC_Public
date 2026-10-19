@@ -30,8 +30,8 @@ class OecE2EAcceptanceContractTests(unittest.TestCase):
 
     def test_qa_uses_only_run_scoped_db_and_selected_asset(self):
         self.assertIn("create_run_scoped_queue(run_db, asset_path, metadata_path)", self.source)
-        self.assertIn("qa_worker.QUEUE_DB_PATH = str(run_db)", self.source)
-        self.assertIn("asset_id=asset_id, once=True", self.source)
+        self.assertIn('"--db-path", str(run_db)', self.source)
+        self.assertIn('"--once", "--asset-id", str(asset_id)', self.source)
         self.assertIn('row[0] != "PENDING_UPLOAD"', self.source)
         self.assertIn('passed_metadata.get("qa_passed") is not True', self.source)
 
