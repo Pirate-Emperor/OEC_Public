@@ -1,0 +1,88 @@
+name: OEC MusicGen A100 inference acceptance (CC-BY-NC research)
+
+on:
+  push:
+    branches:
+      - fix/media-stack-supervision-20261019
+      - feat/media-service-sidecars-20261018
+    paths:
+      - ".github/workflows/oec-musicgen-smoke.yml"
+      - "pipeline_musicgen.py"
+      - "tests/test_musicgen_pipeline.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-media-gpu-storage-serial
+  cancel-in-progress: false
+
+jobs:
+  musicgen-inference:
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout OEC feature branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate AudioCraft phase1 environment and A100
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-1"
+          test -f "$HOME/OEC/storage_config.json"
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -c 'import torch, torchaudio, audiocraft, soundfile; print("ENV=phase1"); print("TORCH="+torch.__version__); print("TORCHAUDIO="+torchaudio.__version__); print("AUDIOCRAFT="+__import__("importlib.metadata",fromlist=["version"]).version("audiocraft")); print("CUDA="+str(torch.version.cuda)); assert torch.cuda.is_available()'
+          nvidia-smi
+
+      - name: Compile and run offline contract tests
+        run: |
+          set -euo pipefail
+          C="$HOME/Conda/condabin/conda"
+          "$C" run --no-capture-output -n phase1 python -m py_compile pipeline_musicgen.py tests/test_musicgen_pipeline.py
+          "$C" run --no-capture-output -n phase1 python -m unittest discover -s tests -p 'test_musicgen_pipeline.py' -v
+
+      - name: Capture model-storage state before MusicGen
+        run: |
+          set -euo pipefail
+          REPORT_DIR="$RUNNER_TEMP/oec-musicgen-smoke-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -p "$REPORT_DIR"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python storage_manager.py --status 2>&1 | tee "$REPORT_DIR/storage-before.log"
+
+      - name: Run one bounded MusicGen inference
+        run: |
+          set -euo pipefail
+          REPORT_DIR="$RUNNER_TEMP/oec-musicgen-smoke-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          OUTPUT="/tmp/oec-musicgen-smoke-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.wav"
+          mkdir -p "$REPORT_DIR"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 \
+            python pipeline_musicgen.py --mode generate --allow-download --scratch-output \
+            --output "$OUTPUT" --duration 3 --seed 42 \
+            --prompt "A short gentle instrumental cue with warm piano, mellow strings and a steady pulse" \
+            2>&1 | tee "$REPORT_DIR/musicgen.log"
+          cp "$OUTPUT" "$REPORT_DIR/"
+          cp "$OUTPUT.info.json" "$REPORT_DIR/"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -c 'import soundfile,sys; x=soundfile.info(sys.argv[1]); print("WAV_VALIDATION=PASS"); print("WAV_INFO="+str(x)); assert x.frames>0 and x.samplerate>0' "$REPORT_DIR/$(basename "$OUTPUT")"
+
+      - name: Capture model-storage state after MusicGen
+        if: always()
+        run: |
+          set +e
+          REPORT_DIR="$RUNNER_TEMP/oec-musicgen-smoke-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -p "$REPORT_DIR"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python storage_manager.py --status 2>&1 | tee "$REPORT_DIR/storage-after.log"
+          exit 0
+
+      - name: Upload run-scoped MusicGen evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-musicgen-smoke
+          path: ${{ runner.temp }}/oec-musicgen-smoke-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: warn
+          retention-days: 3
