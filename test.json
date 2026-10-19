@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-19T21:08:00+05:30",
+  "last_updated": "2026-10-19T21:14:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Current-head static acceptance 39278190899 passed 86 tests, py_compile, four notebook JSON checks and no ResourceWarning. The executable QA frame-path regression passed for .mp4/.webm/.avi without changing source bytes, and fresh transcode-quota assertion passed. Latest completed A100 bootstrap 39278145617 on oec-1 again passed Kokoro/Whisper/Qwen3-ASR (22.48/18.47/20.45 s) and ACE-Step checkpoint/isolated runtime setup, but required ACE-Step inference was blocked by no eligible idle A100; no music output. FLUX→TRELLIS latest completed run remains GPU-admission blocked. No live Qwen2-VL QA, no real HF upload/read-after-write, and no individual-file resumable chunking.",
+  "latest_summary": "Latest static regression run 39278190899 passed 86 tests, compilation and four notebook JSON checks. Latest visual sidecar acceptance report in A100 run 39278268411 says PASS, TRELLIS and LTX 2/2 providers passed; ZIP artifact 12198722285 downloaded and inspected locally: GLB 2,775,928 bytes SHA-256 e7a1a970..., valid glTF 2 and reopened via trimesh (48,806 vertices, 95,566 faces, not watertight); MP4 242,547 bytes SHA-256 5d7d54de..., H.264 768x512 2.083333 s confirmed by local ffprobe. No model downloads or packages installed. GitHub overall workflow/job still returned in_progress at last API poll despite report and artifact upload; do not yet call the workflow job concluded PASS. ACE-Step generation remains blocked by no idle A100; actual Qwen2-VL decisions, real HF upload/read-after-write, single-file resumable chunking, sustained Brain→QA→upload and OEC-Play remain unverified.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -4222,6 +4222,182 @@
         "Storage telemetry does not authorize future writes; rerun fresh admission before any write."
       ],
       "artifact": null
+    },
+    {
+      "id": "EXP-2026-10-19-TRELLIS-LTX-LIVE-SIDECAR-ACCEPTANCE-39278268411",
+      "date": "2026-10-19",
+      "category": "Cache-only live TRELLIS.2 and LTX-2.3 loopback API/artifact acceptance",
+      "approach": "Run the sequential visual-media sidecar harness on the assigned oec-1 A100 runner with model downloads disabled and no package installs. Preflight cached weights, start only harness-owned loopback API processes, probe health/model-loaded status, submit one bounded job per provider, validate returned GLB/MP4, capture report/logs and read StorageManager status before/after. Download and inspect the published Actions artifact; locally reopen GLB with trimesh and verify MP4 with ffprobe.",
+      "reason": "Establish actual API + model load + job submission + terminal state + artifact-file validation for TRELLIS and LTX, extending prior standalone notebook results.",
+      "parameters": {
+        "workflow_run_id": 39278268411,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39278268411",
+        "job_id": 118148474821,
+        "branch": "fix/media-stack-supervision-20261019",
+        "source_sha": "9ed203a9f1122046a28af45f0df84ceda634885f",
+        "runner": "oec-1",
+        "hostname": "scn30-mn",
+        "report_status": "PASS",
+        "providers": {
+          "trellis": {
+            "status": "PASS",
+            "api_port": 17868,
+            "api_health": {
+              "status": "ok",
+              "ready": true,
+              "model_loaded": true,
+              "storage_ready": true
+            },
+            "model": "microsoft/TRELLIS.2-4B",
+            "model_revision": "af44b45f2e35a493886929c6d786e563ec68364d",
+            "input": "oec-synthetic-reference.png",
+            "generation_seconds": 107.003,
+            "startup_plus_job_seconds": 305.365,
+            "job_id": "job_XKMPhPhO-_fTXzLr2znk4tFA",
+            "artifact": "trellis-acceptance.glb",
+            "bytes": 2775928,
+            "sha256": "e7a1a970edae002596a80fa47b19ad87e96ad82a8dfa3d4523ad65167435e875",
+            "geometry": {
+              "meshes": 1,
+              "primitives": 1,
+              "vertices": 48806,
+              "indices": 286698,
+              "faces": 95566
+            },
+            "local_reopen": {
+              "tool": "trimesh 4.11.1",
+              "status": "PASS",
+              "scene_geometry_count": 1,
+              "watertight": false,
+              "bounds": [
+                [
+                  -0.50000012,
+                  -0.49999636,
+                  -0.5
+                ],
+                [
+                  0.49999756,
+                  0.49999583,
+                  0.49999827
+                ]
+              ]
+            }
+          },
+          "ltx": {
+            "status": "PASS",
+            "api_port": 17869,
+            "api_health": {
+              "status": "ok",
+              "ready": true,
+              "model_loaded": true,
+              "storage_ready": true
+            },
+            "model": "Lightricks/LTX-2.3",
+            "model_revision": "ae855f8538843825f9015a419cf4ba5edaf5eec2",
+            "task": "text_to_video",
+            "resolution": [
+              768,
+              512
+            ],
+            "duration_seconds": 2.083333,
+            "fps": 12,
+            "generation_seconds": 131.899,
+            "startup_plus_job_seconds": 181.732,
+            "job_id": "job_49U9O2PgrsmijStdmFcomqgM",
+            "artifact": "ltx-acceptance.mp4",
+            "bytes": 242547,
+            "sha256": "5d7d54de4354936f66867fecd19d20c0ab6972b5d997ca00c145ab0c1e54ec51",
+            "local_ffprobe": {
+              "status": "PASS",
+              "codec": "h264",
+              "width": 768,
+              "height": 512,
+              "duration_seconds": 2.083333
+            }
+          }
+        },
+        "artifact": {
+          "id": 12198722285,
+          "name": "oec-visual-sidecar-smoke-39278268411",
+          "bytes": 1820957,
+          "url": "https://github.com/CalamityStriker/OEC/actions/runs/39278268411/artifacts/12198722285",
+          "zip_sha256": "33ebf5028082ae2dd1d608d71e0cf254d4a396a617ad42693846372b6df9e24c",
+          "inspected_contents": [
+            "trellis-acceptance.glb",
+            "ltx-acceptance.mp4",
+            "report.json",
+            "oec-synthetic-reference.png",
+            "provider logs",
+            "pre/post StorageManager status"
+          ],
+          "local_files": {
+            "glb": "/mnt/data/OEC_TRELLIS_acceptance_39278268411.glb",
+            "mp4": "/mnt/data/OEC_LTX_acceptance_39278268411.mp4",
+            "report": "/mnt/data/OEC_visual_sidecar_report_39278268411.json",
+            "reference_png": "/mnt/data/OEC_visual_sidecar_reference_39278268411.png",
+            "zip": "/mnt/data/oec-visual-sidecar-smoke-39278268411.zip"
+          }
+        },
+        "safety": {
+          "downloads_allowed": false,
+          "package_installs_allowed": false,
+          "production_service_urls_changed": false,
+          "storage_before_hard_headroom_gb": 61.19,
+          "storage_after_hard_headroom_gb": 60.36,
+          "reserve_mutation_attempted": false,
+          "sidecar_cleanup": "NO_LOCK for TRELLIS and LTX after service exit"
+        },
+        "gpu_snapshot": {
+          "gpu": "NVIDIA A100-SXM4-40GB x8",
+          "observed_compute_pid": 3347078,
+          "memory_mib": {
+            "gpu0": 6280,
+            "gpu1": 416,
+            "gpu2": 416,
+            "gpu3": 416,
+            "gpu4": 416,
+            "gpu5": 416,
+            "gpu6": 416,
+            "gpu7": 416
+          },
+          "utilization_percent": 0,
+          "note": "The snapshot is contemporaneous but point-in-time. Sidecar harness reported actual inference PASS; no process was killed."
+        }
+      },
+      "environment": {
+        "runner": "oec-1",
+        "envs": {
+          "trellis": "phase2_3d",
+          "ltx": "phase1_ltx"
+        },
+        "execution": "live loopback APIs and actual model inference"
+      },
+      "results": {
+        "status": "PROVIDER_ACCEPTANCE_PASS_WORKFLOW_FINAL_STATUS_PENDING",
+        "providers_passed": 2,
+        "providers_failed": 0,
+        "providers_blocked": 0,
+        "trellis_glb_validated": true,
+        "glb_local_reopen": "PASS",
+        "glb_watertight": false,
+        "ltx_mp4_validated": true,
+        "mp4_local_ffprobe": "PASS",
+        "actual_files_generated": true,
+        "action_run_status_at_last_poll": "in_progress",
+        "job_status_at_last_poll": "in_progress",
+        "overall_github_workflow_conclusion": "PENDING",
+        "brain_worker_qa_hf_integration": "NOT_TESTED"
+      },
+      "interpretation": "The harness report itself is PASS for both actual loopback model APIs, and the downloaded ZIP contains the exact outputs and reports. TRELLIS returned a valid GLB that reopens locally, but its mesh is not watertight; this only proves artifact existence/structural validity, not geometry fidelity. LTX MP4 passed both harness validation and local ffprobe. The Actions API still reports the enclosing job in_progress at the last poll despite the report/artifact-upload post-step logs, so preserve provider-level PASS while awaiting terminal workflow conclusion.",
+      "limitations": [
+        "Synthetic reference/prompt demonstrates API artifact generation, not real scene accuracy or broad visual quality.",
+        "TRELLIS mesh is not watertight; vertex/face count alone does not prove geometry quality.",
+        "This is sidecar-level TRELLIS and LTX acceptance, not Brain queue→QA→HF upload end-to-end acceptance.",
+        "No Qwen2-VL compliance decision or real HF upload.",
+        "Individual-file resumable upload chunking is not implemented.",
+        "Storage quota values are historical; a fresh admission is required for further writes."
+      ],
+      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39278268411/artifacts/12198722285"
     }
   ]
 }
