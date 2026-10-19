@@ -158,6 +158,8 @@ class UploadDaemonStorageTests(unittest.TestCase):
         self.assertIn("cleanup_on_start=not args.once", source)
         self.assertIn("create_repo_if_missing=not args.once", source)
         self.assertIn("process_queue(max_batches=1, asset_id=args.asset_id)", source)
+        self.assertIn("sys.exit(1)", source)
+        self.assertIn("Avoid leaking a FileHandler", source)
 
 if __name__ == "__main__":
     unittest.main()
