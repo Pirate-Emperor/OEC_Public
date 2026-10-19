@@ -1,5 +1,8 @@
 # OEC Work Changelog
 
+- [2026-10-19 — model inference handoff and Actions quota update](CHANGELOG-2026-10-19.md)
+  - Current checkpoint: AudioGen and standalone TRELLIS/LTX passed on A100; MusicGen failed before inference due to missing cached weights and Hugging Face proxy access; FLUX→TRELLIS failed pre-inference on two path-test fixture errors; ACE-Step strict cache guard is committed but not yet live-verified. The user withdrew the former $0-only Actions requirement after quota reset. See the daily record and [`TODO.md`](../TODO.md) for next steps.
+
 Daily engineering records live here. Use the local Asia/Kolkata date in each filename. Append work to the current day's file while the date remains the same; create a new `CHANGELOG-YYYY-MM-DD.md` on the next date.
 
 ## Daily records
