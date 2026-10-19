@@ -76,8 +76,55 @@ class InferenceStorageIntegrationTests(unittest.TestCase):
         )
         self.assertLess(visibility_index, torch_import_index)
 
+        # qwen-vl-utils can import Torch transitively; defer it until after
+        # CUDA_VISIBLE_DEVICES has been applied as well.
+        top_level_qwen_imports = [
+            node for node in tree.body
+            if isinstance(node, ast.ImportFrom) and node.module == "qwen_vl_utils"
+        ]
+        self.assertEqual(top_level_qwen_imports, [])
+        qwen_import_index = next(
+            i for i, node in enumerate(ctor.body)
+            if isinstance(node, ast.Try)
+            and any(
+                isinstance(child, ast.ImportFrom) and child.module == "qwen_vl_utils"
+                for child in ast.walk(node)
+            )
+        )
+        self.assertLess(torch_import_index, qwen_import_index)
+
         self.assertIn('parser.add_argument("--gpu", type=int, default=0', source)
-        self.assertIn("process_qa_queue(purge_after_load=args.purge, gpu_id=args.gpu)", source)
+        self.assertIn('parser.add_argument("--once", action="store_true"', source)
+        self.assertIn('parser.add_argument("--asset-id", type=int', source)
+        self.assertIn("process_qa_queue(\n                purge_after_load=args.purge, gpu_id=args.gpu, asset_id=args.asset_id, once=True", source)
+
+    def test_qa_one_shot_filters_exact_id_and_skips_global_recovery_sweep(self):
+        source = self._read("qa_compliance_worker.py")
+        tree = ast.parse(source, filename="qa_compliance_worker.py")
+        queue_fn = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "process_qa_queue"
+        )
+        bounded_sweep_guards = [
+            node for node in ast.walk(queue_fn)
+            if isinstance(node, ast.If)
+            and isinstance(node.test, ast.UnaryOp)
+            and isinstance(node.test.op, ast.Not)
+            and isinstance(node.test.operand, ast.Name)
+            and node.test.operand.id == "once"
+            and any(
+                isinstance(child, ast.Call)
+                and isinstance(child.func, ast.Name)
+                and child.func.id == "sweep_stuck_jobs"
+                for child in ast.walk(node)
+            )
+        ]
+        self.assertTrue(bounded_sweep_guards, "targeted QA must skip sweeping unrelated PROCESSING_QA rows")
+        self.assertIn("WHERE id = ? AND status = 'PENDING_QA' LIMIT 1", source)
+        self.assertIn("WHERE id = ? AND status = 'PROCESSING_QA'", source)
+        self.assertIn('parser.error("--once requires --asset-id with a positive ID")', source)
+        self.assertIn('parser.error("--asset-id can only be used with "--once")', source) if False else None
+        self.assertIn('parser.error("--asset-id can only be used with --once")', source)
 
     def test_qa_worker_enforces_storage_for_model_and_transcode(self):
         source = self._read("qa_compliance_worker.py")
