@@ -42,6 +42,17 @@ class OecE2EAcceptanceContractTests(unittest.TestCase):
         self.assertNotIn("daemon.process_queue()", self.source)
         self.assertNotIn("generate_dummy", self.source.lower())
 
+    def test_qa_runs_in_existing_runtime_with_cache_only_and_run_scoped_db(self):
+        self.assertIn("OEC_QA_PYTHON", self.source)
+        self.assertIn('Conda" / "envs" / "phase1_ltx" / "bin" / "python', self.source)
+        self.assertIn('"OEC_QA_CACHE_ONLY": "1"', self.source)
+        self.assertIn('"HF_HUB_OFFLINE": "1"', self.source)
+        self.assertIn('"--db-path", str(run_db)', self.source)
+        self.assertIn("qa_compliance_worker.py", self.source)
+        self.assertNotIn("import qa_compliance_worker as qa_worker", self.source)
+        self.assertIn("qa_process.returncode == 0", self.source)
+        self.assertIn("[QA_ONCE] PASS asset_id=", self.source)
+
     def test_remote_readback_reassembles_and_verifies_hashes(self):
         self.assertIn("manifest.json", self.source)
         self.assertIn("oec-asset-chunks-v1", self.source)
