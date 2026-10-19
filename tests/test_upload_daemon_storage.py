@@ -157,7 +157,7 @@ class UploadDaemonStorageTests(unittest.TestCase):
         self.assertIn('parser.error("--once requires --asset-id with a positive ID")', source)
         self.assertIn("cleanup_on_start=not args.once", source)
         self.assertIn("create_repo_if_missing=not args.once", source)
-        self.assertIn("process_queue(max_batches=1, asset_id=args.asset_id)", source)
+        self.assertIn("max_batches=1, asset_id=args.asset_id, chunk_oversize=args.chunk_oversize", source)
         self.assertIn("sys.exit(1)", source)
         self.assertIn("Avoid leaking a FileHandler", source)
 
@@ -246,6 +246,7 @@ class UploadDaemonStorageTests(unittest.TestCase):
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM assets").fetchone()[0], 0)
 
     def test_chunk_upload_failure_keeps_source_and_rolls_selected_row_back(self):
+        import hashlib
         import sqlite3
         import tempfile
         from unittest import mock
@@ -312,7 +313,11 @@ class UploadDaemonStorageTests(unittest.TestCase):
             with sqlite3.connect(db) as conn:
                 self.assertEqual(conn.execute("SELECT status FROM assets WHERE id=42").fetchone()[0], "PENDING")
             # Retry sees and verifies part 0 by its remote SHA-256, skips it, and resumes at part 1.
-            self.assertEqual(daemon.process_queue(max_batches=1, asset_id=42, chunk_oversize=True), 1)
+            with (
+                mock.patch.dict(uploader.SYSTEM_DIRS, {"cache": str(cache), "outputs": str(outputs)}),
+                mock.patch.object(uploader, "storage_preflight_path", return_value=(True, "test admission")),
+            ):
+                self.assertEqual(daemon.process_queue(max_batches=1, asset_id=42, chunk_oversize=True), 1)
             first_part = next(name for name in daemon.api.objects if name.endswith("part-000000.bin"))
             self.assertEqual(daemon.api.calls.count(first_part), 1)
             self.assertFalse(asset.exists())
