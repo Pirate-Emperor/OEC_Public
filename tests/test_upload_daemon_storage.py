@@ -161,5 +161,132 @@ class UploadDaemonStorageTests(unittest.TestCase):
         self.assertIn("sys.exit(1)", source)
         self.assertIn("Avoid leaking a FileHandler", source)
 
+    def test_explicit_chunk_mode_uploads_parts_then_manifest_and_reassembles(self):
+        import hashlib
+        import json
+        import sqlite3
+        import tempfile
+        from unittest import mock
+        import hf_upload_daemon as uploader
+
+        payload = b"ABCDEFGHIJKLMNO"
+        metadata_bytes = b'{"output_type":"asset","model_type":"unit-test"}'
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            cache = root / "cache"
+            outputs = root / "outputs"
+            cache.mkdir()
+            outputs.mkdir()
+            asset = root / "large.bin"
+            metadata = root / "large.json"
+            asset.write_bytes(payload)
+            metadata.write_bytes(metadata_bytes)
+            db = root / "queue.db"
+            with sqlite3.connect(db) as conn:
+                conn.execute("CREATE TABLE assets (id INTEGER PRIMARY KEY, asset_path TEXT, json_path TEXT, total_size_bytes INTEGER, status TEXT, timestamp DATETIME)")
+                conn.execute("INSERT INTO assets VALUES (41, ?, ?, ?, 'PENDING', '2000-01-01 00:00:00')", (str(asset), str(metadata), len(payload) + len(metadata_bytes)))
+                conn.commit()
+
+            class FakeHub:
+                def __init__(self):
+                    self.objects = {}
+                    self.order = []
+                def upload_file(self, path_or_fileobj, path_in_repo, repo_id, repo_type):
+                    self.objects[path_in_repo] = Path(path_or_fileobj).read_bytes()
+                    self.order.append(path_in_repo)
+
+            daemon = uploader.HFUploadDaemon.__new__(uploader.HFUploadDaemon)
+            daemon.api = FakeHub()
+            daemon.db_path = str(db)
+            daemon.batch_limit_bytes = 8
+            daemon.chunk_size_bytes = 4
+            daemon.archive_min_free_gb = 0.1
+            daemon.is_running = True
+            with mock.patch.dict(uploader.SYSTEM_DIRS, {"cache": str(cache), "outputs": str(outputs)}), \\
+                 mock.patch.object(uploader, "storage_preflight_path", return_value=(True, "test admission")):
+                self.assertEqual(daemon.process_queue(max_batches=1, asset_id=41, chunk_oversize=True), 1)
+
+            uploaded = daemon.api.objects
+            manifest_paths = [name for name in daemon.api.order if name.endswith("/manifest.json")]
+            self.assertEqual(len(manifest_paths), 1)
+            self.assertEqual(daemon.api.order[-1], manifest_paths[0], "manifest must be uploaded after all parts and metadata")
+            manifest = json.loads(uploaded[manifest_paths[0]].decode("utf-8"))
+            self.assertEqual(manifest["protocol"], "oec-asset-chunks-v1")
+            self.assertEqual(manifest["status"], "complete")
+            self.assertEqual(manifest["asset_bytes"], len(payload))
+            self.assertEqual(manifest["asset_sha256"], hashlib.sha256(payload).hexdigest())
+            self.assertEqual(len(manifest["parts"]), 4)
+            rebuilt = bytearray()
+            for expected_index, part in enumerate(manifest["parts"]):
+                self.assertEqual(part["index"], expected_index)
+                piece = uploaded[part["path"]]
+                self.assertEqual(len(piece), part["size_bytes"])
+                self.assertEqual(hashlib.sha256(piece).hexdigest(), part["sha256"])
+                rebuilt.extend(piece)
+            self.assertEqual(bytes(rebuilt), payload)
+            remote_metadata = uploaded[manifest["metadata"]["path"]]
+            self.assertEqual(hashlib.sha256(remote_metadata).hexdigest(), manifest["metadata"]["sha256"])
+            self.assertFalse(asset.exists())
+            self.assertFalse(metadata.exists())
+            self.assertEqual(list(cache.iterdir()), [])
+            with sqlite3.connect(db) as conn:
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM assets").fetchone()[0], 0)
+
+    def test_chunk_upload_failure_keeps_source_and_rolls_selected_row_back(self):
+        import sqlite3
+        import tempfile
+        from unittest import mock
+        import hf_upload_daemon as uploader
+
+        payload = b"ABCDEFGHIJKLMNO"
+        metadata_bytes = b'{}'
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            cache = root / "cache"
+            outputs = root / "outputs"
+            cache.mkdir()
+            outputs.mkdir()
+            asset = root / "large.bin"
+            metadata = root / "large.json"
+            asset.write_bytes(payload)
+            metadata.write_bytes(metadata_bytes)
+            db = root / "queue.db"
+            with sqlite3.connect(db) as conn:
+                conn.execute("CREATE TABLE assets (id INTEGER PRIMARY KEY, asset_path TEXT, json_path TEXT, total_size_bytes INTEGER, status TEXT, timestamp DATETIME)")
+                conn.execute("INSERT INTO assets VALUES (42, ?, ?, ?, 'PENDING', '2000-01-01 00:00:00')", (str(asset), str(metadata), len(payload) + len(metadata_bytes)))
+                conn.commit()
+
+            class FailingHub:
+                def __init__(self):
+                    self.objects = {}
+                def upload_file(self, path_or_fileobj, path_in_repo, repo_id, repo_type):
+                    if path_in_repo.endswith("part-000001.bin"):
+                        raise OSError("simulated network outage")
+                    self.objects[path_in_repo] = Path(path_or_fileobj).read_bytes()
+
+            daemon = uploader.HFUploadDaemon.__new__(uploader.HFUploadDaemon)
+            daemon.api = FailingHub()
+            daemon.db_path = str(db)
+            daemon.batch_limit_bytes = 8
+            daemon.chunk_size_bytes = 4
+            daemon.archive_min_free_gb = 0.1
+            daemon.is_running = True
+            with mock.patch.dict(uploader.SYSTEM_DIRS, {"cache": str(cache), "outputs": str(outputs)}), \\
+                 mock.patch.object(uploader, "storage_preflight_path", return_value=(True, "test admission")):
+                with self.assertRaisesRegex(OSError, "simulated network outage"):
+                    daemon.process_queue(max_batches=1, asset_id=42, chunk_oversize=True)
+            self.assertEqual(asset.read_bytes(), payload)
+            self.assertEqual(metadata.read_bytes(), metadata_bytes)
+            self.assertNotIn("manifest.json", "".join(daemon.api.objects.keys()))
+            with sqlite3.connect(db) as conn:
+                self.assertEqual(conn.execute("SELECT status FROM assets WHERE id=42").fetchone()[0], "PENDING")
+            self.assertEqual(list(cache.iterdir()), [])
+
+    def test_chunk_oversize_requires_explicit_bounded_cli_mode(self):
+        source = (self.ROOT / "hf_upload_daemon.py").read_text(encoding="utf-8")
+        self.assertIn('"--chunk-oversize"', source)
+        self.assertIn('parser.error("--chunk-oversize requires --once --asset-id")', source)
+        self.assertIn("chunk_oversize= args.chunk_oversize", source.replace("chunk_oversize=args.chunk_oversize", "chunk_oversize= args.chunk_oversize"))
+
 if __name__ == "__main__":
     unittest.main()
