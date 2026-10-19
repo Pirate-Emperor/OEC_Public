@@ -3,16 +3,20 @@
 
 
 
-## 2026-10-19 — Current model-pipeline status (2026-10-19T16:27:18.503+05:30)
+## 2026-10-19 — Current media-model inference status (checkpoint 18:28 IST)
 
-- [x] AudioGen was accepted on the current model-pipeline commit. Run [39240127736](https://github.com/Killer4K-N/OEC/actions/runs/39240127736), job [118018656307](https://github.com/Killer4K-N/OEC/actions/runs/39240127736/job/118018656307). All five notebook code cells ran; cached facebook/audiogen-medium loaded on oec-1 / scn30-mn (NVIDIA A100-SXM4-40GB). A 3.0-second mono 16 kHz PCM WAV was generated in 26.737 seconds: 96,078 bytes, SHA-256 6be1acb0cf36cacfc5ba4464ebbecb7f6f3bbe46f8e1e3bdbf88f2eef80bde3b. Peak allocated/reserved VRAM was 5.155/5.385 GiB. Artifact [12181271517](https://github.com/Killer4K-N/OEC/actions/runs/39240127736/artifacts/12181271517).
-- [x] All six AudioCraft notebook static tests and the pre/post StorageManager steps passed. The model cache was hit and no shared outputs were written. The downloaded WAV was independently reopened and its format, duration, rate, frame count and SHA matched the report.
-- [x] Lease-boundary fixes and read-only audio reserve preflight are committed at [21f576b7](https://github.com/Killer4K-N/OEC/commit/21f576b774e25c7766d7c2876b793366918f0436). This commit also adds an API-level TRELLIS remesh option; the standalone generator retains its original remesh-on default.
-- [ ] Visual acceptance [run 39240127757](https://github.com/Killer4K-N/OEC/actions/runs/39240127757) is in progress on this commit. Do not launch another job while it holds the shared A100/storage concurrency group. Accept TRELLIS only after a GLB is produced and reopened; accept LTX only after a playable MP4 is produced and validated.
-- [ ] Bootstrap run [39240127730](https://github.com/Killer4K-N/OEC/actions/runs/39240127730) was cancelled before job assignment. It has no tests or inference evidence. Run the speech/music bootstrap only after the visual run reaches a terminal state. ACE-Step still needs an actual music output.
-- [ ] Run a fresh FLUX PNG inference on the current branch after the serial A100 queue clears. The older successful FLUX-to-TRELLIS run is historical evidence, not current-head verification.
-- [ ] AudioGen is still a notebook one-shot, not a persistent API. MusicGen is a separate model and has non-commercial weight terms; keep it separate from the commercial path. Prioritize ACE-Step for music acceptance.
-- Environment warning: pip check reports thinc 8.3.6 wants NumPy >=2.0.0 while the pinned AudioCraft environment has NumPy 1.26.4. AudioGen passed, and no packages were changed.
+- Actions runner quota was reset per the user. The former $0-only push/rerun prerequisite is withdrawn. Use Actions for needed inference/tests; avoid same-concurrency pending jobs cancelling each other. StorageManager admission stays separate.
+- **PASS AudioGen:** [39240127736](https://github.com/Killer4K-N/OEC/actions/runs/39240127736), valid 3 s mono 16 kHz WAV, 96,078 bytes, SHA-256 6be1acb0cf36cacfc5ba4464ebbecb7f6f3bbe46f8e1e3bdbf88f2eef80bde3b; 26.737 s, peak VRAM 5.155/5.385 GiB.
+- **PASS TRELLIS/LTX standalone:** [39240127757](https://github.com/Killer4K-N/OEC/actions/runs/39240127757), validated GLB 2,742,900 bytes (SHA-256 e0d8f0a3a45921b4119a01a0b45f560d4604fb44da44454ddee2b912bd2fe0b7) and H.264 MP4 242,547 bytes, 768×512, 2.083 s (SHA-256 5d7d54de4354936f66867fecd19d20c0ab6972b5d997ca00c145ab0c1e54ec51). Artifact report 12182600342.
+- **MusicGen failed before inference:** [39254306725](https://github.com/Killer4K-N/OEC/actions/runs/39254306725); offline contract tests 4/4 passed, but model snapshot is not complete and runner cannot reach Hugging Face proxy. No WAV; artifact 12187572013. Diagnose cache/egress before retry.
+- **FLUX→TRELLIS failed before inference:** [39254474617](https://github.com/Killer4K-N/OEC/actions/runs/39254474617); two test fixture errors in tests/test_flux_image_pipeline.py: managed output-root fixture unconfigured and scratch fixture outside /tmp. Artifact 12187637374.
+- **ACE-Step guard fix committed** at b84398af but A100 acceptance not complete; bootstrap 39254306716 was cancelled before assignment. Prior 39246077924 timed out while upstream was downloading a 4.46 GiB DiT file at 91–92%. Run the managed bootstrap again once the shared lane is clear.
+- Earlier speech acceptance [39209090292](https://github.com/Killer4K-N/OEC/actions/runs/39209090292) passed Kokoro → Whisper Turbo/Qwen3-ASR on one controlled clip.
+- [ ] Fix FLUX path test fixtures without relaxing production checks; rerun tests then run current-head FLUX PNG → TRELLIS GLB.
+- [ ] Run ACE-Step managed bootstrap and require an actual valid music file.
+- [ ] Diagnose MusicGen cache/egress and produce WAV.
+- [ ] Implement local multimodal orchestration: FLUX/TRELLIS/LTX visuals; AudioGen effects; ACE-Step/MusicGen score; optional Kokoro narration and Whisper/Qwen3-ASR checks; final mux and hashed manifest. No full-model training, OEC-Play deployment or OEC_Deploy edits.
+- [ ] Refresh StorageManager status before shared writes. The last report in run 39254306725 showed group 2.04/2.10 TB with ~56.71 GB hard headroom under active grace, models 232.81/280 GB with 52.44 GB reserve, outputs 293.74 MB/1 GB with 734.41 MB reserve; this is storage telemetry, not Actions quota or future admission approval.
 
 ## 2026-10-18 — Latest live acceptance, visual sidecar fixes, and full-pipeline follow-up
 
