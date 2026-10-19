@@ -248,7 +248,7 @@ class HFUploadDaemon:
                 if asset_id is not None and size > self.batch_limit_bytes:
                     raise ValueError(
                         f"targeted asset id {asset_id} is {size} bytes, above the configured batch limit "
-                        f"{self.batch_limit_bytes}; individual-file chunking is not implemented"
+                        f"{self.batch_limit_bytes}; individual-file chunking requires explicit --chunk-oversize"
                     )
 
                 if os.path.exists(a_path) and os.path.exists(j_path):
@@ -313,7 +313,7 @@ class HFUploadDaemon:
         remote_blob_id = getattr(info, "blob_id", None)
         if isinstance(remote_blob_id, str) and remote_blob_id.strip():
             git_blob = hashlib.sha1()
-            git_blob.update(f"blob {size_bytes}\\0".encode("ascii"))
+            git_blob.update(b"blob " + str(size_bytes).encode("ascii") + bytes([0]))
             with local_chunk.open("rb") as handle:
                 for block in iter(lambda: handle.read(1024 * 1024), b""):
                     git_blob.update(block)
@@ -557,7 +557,7 @@ class HFUploadDaemon:
                 except ValueError as selection_error:
                     if not (
                         chunk_oversize and max_batches is not None and asset_id is not None
-                        and "individual-file chunking is not implemented" in str(selection_error)
+                        and "individual-file chunking requires explicit --chunk-oversize" in str(selection_error)
                     ):
                         raise
                     # Opt-in chunking is limited to one selected asset and never broadens the batch.
