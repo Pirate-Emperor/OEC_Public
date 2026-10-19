@@ -296,3 +296,13 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 
 - [x] Aligned worker_ltx_video.py's new-database status default to PENDING, matching the canonical QA/uploader status; added a static regression assertion. Existing shared SQLite databases were not changed or migrated.
 - [ ] The static schema assertion and disposable SQLite lifecycle tests remain authored but not executed.
+
+
+## 2026-10-19 — A100 speech acceptance result
+
+- [x] [A100 run 39209090292](https://github.com/Killer4K-N/OEC/actions/runs/39209090292) completed successfully on oec-1 / scn30-mn; all workflow steps passed.
+- [x] Compile/mock suites passed: media API 12/12, audio validation 10/10, supervisor 8/8, SQLite status-contract 5/5 (35 tests total).
+- [x] Cache-only Kokoro-to-Whisper Turbo/Qwen3-ASR chain passed on CUDA. Kokoro created a valid 4.7-second mono 24 kHz WAV; both recognizers returned the same accepted 56-character transcript from that WAV. Audio/text artifacts were saved under the configured output root.
+- [ ] ACE-Step music generation remains skipped because acestep is absent from phase1, phase1_ltx and phase2_3d. Prepare and test it in an isolated runtime without modifying the shared Torch stack.
+- [ ] Visual acceptance [39209706982](https://github.com/Killer4K-N/OEC/actions/runs/39209706982) is running on the same serialized A100 lane; require a validated GLB from TRELLIS and decoded MP4 from LTX.
+- [ ] Continuous Brain-to-worker-to-QA-to-uploader acceptance and production OEC-Play health checks remain unverified.

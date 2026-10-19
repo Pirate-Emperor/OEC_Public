@@ -436,3 +436,12 @@ This is an unmerged candidate branch. These new tests were authored but not exec
 ### Queue schema consistency follow-up
 
 A post-change source read found the LTX worker's CREATE TABLE default was still PENDING_UPLOAD; it is now PENDING, matching the canonical status used by QA and the uploader. The offline contract test has an added static regression assertion. Tests remain unexecuted; no existing shared SQLite database was migrated or modified.
+
+
+## 2026-10-19 — A100 speech service acceptance
+
+Run [39209090292](https://github.com/Killer4K-N/OEC/actions/runs/39209090292) passed all workflow steps on oec-1 / scn30-mn with NVIDIA A100-SXM4-40GB. The pre-write compile/mock stage passed 35 tests: media API 12, audio validation 10, supervisor 8, and SQLite upload-status contract 5. StorageManager cleanup, checkpoint-cache verification, isolated runtime preparation and final status checks also passed.
+
+Live cache-only inference passed for Kokoro, Whisper Turbo and Qwen3-ASR. Kokoro generated a valid mono 24 kHz, 4.7-second WAV (225,644 bytes) under the configured outputs root. Whisper and Qwen3-ASR both processed that WAV and returned the same 56-character transcript; each text artefact is 57 bytes and both have SHA-256 0d8e457da884656285032be2a06b38e00a801822df8682ae125a10058297e080. All three services reported ready=true, model_loaded=true and device=cuda; the temporary smoke processes were stopped after the jobs completed.
+
+ACE-Step remains SKIPPED because its package is absent in all three checked Conda environments. The runtime dependency plan reported zero candidate package installs and preserved shared Torch; no model weights were downloaded. This validates one controlled speech clip, not broad ASR accuracy or the full persistent Brain-to-worker-to-QA-to-uploader pipeline. Visual run [39209706982](https://github.com/Killer4K-N/OEC/actions/runs/39209706982) is still running and must produce a validated GLB and MP4 before visual acceptance is claimed. Production OEC-Play server health remains unverified.

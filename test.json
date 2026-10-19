@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-19",
+  "last_updated": "2026-10-19T06:26:15Z",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Historical one-shot passes: AudioGen run 39135140674; Kokoro→Whisper Turbo/Qwen3-ASR run 39135140660; ACE-Step skipped because its package is absent. Later bootstrap 39149243881 failed before runtime setup because StorageManager refused reserve resizing during an active operation, with no packages installed. Latest visual sidecar run 39149240005 loaded TRELLIS but its job submission failed HTTP 507 because outputs was locked; LTX did not reach ready/model_loaded. Candidate commit f52aae4 adds safe cache-only sidecar supervision, shared workflow serialization, and a canonical QA upload-pending status with offline test sources. Those new tests have not been executed. OEC-Play server health remains unverified. Follow-up: worker_ltx_video.py's new-database default now matches canonical PENDING; static regression added, tests unexecuted.",
+  "latest_summary": "A100 run 39209090292 completed successfully on self-hosted oec-1: 35 compile/mock/media/supervisor/SQLite regression tests passed; StorageManager cleanup and isolated speech runtime preparation passed; Kokoro, Whisper Turbo and Qwen3-ASR all passed live CUDA smoke on one generated WAV. Audio outputs and text transcripts were saved under configured AIEROS outputs. ACE-Step was skipped because acestep is absent in all checked environments. Visual sidecar run 39209706982 is running after adding StorageManager-owned stale pause-lock cleanup. Production OEC-Play server health and a continuous Brain-to-worker-to-QA-to-uploader run remain unverified.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -3219,7 +3219,7 @@
         "runtime_validation": "not run"
       },
       "results": {
-        "status": "SOURCE_CANDIDATE_COMMITTED",
+        "status": "SOURCE_CANDIDATE_COMMITTED_A100_REGRESSIONS_PASS",
         "new_or_modified_files": [
           "tools/oec_service_manager.py",
           "tools/README_media_stack.md",
@@ -3233,14 +3233,18 @@
           ".github/workflows/oec-visual-media-sidecar-smoke.yml",
           "worker_ltx_video.py"
         ],
-        "test_status": "AUTHORED_NOT_EXECUTED",
-        "actions_run_triggered": false,
-        "live_services_started": false
+        "test_status": "PASS_ON_A100_RUN_39209090292",
+        "actions_run_triggered": true,
+        "live_services_started": false,
+        "live_inference": "KOKORO_WHISPER_QWEN_ASR_PASS; ACE_STEP_SKIPPED",
+        "persistent_services_started": false,
+        "ephemeral_service_smokes": "Kokoro, Whisper Turbo and Qwen3-ASR processes ran sequentially, accepted one job each and were stopped by the smoke harness"
       },
       "limitations": [
-        "Unmerged candidate only; no CI or GPU live acceptance was executed.",
-        "ACE-Step package/runtime still needs separate isolated setup.",
-        "Persistent OEC-Play server health and a continuous brain→QA→uploader run remain unverified."
+        "Candidate branch remains unmerged; no production services were left running.",
+        "ACE-Step runtime package is absent and was skipped.",
+        "TRELLIS/LTX visual acceptance is still running separately; no GLB/MP4 result yet.",
+        "OEC-Play live server health and continuous Brain-to-worker-to-QA-to-uploader end-to-end acceptance remain unverified."
       ]
     },
     {
@@ -3268,6 +3272,104 @@
       "limitations": [
         "No existing shared database was changed or migrated.",
         "Static and temporary SQLite tests remain unexecuted."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-19-A100-SPEECH-PIPELINE-LIVE-ACCEPTANCE",
+      "category": "Live CUDA speech-service inference and audio-to-transcription chain",
+      "method": "Run cache-only smoke clients on the self-hosted oec-1 A100 runner. Start one loopback provider at a time; require health readiness, submit one job, wait for succeeded, validate the WAV/text artifact, save via managed outputs write, and pass Kokoro WAV unchanged to both recognizers.",
+      "rationale": "Verify live model inference after resolving the stale outputs pause lock, separately from source tests and model cache checks.",
+      "parameters": {
+        "workflow_run_id": 39209090292,
+        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/39209090292",
+        "commit_sha": "1c9dda097d88f594b22ba3faa680c0b75cb6fdcd",
+        "providers": [
+          "kokoro",
+          "whisper",
+          "qwen3-asr"
+        ],
+        "downloads_allowed": false,
+        "dependency_plan_candidate_installs": 0,
+        "model_checkpoint_downloads": 0,
+        "output_directory": "AIEROS_OUTPUT/media_services/smoke"
+      },
+      "environment": {
+        "runner": "oec-1",
+        "hostname": "scn30-mn",
+        "gpu": "NVIDIA A100-SXM4-40GB",
+        "visible_gpus": 8,
+        "inference_device": "cuda",
+        "cuda_driver_reported_version": "12.4",
+        "runtime_venv": "~/.local/venvs/oec-audio-py311",
+        "base_torch_preserved": true
+      },
+      "results": {
+        "status": "PASS_WITH_ACE_STEP_SKIPPED",
+        "regression_tests": {
+          "media_service_api": 12,
+          "audio_service_validation": 10,
+          "media_supervisor": 8,
+          "upload_status_contract": 5,
+          "total": 35,
+          "aggregate": "PASS"
+        },
+        "storage_cleanup": "PASS",
+        "isolated_runtime_preparation": "PASS",
+        "providers": [
+          {
+            "provider": "kokoro",
+            "status": "PASS",
+            "health_ready": true,
+            "model_loaded": true,
+            "device": "cuda",
+            "audio_duration_seconds": 4.7,
+            "sample_rate_hz": 24000,
+            "channels": 1,
+            "frames": 112800,
+            "artifact_bytes": 225644,
+            "elapsed_seconds": 22.345,
+            "startup_plus_inference_seconds": 127.92,
+            "artifact_path": "/nlsasfs/home/lmedge/rahkus/aireos_output/media_services/smoke/kokoro-20261019-115439-job__LfrE7JuCRaXQ9GN_9jRL_th.wav",
+            "artifact_sha256": "8dc67131a56cb8af15ba0b5e1b5479050fd01082be00fdb4ab56e29626647945"
+          },
+          {
+            "provider": "whisper",
+            "status": "PASS",
+            "health_ready": true,
+            "model_loaded": true,
+            "device": "cuda",
+            "input_audio_bytes": 225644,
+            "artifact_bytes": 57,
+            "transcript_characters": 56,
+            "transcript": "Welcome to OEC. This is a model service acceptance test.",
+            "artifact_sha256": "0d8e457da884656285032be2a06b38e00a801822df8682ae125a10058297e080",
+            "startup_plus_inference_seconds": 40.27
+          },
+          {
+            "provider": "qwen3-asr",
+            "status": "PASS",
+            "health_ready": true,
+            "model_loaded": true,
+            "device": "cuda",
+            "input_audio_bytes": 225644,
+            "artifact_bytes": 57,
+            "transcript_characters": 56,
+            "transcript": "Welcome to OEC. This is a model service acceptance test.",
+            "artifact_sha256": "0d8e457da884656285032be2a06b38e00a801822df8682ae125a10058297e080",
+            "startup_plus_inference_seconds": 40.52
+          }
+        ],
+        "ace_step": {
+          "status": "SKIPPED",
+          "reason": "acestep import is absent from phase1, phase1_ltx and phase2_3d; no ACE-Step package or model download was attempted"
+        }
+      },
+      "limitations": [
+        "One short English sample; acceptance validates pipeline wiring and output format, not broad word-error rate or language coverage.",
+        "AudioGen remains a separately accepted notebook one-shot run 39135140674, not a persistent API.",
+        "ACE-Step music generation remains unaccepted pending isolated runtime provisioning and a live artifact.",
+        "No persistent inference process was left running; the harness stopped each temporary service after its smoke.",
+        "The full Brain-to-LTX-worker-to-QA-to-uploader path and production OEC-Play health remain separate acceptance gates."
       ]
     }
   ]
