@@ -577,3 +577,30 @@ ACE-Step remains SKIPPED because its package is absent in all three checked Cond
 - Historical FLUX→TRELLIS run [39271901007](https://github.com/CalamityStriker/OEC/actions/runs/39271901007) still had no PNG/GLB because the GPU selector observed external PID `3347078` on all eight A100s (owner `rahkus`, parent `3345823`, 0% utilization but active compute context). This is only a past observation; don't kill/signal it or assume it is still current.
 - The latest accepted state remains: AudioGen, standalone TRELLIS, standalone LTX, Kokoro, Whisper and Qwen3-ASR have controlled independent inference evidence; ACE-Step's last required generation was blocked by no idle A100; MusicGen remains incomplete-cache/proxy-blocked and CC-BY-NC. The sustained Brain→LTX worker→QA→real HF archive upload/read-after-write, actual Qwen2-VL QA decisions, per-file resumable chunking, and live OEC-Play remain unverified.
 - The branch has not been merged to main. User target date is 2026-10-21; original 15-day project start/deadline remains unverified. No current remote upload, large training run, process kill, or storage-reserve mutation was performed in this work cycle.
+
+
+## 2026-10-19T21:05 IST — Current-head QA regressions pass; latest A100 bootstrap outcome recovered
+
+### QA frame-path and quota regression — PASS
+
+- [Current-head CI run 39278190899](https://github.com/CalamityStriker/OEC/actions/runs/39278190899), job [118147459705](https://github.com/CalamityStriker/OEC/actions/runs/39278190899/job/118147459705), tested commit `486e467d8bb2b178c5b6501a376c9295b03708a3`, hosted GitHub Actions runner / Python 3.11.17, conclusion SUCCESS.
+- **86 tests passed**, grouped by workflow output: TRELLIS notebook 12, TRELLIS CLI 5, AudioCraft notebook 6, storage write admission 6, inference/storage integration 7, Brain/LTX queue 4, upload status 5, upload daemon storage 8, StorageManager 10, StoragePolicy 10, quota snapshot 7, storage reservation 6. Python compilation and all four notebook JSON checks passed (16/15/10/6 cells). No `ResourceWarning`.
+- The new test executes only the extracted `QANode.extract_evaluation_frame` function in isolation, with mocked ffmpeg. For .mp4/.webm/.avi, it verifies a separate `source_qa_frame.jpg` is passed as output and original source bytes remain unchanged. The fresh transcode storage-gate assertion also passed. This is executable function/contract testing, not live model QA or actual ffmpeg transcode.
+- This closes the latest QA path-safety regression; earlier failed CLI assertion/workflow runs remain historical. No force push or main merge was performed.
+
+### A100 bootstrap run 39277286186 — PARTIAL PASS, overall FAILURE
+
+- [Run 39277286186](https://github.com/CalamityStriker/OEC/actions/runs/39277286186), job `118144848005`, assigned runner `oec-1`, source SHA `227c6eb32409d1010926a3ec6f36c7bcddc1c625`, finished FAILURE.
+- Live sequential provider acceptance passed: Kokoro startup+inference 44.53 s, Whisper 26.47 s, Qwen3-ASR 30.66 s; summary reported 3 passed / 0 failed / 0 skipped.
+- ACE-Step selected model checkpoint manifest was complete. The pinned source `ca1e85fe9430179831e6bc6be790c332190a3866` and isolated runtime accepted: Python 3.12; Torch 2.10.0+cu128; CUDA 12.8; A100 visible; `shared_torch_mutated=false`. Fresh StorageManager preflights admitted the source/runtime setup, with hard-headroom estimates of about 64.8 GB and no shared Torch upgrades.
+- Required ACE-Step generation then failed closed with `GPU admission failed: RuntimeError: no idle A100 available; no ACE-Step process was started`. No ACE-Step music artifact exists from this run. The workflow must remain FAILURE despite the three speech passes and ACE-Step runtime readiness.
+- A newer bootstrap [39278145617](https://github.com/CalamityStriker/OEC/actions/runs/39278145617), runner `oec-1`, was still in progress at the last state fetch. Its final speech/ACE-Step outcome is not yet inferred. Older visual sidecar run [39278043547](https://github.com/CalamityStriker/OEC/actions/runs/39278043547) concluded CANCELLED, not PASS; require a newer live artifact run before using it as current E2E evidence.
+
+### Current live pipeline boundary
+
+- Current completed static pass: 86 tests and syntax/notebook validation.
+- Live controlled independent inference accepted: AudioGen, TRELLIS standalone, LTX standalone, Kokoro, Whisper, Qwen3-ASR.
+- Live inference not yet accepted in the required joined workflow: FLUX→TRELLIS currently has no accepted image/GLB from its last attempt; ACE-Step music generation repeatedly blocks at idle-A100 admission; MusicGen remains incomplete-cache/network blocked.
+- QA model is still not live-tested. `--once --asset-id ID --gpu N` is available and source/static contracts pass, but no loaded Qwen2-VL valid/violating-media decisions have been recorded.
+- The uploader's `--once --asset-id ID` path is source/unit tested only. No real Hugging Face archive was uploaded, no upload receipt/read-after-write was captured, and individual-file resumable chunking does not exist. Tar.gz size/age batch archiving remains distinct from per-file chunking.
+- Current branch head has advanced with documentation/status commits; latest tested code SHA remains `486e467d8bb2`. A100 trigger-hygiene commit `a7b513bad73564a8d3e75a25167e315a15feb21d` now prevents future QA/uploader-only changes from automatically triggering model bootstrap. Existing queued runs are preserved in history.
