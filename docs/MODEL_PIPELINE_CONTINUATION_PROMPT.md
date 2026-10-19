@@ -1,9 +1,9 @@
 # OEC model-inference pipeline — continuation prompt
 
-**Evidence checkpoint:** 2026-10-19, 20:59 IST  
+**Evidence checkpoint:** 2026-10-19, 21:08 IST  
 **Primary repository:** [Killer4K-N/OEC](https://github.com/Killer4K-N/OEC)  
 **Implementation branch:** `fix/media-stack-supervision-20261019`  
-**Current feature-branch head:** `a7b513bad73564a8d3e75a25167e315a15feb21d`; latest fully tested source/test SHA is `620ab348a16f468124db6610ac3eab2308446f40`. QA path/transcode fixes at `249b34e` / `486e467` are awaiting current-head CI.  
+**Current feature-branch head:** `69d583933bac9ee13a2d9d6f280983c969a54f30`; latest tested source/test SHA is `486e467d8bb2b178c5b6501a376c9295b03708a3`. Latest tracker-only commits follow the tested code; no main merge.  
 **Scope:** prepare model runtimes and checkpoints, generate real inference outputs on the assigned A100s, connect the model calls into a repeatable local media-production pipeline, validate artifacts and track every result.
 
 ## Core instruction
@@ -35,37 +35,36 @@ Use the exact runner/environment specified in the current workflow. The latest l
 
 Do not assume a GPU is idle or available simply because a runner label exists. Read current GPU/process telemetry and the relevant workflow's concurrency rules. No process should be killed to make room for a new inference.
 
-## Current verified status — 19 October 2026, 20:36 IST
+## Current verified status — 19 October 2026, 21:08 IST
 
 | Component | Latest evidence | Classification |
 |---|---|---|
-| Static / queue / uploader contracts | [Run 39277515469](https://github.com/CalamityStriker/OEC/actions/runs/39277515469), job 118145606407, SHA 620ab348a16f | **PASS — 84 tests**, uploader/QA compilation, four notebook JSON checks, no ResourceWarning. Hosted CPU + disposable SQLite only. |
-| Safe one-asset upload mode | `hf_upload_daemon.py --once --asset-id ID` | **CONTRACT TESTED, NO LIVE UPLOAD.** Selects exactly one existing PENDING row; no fallback to other pending rows, no startup cleanup of other rows/archives, no missing remote repo auto-create, prompt failure, rollback of selected IDs, and fail-closed over configured batch limit. This is not per-file chunk/resume support. |
+| Static / queue / uploader / QA contracts | [Run 39278190899](https://github.com/CalamityStriker/OEC/actions/runs/39278190899), job 118147459705, SHA 486e467d8bb2 | **PASS — 86 tests**, uploader/QA compilation, four notebook JSON checks (16/15/10/6 cells), no ResourceWarning. Hosted CPU + disposable SQLite/mocked ffmpeg only. |
+| Safe one-asset upload mode | `hf_upload_daemon.py --once --asset-id ID` | **CONTRACT TESTED, NO LIVE UPLOAD.** Selects exact existing PENDING row; no broader fallback; skips startup cleanup of unrelated rows/archives; no auto-create of missing remote dataset; prompt error and targeted rollback; oversize single files fail closed because per-file chunk/resume isn't implemented. |
+| QA frame extraction / transcode gate | Same run 39278190899 | **STATIC/FUNCTION PASS.** `.mp4`, `.webm`, `.avi` inputs get a separate sibling `*_qa_frame.jpg`; the mocked-ffmpeg test proved the source bytes remain unchanged. Video transcode requires fresh StorageManager quota. No live Qwen2-VL decision or actual ffmpeg transcode. |
+| QA/compliance CLI | Static tests in run 39278190899 | **STATIC PASS; LIVE UNVERIFIED.** `qa_compliance_worker.py --once --asset-id ID --gpu N` checks exact PENDING_QA state, avoids global recovery sweep for a targeted call, and sets CUDA visibility before Torch/`qwen_vl_utils` import. No real compliant/violating media decision was run. |
 | FLUX image → TRELLIS GLB | [Run 39271901007](https://github.com/CalamityStriker/OEC/actions/runs/39271901007), job 118126083988 on oec-1 / phase2_3d | **SOURCE TEST PASS / LIVE BLOCKED.** Selector returned `RuntimeError: no eligible idle A100`; no PNG/GLB. |
-| GPU resource owner | Same run, safe PID diagnostic | PID 3347078, user rahkus, parent 3345823, elapsed about 1h36m at capture; memory 6280 MiB on GPU0 and 416 MiB on GPUs1–7, utilization 0%. Compute PID still made all eight A100s ineligible. **Do not kill/signal it**; this is point-in-time evidence. Diagnostic artifact [12195338666](https://github.com/CalamityStriker/OEC/actions/runs/39271901007/artifacts/12195338666). |
-| Speech services / ACE-Step | [Latest bootstrap 39274961054](https://github.com/CalamityStriker/OEC/actions/runs/39274961054), job 118136738946 | Kokoro PASS 18.42 s; Whisper PASS 18.48 s; Qwen3-ASR PASS 20.42 s. ACE-Step checkpoint and isolated runtime passed readiness but CUDA generation failed closed due no idle A100; overall workflow FAILURE, no music file. |
-| AudioGen | [A100 run 39240127736](https://github.com/Killer4K-N/OEC/actions/runs/39240127736), artifact 12181271517 | **PASS single notebook smoke** — 3 s mono 16 kHz PCM WAV, 96,078 bytes, 26.737 s, peak VRAM 5.155/5.385 GiB. |
-| TRELLIS / LTX standalone | [A100 run 39240127757](https://github.com/Killer4K-N/OEC/actions/runs/39240127757), artifact 12182600342 | **PASS standalone** — 2,742,900-byte GLB and 242,547-byte H.264 MP4 (768×512, 2.083 s). Not an integrated Brain/QA/upload flow. |
-| MusicGen medium | [Run 39254306725](https://github.com/Killer4K-N/OEC/actions/runs/39254306725), artifact 12187572013 | **BLOCKED before inference** — incomplete cache and Hugging Face proxy `No route to host`, no WAV; CC-BY-NC absent separate commercial rights. |
-| Qwen2-VL QA/compliance | Static order/one-shot contracts passed through source SHA 620ab348a16f; QA frame/transcode patch `249b34e` plus executable tests `486e467` awaiting [run 39278190899](https://github.com/CalamityStriker/OEC/actions/runs/39278190899). | **EARLIER STATIC PASS; LATEST FIX PENDING.** QA selects `CUDA_VISIBLE_DEVICES` before Torch/qwen_vl_utils import, supports `--once --asset-id ID --gpu N`, derives a separate sibling `*_qa_frame.jpg` for .mp4/.webm/.avi, and requires fresh quota for transcode writes. Actual Qwen2-VL compliance decisions remain unverified. |
-| Brain → LTX → QA → archive → Hugging Face | Queue/status tests are in the 83-test run; one-shot uploader has targeted-selection tests | **NOT LIVE END-TO-END ACCEPTED.** No real remote upload receipt/read-after-write, no sustained job trace and no OEC-Play server health verification. |
-| Chunking | Uploader batches complete asset+JSON pairs into tar.gz archives on size/age; `brain_config.json:max_batch_size=10` is prompt/job count. | **NO per-file resumable chunker verified or implemented.** Oversized single files now refuse upload instead of implying chunking. LTX temporal/VAE chunk handling is separate. |
+| Speech + ACE-Step bootstrap | [Run 39278145617](https://github.com/CalamityStriker/OEC/actions/runs/39278145617), job 118147435541, runner oec-1 | Kokoro PASS 22.48 s, Whisper PASS 18.47 s, Qwen3-ASR PASS 20.45 s. ACE-Step checkpoint manifest and isolated Python 3.12/Torch 2.10.0+cu128/CUDA 12.8 runtime PASS; required music generation **BLOCKED** because no idle A100 was eligible; no music output. Overall workflow FAILURE. |
+| Prior bootstrap repeat | [Run 39277286186](https://github.com/CalamityStriker/OEC/actions/runs/39277286186), job 118144848005 | **FAILURE** for the same no-idle-A100 ACE-Step generation gate; speech smoke had passed there too. No generated song. |
+| StorageManager snapshot in latest bootstrap | Run 39278145617 | Group 2.04/2.10 TB hard quota, 61.19 GB headroom under active grace; models 232.81/280 GB, outputs 296.78 MB/1 GB. This is historical telemetry, not permission for a future write. |
+| AudioGen | [A100 run 39240127736](https://github.com/Killer4K-N/OEC/actions/runs/39240127736), artifact 12181271517 | **PASS standalone notebook smoke** — 3 s mono 16 kHz PCM WAV, 96,078 bytes, 26.737 s, peak VRAM 5.155/5.385 GiB. |
+| TRELLIS / LTX standalone | [A100 run 39240127757](https://github.com/Killer4K-N/OEC/actions/runs/39240127757), artifact 12182600342 | **PASS standalone** — 2,742,900-byte GLB and 242,547-byte H.264 MP4 (768×512, 2.083 s). Not a connected Brain/QA/upload flow. |
+| MusicGen medium | [Run 39254306725](https://github.com/Killer4K-N/OEC/actions/runs/39254306725), artifact 12187572013; later bootstrap logs too | **BLOCKED before inference** — incomplete cache and proxy/CDN timeout / `No route to host`; no WAV. CC-BY-NC absent separate rights. Do not blindly retry downloads. |
+| Brain → LTX → QA → archive → Hugging Face | Queue/status tests pass, but no real remote dataset upload was run | **NOT LIVE END-TO-END ACCEPTED.** No HF upload receipt/read-after-write, no sustained job trace, no actual Qwen2-VL policy decision, and no OEC-Play server-health proof. |
+| Upload chunking semantics | `hf_upload_daemon.py` batches complete asset+JSON pairs into size/age-flushed tar.gz; `brain_config.json:max_batch_size=10` means prompt/job count. | **No per-file resumable chunker found/implemented.** Archive batching is not byte-range or resumable file chunking; oversized single files now fail closed. |
 
-Latest StorageManager snapshot from bootstrap 39274961054: group used 2.04 TB, soft 2.00 TB, hard 2.10 TB; 60.38 GB hard headroom under active grace; model root 232.81/280 GB, outputs 295.91 MB/1 GB. This is historical telemetry, not future write approval.
-
-The bounded upload feature's initial tests failed in runs [39273864407](https://github.com/CalamityStriker/OEC/actions/runs/39273864407) and [39273898592](https://github.com/CalamityStriker/OEC/actions/runs/39273898592) because a CLI test assumed a single-line argparse declaration. The test was made formatting-independent; current run 39275020758 passed. Keep those failures in history.
+The timeout state was rechecked against live GitHub. The branch and prior commits remained intact; no rollback was observed. The exact client-side timeout cause cannot be determined from GitHub APIs.
 
 ## Next work, in order
 
-1. **Finish current-head CPU regression first.** Poll [run 39278190899](https://github.com/CalamityStriker/OEC/actions/runs/39278190899) and fix any genuine frame-path/transcode-admission test failure before calling the latest QA patch passed. Static run 39277515469 is the last completed full pass (84 tests), but predates that patch.
-2. **Recheck GPU ownership on the assigned host.** Do not kill PID 3347078. The owning operator must release/move its process by normal lifecycle; re-run `nvidia-smi`, process ownership capture and live StorageManager status. Only then launch FLUX→TRELLIS and ACE-Step separately when the selector admits a GPU.
-2. **Perform one controlled remote upload after a real QA-passed asset exists.** Preserve local asset/metadata hashes first; confirm an already-existing approved `AIEROS_HF_DATASET_REPO` without printing tokens; call `hf_upload_daemon.py --once --asset-id ID`; confirm the archive appears remotely, download/list/inspect it, and compare hashes. This session did not perform the upload.
-3. **Run actual Qwen2-VL QA** with one valid and one known policy-violating fixture, under the correct environment and assigned physical GPU. Verify decision, queue transition, metadata, and failure rollback.
-5. **MusicGen:** inspect cache completeness and runner network egress before any retry, retain its non-commercial licence boundary. ACE-Step needs an idle GPU for the generation step.
-5. **Training streams remain separate:** Full_Model profile run 39268460684 failed before install/training due missing fresh quota telemetry; cleanup passed. Unit-only run 39267110795 is not training evidence. Frozen PEFT and learned sparse MoE remain unvalidated.
-6. **Deliverables:** OEC-Viewer graph referential audit passed only for duplicate IDs/missing edge endpoints; source links/equations/browser render are not fully inspected. Report_Docs source versions were fetched, but current paper/PPT/poster were not rebuilt or visually inspected. OEC Research Report is unavailable in the current PaperDock project list.
+1. **Resolve the A100 gate without process termination.** The two latest bootstrap runs (39277286186 and 39278145617) prove the model checkpoints/runtime are ready but the selector cannot get an idle A100. Refresh GPU ownership and StorageManager state; do not kill/signals unrelated processes. Run FLUX→TRELLIS, ACE-Step and live QA separately only after a selector-approved GPU is available.
+2. **Perform one controlled real HF upload.** Use a new approved QA-passed asset, preserve local asset/metadata hashes, confirm an already-existing authorized `AIEROS_HF_DATASET_REPO` without printing credentials, then run `hf_upload_daemon.py --once --asset-id ID`; independently verify remote archive listing/read-after-write/content hash. This session did not perform the upload.
+3. **Run actual Qwen2-VL QA** with one known-compliant and one known-policy-violating fixture under the assigned environment/GPU, confirming decision, status, metadata and rollback. Current tests are static/mocked only.
+4. **MusicGen:** diagnose cache and egress before further downloads; retain CC-BY-NC restrictions. ACE-Step requires an idle A100 before generation.
+5. **Keep training separate:** Full_Model profile run 39268460684 failed before training because fresh quota telemetry was unavailable; unit-only run 39267110795 is not training evidence. Frozen PEFT and learned sparse MoE are still unvalidated.
+6. **Academic deliverables:** OEC-Viewer graph referential audit was structural only. Report_Docs sources were fetched, but no fresh report/PPT/poster rebuild/page-by-page visual QA was performed; OEC Research Report is unavailable in the active PaperDock project listing.
 
-The requested near-term delivery target is 2026-10-21. The original 15-day start/deadline has not been recovered from an authoritative record and must not be reset or guessed.
+The user target is 2026-10-21. The original 15-day start/deadline remains unresolved from authoritative records; do not reset or guess it.
 ## Storage, concurrency and licensing rules
 
 - The Actions quota reset only retires the prior special $0-cost approval gate. It does not create network access or prove a model is cached.
