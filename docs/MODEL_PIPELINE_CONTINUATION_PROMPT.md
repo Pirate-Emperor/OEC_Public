@@ -1,9 +1,9 @@
 # OEC model-inference pipeline — continuation prompt
 
-**Evidence checkpoint:** 2026-10-19, 21:08 IST  
+**Evidence checkpoint:** 2026-10-19, 21:10 IST  
 **Primary repository:** [Killer4K-N/OEC](https://github.com/Killer4K-N/OEC)  
 **Implementation branch:** `fix/media-stack-supervision-20261019`  
-**Current feature-branch head:** `69d583933bac9ee13a2d9d6f280983c969a54f30`; latest tested source/test SHA is `486e467d8bb2b178c5b6501a376c9295b03708a3`. Latest tracker-only commits follow the tested code; no main merge.  
+**Current feature-branch head:** `f3bc90d375efab8bc6c0c85a8eae1b32bb7d53ea`; latest tested source/test SHA is `486e467d8bb2b178c5b6501a376c9295b03708a3`. Latest tracker-only commits follow the tested code; no main merge.  
 **Scope:** prepare model runtimes and checkpoints, generate real inference outputs on the assigned A100s, connect the model calls into a repeatable local media-production pipeline, validate artifacts and track every result.
 
 ## Core instruction
@@ -69,7 +69,7 @@ The user target is 2026-10-21. The original 15-day start/deadline remains unreso
 
 - The Actions quota reset only retires the prior special $0-cost approval gate. It does not create network access or prove a model is cached.
 - Use the configured OEC StorageManager and `managed_storage_operation` / `storage_preflight` for shared model/output writes. Never directly inspect, hash, resize, overwrite, move or delete `.storage_reserve.bin` or other protected reserve/lease files. Do not clear a live lease to force a run through.
-- The last storage report (from run 39254306725 around 18:20 IST) measured group usage 2.04/2.10 TB hard, about 56.71 GB hard-limit headroom under active grace; models 232.81/280 GB with 52.44 GB reserve; outputs 293.74 MB/1 GB with 734.41 MB reserve. Treat it as historical telemetry and obtain fresh status/admission before a new shared write.
+- The latest StorageManager report inspected in run 39278145617 around 20:30 IST measured group usage 2.04/2.10 TB hard, 61.19 GB reported hard headroom under active grace; models 232.81/280 GB, outputs 296.78 MB/1 GB. This is historical telemetry; obtain fresh live status/admission before any new shared write.
 - Do not run simultaneous jobs that share `oec-media-gpu-storage-serial` or the same physical GPU/model cache. Batch tests within a job, but queue workflows sequentially where the shared lane requires it.
 - Preserve partial checkpoint files for managed resume. No blanket cache purge or environment reinstall. Keep isolated environments isolated.
 - AudioGen/MusicGen weight licenses may restrict commercial use; record the boundary and keep non-commercially licensed models out of a commercial output path unless exact usage rights have been cleared.
