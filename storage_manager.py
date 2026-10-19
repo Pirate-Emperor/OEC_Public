@@ -574,8 +574,16 @@ def managed_storage_operation(
 def print_status(config):
     """Print live group-quota status and per-directory reserve policy without mutation."""
     policy = StoragePolicy(config)
-    quota_path = SYSTEM_DIRS.get("models") or next(
-        (SYSTEM_DIRS.get(item["name"]) for item in config.get("directories", []) if SYSTEM_DIRS.get(item["name"])),
+    quota_candidates = [
+        SYSTEM_DIRS.get("models"),
+        *(SYSTEM_DIRS.get(item["name"]) for item in config.get("directories", [])),
+    ]
+    quota_path = next(
+        (
+            os.path.expanduser(str(candidate))
+            for candidate in quota_candidates
+            if candidate and os.path.isdir(os.path.expanduser(str(candidate)))
+        ),
         None,
     )
     quota = policy.get_quota_snapshot(quota_path) if quota_path else policy.get_quota_snapshot()
@@ -602,8 +610,17 @@ def print_status(config):
     for dir_cfg in config.get("directories", []):
         dir_name = dir_cfg["name"]
         target_gb = float(dir_cfg["target_allocation_gb"])
-        folder_path = SYSTEM_DIRS.get(dir_name, dir_name)
-        os.makedirs(folder_path, exist_ok=True)
+        folder_path = os.path.expanduser(str(SYSTEM_DIRS.get(dir_name, dir_name)))
+        reserve_target = dir_cfg.get("reserve_target_gb")
+        target_note = f" reserve_target={float(reserve_target):.2f} GiB" if reserve_target is not None else ""
+        if not os.path.isdir(folder_path):
+            print(
+                f"[{dir_name}] state=MISSING path={folder_path} target={target_gb:.2f} GB "
+                f"reserve=unavailable{target_note} "
+                "reason=managed directory is absent; read-only status did not create it"
+            )
+            continue
+
         decision = policy.evaluate(folder_path, int(target_gb * BYTES_PER_GB), RESERVE_FILENAME, LOCK_FILENAME)
         reserve_path = os.path.join(folder_path, RESERVE_FILENAME)
         reserve_bytes = (
@@ -611,8 +628,6 @@ def print_status(config):
             if os.path.isfile(reserve_path) and not os.path.islink(reserve_path) else 0
         )
         total_bytes, _used_bytes, free_bytes = filesystem_usage(folder_path)
-        reserve_target = dir_cfg.get("reserve_target_gb")
-        target_note = f" reserve_target={float(reserve_target):.2f} GiB" if reserve_target is not None else ""
         print(
             f"[{dir_name}] state={decision.state} actual={format_bytes(decision.actual_bytes)} / "
             f"{target_gb:.2f} GB reserve={format_bytes(reserve_bytes)}{target_note} "
