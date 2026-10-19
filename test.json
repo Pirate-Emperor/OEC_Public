@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-19T20:18:00+05:30",
+  "last_updated": "2026-10-19T20:36:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Latest static/upload regression run 39272166140 passed 79 CPU tests, source compilation, and four notebook JSON checks; the uploader ResourceWarning was removed by test teardown. Latest live FLUX→TRELLIS run 39271901007 passed preflight and contracts but correctly refused inference because external PID 3347078 owned a compute process on all eight A100s. No PNG/GLB. Fresh StorageManager snapshot reported 60.38 GB hard quota headroom with grace active. Speech models previously passed controlled smoke; ACE-Step live generation remains GPU blocked; MusicGen remains network/cache blocked. Real QA decision, real HF upload, individual-file resumable chunking and sustained Brain→worker→QA→upload remain unverified.",
+  "latest_summary": "Current-head static/queue/upload acceptance run 39275020758 passed 83 tests, py_compile, and four notebook JSON checks with no ResourceWarning. Added exact asset-ID one-shot upload mode with fail-closed no-fallback, oversize-file, shared cleanup and missing remote dataset protections; remote HF upload/read-after-write remains untested. Latest media bootstrap run 39274961054 passed Kokoro/Whisper/Qwen3-ASR live smokes (18.42/18.48/20.42 s) and ACE-Step runtime preparation, but ACE music generation was refused by the no-idle-A100 gate. Earlier FLUX→TRELLIS run 39271901007 still blocked by external compute PID 3347078 across all eight A100s. No new PNG/GLB/music file or live HF upload.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -3830,6 +3830,182 @@
         "Do not terminate the process; the owning user must release the allocation normally."
       ],
       "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39271901007/artifacts/12195338666"
+    },
+    {
+      "id": "EXP-2026-10-19-ONE-SHOT-UPLOAD-CONTRACTS-39275020758",
+      "date": "2026-10-19",
+      "category": "Bounded single-asset Hugging Face uploader and storage/queue regression acceptance",
+      "approach": "Add a selected-ID-only --once upload path, no shared startup cleanup, no remote repo auto-create, force one complete asset+metadata pair into one bounded archive, fail fast on errors and roll back only selected IDs. Test candidate code through the hosted Python 3.11.17 static workflow, compiling uploader plus tests, running queue/upload/storage contracts, and parsing all notebook JSON.",
+      "reason": "Make the live remote-upload acceptance command safe to execute against a shared pending queue without accidentally shipping unrelated assets or cleaning unrelated shared queue state.",
+      "parameters": {
+        "workflow_run_id": 39275020758,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39275020758",
+        "job_id": 118136949142,
+        "commit_sha": "1580fdfce033c0aedaea88f3fd5e2360aebe5a38",
+        "branch": "fix/media-stack-supervision-20261019",
+        "runner": "GitHub-hosted",
+        "python": "3.11.17",
+        "test_suites": {
+          "trellis_notebook_static": 12,
+          "trellis_cli_easy_run": 5,
+          "audiocraft_notebook_static": 6,
+          "storage_write_admission": 6,
+          "inference_storage_integration": 4,
+          "brain_ltx_queue_storage": 4,
+          "upload_status_contract": 5,
+          "upload_daemon_storage": 8,
+          "storage_manager": 10,
+          "storage_policy": 10,
+          "quota_snapshot": 7,
+          "storage_reservation": 6
+        },
+        "compile_sources": [
+          "hf_upload_daemon.py",
+          "tests/test_upload_daemon_storage.py",
+          "qa_compliance_worker.py",
+          "tests/test_inference_storage_integration.py",
+          "pipeline_trellis_3d.py",
+          "storage_manager.py",
+          "storage_policy.py",
+          "storage_reservation.py",
+          "tools/quota_snapshot.py"
+        ],
+        "notebooks": [
+          {
+            "path": "pipeline_trellis_3d.ipynb",
+            "cells": 16
+          },
+          {
+            "path": "pipeline_trellis_3d_only.ipynb",
+            "cells": 15
+          },
+          {
+            "path": "pipeline_flux_only.ipynb",
+            "cells": 10
+          },
+          {
+            "path": "pipeline_audiocraft.ipynb",
+            "cells": 6
+          }
+        ]
+      },
+      "environment": {
+        "runner": "GitHub-hosted",
+        "execution_type": "CPU/static/disposable SQLite; no A100 or remote upload"
+      },
+      "results": {
+        "status": "PASS",
+        "total_tests": 83,
+        "failed_tests": 0,
+        "uploader_tests": 8,
+        "py_compile": "PASS",
+        "notebook_json": "PASS",
+        "resource_warning": "NONE",
+        "live_hf_upload": "NOT_RUN"
+      },
+      "implementation": {
+        "one_shot_cli": [
+          "--once",
+          "--asset-id ID"
+        ],
+        "guarantees": [
+          "Requires a positive asset ID and PENDING state",
+          "Refuses to expand to a wider batch when the selected ID is absent/non-PENDING",
+          "Disables daemon startup cleanup of unrelated archive and ARCHIVING state",
+          "Does not create a missing remote dataset repository",
+          "Force-flushes only the selected asset+metadata pair in one archive",
+          "Returns failure promptly; no long retry/sleep loop in targeted mode",
+          "Rolls back only selected row IDs to PENDING on failure",
+          "Rejects asset larger than configured archive limit because per-file chunking is not implemented",
+          "Instance-lock conflict exits nonzero",
+          "Logging handlers attach idempotently with no ResourceWarning"
+        ]
+      },
+      "interpretation": "The bounded command and local state contracts now pass. Real archive upload, remote receipt/read-after-write, actual QA model decision, and chunking/resume of a single large file remain unverified.",
+      "limitations": [
+        "No live Hugging Face credentials or destination were used.",
+        "No remote dataset repository was created.",
+        "A successful API upload is not independently read-after-write verified by current one-shot code.",
+        "Upload batching is archive batching of whole file pairs, not individual-file chunking."
+      ],
+      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39275020758"
+    },
+    {
+      "id": "EXP-2026-10-19-SPEECH-SMOKE-ACE-STEP-GATE-39274961054",
+      "date": "2026-10-19",
+      "category": "Live Kokoro/Whisper/Qwen3-ASR acceptance and ACE-Step generation gate",
+      "approach": "Execute current OEC media bootstrap workflow on assigned oec-1, audit existing runtime packages, run sequential controlled speech inference, verify ACE-Step cached checkpoint/source/runtime, and attempt the required live CUDA generation only if the selected GPU is idle.",
+      "reason": "Ensure speech providers are still live after environment bootstrapping and distinguish ACE-Step checkpoint/runtime preparation from generated-audio acceptance.",
+      "parameters": {
+        "workflow_run_id": 39274961054,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39274961054",
+        "job_id": 118136738946,
+        "commit_sha": "e58e5daf699d01774b4d2ca014ecfaabf702e3a7",
+        "branch": "fix/media-stack-supervision-20261019",
+        "runner": "oec-1",
+        "speech": {
+          "kokoro": {
+            "status": "PASS",
+            "startup_plus_inference_seconds": 18.42,
+            "output_bytes": 225644,
+            "sha256": "ef64639faa8fee1fa25a80e0afa61fc3492398bcff003469bc0458e5e7a509e7"
+          },
+          "whisper": {
+            "status": "PASS",
+            "startup_plus_inference_seconds": 18.48,
+            "output_bytes": 57,
+            "sha256": "0d8e457da884656285032be2a06b38e00a801822df8682ae125a10058297e080"
+          },
+          "qwen3_asr": {
+            "status": "PASS",
+            "startup_plus_inference_seconds": 20.42,
+            "output_bytes": 57,
+            "sha256": "0d8e457da884656285032be2a06b38e00a801822df8682ae125a10058297e080"
+          }
+        },
+        "ace_step": {
+          "checkpoint_complete": true,
+          "source_commit": "ca1e85fe9430179831e6bc6be790c332190a3866",
+          "runtime_python": "3.12",
+          "torch": "2.10.0+cu128",
+          "cuda": "12.8",
+          "gpu": "NVIDIA A100-SXM4-40GB",
+          "shared_torch_mutated": false,
+          "live_generation": "BLOCKED_NO_IDLE_A100"
+        },
+        "final_storage_snapshot": {
+          "source": "live lfs quota",
+          "used_tb": 2.04,
+          "soft_tb": 2,
+          "hard_tb": 2.1,
+          "headroom_gb": 60.38,
+          "grace_active": true,
+          "model_root_used_gb": 232.81,
+          "model_root_limit_gb": 280,
+          "output_root_used_mb": 295.91,
+          "output_root_limit_gb": 1
+        }
+      },
+      "environment": {
+        "runner": "oec-1",
+        "device": "NVIDIA A100-SXM4-40GB",
+        "shared_torch_mutated": false
+      },
+      "results": {
+        "status": "PARTIAL_PASS_ACE_STEP_BLOCKED",
+        "passed_providers": 3,
+        "failed_providers": 1,
+        "ace_checkpoint_and_runtime": "PASS",
+        "ace_music_output": false,
+        "final_workflow_conclusion": "FAILURE"
+      },
+      "interpretation": "Kokoro, Whisper and Qwen3-ASR completed controlled live inference. ACE-Step source/checkpoints/runtime are ready; inference was refused before launching a process because no eligible idle A100 was available. The overall workflow is not passed.",
+      "limitations": [
+        "No ACE-Step audio was generated.",
+        "Output and quota status are run-specific snapshots and do not authorize future writes.",
+        "No generalized WER/audio quality evaluation was performed."
+      ],
+      "artifact": null
     }
   ]
 }
