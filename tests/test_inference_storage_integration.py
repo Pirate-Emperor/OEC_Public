@@ -1,6 +1,9 @@
 import ast
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 class InferenceStorageIntegrationTests(unittest.TestCase):
@@ -125,6 +128,56 @@ class InferenceStorageIntegrationTests(unittest.TestCase):
         self.assertIn('with managed_storage_operation(\n                "outputs", required_gb=0.001, require_fresh_quota=True', source)
         self.assertIn('parser.error("--once requires --asset-id with a positive ID")', source)
         self.assertIn('parser.error("--asset-id can only be used with --once")', source)
+
+    def test_qa_frame_extraction_preserves_webm_and_avi_inputs(self):
+        source = self._read("qa_compliance_worker.py")
+        tree = ast.parse(source, filename="qa_compliance_worker.py")
+        qa_class = next(
+            node for node in tree.body
+            if isinstance(node, ast.ClassDef) and node.name == "QANode"
+        )
+        extractor = next(
+            node for node in qa_class.body
+            if isinstance(node, ast.FunctionDef) and node.name == "extract_evaluation_frame"
+        )
+        # Execute only the small method in isolation, avoiding core_config, Torch,
+        # model loading, and all shared OEC directories.
+        module = ast.Module(body=[extractor], type_ignores=[])
+        ast.fix_missing_locations(module)
+        namespace = {"Path": Path, "subprocess": subprocess}
+        exec(compile(module, "qa_compliance_worker.py", "exec"), namespace)
+        extract = namespace["extract_evaluation_frame"]
+
+        for suffix in (".mp4", ".webm", ".avi"):
+            with self.subTest(suffix=suffix), tempfile.TemporaryDirectory() as temp:
+                video = Path(temp) / f"source{suffix}"
+                original = b"original-video-bytes"
+                video.write_bytes(original)
+                calls = []
+
+                def fake_ffmpeg(command, **kwargs):
+                    calls.append(command)
+                    Path(command[-1]).write_bytes(b"jpeg-frame")
+                    return None
+
+                with mock.patch("subprocess.run", side_effect=fake_ffmpeg):
+                    frame, extracted = extract(object(), str(video))
+
+                self.assertTrue(extracted)
+                self.assertEqual(frame, str(video.with_name("source_qa_frame.jpg")))
+                self.assertNotEqual(Path(frame), video)
+                self.assertEqual(video.read_bytes(), original)
+                self.assertEqual(Path(frame).read_bytes(), b"jpeg-frame")
+                self.assertEqual(calls[0][-1], frame)
+
+    def test_qa_video_transcode_requires_fresh_storage_admission(self):
+        source = self._read("qa_compliance_worker.py")
+        start = source.index("    def improve_and_standardize_video")
+        end = source.index("\ndef sweep_stuck_jobs", start)
+        transcode = source[start:end]
+        self.assertIn('with managed_storage_operation(', transcode)
+        self.assertIn('require_fresh_quota=True', transcode)
+        self.assertNotIn('require_fresh_quota=False', transcode)
 
     def test_qa_worker_enforces_storage_for_model_and_transcode(self):
         source = self._read("qa_compliance_worker.py")
