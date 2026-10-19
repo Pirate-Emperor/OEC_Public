@@ -648,3 +648,34 @@ ACE-Step remains SKIPPED because its package is absent in all three checked Cond
   - `/mnt/data/OEC_LTX_acceptance_39278268411.mp4` — local ffprobe PASS.
   - `/mnt/data/OEC_visual_sidecar_report_39278268411.json`, `/mnt/data/OEC_visual_sidecar_reference_39278268411.png`, `/mnt/data/oec-visual-sidecar-smoke-39278268411.zip`.
 - **Important conclusion distinction:** provider-level sidecar report and both outputs are PASS, and the artifact was uploaded/inspected; the GitHub API still returned enclosing workflow/job `in_progress` after final log lines/artifact completion at the last poll. Keep the overall Actions job marked pending until its terminal conclusion becomes visible. This acceptance does not prove Brain→LTX worker queue→Qwen2-VL QA→archive→Hugging Face upload/read-after-write.
+
+
+## 2026-10-19T22:38 IST — resumable uploader chunk protocol and final current-head CI pass
+
+### Latest static verification — PASS
+
+- [Current-head CI run 39291422187](https://github.com/CalamityStriker/OEC/actions/runs/39291422187), job [118192741690](https://github.com/CalamityStriker/OEC/actions/runs/39291422187/job/118192741690), source/test SHA `85431311caf28e6e3ede293fdcc959f86419c402`, hosted Python 3.11.17, completed SUCCESS.
+- **90 tests passed** across the listed workflow groups: TRELLIS notebook 12, TRELLIS CLI 5, AudioCraft notebook 6, storage write admission 6, inference/storage integration 7, Brain/LTX queue 5, upload status contract 5, upload daemon storage 11, StorageManager 10, StoragePolicy 10, quota snapshot 7, storage reservation 6. Compilation and four notebook JSON checks (16/15/10/6 cells) passed; no ResourceWarning.
+- Failed iterations remain visible as history, not hidden: [39290757586](https://github.com/CalamityStriker/OEC/actions/runs/39290757586) (initial test context syntax), [39291119869](https://github.com/CalamityStriker/OEC/actions/runs/39291119869) (small metadata fixture and stale CLI assertion), [39291171278](https://github.com/CalamityStriker/OEC/actions/runs/39291171278) (retry storage mock/CLI assertion), and [39291398540](https://github.com/CalamityStriker/OEC/actions/runs/39291398540) (legacy assertion still expected “chunking not implemented”). The final tested run 39291422187 passed after correcting these.
+ 
+### Per-file upload chunking — opt-in, statically/mock tested
+
+- Added `hf_upload_daemon.py --once --asset-id ID --chunk-oversize`. Normal daemon/archive batching remains unchanged. Chunk mode is bounded to exactly one existing PENDING row and cannot run without `--once --asset-id`.
+- A single large media file is streamed to bounded part files in the configured cache after fresh StorageManager preflight. The code hashes the full source and individual chunks, checks that the source did not change during streaming, and names the remote namespace with the full source SHA-256. Each part record contains index/path/offset/size/SHA-256. Metadata JSON is uploaded separately; `manifest.json` is published last as the completion marker with instructions to concatenate ordered parts and validate per-part and full-file checksums.
+- On retry, `HfApi.get_paths_info` is queried for the deterministic chunk path. A part is skipped only if Hub metadata proves size plus LFS SHA-256 or Git blob SHA-1; if no digest is exposed, the part is re-uploaded rather than assumed good. A size/hash conflict fails closed.
+- Test [`test_explicit_chunk_mode_uploads_parts_then_manifest_and_reassembles`](https://github.com/CalamityStriker/OEC/blob/85431311caf28e6e3ede293fdcc959f86419c402/tests/test_upload_daemon_storage.py) verifies the fake-Hub object map can reconstruct original bytes and checks all part/metadata hashes and manifest-last order. Test [`test_chunk_upload_failure_keeps_source_and_rolls_selected_row_back`](https://github.com/CalamityStriker/OEC/blob/85431311caf28e6e3ede293fdcc959f86419c402/tests/test_upload_daemon_storage.py) simulates a network outage after part 0; the first call leaves sources intact and row PENDING, while retry revalidates/skips remote part 0, uploads remaining parts, and completes the manifest. The selected local files/DB row are deleted only after completion.
+- **Boundary:** this is mocked-Hub CI, not a real remote upload. It does not yet prove authentication, Hub write/read-after-write, remote file availability to a consumer, assembled output hash on a separate client, or an end-to-end Brain→QA→upload run. An actual approved target repo and run-scoped accepted asset are still required.
+
+### Current visual sidecar workflow conclusion corrected
+
+- The GitHub API later returned terminal **SUCCESS** for [visual sidecar run 39278268411](https://github.com/CalamityStriker/OEC/actions/runs/39278268411), job 118148474821, tested source SHA `9ed203a9f1122046a28af45f0df84ceda634885f`. The report and actual GLB/MP4 artifact [12198722285](https://github.com/CalamityStriker/OEC/actions/runs/39278268411/artifacts/12198722285) were already inspected; this resolves the earlier snapshot's “in_progress after artifact upload” status note.
+- TRELLIS GLB: 2,775,928 bytes, SHA-256 `e7a1a970edae002596a80fa47b19ad87e96ad82a8dfa3d4523ad65167435e875`; local `trimesh 4.11.1` reopened one geometry with 48,806 vertices / 95,566 faces. **Not watertight**, so no geometry-quality claim.
+- LTX H.264 MP4: 242,547 bytes, SHA-256 `5d7d54de4354936f66867fecd19d20c0ab6972b5d997ca00c145ab0c1e54ec51`; 768×512, 2.083333 s, local `ffprobe` PASS.
+- Visual acceptance was cache-only; model downloads/package installs disabled. This is sidecar API acceptance, not integrated Brain→QA→uploader.
+
+### Remaining acceptance boundary
+
+- Latest tested feature code: `85431311caf28e6e3ede293fdcc959f86419c402`; later commits update ledgers/runbook/checklist only. Branch `fix/media-stack-supervision-20261019`, not merged to main.
+- Static tests now cover the QA non-MP4 source-preservation fix, transcode fresh-quota check, safe exact-row uploader, and opt-in resumable chunking.
+- Still not accepted: real Qwen2-VL compliant/rejected decision; actual Hugging Face archive or chunk upload/read-after-write; remote consumer assembly; sustained Brain→LTX worker→QA→queue→upload; live OEC-Play health; combined FLUX→TRELLIS artifact (latest run blocked by no idle A100); ACE-Step audio (same no-idle-A100 admission blocker); MusicGen inference (incomplete cache/proxy egress); academic report/PPT/poster rebuild and visual QA.
+- No real Hugging Face upload, reserve-file mutation, process termination, or main merge was performed. Fresh StorageManager / physical GPU admission remains mandatory before any future write or inference.
