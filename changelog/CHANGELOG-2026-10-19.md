@@ -21,3 +21,8 @@
 - No new unit/integration test, training job, inference, workflow dispatch, rerun or artifact upload was performed as part of this documentation update.
 - Acceptance of this documentation update requires read-back of the resulting branch/head and file blobs, then confirmation that the documentation-only paths did not start an Action.
 - Next action: poll the currently active visual-sidecar job and pending bootstrap run read-only, inspect final logs/artifacts and update the checklist using their terminal results.
+
+
+## 2026-10-19T18:28:04+05:30 — model-inference handoff refresh
+
+Updated the permanent continuation rules and checklist to reflect the user's Actions-quota reset instruction. The detailed handoff is saved in `docs/MODEL_PIPELINE_CONTINUATION_PROMPT.md`. Current A100 evidence: AudioGen and standalone TRELLIS/LTX passed; MusicGen did not reach inference because model cache/network access failed; current FLUX→TRELLIS attempt stopped on two unit-test fixture errors; ACE-Step guard is committed but its latest bootstrap did not run. Next: fix FLUX fixtures, rerun combined inference, verify ACE-Step on A100 and diagnose MusicGen cache/egress. StorageManager rules remain separate from Action-runner quota.
