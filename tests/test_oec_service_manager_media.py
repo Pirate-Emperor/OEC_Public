@@ -49,6 +49,23 @@ class MediaServiceSpecTests(unittest.TestCase):
         self.assertNotIn("--allow-download", trellis["script_args"])
         self.assertNotIn("--allow-download", ltx["script_args"])
 
+    def test_ace_step_uses_separate_runtime_and_aieros_roots(self):
+        with mock.patch.dict("os.environ", {
+            "AIEROS_CACHE_DIR": "/tmp/oec-ace-cache-test",
+            "AIEROS_MODELS_DIR": "/tmp/oec-ace-models-test",
+        }, clear=False):
+            with mock.patch.object(manager, "_assert_port_range"):
+                spec = manager._build_media_service_spec("audio-api", "ace-step", "3")
+        self.assertEqual(spec["environment"], "oec-acestep-py311")
+        self.assertIn(".local/venvs/oec-acestep-py311/bin/python", spec["python_override"])
+        self.assertEqual(spec["env_updates"]["CUDA_VISIBLE_DEVICES"], "3")
+        self.assertEqual(spec["env_updates"]["HF_HUB_OFFLINE"], "1")
+        self.assertEqual(spec["env_updates"]["TRANSFORMERS_OFFLINE"], "1")
+        self.assertEqual(spec["env_updates"]["AIEROS_ACE_STEP_SOURCE_ROOT"], "/tmp/oec-ace-cache-test/third_party/ACE-Step-1.5")
+        self.assertEqual(spec["env_updates"]["ACESTEP_CHECKPOINTS_DIR"], "/tmp/oec-ace-models-test/ace-step-1.5")
+        self.assertEqual(spec["env_updates"]["ACESTEP_PROJECT_ROOT"], "/tmp/oec-ace-cache-test/third_party/ACE-Step-1.5")
+        self.assertNotIn("--allow-download", spec["script_args"])
+
     def test_unknown_provider_or_service_is_rejected(self):
         with mock.patch.object(manager, "_assert_port_range"):
             with self.assertRaises(ValueError):

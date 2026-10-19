@@ -15,6 +15,11 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path: sys.path.insert(0, str(ROOT))
+_ace_root_value = os.environ.get("AIEROS_ACE_STEP_SOURCE_ROOT", "").strip()
+ACE_STEP_SOURCE_ROOT = Path(_ace_root_value).expanduser().resolve() if _ace_root_value else None
+if ACE_STEP_SOURCE_ROOT is not None and (ACE_STEP_SOURCE_ROOT / "acestep").is_dir():
+    if str(ACE_STEP_SOURCE_ROOT) not in sys.path:
+        sys.path.insert(0, str(ACE_STEP_SOURCE_ROOT))
 from core_config import SYSTEM_DIRS
 from common import MediaProvider, ModelNotReady, RequestError, managed_write, safe_child, serve, storage_check
 from model_cache import MODELS_ROOT, RuntimeLock, hf_cache_has_weights, model_targets
@@ -50,6 +55,11 @@ def _network_policy(allow_download: bool) -> None:
     os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
     os.environ["ACESTEP_CHECKPOINTS_DIR"] = str(MODELS_ROOT / "ace-step-1.5")
     os.environ["TORCH_HOME"] = str(MODELS_ROOT / "torch_hub")
+    if ACE_STEP_SOURCE_ROOT is not None:
+        os.environ["ACESTEP_PROJECT_ROOT"] = str(ACE_STEP_SOURCE_ROOT)
+        os.environ["AIEROS_ACE_STEP_SOURCE_ROOT"] = str(ACE_STEP_SOURCE_ROOT)
+    os.environ.setdefault("ACESTEP_LM_BACKEND", "pt")
+
 
 class AudioProvider(MediaProvider):
     max_prompt_chars = 2500
@@ -129,6 +139,15 @@ class AudioProvider(MediaProvider):
         return "cpu"
 
     def _load_ace_step(self, device: str) -> None:
+        if ACE_STEP_SOURCE_ROOT is None or not (
+            (ACE_STEP_SOURCE_ROOT / "pyproject.toml").is_file()
+            and (ACE_STEP_SOURCE_ROOT / "acestep").is_dir()
+        ):
+            raise ModelNotReady(
+                "ACE-Step source checkout is missing or unpinned; run prepare_ace_step_runtime.py install first"
+            )
+        if str(ACE_STEP_SOURCE_ROOT) not in sys.path:
+            sys.path.insert(0, str(ACE_STEP_SOURCE_ROOT))
         from acestep.handler import AceStepHandler
         from acestep.llm_inference import LLMHandler
         from acestep.inference import GenerationParams, GenerationConfig, generate_music
@@ -144,7 +163,7 @@ class AudioProvider(MediaProvider):
                 )
         dit = AceStepHandler()
         dit_status, dit_ok = dit.initialize_service(
-            project_root=str(ROOT), config_path=self.ace_config, device=device, offload_to_cpu=False
+            project_root=str(ACE_STEP_SOURCE_ROOT), config_path=self.ace_config, device=device, offload_to_cpu=False
         )
         if not dit_ok:
             raise ModelNotReady(f"ACE-Step DiT initialization failed: {dit_status}")

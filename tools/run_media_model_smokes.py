@@ -2,6 +2,7 @@
 """Run sequential live media-model smoke jobs in pre-existing Conda environments."""
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -44,8 +45,145 @@ def _conda_prefixes() -> dict[str, Path]:
     return {Path(prefix).name: Path(prefix) for prefix in json.loads(proc.stdout).get("envs", [])}
 
 
+def _configured_path(key: str, default: Path) -> Path:
+    value = os.environ.get(key, "").strip()
+    if not value:
+        try:
+            for raw in (Path.home() / ".env").read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    name, item = line.split("=", 1)
+                    if name.strip() == key:
+                        value = item.strip().strip("'").strip('"')
+                        break
+        except OSError:
+            pass
+    return Path(os.path.expandvars(os.path.expanduser(value))).resolve() if value else default.expanduser().resolve()
+
+
+def _ace_roots() -> tuple[Path, Path]:
+    cache_root = _configured_path("AIEROS_CACHE_DIR", Path.home() / "aireos_cache")
+    models_root = _configured_path("AIEROS_MODELS_DIR", Path.home() / "aireos_models")
+    source_root = Path(os.environ.get(
+        "AIEROS_ACE_STEP_SOURCE_ROOT", str(cache_root / "third_party" / "ACE-Step-1.5")
+    )).expanduser().resolve()
+    model_root = models_root / "ace-step-1.5"
+    if not source_root.is_relative_to(cache_root):
+        raise RuntimeError("ACE-Step source checkout must remain under AIEROS_CACHE_DIR")
+    return source_root, model_root
+
+
+def _free_a100_gpu() -> str:
+    inventory = subprocess.run(
+        ["nvidia-smi", "--query-gpu=index,name,uuid,memory.used,utilization.gpu", "--format=csv,noheader,nounits"],
+        capture_output=True, text=True, timeout=12, check=False,
+    )
+    apps = subprocess.run(
+        ["nvidia-smi", "--query-compute-apps=gpu_uuid,pid", "--format=csv,noheader,nounits"],
+        capture_output=True, text=True, timeout=12, check=False,
+    )
+    if inventory.returncode or apps.returncode:
+        raise RuntimeError("GPU/process telemetry unavailable; refusing ACE-Step launch")
+    busy_uuids = set()
+    for line in apps.stdout.splitlines():
+        fields = [part.strip() for part in line.split(",")]
+        if len(fields) >= 2 and fields[0] and fields[1].isdigit():
+            busy_uuids.add(fields[0])
+    candidates = []
+    for line in inventory.stdout.splitlines():
+        fields = [part.strip() for part in line.split(",")]
+        if len(fields) < 5 or not fields[0].isdigit() or "A100" not in fields[1].upper():
+            continue
+        try:
+            memory_used, utilization = float(fields[3]), float(fields[4])
+        except ValueError:
+            continue
+        if fields[2] not in busy_uuids and memory_used <= 1024 and utilization <= 5:
+            candidates.append((int(fields[0]), memory_used, utilization))
+    if not candidates:
+        raise RuntimeError("no idle A100 available; no ACE-Step process was started")
+    selected = str(min(candidates)[0])
+    print(f"ACE_STEP_PHYSICAL_GPU={selected}", flush=True)
+    return selected
+
+
+def _ace_env() -> dict[str, str]:
+    source_root, model_root = _ace_roots()
+    env = os.environ.copy()
+    current_path = env.get("PYTHONPATH", "")
+    env.update({
+        "AIEROS_ACE_STEP_SOURCE_ROOT": str(source_root),
+        "ACESTEP_PROJECT_ROOT": str(source_root),
+        "ACESTEP_CHECKPOINTS_DIR": str(model_root),
+        "ACESTEP_LM_BACKEND": "pt",
+        "TORCH_HOME": str(model_root.parent / "torch_hub"),
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "HF_HUB_DISABLE_TELEMETRY": "1",
+        "PYTHONPATH": os.pathsep.join(str(x) for x in (source_root, ROOT, MEDIA, current_path) if str(x)),
+        "PYTHONUNBUFFERED": "1",
+    })
+    return env
+
+
 def _env_for(provider: str, envs: dict[str, Path]) -> tuple[str | None, Path | None, dict[str, bool]]:
     report: dict[str, bool] = {}
+    if provider == "ace-step":
+        # Never fall back to a shared Conda environment for ACE-Step.
+        python = Path.home() / ".local" / "venvs" / "oec-acestep-py311" / "bin" / "python"
+        if not python.is_file():
+            report["oec-acestep-py311"] = False
+            print("SMOKE_ENV provider=ace-step environment=oec-acestep-py311 present=false", flush=True)
+            return None, None, report
+        try:
+            env = _ace_env()
+            code = r'''
+import json, os, sys
+from pathlib import Path
+import torch
+import acestep
+prefix = Path(sys.prefix).resolve()
+source = Path(os.environ["AIEROS_ACE_STEP_SOURCE_ROOT"]).resolve()
+model_root = Path(os.environ["ACESTEP_CHECKPOINTS_DIR"]).resolve()
+required = ("acestep-v15-turbo", "vae", "Qwen3-Embedding-0.6B", "acestep-5Hz-lm-0.6B")
+def has_weight(folder):
+    if folder.is_symlink() or not folder.is_dir(): return False
+    for parent, dirs, files in os.walk(folder, followlinks=False):
+        base = Path(parent)
+        dirs[:] = [d for d in dirs if not (base / d).is_symlink()]
+        for name in files:
+            p = base / name
+            if p.is_symlink() or p.suffix.lower() not in {".safetensors", ".bin", ".pt", ".pth"}: continue
+            try:
+                if p.stat().st_size > 0: return True
+            except OSError: pass
+    return False
+missing = [name for name in required if not has_weight(model_root / name)]
+module = Path(acestep.__file__).resolve()
+torch_path = Path(torch.__file__).resolve()
+if source not in module.parents: raise SystemExit("ACE-Step import is not from the pinned source checkout")
+if prefix not in torch_path.parents: raise SystemExit("Torch import is outside the isolated ACE-Step venv")
+if missing: raise SystemExit("ACE-Step checkpoints missing: " + ",".join(missing))
+if not torch.cuda.is_available(): raise SystemExit("CUDA is unavailable in the isolated ACE-Step runtime")
+gpu = torch.cuda.get_device_name(0)
+if "A100" not in gpu.upper(): raise SystemExit("expected A100, got " + gpu)
+print(json.dumps({"source":str(source),"model_root":str(model_root),"torch_version":torch.__version__,
+ "torch_path":str(torch_path),"gpu":gpu,"cuda_available":True,"missing":missing},sort_keys=True))
+'''
+            checked = subprocess.run([str(python), "-c", code], cwd=ROOT, env=env,
+                                     text=True, capture_output=True, timeout=90, check=False)
+            if checked.returncode:
+                report["oec-acestep-py311"] = False
+                detail = (checked.stdout + "\n" + checked.stderr).strip()[-1200:]
+                print(f"SMOKE_ENV provider=ace-step environment=oec-acestep-py311 ready=false detail={detail}", flush=True)
+                return None, None, report
+            report["oec-acestep-py311"] = True
+            print(f"SMOKE_ENV provider=ace-step environment=oec-acestep-py311 ready=true {checked.stdout.strip().splitlines()[-1]}", flush=True)
+            return "oec-acestep-py311", python, report
+        except Exception as exc:
+            report["oec-acestep-py311"] = False
+            print(f"SMOKE_ENV provider=ace-step environment=oec-acestep-py311 check_error={type(exc).__name__}: {exc}", flush=True)
+            return None, None, report
     if provider in {"kokoro", "whisper", "qwen3-asr"}:
         python = Path.home() / ".local" / "venvs" / "oec-audio-py311" / "bin" / "python"
         if python.is_file():
@@ -119,12 +257,20 @@ def _run_provider(provider: str, python: Path, audio_path: Path | None, log_dir:
 
     service_log = log_dir / f"{provider}-service.log"
     smoke_log = log_dir / f"{provider}-smoke.log"
-    env = os.environ.copy()
+    env = _ace_env() if provider == "ace-step" else os.environ.copy()
     env["PATH"] = str(python.parent) + os.pathsep + env.get("PATH", "")
     env["PYTHONUNBUFFERED"] = "1"
-    env["PYTHONPATH"] = str(ROOT) + os.pathsep + str(MEDIA) + os.pathsep + env.get("PYTHONPATH", "")
-    # Do not fall back to directory-only admission for shared model/output writes.
+    if provider != "ace-step":
+        env["PYTHONPATH"] = str(ROOT) + os.pathsep + str(MEDIA) + os.pathsep + env.get("PYTHONPATH", "")
     env["OEC_USE_MANAGER_DIRECTORY_ONLY"] = "0"
+    selected_physical_gpu = None
+    if provider == "ace-step":
+        try:
+            selected_physical_gpu = _free_a100_gpu()
+            env["CUDA_VISIBLE_DEVICES"] = selected_physical_gpu
+        except Exception as exc:
+            return {"provider": provider, "status": "FAIL",
+                    "reason": f"GPU admission failed: {type(exc).__name__}: {exc}"}, None
     command = [str(python), str(MEDIA / "audio_api.py"), "--model", provider, "--host", "127.0.0.1", "--port", str(port)]
     print(f"SMOKE_START provider={provider} environment_python={python} port={port}", flush=True)
     started = time.monotonic()
@@ -168,6 +314,8 @@ def _run_provider(provider: str, python: Path, audio_path: Path | None, log_dir:
         report = {"provider": provider, "status": "PASS", "environment_python": str(python),
                   "startup_plus_inference_seconds": elapsed, "smoke_log": str(smoke_log),
                   "service_log": str(service_log), "artifact_path": str(artifact) if artifact else None}
+        if selected_physical_gpu is not None:
+            report["physical_gpu_index"] = selected_physical_gpu
         print("SMOKE_ACCEPTANCE " + json.dumps(report), flush=True)
         return report, artifact if provider == "kokoro" and artifact and artifact.suffix.lower() == ".wav" else None
     except Exception as exc:
@@ -190,19 +338,32 @@ def _run_provider(provider: str, python: Path, audio_path: Path | None, log_dir:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--providers", default="kokoro,whisper,qwen3-asr,ace-step",
+                        help="Comma-separated provider order; ACE-Step uses only its dedicated isolated venv.")
+    parser.add_argument("--require-pass", action="store_true",
+                        help="Treat a requested provider skip as failure for required acceptance.")
+    args = parser.parse_args()
+    available = set(REQUIRED)
+    order = tuple(item.strip() for item in args.providers.split(",") if item.strip())
+    if not order or len(order) != len(set(order)) or any(item not in available for item in order):
+        parser.error(f"--providers must be unique entries from: {', '.join(sorted(available))}")
     temp_dir = Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "oec-media-smoke-logs"
     temp_dir.mkdir(parents=True, exist_ok=True)
     envs = _conda_prefixes()
     results: list[dict[str, Any]] = []
     kokoro_wav: Path | None = None
     errors = 0
-    order = ("kokoro", "whisper", "qwen3-asr", "ace-step")
     for provider in order:
         name, python, report = _env_for(provider, envs)
         if python is None:
             summary = {"provider": provider, "status": "SKIPPED",
                        "reason": "none of phase1, phase1_ltx, phase2_3d has all runtime packages; no packages were installed",
                        "environment_checks": report}
+            if args.require_pass:
+                summary["status"] = "FAIL"
+                summary["reason"] = "required provider is unavailable; " + summary["reason"]
+                errors += 1
             results.append(summary)
             print("SMOKE_ACCEPTANCE " + json.dumps(summary), flush=True)
             continue
@@ -217,6 +378,8 @@ def main() -> int:
                "log_directory": str(temp_dir)}
     print("SMOKE_SUITE_SUMMARY " + json.dumps(summary, ensure_ascii=False), flush=True)
     # Missing runtimes are an explicit skip; real failures in a discovered runtime fail this acceptance job.
+    if args.require_pass and summary["skipped"]:
+        return 1
     return 1 if errors else 0
 
 

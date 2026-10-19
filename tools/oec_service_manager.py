@@ -410,6 +410,25 @@ def _assert_port_range(port: int) -> None:
         raise ValueError("--media-port must be an integer in 1..65535.")
 
 
+def _configured_storage_path(key: str, default: Path) -> Path:
+    """Resolve a configured model/cache path without importing side-effectful core_config."""
+    value = os.environ.get(key, "").strip()
+    if not value:
+        env_file = Path.home() / ".env"
+        try:
+            for raw in env_file.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                name, item = line.split("=", 1)
+                if name.strip() == key:
+                    value = item.strip().strip("'").strip('"')
+                    break
+        except OSError:
+            pass
+    return Path(os.path.expandvars(os.path.expanduser(value))).resolve() if value else default.expanduser().resolve()
+
+
 def _build_media_service_spec(
     service: str,
     provider: str = "kokoro",
@@ -427,8 +446,12 @@ def _build_media_service_spec(
         selected_port = port if port is not None else AUDIO_API_DEFAULT_PORTS[provider]
         module_name = AUDIO_API_IMPORTS[provider]
         script = REPO_ROOT / "tools" / "media_services" / "audio_api.py"
-        env_name = "oec-audio-py311"
-        selected_python = python_override or str(Path.home() / ".local" / "venvs" / "oec-audio-py311" / "bin" / "python")
+        if provider == "ace-step":
+            env_name = "oec-acestep-py311"
+            selected_python = python_override or str(Path.home() / ".local" / "venvs" / "oec-acestep-py311" / "bin" / "python")
+        else:
+            env_name = "oec-audio-py311"
+            selected_python = python_override or str(Path.home() / ".local" / "venvs" / "oec-audio-py311" / "bin" / "python")
         instance_id = f"audio-api-{provider}"
         script_args = ["--model", provider, "--host", "127.0.0.1", "--port", str(selected_port)]
     elif service in MEDIA_SIDECAR_DEFAULT_PORTS:
@@ -441,15 +464,35 @@ def _build_media_service_spec(
             provider = "trellis-2"
         selected_python = python_override
         instance_id = service
-        # CUDA is masked to one physical device; the API sees logical cuda:0.
         script_args = ["--host", "127.0.0.1", "--port", str(selected_port)]
     else:
         raise ValueError(f"Unsupported media service {service!r}.")
     _assert_port_range(selected_port)
     current_pythonpath = os.environ.get("PYTHONPATH", "")
-    pythonpath = os.pathsep.join(
-        value for value in (str(REPO_ROOT), str(REPO_ROOT / "tools" / "media_services"), current_pythonpath) if value
-    )
+    additional_paths = [str(REPO_ROOT), str(REPO_ROOT / "tools" / "media_services")]
+    env_updates = {
+        "CUDA_VISIBLE_DEVICES": gpu_id,
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "OEC_USE_MANAGER_DIRECTORY_ONLY": "0",
+    }
+    if service == "audio-api" and provider == "ace-step":
+        cache_root = _configured_storage_path("AIEROS_CACHE_DIR", Path.home() / "aireos_cache")
+        models_root = _configured_storage_path("AIEROS_MODELS_DIR", Path.home() / "aireos_models")
+        ace_source = Path(os.environ.get(
+            "AIEROS_ACE_STEP_SOURCE_ROOT", str(cache_root / "third_party" / "ACE-Step-1.5")
+        )).expanduser().resolve()
+        ace_model_root = models_root / "ace-step-1.5"
+        additional_paths.insert(0, str(ace_source))
+        env_updates.update({
+            "AIEROS_ACE_STEP_SOURCE_ROOT": str(ace_source),
+            "ACESTEP_PROJECT_ROOT": str(ace_source),
+            "ACESTEP_CHECKPOINTS_DIR": str(ace_model_root),
+            "ACESTEP_LM_BACKEND": "pt",
+            "TORCH_HOME": str(models_root / "torch_hub"),
+        })
+    pythonpath = os.pathsep.join(value for value in (*additional_paths, current_pythonpath) if value)
+    env_updates["PYTHONPATH"] = pythonpath
     return {
         "instance_id": instance_id,
         "group": service,
@@ -457,13 +500,7 @@ def _build_media_service_spec(
         "environment": env_name,
         "python_override": selected_python,
         "script_args": script_args,
-        "env_updates": {
-            "CUDA_VISIBLE_DEVICES": gpu_id,
-            "PYTHONPATH": pythonpath,
-            "HF_HUB_OFFLINE": "1",
-            "TRANSFORMERS_OFFLINE": "1",
-            "OEC_USE_MANAGER_DIRECTORY_ONLY": "0",
-        },
+        "env_updates": env_updates,
         "gpus": {gpu_id},
         "port": selected_port,
         "provider": provider,
@@ -479,11 +516,12 @@ def _start_media_service(args: argparse.Namespace, service: str, conda_root: Pat
     _assert_gpu_available(spec["gpus"])
     _assert_gpu_idle(next(iter(spec["gpus"])))
     _assert_port_available(spec["port"])
-    if service == "audio-api" and spec["environment"] == "oec-audio-py311":
+    if service == "audio-api" and spec["environment"] in {"oec-audio-py311", "oec-acestep-py311"}:
         if not spec["python_override"] or not Path(spec["python_override"]).is_file():
+            setup_command = "tools/prepare_ace_step_runtime.py install" if args.provider == "ace-step" else "tools/prepare_media_runtime.py"
             raise RuntimeError(
-                "Isolated oec-audio-py311 Python is missing. Resolve StorageManager's active output lease, "
-                "then run approved isolated-runtime preparation; no package installation was attempted."
+                f"Isolated {spec['environment']} Python is missing; run {setup_command} first. "
+                "No install or model download was attempted by service start."
             )
     py_prefix = _python_prefix(spec["environment"], conda_root, spec["python_override"])
     preflight_env = _base_env()

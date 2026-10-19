@@ -10,6 +10,7 @@ on:
     paths:
       - ".github/workflows/oec-a100-media-model-bootstrap.yml"
       - "tools/prepare_media_models.py"
+      - "tools/prepare_ace_step_runtime.py"
       - "tools/prepare_media_runtime.py"
       - "tools/oec_service_manager.py"
       - "asset_status.py"
@@ -19,6 +20,7 @@ on:
       - "tests/test_oec_service_manager_media.py"
       - "tests/test_upload_status_contract.py"
       - "tools/run_media_model_smokes.py"
+      - "tests/test_ace_step_runtime.py"
       - "tools/media_services/**"
       - "tools/model_cache_manager.py"
       - "core_config.py"
@@ -92,11 +94,12 @@ jobs:
       - name: Compile and run CPU/mock regressions before any storage writes
         run: |
           set -euo pipefail
-          "$OEC_PYTHON" -m py_compile tools/prepare_media_models.py tools/run_media_model_smokes.py tools/media_services/common.py tools/media_services/model_cache.py tools/media_services/audio_api.py tools/media_services/smoke_client.py tools/model_cache_manager.py tests/test_media_service_api.py tests/test_audio_service_validation.py
+          "$OEC_PYTHON" -m py_compile tools/prepare_media_models.py tools/prepare_ace_step_runtime.py tools/run_media_model_smokes.py tools/media_services/common.py tools/media_services/model_cache.py tools/media_services/audio_api.py tools/media_services/smoke_client.py tools/model_cache_manager.py tests/test_media_service_api.py tests/test_audio_service_validation.py tests/test_oec_service_manager_media.py tests/test_upload_status_contract.py tests/test_ace_step_runtime.py
           "$OEC_PYTHON" -m unittest discover -s tests -p 'test_media_service_api.py' -v
           "$OEC_PYTHON" -m unittest discover -s tests -p 'test_audio_service_validation.py' -v
           "$OEC_PYTHON" -m unittest discover -s tests -p 'test_oec_service_manager_media.py' -v
           "$OEC_PYTHON" -m unittest discover -s tests -p 'test_upload_status_contract.py' -v
+          "$OEC_PYTHON" -m unittest discover -s tests -p 'test_ace_step_runtime.py' -v
 
       - name: Read current StorageManager status, log tail and cached models
         run: |
@@ -144,7 +147,26 @@ jobs:
         if: success()
         run: |
           set -euo pipefail
-          "$OEC_PYTHON" tools/run_media_model_smokes.py
+          "$OEC_PYTHON" tools/run_media_model_smokes.py --providers kokoro,whisper,qwen3-asr
+
+      - name: Download ACE-Step checkpoint groups into AIEROS_MODELS through StorageManager
+        if: success()
+        run: |
+          set -euo pipefail
+          "$OEC_PYTHON" tools/prepare_media_models.py download --model ace-step-main
+          "$OEC_PYTHON" tools/prepare_media_models.py download --model ace-step-lm-0.6b
+
+      - name: Prepare pinned ACE-Step in its own Python/Torch environment
+        if: success()
+        run: |
+          set -euo pipefail
+          "$OEC_PYTHON" tools/prepare_ace_step_runtime.py install
+
+      - name: Required ACE-Step CUDA music-generation acceptance
+        if: success()
+        run: |
+          set -euo pipefail
+          "$OEC_PYTHON" tools/run_media_model_smokes.py --providers ace-step --require-pass
 
       - name: Recheck model cache after downloads
         if: always()
