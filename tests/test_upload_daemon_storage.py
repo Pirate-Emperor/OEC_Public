@@ -132,7 +132,7 @@ class UploadDaemonStorageTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "not in PENDING"):
                 daemon._get_pending_batch(asset_id=2, force_flush=True)
 
-    def test_targeted_batch_rejects_oversized_asset_when_chunking_is_unavailable(self):
+    def test_targeted_batch_requires_explicit_opt_in_for_oversized_asset(self):
         import sqlite3
         import tempfile
         from hf_upload_daemon import HFUploadDaemon
@@ -145,7 +145,7 @@ class UploadDaemonStorageTests(unittest.TestCase):
             daemon.batch_limit_bytes = 1024
             daemon.partial_batch_max_age_seconds = 3600
 
-            with self.assertRaisesRegex(ValueError, "individual-file chunking is not implemented"):
+            with self.assertRaisesRegex(ValueError, "individual-file chunking requires explicit --chunk-oversize"):
                 daemon._get_pending_batch(asset_id=7, force_flush=True)
             with sqlite3.connect(db_path) as conn:
                 self.assertEqual(conn.execute("SELECT status FROM assets WHERE id=7").fetchone()[0], "PENDING")
