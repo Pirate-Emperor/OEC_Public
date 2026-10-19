@@ -223,14 +223,22 @@ class QANode:
         if media_path.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
             return media_path, False
             
-        frame_path = media_path.replace(".mp4", "_qa_frame.jpg")
+        # Preserve the input extension and derive a sibling JPEG for any supported video.
+        # String-replacing ".mp4" returned the original .webm/.avi path and could overwrite it.
+        source_path = Path(media_path)
+        frame_path = str(source_path.with_name(f"{source_path.stem}_qa_frame.jpg"))
         try:
             subprocess.run([
-                "ffmpeg", "-y", "-ss", "00:00:02", "-i", media_path, 
+                "ffmpeg", "-y", "-ss", "00:00:02", "-i", media_path,
                 "-vframes", "1", "-q:v", "2", frame_path
             ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
             return frame_path, True
         except Exception as e:
+            # Remove only a partial frame emitted by this exact extraction attempt.
+            try:
+                Path(frame_path).unlink(missing_ok=True)
+            except OSError:
+                pass
             print(f"[QA-NODE] Frame extraction failed: {e}")
             return None, False
 
@@ -252,7 +260,7 @@ class QANode:
             with managed_storage_operation(
                 "outputs",
                 required_gb=max(0.05, raw_size_gb * 1.25),
-                require_fresh_quota=False,
+                require_fresh_quota=True,
                 minimum_free_gb=float(
                     os.environ.get("AIEROS_OUTPUT_MIN_FREE_GB", "0.05")
                 ),
