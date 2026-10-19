@@ -1,10 +1,12 @@
 # OEC project continuation checklist
 
-**Snapshot timestamp:** 2026-10-19T15:13:52.946+05:30 (Asia/Kolkata)  
+**Snapshot timestamp:** 2026-10-19T18:28:04+05:30 (Asia/Kolkata)  
 **Project:** OEC / AIREOS — core implementation, full-model research, product demonstration and academic deliverables  
 **Purpose:** Current status and next actions. Refresh GitHub refs, jobs, logs, trackers and quota before treating this as live state. Permanent rules are in [`Prompt.md`](Prompt.md).  
-**Current OEC source branch:** `main` at `f6b9d7d484480d3f121241964fc28f69dbb5e3a4` when this snapshot was prepared.  
-**Actions policy:** no workflow was deliberately triggered by this work. Keep the $0 rule.
+**Main head before this documentation refresh:** `f41db4905849e738968e8ac8ee3fe3e272640fe2`. The model implementation is on `fix/media-stack-supervision-20261019`; refresh both refs at session start.  
+**Actions policy:** user confirmed the Actions runner quota reset on 2026-10-19 and withdrew the prior $0-only prerequisite. Do not impose that veto. Use Actions as needed, batch meaningful tests/inference, and avoid same-group pending-run collisions. StorageManager model/storage admission remains separate.
+
+The non-OEC-media repository summaries below remain from the earlier 15:13 snapshot and must be refreshed before acting on those workstreams. The current OEC model-inference evidence and next steps are in section 0 above.
 
 ## 1. Project window — unresolved
 
@@ -19,19 +21,23 @@ Not fully inspected in this session: all source files on each repository's curre
 
 ## 3. Current repository heads and latest relevant workflow evidence
 
-### OEC core
+## 0. Current model-inference handoff — supersedes the older OEC run table below
 
-- **Main:** `f6b9d7d484480d3f121241964fc28f69dbb5e3a4`.  
-- **Active feature branch:** `fix/media-stack-supervision-20261019`, head `74abb2f77d9076cf00e8bf0b2c2bc95b642457ce`. Keep feature implementation on this branch; main changes here are tracking/documentation only unless otherwise authorized.
+**Evidence checkpoint:** 2026-10-19T18:28:04+05:30. Feature code head at review time: `76bb7f7a392acc2fbddd7428532f18da8c0aaf80`; tracker-only updates may move the branch tip without changing the implementation source.
 
-| Run / job | State at snapshot | Actual evidence / next action |
+| Capability / run | Current evidence | State and next action |
 |---|---|---|
-| [39225901764 — visual media sidecar smoke](https://github.com/Killer4K-N/OEC/actions/runs/39225901764), job [117971993674](https://github.com/Killer4K-N/OEC/actions/runs/39225901764/job/117971993674) | **In progress** on `oec-1`, host `scn30-mn`; source SHA `86298cfbfb01a723efdb4d5b01f5ef35fb9a2fd3` | Steps through runner/env validation, compile, guarded Brain/LTX queue regressions, StorageManager status and expired plain pause-lock handling completed. Step 8 (“Test each visual sidecar in isolation without model downloads”) was in progress; final StorageManager readout/artifact upload still pending. Re-check run/jobs/log/artifacts read-only. Do not launch a duplicate. |
-| [39226037799 — model bootstrap](https://github.com/Killer4K-N/OEC/actions/runs/39226037799) | **Pending** on `fix/media-stack-supervision-20261019`; source SHA `74abb2f77d9076cf00e8bf0b2c2bc95b642457ce`; no job object returned at the snapshot check | Pending is not running. Do not launch another bootstrap. Re-check after state changes. |
-| [39225808196 — model bootstrap failure](https://github.com/Killer4K-N/OEC/actions/runs/39225808196), job 117971686653 | **Failed** on `oec-1` / `scn30-mn`, source SHA `be0215e2f480438a4c0969db02707fc70439f55b` | CPU/mock test `test_managed_status_must_agree_with_reserve_file_size` errored because its fixture was 1 MiB size / 512 bytes allocated and the probe correctly rejected it as sparse/underallocated. Subsequent storage write, download and inference steps were skipped. Treat as a test-fixture failure to fix in the feature branch, not proof of a live reserve-file failure. |
-| [39225531165 — earlier sidecar smoke failure](https://github.com/Killer4K-N/OEC/actions/runs/39225531165) | Failed, older commit `d31fe0ab8fb72957462d19765b4e2fd46eb7a4a2` | Preserve as failed history; do not replace it with the later still-active run. |
+| AudioGen — [39240127736](https://github.com/Killer4K-N/OEC/actions/runs/39240127736) | A100; 3 s mono 16 kHz WAV, 96,078 bytes, SHA-256 `6be1acb0cf36cacfc5ba4464ebbecb7f6f3bbe46f8e1e3bdbf88f2eef80bde3b`; 26.737 s; 5.155/5.385 GiB allocated/reserved. Artifact [12181271517](https://github.com/Killer4K-N/OEC/actions/runs/39240127736/artifacts/12181271517). | **PASS** |
+| TRELLIS and LTX sidecars — [39240127757](https://github.com/Killer4K-N/OEC/actions/runs/39240127757) | A100. TRELLIS GLB 2,742,900 bytes, SHA-256 `e0d8f0a3a45921b4119a01a0b45f560d4604fb44da44454ddee2b912bd2fe0b7`. LTX H.264 MP4 242,547 bytes, 768×512, 2.083 s, SHA-256 `5d7d54de4354936f66867fecd19d20c0ab6972b5d997ca00c145ab0c1e54ec51`. Artifact report [12182600342](https://github.com/Killer4K-N/OEC/actions/runs/39240127757/artifacts/12182600342). | **PASS standalone only**; a combined production/media job remains open. |
+| MusicGen — [39254306725](https://github.com/Killer4K-N/OEC/actions/runs/39254306725) | A100/environment checks and 4/4 offline contract tests passed. Actual inference failed because `facebook/musicgen-medium` was not fully cached and connection to the Hugging Face proxy failed with `No route to host`. No WAV produced. Artifact [12187572013](https://github.com/Killer4K-N/OEC/actions/runs/39254306725/artifacts/12187572013). | **BLOCKED before inference by cache/egress**; inspect model cache and runner network before retrying. |
+| FLUX→TRELLIS — [39254474617](https://github.com/Killer4K-N/OEC/actions/runs/39254474617) | Offline tests had two errors in `tests/test_flux_image_pipeline.py`: managed output-root fixture omitted `flux.SYSTEM_DIRS["outputs"]`; scratch-output fixture outside `/tmp`. Inference steps skipped. Artifact [12187637374](https://github.com/Killer4K-N/OEC/actions/runs/39254474617/artifacts/12187637374). | **FAILED before inference**; repair test fixtures, then rerun current-head PNG→GLB pipeline. Do not weaken production path checks. |
+| ACE-Step — [39254306716](https://github.com/Killer4K-N/OEC/actions/runs/39254306716) | Bootstrap cancelled before runner assignment, no evidence. Previous [39246077924](https://github.com/Killer4K-N/OEC/actions/runs/39246077924) timed out after 900 s while upstream was downloading a 4.46 GiB DiT file at 91–92%. New strict checkpoint/cache-only guard is committed at [b84398af](https://github.com/Killer4K-N/OEC/commit/b84398af2654f9ddffb00b34d7b3e995e1b38418), not live-verified. | **OPEN**; run current bootstrap once the serial lane clears and require an actual music artifact. |
+| Kokoro → Whisper Turbo / Qwen3-ASR | Previous one-clip A100 acceptance [39209090292](https://github.com/Killer4K-N/OEC/actions/runs/39209090292). | Historical **PASS**; repeat against current code when useful. |
 
-**Last measured StorageManager state from run 39225808196 (historical, not fresh admission):** models 219.97/280 GB with ~60.04 GB reserve; outputs ~290.02 MB/1 GB with ~734.41 MB reserve. Both showed WARNING (usage above soft quota while grace was active; logged hard-limit headroom ~69.29 GB). The manager reported it could not update the outputs reserve during a managed operation/unresolved lease. Do not treat that snapshot as authorization for new writes, downloads or training. Obtain fresh approved telemetry and manager admission for a future operation; never access the protected reserve file directly.
+**Next order:** (1) fix FLUX test fixtures and rerun offline suites; (2) current-head FLUX PNG→TRELLIS GLB inference; (3) run ACE-Step managed bootstrap and live generation; (4) diagnose MusicGen cache/egress instead of repeating a known failed download; (5) build a local job-level multimodal orchestrator for FLUX/TRELLIS/LTX, AudioGen, ACE-Step/MusicGen and optional Kokoro/Whisper/Qwen3-ASR, with a hashed output manifest and final muxed artifact. Scope is model setup/inference/orchestration, not full-model training or OEC-Play deployment.
+
+**Actions quota:** The user explicitly withdrew the prior $0-only prerequisite because Actions quota was reset. Use Actions when required. Preserve shared concurrency, runner identity, model licensing and StorageManager admission. A captured StorageManager reading from the MusicGen run at ~18:20 IST showed group usage 2.04/2.10 TB hard limit with ~56.71 GB headroom under active grace; models 232.81/280 GB with 52.44 GB reserve; outputs 293.74 MB/1 GB with 734.41 MB reserve. This is storage telemetry, not Actions quota, and it is not future write approval.
+
 
 ### Full-model training
 
