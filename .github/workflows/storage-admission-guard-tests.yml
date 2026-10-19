@@ -43,8 +43,10 @@ jobs:
           python -m unittest discover -s tests -p 'test_brain_ltx_queue_storage.py' -v
           python -m unittest discover -s tests -p 'test_upload_status_contract.py' -v
           python -m unittest discover -s tests -p 'test_upload_daemon_storage.py' -v
+          python -m unittest discover -s tests -p 'test_oec_e2e_acceptance_contract.py' -v
           python -m py_compile qa_compliance_worker.py tests/test_inference_storage_integration.py
           python -m py_compile hf_upload_daemon.py tests/test_upload_daemon_storage.py
+          python -m py_compile tools/run_oec_e2e_acceptance.py tests/test_oec_e2e_acceptance_contract.py
           python -m py_compile brain.py tests/test_brain_ltx_queue_storage.py
           python -m unittest discover -s tests -p 'test_storage_manager.py' -v
           python -m unittest discover -s tests -p 'test_storage_policy.py' -v
