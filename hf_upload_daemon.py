@@ -287,12 +287,45 @@ class HFUploadDaemon:
             return batch_ids, batch_files, current_size, True
         return [], [], 0, False
 
-    def _upload_asset_in_chunks(self, asset_id: int, chunk_size_bytes: int | None = None) -> int:
-        """Upload one oversized PENDING asset as verified parts; publish the manifest last.
+    def _remote_chunk_matches(self, remote_path: str, local_chunk: Path, size_bytes: int, sha256_hex: str) -> bool:
+        """Return True only when an existing remote part can be verified byte-for-byte by its digest metadata.
 
-        Remote parts are deterministic for (asset ID, asset SHA-256), so a retry can safely
-        overwrite partial objects. Consumers must assemble the ordered parts listed in
-        manifest.json and verify the full SHA-256 before treating the asset as complete.
+        The remote path includes the full asset SHA-256 and stable part index. Query Hub metadata so a
+        retry skips a part only when its size and LFS SHA-256 or Git blob SHA-1 are verifiably equal.
+        If the Hub does not expose a usable content digest, safely re-upload that part instead of guessing.
+        """
+        get_paths_info = getattr(self.api, "get_paths_info", None)
+        if not callable(get_paths_info):
+            return False
+        infos = get_paths_info(repo_id=HF_DATASET_REPO, paths=[remote_path], repo_type="dataset")
+        info = next((item for item in infos if getattr(item, "path", None) == remote_path), None)
+        if info is None:
+            return False
+        remote_size = getattr(info, "size", None)
+        if remote_size is None or int(remote_size) != size_bytes:
+            raise RuntimeError(f"existing remote chunk has unexpected size at {remote_path}; refusing unsafe resume")
+        lfs = getattr(info, "lfs", None)
+        remote_sha256 = getattr(lfs, "sha256", None) if lfs is not None else None
+        if isinstance(remote_sha256, str) and remote_sha256.strip():
+            if remote_sha256.lower() != sha256_hex.lower():
+                raise RuntimeError(f"existing remote chunk SHA-256 mismatch at {remote_path}; refusing unsafe resume")
+            return True
+        remote_blob_id = getattr(info, "blob_id", None)
+        if isinstance(remote_blob_id, str) and remote_blob_id.strip():
+            git_blob = hashlib.sha1()
+            git_blob.update(f"blob {size_bytes}\\0".encode("ascii"))
+            with local_chunk.open("rb") as handle:
+                for block in iter(lambda: handle.read(1024 * 1024), b""):
+                    git_blob.update(block)
+            if remote_blob_id.lower() == git_blob.hexdigest():
+                return True
+        return False
+    def _upload_asset_in_chunks(self, asset_id: int, chunk_size_bytes: int | None = None) -> int:
+        """Resume one oversized asset as verified parts; publish the manifest only after all parts.
+
+        Part paths include the full source SHA-256. Existing parts are skipped only when Hub metadata
+        proves their size and content digest; otherwise the part is uploaded again. Consumers assemble
+        the ordered parts in manifest.json and verify the full SHA-256 before treating the asset complete.
         """
         if isinstance(asset_id, bool) or not isinstance(asset_id, int) or asset_id < 1:
             raise ValueError("asset_id must be a positive integer")
@@ -356,7 +389,7 @@ class HFUploadDaemon:
                 for block in iter(lambda: source.read(1024 * 1024), b""):
                     initial_digest.update(block)
             asset_sha256 = initial_digest.hexdigest()
-            remote_prefix = f"data/chunks/asset-{asset_id}-{asset_sha256[:16]}"
+            remote_prefix = f"data/chunks/asset-{asset_id}-{asset_sha256}"
             metadata_bytes = metadata_path.read_bytes()
             metadata_value = json.loads(metadata_bytes.decode("utf-8"))
             metadata_sha256 = hashlib.sha256(metadata_bytes).hexdigest()
@@ -404,10 +437,16 @@ class HFUploadDaemon:
                         raise RuntimeError("source asset shrank while it was being chunked")
                     part_hash = part_digest.hexdigest()
                     remote_path = f"{remote_prefix}/part-{part_index:06d}.bin"
-                    self.api.upload_file(
-                        path_or_fileobj=str(chunk_path), path_in_repo=remote_path,
-                        repo_id=HF_DATASET_REPO, repo_type="dataset",
-                    )
+                    if self._remote_chunk_matches(remote_path, chunk_path, written, part_hash):
+                        logging.info(
+                            "Resuming verified remote chunk asset_id=%s part=%s bytes=%s sha256=%s",
+                            asset_id, part_index, written, part_hash,
+                        )
+                    else:
+                        self.api.upload_file(
+                            path_or_fileobj=str(chunk_path), path_in_repo=remote_path,
+                            repo_id=HF_DATASET_REPO, repo_type="dataset",
+                        )
                     parts.append({
                         "index": part_index, "path": remote_path, "offset_bytes": offset,
                         "size_bytes": written, "sha256": part_hash,
