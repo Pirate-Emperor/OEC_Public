@@ -1,0 +1,158 @@
+name: OEC A100 read-only model setup audit
+run-name: "OEC model setup audit - ${{ github.ref_name }}"
+
+on:
+  push:
+    branches:
+      - fix/media-stack-supervision-20261019
+    paths:
+      - ".github/workflows/oec-model-setup-audit.yml"
+      - "tools/prepare_media_models.py"
+      - "tools/prepare_ace_step_runtime.py"
+      - "tools/storage_reserve_probe.py"
+      - "tools/media_services/model_cache.py"
+      - "tools/model_cache_manager.py"
+      - "core_config.py"
+      - "storage_manager.py"
+      - "storage_policy.py"
+      - "storage_config.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-media-gpu-storage-serial
+  cancel-in-progress: false
+
+jobs:
+  read-only-model-setup-audit:
+    name: StorageManager + cache + env audit + aggregate preflight
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout feature branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Confirm assigned runner and existing Python environment
+        run: |
+          set -euo pipefail
+          test "${RUNNER_NAME:-unknown}" = "oec-1" || {
+            echo "::error::Expected assigned oec-1 A100 runner; no setup attempted."
+            exit 2
+          }
+          if [[ -f "$HOME/Conda/bin/activate" ]]; then
+            source "$HOME/Conda/bin/activate"
+          elif [[ -f "$HOME/Conda/etc/profile.d/conda.sh" ]]; then
+            source "$HOME/Conda/etc/profile.d/conda.sh"
+          fi
+          command -v conda >/dev/null 2>&1 || {
+            echo "::error::Conda missing; no environment was created or modified."
+            exit 2
+          }
+          test -f "$HOME/OEC/storage_config.json" || {
+            echo "::error::Authoritative runner storage_config.json missing; fail closed."
+            exit 2
+          }
+          # Copy the runner's active config into the disposable checkout only.
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          selected=""
+          for name in oec_deploy phase1 phase1_ltx phase2_3d; do
+            py="$(conda run --no-capture-output -n "$name" python -c 'import sys; print(sys.executable)' 2>/dev/null | tail -n 1 || true)"
+            if [[ -z "$py" || ! -x "$py" ]]; then continue; fi
+            if "$py" -c 'import core_config, huggingface_hub; from storage_manager import storage_preflight, managed_storage_operation' >/dev/null 2>&1; then
+              selected="$py"
+              echo "SELECTED_ENV=$name"
+              break
+            fi
+          done
+          test -n "$selected" || {
+            echo "::error::No existing environment has the required OEC + Hugging Face imports; no install attempted."
+            exit 2
+          }
+          echo "OEC_PYTHON=$selected" >> "$GITHUB_ENV"
+          echo "RUNNER_HOST=$(hostname)"
+          echo "RUNNER_NAME=$RUNNER_NAME"
+          echo "OEC_PYTHON=$selected"
+          "$selected" --version
+          # Inventory only: no attempt to unload, signal, or terminate other processes.
+          nvidia-smi
+          nvidia-smi --query-gpu=index,name,memory.total,memory.used,utilization.gpu --format=csv
+          nvidia-smi --query-compute-apps=gpu_uuid,pid,process_name,used_gpu_memory --format=csv
+
+      - name: Compile model preparation tools without installing or downloading anything
+        run: |
+          set -euo pipefail
+          "$OEC_PYTHON" -m py_compile             tools/prepare_media_models.py             tools/prepare_ace_step_runtime.py             tools/prepare_media_runtime.py             tools/storage_reserve_probe.py             tools/model_cache_manager.py             tools/media_services/model_cache.py             storage_manager.py storage_policy.py
+
+      - name: Run read-only status, environment audit, and strict aggregate preflight
+        id: audit
+        env:
+          OEC_MODEL_AUDIT_DIR: ${{ runner.temp }}/oec-model-setup-audit-${{ github.run_id }}
+        run: |
+          set -uo pipefail
+          mkdir -p "$OEC_MODEL_AUDIT_DIR"
+          printf '{"run_id":"%s","runner":"%s","host":"%s","branch":"%s","commit":"%s","downloads_attempted":false,"package_installs_attempted":false,"services_started":false,"reserve_mutation_attempted":false}\n'             "$GITHUB_RUN_ID" "$RUNNER_NAME" "$(hostname)" "$GITHUB_REF_NAME" "$GITHUB_SHA" > "$OEC_MODEL_AUDIT_DIR/report.json"
+          run_capture() {
+            local name="$1"; shift
+            echo "AUDIT_COMMAND[$name]=$(printf '%q ' "$@")"
+            "$@" >"$OEC_MODEL_AUDIT_DIR/$name.log" 2>&1
+            local rc=$?
+            printf '%s\n' "$rc" > "$OEC_MODEL_AUDIT_DIR/$name.exit_code"
+            echo "AUDIT_RESULT[$name]=$rc"
+            tail -n 80 "$OEC_MODEL_AUDIT_DIR/$name.log" || true
+          }
+          run_capture gpu-before nvidia-smi --query-gpu=index,name,memory.total,memory.used,utilization.gpu --format=csv
+          run_capture compute-processes-before nvidia-smi --query-compute-apps=gpu_uuid,pid,process_name,used_gpu_memory --format=csv
+          run_capture storage-manager-status "$OEC_PYTHON" storage_manager.py --status
+          run_capture model-preparation-status "$OEC_PYTHON" tools/prepare_media_models.py status
+          run_capture existing-environment-audit "$OEC_PYTHON" tools/prepare_media_models.py env-audit
+          # Strict authoritative quota only: intentionally do not pass --use-manager-directory-only.
+          run_capture aggregate-model-preflight "$OEC_PYTHON" tools/prepare_media_models.py plan --preflight
+          "$OEC_PYTHON" - "$OEC_MODEL_AUDIT_DIR/report.json" <<'PY'
+          import json, pathlib, sys
+          root = pathlib.Path(sys.argv[1]).parent
+          report_path = pathlib.Path(sys.argv[1])
+          report = json.loads(report_path.read_text())
+          checks = {}
+          for name in (
+              "gpu-before", "compute-processes-before", "storage-manager-status",
+              "model-preparation-status", "existing-environment-audit", "aggregate-model-preflight",
+          ):
+              try:
+                  checks[name] = int((root / f"{name}.exit_code").read_text().strip())
+              except Exception:
+                  checks[name] = None
+          report["checks"] = checks
+          report["preflight_passed"] = checks["aggregate-model-preflight"] == 0
+          report["model_download_decision"] = "NOT_AUTHORIZED_IN_THIS_AUDIT"
+          report["notes"] = [
+              "This workflow is read-only with respect to shared model/cache/output contents.",
+              "A positive preflight is necessary but does not trigger or authorize downloads in this workflow.",
+              "Missing/stale quota telemetry remains fail-closed; filesystem free space is not a substitute.",
+          ]
+          report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+          print("OEC_MODEL_SETUP_AUDIT=" + json.dumps(report, sort_keys=True))
+          PY
+          # Mark a failed required gate red, after preserving reports for upload.
+          for name in storage-manager-status model-preparation-status existing-environment-audit aggregate-model-preflight; do
+            rc="$(cat "$OEC_MODEL_AUDIT_DIR/$name.exit_code" 2>/dev/null || echo 99)"
+            if [[ "$rc" != "0" ]]; then
+              echo "::error::Model setup audit gate $name returned $rc. No download or install was attempted."
+              exit 2
+            fi
+          done
+
+      - name: Upload read-only model setup evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-model-setup-audit-${{ github.run_id }}
+          path: ${{ runner.temp }}/oec-model-setup-audit-${{ github.run_id }}/
+          if-no-files-found: warn
+          retention-days: 7
