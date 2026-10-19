@@ -4,7 +4,7 @@
   "last_updated": "2026-10-19T22:38:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Latest current-head static acceptance run 39291422187 passed on SHA 85431311caf28e6e3ede293fdcc959f86419c402: 90 tests, py_compile, all four notebook JSON checks (16/15/10/6), no ResourceWarning. New explicit opt-in uploader chunk protocol now passes mocked-Hub tests for part SHA validation/reassembly, resume after a simulated upload interruption, keeping source/queue on failure, and publishing the completion manifest last. This is not a real Hugging Face upload or remote read-after-write. Visual sidecar workflow 39278268411 now concludes SUCCESS; its TRELLIS GLB and LTX MP4 were downloaded, reopened/ffprobed, and hashes recorded. Actual Qwen2-VL decision, real HF upload receipt/read-after-write, full Brain→QA→upload→OEC-Play acceptance, ACE-Step generation (no idle A100) and FLUX→TRELLIS combined path remain open.",
+  "latest_summary": "Latest current-head static acceptance run 39291422187 passed on SHA 85431311caf28e6e3ede293fdcc959f86419c402: 90 tests, py_compile, four notebook JSON checks (16/15/10/6), no ResourceWarning. Explicit one-row oversized uploader chunk mode now has mock-tested hashed parts, source reassembly, manifest-last publication, failure rollback/source retention and remote-metadata-verified retry after simulated interruption. This is not a real HF upload/read-after-write. Visual sidecar workflow 39278268411 concluded success; its actual TRELLIS GLB and LTX MP4 were inspected/reopened/ffprobed and their hashes are recorded. Actual Qwen2-VL decisions, real HF upload/remote resume, full Brain→QA→upload→OEC-Play, ACE-Step generation (no idle A100) and FLUX→TRELLIS combined path remain open.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -4373,7 +4373,7 @@
         "execution": "live loopback APIs and actual model inference"
       },
       "results": {
-        "status": "PROVIDER_ACCEPTANCE_PASS_WORKFLOW_FINAL_STATUS_PENDING",
+        "status": "PASS_PROVIDER_AND_WORKFLOW",
         "providers_passed": 2,
         "providers_failed": 0,
         "providers_blocked": 0,
@@ -4383,12 +4383,12 @@
         "ltx_mp4_validated": true,
         "mp4_local_ffprobe": "PASS",
         "actual_files_generated": true,
-        "action_run_status_at_last_poll": "in_progress",
-        "job_status_at_last_poll": "in_progress",
-        "overall_github_workflow_conclusion": "PENDING",
+        "action_run_status_at_last_poll": "completed",
+        "job_status_at_last_poll": "completed",
+        "overall_github_workflow_conclusion": "SUCCESS",
         "brain_worker_qa_hf_integration": "NOT_TESTED"
       },
-      "interpretation": "The harness report itself is PASS for both actual loopback model APIs, and the downloaded ZIP contains the exact outputs and reports. TRELLIS returned a valid GLB that reopens locally, but its mesh is not watertight; this only proves artifact existence/structural validity, not geometry fidelity. LTX MP4 passed both harness validation and local ffprobe. The Actions API still reports the enclosing job in_progress at the last poll despite the report/artifact-upload post-step logs, so preserve provider-level PASS while awaiting terminal workflow conclusion.",
+      "interpretation": "The harness report and GitHub Actions run both reached SUCCESS. The GLB was independently reopened and the MP4 independently ffprobed. TRELLIS mesh is structurally valid but not watertight; this is not a geometry-fidelity or connected-pipeline claim.",
       "limitations": [
         "Synthetic reference/prompt demonstrates API artifact generation, not real scene accuracy or broad visual quality.",
         "TRELLIS mesh is not watertight; vertex/face count alone does not prove geometry quality.",
@@ -4454,7 +4454,8 @@
             "conclusion": "failure",
             "reason": "One legacy oversized-row assertion still expected 'chunking is not implemented' after the implementation became opt-in."
           }
-        ]
+        ],
+        "current_head_commit": "85431311caf28e6e3ede293fdcc959f86419c402"
       },
       "environment": {
         "runner": "GitHub-hosted CI, Python 3.11.17",
@@ -4462,7 +4463,7 @@
         "hub": "FakeHub; no credentials or real repository contacted"
       },
       "results": {
-        "status": "PASS_STATIC_MOCKED_RESUME",
+        "status": "PASS_STATIC_MOCKED_RESUME_CURRENT_HEAD",
         "workflow_status": "success",
         "tests_in_full_suite": 90,
         "suite_counts": {
@@ -4491,7 +4492,7 @@
         "remote_read_after_write": "NOT_RUN",
         "remote_large_asset_consumer_reassembly": "NOT_RUN"
       },
-      "interpretation": "The code now supports explicit, resumable per-file chunk uploads and passes the current hosted static/mock test suite. A failed upload returns only the selected row to PENDING and preserves local sources. Retrying consults Hub metadata to reuse an existing remote part only when size and content digest can be verified; otherwise it safely re-uploads that chunk. Manifest publication is the completion marker and happens after the parts and metadata. This is not yet proven against a real approved dataset or a downstream consumer, so no live remote-upload acceptance is claimed.",
+      "interpretation": "The current tested source/test revision passed the full 90-test workflow. The new one-row upload chunk mode was exercised against a fake Hub with a simulated interruption and retry; the existing part was verified and skipped, remaining parts were uploaded, the manifest was published last, and part/metadata/full-source hashes were checked. A real approved Hub dataset upload and remote consumer assembly/read-after-write are still required for live acceptance.",
       "limitations": [
         "Only --once --asset-id --chunk-oversize can select chunk mode; continuous daemon behavior and default tar.gz archive batching are unchanged.",
         "The Hub API behavior is mocked. No live auth, remote dataset commit, post-upload list/download, or content hash verification occurred.",
