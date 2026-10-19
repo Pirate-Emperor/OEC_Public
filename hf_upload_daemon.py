@@ -19,14 +19,29 @@ from storage_manager import storage_preflight_path, managed_storage_operation
 from asset_status import fetch_pending_upload_rows, recover_archiving_rows, rollback_upload_batch
 
 log_path = os.path.join(SYSTEM_DIRS['logs'], "upload_daemon.log")
-logging.basicConfig(
-    level=logging.INFO, 
-    format='%(asctime)s - [HF-DAEMON] %(message)s',
-    handlers=[
-        logging.FileHandler(log_path),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
+_root_logger = logging.getLogger()
+_root_logger.setLevel(logging.INFO)
+_log_formatter = logging.Formatter("%(asctime)s - [HF-DAEMON] %(message)s")
+
+# Avoid leaking a FileHandler when a host/test has already configured root logging.
+# Explicitly attach only missing handlers instead of constructing handlers for basicConfig.
+if not any(
+    isinstance(handler, logging.FileHandler)
+    and os.path.abspath(handler.baseFilename) == os.path.abspath(log_path)
+    for handler in _root_logger.handlers
+):
+    _file_handler = logging.FileHandler(log_path)
+    _file_handler.setFormatter(_log_formatter)
+    _root_logger.addHandler(_file_handler)
+
+if not any(
+    isinstance(handler, logging.StreamHandler)
+    and not isinstance(handler, logging.FileHandler)
+    for handler in _root_logger.handlers
+):
+    _stream_handler = logging.StreamHandler(sys.stdout)
+    _stream_handler.setFormatter(_log_formatter)
+    _root_logger.addHandler(_stream_handler)
 
 # ==============================================================================
 # PART 1: THE QUEUE API (Imported by your Generator Scripts)
@@ -132,8 +147,8 @@ class HFUploadDaemon:
             fcntl.lockf(self.lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except IOError:
             print("[CRITICAL] Another instance of hf_upload_daemon is already running!")
-            print("To stop it, run: pkill -f hf_upload_daemon.py")
-            sys.exit(0)
+            print("The selected daemon instance is still active; targeted uploads must not bypass its lock.")
+            sys.exit(1)
         
         # 1. Register graceful shutdown for Ctrl+C and Kill signals
         signal.signal(signal.SIGINT, self._shutdown_handler)
