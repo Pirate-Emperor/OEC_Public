@@ -194,11 +194,21 @@ class HFUploadDaemon:
         except Exception as e:
             logging.error(f"Failed to clean up cache/db: {e}")
 
-    def _get_pending_batch(self):
+    def _get_pending_batch(
+        self,
+        asset_id: int | None = None,
+        force_flush: bool = False,
+    ):
         now = time.time()
 
         with sqlite3.connect(self.db_path) as conn:
             rows = fetch_pending_upload_rows(conn)
+            if asset_id is not None:
+                rows = [row for row in rows if row[0] == asset_id]
+                if not rows:
+                    raise RuntimeError(
+                        f"targeted asset id {asset_id} is not in PENDING state; refusing a broader upload batch"
+                    )
 
             batch_ids, batch_files = [], []
             current_size = 0
@@ -206,46 +216,47 @@ class HFUploadDaemon:
 
             for row in rows:
                 row_id, a_path, j_path, size, timestamp = row
+                size = int(size or 0)
+                if asset_id is not None and size > self.batch_limit_bytes:
+                    raise ValueError(
+                        f"targeted asset id {asset_id} is {size} bytes, above the configured batch limit "
+                        f"{self.batch_limit_bytes}; individual-file chunking is not implemented"
+                    )
 
                 if os.path.exists(a_path) and os.path.exists(j_path):
                     batch_ids.append(row_id)
                     batch_files.extend([a_path, j_path])
                     current_size += size
-
                     if oldest_timestamp is None:
                         try:
                             oldest_timestamp = datetime.strptime(
-                                timestamp,
-                                "%Y-%m-%d %H:%M:%S",
+                                timestamp, "%Y-%m-%d %H:%M:%S"
                             ).timestamp()
                         except (TypeError, ValueError):
                             oldest_timestamp = now
-
                     if current_size >= self.batch_limit_bytes:
                         break
                 else:
-                    cursor.execute(
+                    conn.execute(
                         "UPDATE assets SET status = 'FAILED_MISSING_FILE' WHERE id = ?",
                         (row_id,),
                     )
-
             conn.commit()
 
         if not batch_ids:
             return [], [], 0, False
-
         if current_size >= self.batch_limit_bytes:
             return batch_ids, batch_files, current_size, False
-
+        if force_flush:
+            logging.info("Targeted one-shot upload: forcing selected asset pair into one archive.")
+            return batch_ids, batch_files, current_size, True
         age = max(0.0, now - (oldest_timestamp or now))
         if age >= self.partial_batch_max_age_seconds:
             logging.info(
                 "Partial upload batch aged %.0fs; forcing flush of %.2f GB.",
-                age,
-                current_size / (1024**3),
+                age, current_size / (1024**3),
             )
             return batch_ids, batch_files, current_size, True
-
         return [], [], 0, False
 
     def process_queue(self):
