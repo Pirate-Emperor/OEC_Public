@@ -12,6 +12,7 @@ on:
       - main
       - 'fix/storage-admission-write-guards-20261014'
       - 'feat/quota-aware-reserve-management-20261017'
+      - 'fix/media-stack-supervision-20261019'
 
 permissions:
   contents: read
@@ -38,6 +39,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_trellis_easy_run.py' -v
           python -m unittest discover -s tests -p 'test_audiocraft_notebook_static.py' -v
           python -m unittest discover -s tests -p 'test_storage_write_admission.py' -v
+          python -m unittest discover -s tests -p 'test_inference_storage_integration.py' -v
+          python -m py_compile qa_compliance_worker.py tests/test_inference_storage_integration.py
           python -m unittest discover -s tests -p 'test_storage_manager.py' -v
           python -m unittest discover -s tests -p 'test_storage_policy.py' -v
           python -m unittest discover -s tests -p 'test_quota_snapshot.py' -v
