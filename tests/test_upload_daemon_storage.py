@@ -73,5 +73,91 @@ class UploadDaemonStorageTests(unittest.TestCase):
         block = source[dummy_pos:daemon_pos]
         self.assertIn("managed_storage_operation", block)
 
+    def _seed_pending_queue(self, root, items):
+        import sqlite3
+
+        db_path = root / "queue.db"
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                "CREATE TABLE assets ("
+                "id INTEGER PRIMARY KEY, asset_path TEXT, json_path TEXT, "
+                "total_size_bytes INTEGER, status TEXT, timestamp DATETIME)"
+            )
+            for asset_id, size, status in items:
+                asset = root / f"asset-{asset_id}.mp4"
+                metadata = root / f"asset-{asset_id}.json"
+                asset.write_bytes(b"x" * min(size, 1024))
+                metadata.write_text("{}", encoding="utf-8")
+                conn.execute(
+                    "INSERT INTO assets VALUES (?, ?, ?, ?, ?, ?)",
+                    (asset_id, str(asset), str(metadata), size, status, "2000-01-01 00:00:00"),
+                )
+            conn.commit()
+        return db_path
+
+    def test_targeted_batch_contains_only_the_requested_pending_asset(self):
+        import sqlite3
+        import tempfile
+        from hf_upload_daemon import HFUploadDaemon
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            db_path = self._seed_pending_queue(root, [(1, 100, "PENDING"), (2, 200, "PENDING")])
+            daemon = HFUploadDaemon.__new__(HFUploadDaemon)
+            daemon.db_path = str(db_path)
+            daemon.batch_limit_bytes = 1024
+            daemon.partial_batch_max_age_seconds = 3600
+
+            ids, files, size, forced = daemon._get_pending_batch(asset_id=2, force_flush=True)
+            self.assertEqual(ids, [2])
+            self.assertEqual(files, [str(root / "asset-2.mp4"), str(root / "asset-2.json")])
+            self.assertEqual(size, 200)
+            self.assertTrue(forced)
+            with sqlite3.connect(db_path) as conn:
+                statuses = conn.execute("SELECT id, status FROM assets ORDER BY id").fetchall()
+            self.assertEqual(statuses, [(1, "PENDING"), (2, "PENDING")])
+
+    def test_targeted_batch_refuses_non_pending_id_without_fallback(self):
+        import tempfile
+        from hf_upload_daemon import HFUploadDaemon
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            db_path = self._seed_pending_queue(root, [(1, 100, "PENDING"), (2, 200, "ARCHIVING")])
+            daemon = HFUploadDaemon.__new__(HFUploadDaemon)
+            daemon.db_path = str(db_path)
+            daemon.batch_limit_bytes = 1024
+            daemon.partial_batch_max_age_seconds = 3600
+
+            with self.assertRaisesRegex(RuntimeError, "not in PENDING"):
+                daemon._get_pending_batch(asset_id=2, force_flush=True)
+
+    def test_targeted_batch_rejects_oversized_asset_when_chunking_is_unavailable(self):
+        import sqlite3
+        import tempfile
+        from hf_upload_daemon import HFUploadDaemon
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            db_path = self._seed_pending_queue(root, [(7, 2048, "PENDING")])
+            daemon = HFUploadDaemon.__new__(HFUploadDaemon)
+            daemon.db_path = str(db_path)
+            daemon.batch_limit_bytes = 1024
+            daemon.partial_batch_max_age_seconds = 3600
+
+            with self.assertRaisesRegex(ValueError, "individual-file chunking is not implemented"):
+                daemon._get_pending_batch(asset_id=7, force_flush=True)
+            with sqlite3.connect(db_path) as conn:
+                self.assertEqual(conn.execute("SELECT status FROM assets WHERE id=7").fetchone()[0], "PENDING")
+
+    def test_one_shot_cli_requires_exact_asset_and_disables_shared_cleanup(self):
+        source = (self.ROOT / "hf_upload_daemon.py").read_text(encoding="utf-8")
+        self.assertIn('parser.add_argument("--once"', source)
+        self.assertIn('parser.add_argument("--asset-id"', source)
+        self.assertIn('parser.error("--once requires --asset-id with a positive ID")', source)
+        self.assertIn("cleanup_on_start=not args.once", source)
+        self.assertIn("create_repo_if_missing=not args.once", source)
+        self.assertIn("process_queue(max_batches=1, asset_id=args.asset_id)", source)
+
 if __name__ == "__main__":
     unittest.main()
