@@ -6,9 +6,18 @@ on:
   push:
     branches:
       - feat/media-service-sidecars-20261018
+      - fix/media-stack-supervision-20261019
     paths:
       - ".github/workflows/oec-a100-media-model-bootstrap.yml"
       - "tools/prepare_media_models.py"
+      - "tools/prepare_media_runtime.py"
+      - "tools/oec_service_manager.py"
+      - "asset_status.py"
+      - "qa_compliance_worker.py"
+      - "hf_upload_daemon.py"
+      - "worker_ltx_video.py"
+      - "tests/test_oec_service_manager_media.py"
+      - "tests/test_upload_status_contract.py"
       - "tools/run_media_model_smokes.py"
       - "tools/media_services/**"
       - "tools/model_cache_manager.py"
@@ -86,11 +95,20 @@ jobs:
           "$OEC_PYTHON" -m py_compile tools/prepare_media_models.py tools/run_media_model_smokes.py tools/media_services/common.py tools/media_services/model_cache.py tools/media_services/audio_api.py tools/media_services/smoke_client.py tools/model_cache_manager.py tests/test_media_service_api.py tests/test_audio_service_validation.py
           "$OEC_PYTHON" -m unittest discover -s tests -p 'test_media_service_api.py' -v
           "$OEC_PYTHON" -m unittest discover -s tests -p 'test_audio_service_validation.py' -v
+          "$OEC_PYTHON" -m unittest discover -s tests -p 'test_oec_service_manager_media.py' -v
+          "$OEC_PYTHON" -m unittest discover -s tests -p 'test_upload_status_contract.py' -v
 
       - name: Read current StorageManager status, log tail and cached models
         run: |
           set -euo pipefail
           "$OEC_PYTHON" tools/prepare_media_models.py status
+
+      - name: Recover expired plain pause locks via StorageManager only
+        run: |
+          set -euo pipefail
+          # --clean only removes expired plain pause-lock files; it preserves reserves and lease manifests.
+          "$OEC_PYTHON" storage_manager.py --clean
+          "$OEC_PYTHON" storage_manager.py --status
 
       - name: Audit existing inference environments without installing packages
         run: |
