@@ -188,9 +188,9 @@ def _generate(pipe: Any, torch: Any, gpu: dict[str, str], snapshot: Path, prompt
     metadata = {"provider": "flux", "model": MODEL_ID, "model_revision": snapshot.name,
                 "physical_gpu": int(gpu["index"]), "seed": int(seed), "prompt": prompt.strip(),
                 "steps": steps, "guidance_scale": guidance, "generation_seconds": round(time.monotonic()-started, 3)}
-    metadata = _write_image(image, path, scratch, metadata)
     metadata["peak_allocated_gib"] = round(torch.cuda.max_memory_allocated() / 1024**3, 3)
     metadata["peak_reserved_gib"] = round(torch.cuda.max_memory_reserved() / 1024**3, 3)
+    metadata = _write_image(image, path, scratch, metadata)
     torch.cuda.empty_cache()
     print("FLUX_IMAGE_ACCEPTANCE=" + json.dumps(metadata, sort_keys=True), flush=True)
     return image, metadata

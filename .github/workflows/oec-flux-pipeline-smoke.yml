@@ -1,0 +1,97 @@
+name: OEC FLUX to TRELLIS A100 inference acceptance
+
+on:
+  push:
+    branches:
+      - fix/media-stack-supervision-20261019
+      - feat/media-service-sidecars-20261018
+    paths:
+      - ".github/workflows/oec-flux-pipeline-smoke.yml"
+      - "pipeline_flux_image.py"
+      - "pipeline_flux_trellis.py"
+      - "pipeline_trellis_3d.py"
+      - "tools/run_flux_pipeline_smoke.py"
+      - "tools/oec_service_manager.py"
+      - "tests/test_flux_image_pipeline.py"
+      - "tests/test_flux_trellis_pipeline.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-media-gpu-storage-serial
+  cancel-in-progress: false
+
+jobs:
+  flux-trellis-inference:
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout OEC feature branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate assigned A100 runner, existing environment and storage configuration
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-1" || {
+            echo "::error::Expected oec-1 A100 runner, got $RUNNER_NAME"
+            exit 2
+          }
+          test -x "$HOME/Conda/condabin/conda"
+          test -f "$HOME/OEC/storage_config.json" || {
+            echo "::error::Live StorageManager configuration is missing; managed inference is denied."
+            exit 2
+          }
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python -c 'import sys, torch, diffusers, huggingface_hub, transformers; print("ENV=phase2_3d"); print("PYTHON="+sys.version.split()[0]); print("TORCH="+torch.__version__); print("CUDA="+str(torch.version.cuda)); print("DIFFUSERS="+diffusers.__version__); print("HUGGINGFACE_HUB="+huggingface_hub.__version__); print("TRANSFORMERS="+transformers.__version__); assert torch.cuda.is_available()'
+          nvidia-smi
+
+      - name: Compile sources and run offline contract tests
+        run: |
+          set -euo pipefail
+          CONDA="$HOME/Conda/condabin/conda"
+          "$CONDA" run --no-capture-output -n phase2_3d python -m py_compile \
+            pipeline_flux_image.py pipeline_flux_trellis.py pipeline_trellis_3d.py \
+            tools/run_flux_pipeline_smoke.py tests/test_flux_image_pipeline.py tests/test_flux_trellis_pipeline.py
+          "$CONDA" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_flux_image_pipeline.py' -v
+          "$CONDA" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_flux_trellis_pipeline.py' -v
+
+      - name: Capture live StorageManager state before inference
+        run: |
+          set -euo pipefail
+          REPORT_DIR="$RUNNER_TEMP/oec-flux-pipeline-smoke-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -p "$REPORT_DIR"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$REPORT_DIR/storage-before.log"
+
+      - name: Generate a PNG with FLUX and pass the exact file to TRELLIS
+        run: |
+          set -euo pipefail
+          REPORT_DIR="$RUNNER_TEMP/oec-flux-pipeline-smoke-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          WORK_DIR="/tmp/oec-flux-pipeline-smoke-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -p "$REPORT_DIR"
+          timeout 6600s "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d \
+            python tools/run_flux_pipeline_smoke.py \
+            --work-dir "$WORK_DIR" --report-dir "$REPORT_DIR" --width 512 --height 512 --steps 4
+
+      - name: Capture final StorageManager state
+        if: always()
+        run: |
+          set +e
+          REPORT_DIR="$RUNNER_TEMP/oec-flux-pipeline-smoke-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -p "$REPORT_DIR"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$REPORT_DIR/storage-after.log"
+          exit 0
+
+      - name: Upload current-run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-flux-pipeline-smoke
+          path: ${{ runner.temp }}/oec-flux-pipeline-smoke-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: warn
+          retention-days: 3
