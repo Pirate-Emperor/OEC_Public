@@ -413,7 +413,23 @@ if __name__ == "__main__":
         action="store_true",
         help="Generate dummy 300MB video/json pairs to trigger the upload queue threshold."
     )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Upload exactly one explicitly selected pending asset pair, then exit.",
+    )
+    parser.add_argument(
+        "--asset-id",
+        type=int,
+        help="Positive asset row ID; required with --once and refused unless status is PENDING.",
+    )
     args = parser.parse_args()
+    if args.once and (args.asset_id is None or args.asset_id < 1):
+        parser.error("--once requires --asset-id with a positive ID")
+    if not args.once and args.asset_id is not None:
+        parser.error("--asset-id can only be used with --once")
+    if args.once and args.generate_dummy:
+        parser.error("--once cannot be combined with --generate-dummy")
 
     # Dynamically strip proxies if we are on the login node
     if args.no_proxy:
@@ -464,5 +480,20 @@ if __name__ == "__main__":
 
             print("[TESTING] Dummy files queued successfully! Starting daemon...\n")
 
-    daemon = HFUploadDaemon(auto_confirm=args.auto_confirm)
-    daemon.process_queue()
+    daemon = HFUploadDaemon(
+        auto_confirm=args.auto_confirm,
+        cleanup_on_start=not args.once,
+        create_repo_if_missing=not args.once,
+    )
+    if args.once:
+        try:
+            processed = daemon.process_queue(max_batches=1, asset_id=args.asset_id)
+        except Exception as exc:
+            print(f"[UPLOAD_ONCE] FAIL {type(exc).__name__}: {exc}", file=sys.stderr)
+            raise SystemExit(1) from exc
+        if processed != 1:
+            print("[UPLOAD_ONCE] FAIL no asset batch was uploaded", file=sys.stderr)
+            raise SystemExit(1)
+        print(f"[UPLOAD_ONCE] PASS asset_id={args.asset_id} batches={processed}")
+    else:
+        daemon.process_queue()
