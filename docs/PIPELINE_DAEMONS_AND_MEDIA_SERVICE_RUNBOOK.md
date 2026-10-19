@@ -1,6 +1,6 @@
 # OEC pipeline, daemons, and media-service runbook
 
-**Evidence checkpoint:** 2026-10-19T20:36+05:30, Asia/Kolkata  
+**Evidence checkpoint:** 2026-10-19T20:59+05:30, Asia/Kolkata  
 **OEC source branch:** `fix/media-stack-supervision-20261019` (current evidence; not merged to main)  
 **Scope:** OEC implementation and verification. OEC-Deploy is read-only in this task.
 
@@ -23,7 +23,7 @@ This runbook separates confirmed live acceptance from commands that still requir
 | Brain → LTX worker → QA → HF upload | Runbook documents intended commands; components and independent smoke results do not prove the sustained queue path. | **NOT YET LIVE-ACCEPTED AS ONE PIPELINE.** Run a single short controlled job and verify each status/artifact transition before scaling. |
 | OEC-Play | OEC-Deploy feature validation runs are active/pending on their own branch; no server health request from this session. | **LIVE SERVER / CAPABILITY STATUS UNVERIFIED.** Keep adapters disabled unless their health and real artifact tests pass. |
 
-Latest static suite [39275020758](https://github.com/CalamityStriker/OEC/actions/runs/39275020758) passed 83 CPU/contract tests, uploader/QA compilation and four notebook JSON checks with no ResourceWarning. Latest media bootstrap [39274961054](https://github.com/CalamityStriker/OEC/actions/runs/39274961054) passed live Kokoro/Whisper/Qwen3-ASR inference in 18.42/18.48/20.42 seconds; ACE-Step source/checkpoint/runtime were ready but generation was refused because no idle A100 was eligible. Latest FLUX→TRELLIS run [39271901007](https://github.com/CalamityStriker/OEC/actions/runs/39271901007) is blocked by external PID 3347078 on all eight A100s; no process was killed and no PNG/GLB was generated. Latest StorageManager snapshot: 60.38 GB hard headroom under active grace, model 232.81/280 GB, outputs 295.91 MB/1 GB. Historical only; it does not authorize future writes.
+Latest completed static acceptance [39277515469](https://github.com/CalamityStriker/OEC/actions/runs/39277515469) passed 84 tests, compilation and four notebook JSON checks without ResourceWarning. It predates the current QA frame-path/transcode-quota patch; [current-head CI 39278190899](https://github.com/CalamityStriker/OEC/actions/runs/39278190899) was queued as of 20:59 IST. A100 bootstrap [39277286186](https://github.com/CalamityStriker/OEC/actions/runs/39277286186) remained in progress at the speech smoke step; its live logs were not retrievable and ACE-Step had not completed in the last observed job status. Older bootstrap [39278145617](https://github.com/CalamityStriker/OEC/actions/runs/39278145617) and visual-sidecar [39278043547](https://github.com/CalamityStriker/OEC/actions/runs/39278043547) were queued/pending. Historical FLUX→TRELLIS [39271901007](https://github.com/CalamityStriker/OEC/actions/runs/39271901007) was blocked by a compute PID attached to all eight A100s; refresh current ownership rather than assuming that PID is still active. Old quota snapshots do not authorize future writes.
 
 ## 2. What \`brain_config.json\` means for queue chunking
 
@@ -96,15 +96,31 @@ conda run --no-capture-output -n phase1_ltx \\
 
 The above is the documented worker invocation; it is **not** proof that all 11 cluster GPUs are allocated/online right now. Verify the actual allocation before launch. Do not use \`--clean-state\`; it purges the model cache.
 
-**QA/compliance worker** — use an existing environment that passes imports of Torch, Transformers and \`qwen_vl_utils\`, plus a working \`ffmpeg\`.
+**QA/compliance worker — one row at a time first.** Use an existing environment that passes imports of Torch, Transformers and `qwen_vl_utils`, plus a working `ffmpeg`.
 
-\`\`\`bash
+Read-only preflight:
+
+```bash
 cd "$HOME/OEC"
-conda run --no-capture-output -n "$OEC_QA_ENV" \\
-  python "$HOME/OEC/qa_compliance_worker.py" --no-purge --gpu "$OEC_QA_GPU"
-\`\`\`
+nvidia-smi
+conda run --no-capture-output -n "$OEC_QA_ENV" python -c 'import torch, transformers, qwen_vl_utils; print("torch", torch.__version__, "cuda", torch.cuda.is_available()); print("transformers", transformers.__version__)'
+conda run --no-capture-output -n "$OEC_QA_ENV" python "$HOME/OEC/storage_manager.py" --status
+```
 
-Set \`OEC_QA_ENV\` only after the dependency check. \`--no-purge\` avoids deleting the QA model cache; this is intentional. Set OEC_QA_GPU to the assigned physical GPU index after checking the active allocation and nvidia-smi; do not guess an index or share a device with another large model. The QA worker sets CUDA_VISIBLE_DEVICES before importing Torch.
+For an approved, run-scoped media item already present as one exact database row in `PENDING_QA`, use targeted mode:
+
+```bash
+test -n "${OEC_QA_ENV:-}" || { echo "Set OEC_QA_ENV to the verified existing QA environment"; exit 2; }
+test "${OEC_QA_ASSET_ID:-}" -ge 1 2>/dev/null || { echo "Set OEC_QA_ASSET_ID to a verified PENDING_QA row"; exit 2; }
+test -n "${OEC_QA_GPU:-}" || { echo "Set OEC_QA_GPU to an actually allocated physical GPU"; exit 2; }
+conda run --no-capture-output -n "$OEC_QA_ENV" \
+  python "$HOME/OEC/qa_compliance_worker.py" --once --asset-id "$OEC_QA_ASSET_ID" \
+  --no-purge --gpu "$OEC_QA_GPU"
+```
+
+A completed policy pass should print `[QA_ONCE] PASS ... status=PENDING_UPLOAD`; a completed policy rejection should print `[QA_ONCE] REJECTED ...`. Other outcomes exit nonzero. The bounded mode verifies the exact row before loading the 7B model, skips sweeping unrelated `PROCESSING_QA` rows, and records the selected row's terminal state. It still performs real inference and can move/delete a rejected asset: use only an approved test asset and a freshly admitted GPU. Do not start the continuous daemon for the first isolated acceptance.
+
+Set `OEC_QA_ENV` only after the import preflight. `--no-purge` retains the model cache. The latest non-MP4 frame-path/transcode-quota fix is committed but awaits [current-head CI 39278190899](https://github.com/CalamityStriker/OEC/actions/runs/39278190899); the latest completed full suite [39277515469](https://github.com/CalamityStriker/OEC/actions/runs/39277515469) passed 84 tests but predates that fix.
 
 **HF upload daemon — targeted acceptance first.** Do not start the indefinite normal daemon while unrelated rows may be PENDING; it consumes the regular pending batch. The new `--once --asset-id ID` mode selects exactly one existing PENDING row, avoids startup cleanup of unrelated state, refuses to auto-create the dataset repository, and exits after one API upload attempt. On success, it deletes that selected row and local asset/JSON; on failure it rolls the selected row back to PENDING. Use a new, small, approved test asset and retain its metadata/hash somewhere safe before upload.
 
@@ -208,4 +224,4 @@ Use \`http://127.0.0.1:7987\` via an approved SSH tunnel for the desktop client;
 
 Stop a process by pressing Ctrl+C in its own terminal or terminating its verified exact PID after confirming the command line. Do not run broad \`pkill -f\` patterns. After stopping the daemons, rerun \`storage_manager.py --status\` and preserve logs/results.
 
-Latest evidence checkpoint: 2026-10-19 20:36 IST. Static/contract CI [39275020758] passed 83 tests, py_compile and four notebook JSON checks without ResourceWarning. AudioGen, standalone TRELLIS, standalone LTX, Kokoro, Whisper and Qwen3-ASR have controlled live inference passes. Latest bootstrap [39274961054] passed the three speech providers and ACE-Step runtime prep, but its required music generation failed closed because no idle A100 was eligible; no music file. FLUX→TRELLIS [39271901007] is also blocked by external PID 3347078 on all eight A100s; no PNG/GLB from that attempt. MusicGen remains incomplete-cache/proxy-blocked. The new bounded upload CLI is contract-tested only; no remote upload was performed. Live Qwen2-VL decision, HF receipt/read-after-write, per-file chunk/resume, sustained Brain→worker→QA→upload, and live OEC-Play service remain unverified.
+Latest evidence checkpoint: 2026-10-19 20:59 IST. Static acceptance [39277515469] passed 84 tests/compilation/notebook JSON; current QA frame-path/fresh-transcode-quota tests are queued at [39278190899]. The one-row QA mode exists, but no live Qwen2-VL decision was run. A100 bootstrap [39277286186] was in progress at speech inference, with logs unavailable while active; no new ACE-Step result is inferred. Existing live independent passes remain AudioGen, standalone TRELLIS/LTX, Kokoro/Whisper/Qwen3-ASR. Latest FLUX→TRELLIS attempt remains GPU-admission blocked; ACE-Step's earlier attempt blocked at the same gate; MusicGen remains incomplete-cache/proxy-blocked. The bounded uploader is unit/contract-tested only; no remote upload occurred. No per-file resumable chunker, sustained Brain→worker→QA→upload, or live OEC-Play acceptance is verified.
