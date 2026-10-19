@@ -202,8 +202,10 @@ class UploadDaemonStorageTests(unittest.TestCase):
             daemon.chunk_size_bytes = 4
             daemon.archive_min_free_gb = 0.1
             daemon.is_running = True
-            with mock.patch.dict(uploader.SYSTEM_DIRS, {"cache": str(cache), "outputs": str(outputs)}), \\
-                 mock.patch.object(uploader, "storage_preflight_path", return_value=(True, "test admission")):
+            with (
+                mock.patch.dict(uploader.SYSTEM_DIRS, {"cache": str(cache), "outputs": str(outputs)}),
+                mock.patch.object(uploader, "storage_preflight_path", return_value=(True, "test admission")),
+            ):
                 self.assertEqual(daemon.process_queue(max_batches=1, asset_id=41, chunk_oversize=True), 1)
 
             uploaded = daemon.api.objects
@@ -271,8 +273,10 @@ class UploadDaemonStorageTests(unittest.TestCase):
             daemon.chunk_size_bytes = 4
             daemon.archive_min_free_gb = 0.1
             daemon.is_running = True
-            with mock.patch.dict(uploader.SYSTEM_DIRS, {"cache": str(cache), "outputs": str(outputs)}), \\
-                 mock.patch.object(uploader, "storage_preflight_path", return_value=(True, "test admission")):
+            with (
+                mock.patch.dict(uploader.SYSTEM_DIRS, {"cache": str(cache), "outputs": str(outputs)}),
+                mock.patch.object(uploader, "storage_preflight_path", return_value=(True, "test admission")),
+            ):
                 with self.assertRaisesRegex(OSError, "simulated network outage"):
                     daemon.process_queue(max_batches=1, asset_id=42, chunk_oversize=True)
             self.assertEqual(asset.read_bytes(), payload)
