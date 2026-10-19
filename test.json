@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-19T22:38:00+05:30",
+  "last_updated": "2026-10-19T23:33:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Latest current-head static acceptance run 39291422187 passed on SHA 85431311caf28e6e3ede293fdcc959f86419c402: 90 tests, py_compile, four notebook JSON checks (16/15/10/6), no ResourceWarning. Explicit one-row oversized uploader chunk mode now has mock-tested hashed parts, source reassembly, manifest-last publication, failure rollback/source retention and remote-metadata-verified retry after simulated interruption. This is not a real HF upload/read-after-write. Visual sidecar workflow 39278268411 concluded success; its actual TRELLIS GLB and LTX MP4 were inspected/reopened/ffprobed and their hashes are recorded. Actual Qwen2-VL decisions, real HF upload/remote resume, full Brain→QA→upload→OEC-Play, ACE-Step generation (no idle A100) and FLUX→TRELLIS combined path remain open.",
+  "latest_summary": "Current static regression workflow 39300850953 passed on SHA 80cc89480ee79f18d1ec7c101f97cfc310379ed1: 96 tests across notebook/CLI, storage, QA/frame, Brain/LTX queue, uploader/chunking, new E2E acceptance contracts, StorageManager/Policy, quota and reservation; compilation and all 4 notebook JSON checks passed. New guarded live E2E run 39300850928 on assigned oec-1 completed BLOCKED before inference because external process PID 3347078 (Biome server-components Python) had CUDA contexts on all eight A100s. The exact artifact report confirms no model inference, shared queue use, remote repo creation, process kill or upload attempt. This is an infrastructure admission block; it does not test live Qwen2-VL or real HF upload. Visual sidecar run 39278268411 succeeded with inspected TRELLIS GLB and LTX MP4. ACE-Step remains no-idle-A100 blocked; combined FLUX→TRELLIS no accepted output. End-to-end LTX→QA→HF upload/readback remains open pending normal release of GPU ownership.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -4501,6 +4501,89 @@
         "The visual sidecar outputs use synthetic input/prompt and TRELLIS mesh is not watertight."
       ],
       "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39291422187"
+    },
+    {
+      "id": "EXP-2026-10-19-LIVE-E2E-GPU-ADMISSION-BLOCKED-39300850928",
+      "date": "2026-10-19",
+      "category": "Guarded live LTX → Qwen2-VL QA → resumable HF chunk upload → remote read-after-write",
+      "approach": "Run new end-to-end acceptance workflow on assigned oec-1. It validates runner/env, compiles harness, then checks nvidia-smi GPU inventory and compute-process ownership, read-only StorageManager status, configured existing HF repo/auth, cache-only LTX inference, run-scoped QA row, one-row resumable upload and remote manifest/part/metadata downloads. It produces a report artifact on PASS or BLOCKED/FAIL.",
+      "reason": "Move from isolated component/contract evidence to an actual joined asset lifecycle, while refusing GPU overlap and avoiding the shared upload queue.",
+      "parameters": {
+        "workflow_run_id": 39300850928,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39300850928",
+        "job_id": 118225345452,
+        "source_sha": "80cc89480ee79f18d1ec7c101f97cfc310379ed1",
+        "branch": "fix/media-stack-supervision-20261019",
+        "runner": "oec-1",
+        "report_artifact_id": 12211286861,
+        "report_artifact_url": "https://github.com/CalamityStriker/OEC/actions/runs/39300850928/artifacts/12211286861",
+        "report_artifact_sha256": "662beaa9a52c82274a0b4997dd9a7995f94f3da1a904f9fffd890cbf8c339add",
+        "report_artifact_bytes": 1758,
+        "blocker": "A100 compute processes are already present; refusing overlap",
+        "process": {
+          "pid": 3347078,
+          "executable": "/nlsasfs/home/lmedge/rahkus/OEC/oec_deploy/v1/Biome/server-components/.venv/bin/python",
+          "gpu_memory_mib": {
+            "gpu0": 8194,
+            "gpu1": 1072,
+            "gpu2": 974,
+            "gpu3": 1046,
+            "gpu4": 970,
+            "gpu5": 1212,
+            "gpu6": 1126,
+            "gpu7": 8986
+          },
+          "note": "Point-in-time observed process details. Not killed or signalled."
+        },
+        "safety_checks": {
+          "assigned_runner_check": "PASS",
+          "environment_check": "PASS",
+          "syntax_compilation": "PASS",
+          "gpu_admission": "BLOCKED",
+          "storage_status": "NOT_REACHED_BY_HARNESS",
+          "hf_auth_and_existing_repo_check": "NOT_REACHED_BY_HARNESS",
+          "sidecar_inference": "NOT_RUN",
+          "qwen2_vl_qa": "NOT_RUN",
+          "hf_upload": "NOT_RUN",
+          "remote_read_after_write": "NOT_RUN",
+          "shared_queue_used": false,
+          "remote_dataset_created": false,
+          "process_kill_attempted": false
+        },
+        "static_companion_run": {
+          "run_id": 39300850953,
+          "url": "https://github.com/CalamityStriker/OEC/actions/runs/39300850953",
+          "job_id": 118225345013,
+          "status": "success",
+          "tests": 96,
+          "commit": "80cc89480ee79f18d1ec7c101f97cfc310379ed1",
+          "notebook_json": "PASS (16/15/10/6 cells)",
+          "py_compile": "PASS"
+        }
+      },
+      "environment": {
+        "runner": "oec-1",
+        "execution": "runner/environment checks and py_compile passed; harness blocked before inference"
+      },
+      "results": {
+        "status": "BLOCKED_GPU_OWNERSHIP",
+        "workflow_conclusion": "failure (expected fail-closed gate)",
+        "gpu_preflight": "BLOCKED",
+        "tests": 0,
+        "live_inference": "NOT_RUN",
+        "qa_decision": "NOT_RUN",
+        "real_remote_upload": "NOT_RUN",
+        "remote_read_after_write": "NOT_RUN",
+        "collateral_side_effects": "NONE_REPORTED"
+      },
+      "interpretation": "The harness worked as designed: it found an externally owned compute process mapped to all eight A100 devices and exited before any model inference or remote write. This is not a model-quality or upload-protocol failure; it is an infrastructure/resource-ownership blocker. Release the process through its owner’s normal lifecycle, then rerun after fresh nvidia-smi and StorageManager checks. Do not terminate it or weaken the admission gate.",
+      "limitations": [
+        "GPU guard ran before the harness's StorageManager status and HF auth preflight, so current quota and target/auth status remain unknown in this run.",
+        "No QA-passed media was created by this E2E run.",
+        "No real Hugging Face credentials were exercised and no dataset was modified.",
+        "No full pipeline success claim is justified."
+      ],
+      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39300850928/artifacts/12211286861"
     }
   ]
 }
