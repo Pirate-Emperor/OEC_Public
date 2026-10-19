@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-19T16:27:18.503+05:30",
+  "last_updated": "2026-10-19T18:28:04+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Current branch 21f576b774e25c7766d7c2876b793366918f0436: AudioGen live A100 smoke run 39240127736 passed on oec-1 (3.0 s mono 16 kHz PCM WAV, 96,078 bytes, SHA-256 6be1acb0cf36cacfc5ba4464ebbecb7f6f3bbe46f8e1e3bdbf88f2eef80bde3b; 26.737 s generation; peak allocated/reserved VRAM 5.155/5.385 GiB); six static notebook tests passed. Current TRELLIS/LTX acceptance run 39240127757 is in progress; bootstrap run 39240127730 was cancelled before job assignment and carries no test/inference evidence. ACE-Step music and a fresh current-head FLUX smoke remain outstanding.",
+  "latest_summary": "AudioGen and standalone TRELLIS/LTX inference passed. MusicGen contract tests passed 4/4 but generation failed before inference because the checkpoint cache was incomplete and runner network access to Hugging Face failed. FLUX→TRELLIS tests failed before inference on two test-fixture path errors. ACE-Step strict cache guard is committed but not live-verified. Actions quota gate was withdrawn by the user; StorageManager admission remains.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -3453,6 +3453,37 @@
         "ACE-Step has not yet produced a live music artifact; bootstrap run 39240127730 was cancelled before a job was assigned.",
         "The current TRELLIS/LTX live acceptance run 39240127757 is in progress at the time of this record.",
         "pip check reports a thinc/NumPy version conflict; no shared packages were changed."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-19-MEDIA-PIPELINE-RECHECK",
+      "date": "2026-10-19",
+      "category": "A100 media inference acceptance",
+      "approach": "Review latest A100 job logs/artifacts for AudioGen, TRELLIS, LTX, MusicGen and FLUX→TRELLIS; triage ACE-Step load timeout.",
+      "reason": "Record true model-level acceptance separately from jobs that failed before inference.",
+      "parameters": {
+        "branch": "fix/media-stack-supervision-20261019",
+        "head": "76bb7f7a392acc2fbddd7428532f18da8c0aaf80",
+        "runs": [
+          39240127736,
+          39240127757,
+          39254306725,
+          39254474617,
+          39254306716,
+          39246077924
+        ]
+      },
+      "results": {
+        "audiogen": "PASS; WAV validated",
+        "trellis_ltx": "PASS standalone; GLB/MP4 validated",
+        "musicgen": "FAILED before inference; 4/4 offline tests passed; model cache incomplete and Hugging Face proxy unreachable",
+        "flux_trellis": "FAILED before inference; two path-fixture errors",
+        "ace_step": "strict guard committed; latest bootstrap cancelled before assignment; live generation not verified"
+      },
+      "limitations": [
+        "No combined multimodal job has passed end-to-end.",
+        "StorageManager must be rechecked before new shared writes.",
+        "No model training or deployment performed."
       ]
     }
   ]
