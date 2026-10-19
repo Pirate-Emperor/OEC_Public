@@ -27,6 +27,7 @@ for _entry in (str(ROOT), str(TOOLS_ROOT)):
         sys.path.insert(0, _entry)
 
 from core_config import SYSTEM_DIRS  # noqa: E402
+from storage_reserve_probe import inspect_managed_reserve  # noqa: E402
 from media_services.model_cache import MODELS_ROOT, cache_status, hf_cache_has_weights, model_targets  # noqa: E402
 from storage_manager import managed_storage_operation, storage_preflight  # noqa: E402
 
@@ -176,55 +177,55 @@ def _effective_reserve_floor(requested_gb: float) -> float:
 
 
 def _manager_directory_capacity(required_gb: float, reserve_floor_gb: float, *, resize_reserve: bool) -> dict[str, Any]:
-    """Admit against the live OEC models target, reserving positive capacity."""
+    """Admit model writes without resizing the existing allocated reserve.
+
+    StorageManager's fresh-quota preflight below the caller remains authoritative
+    for hard-quota headroom. The models target is a payload budget; adding the
+    already-allocated reserve to that payload budget double-counts the same
+    protected blocks and was rejecting cached-model workflows unnecessarily.
+    """
     status = _read_model_storage_status()
     reserve_floor_gb = _effective_reserve_floor(reserve_floor_gb)
     state, actual, target, reserve = status["state"], status["actual_gb"], status["target_gb"], status["reserve_gb"]
     if state not in {"NORMAL", "WARNING"}:
         raise RuntimeError(f"OEC models directory state is {state}; refusing new model writes")
-    projected = actual + float(required_gb) + MINIMUM_FREE_GB + reserve_floor_gb
-    if projected > target + 0.01:
-        raise RuntimeError(
-            f"models budget denied: content={actual:.2f} GB + download={required_gb:.2f} GB "
-            f"+ margin={MINIMUM_FREE_GB:.2f} GB + positive reserve={reserve_floor_gb:.2f} GB "
-            f"exceeds target={target:.2f} GB"
-        )
+
+    reserve_file = inspect_managed_reserve("models", reserve, SYSTEM_DIRS)
+    if reserve <= 0:
+        raise RuntimeError("models reserve is not positive; no reserve mutation or model download was attempted")
     if reserve + 0.1 < reserve_floor_gb:
         raise RuntimeError(
-            f"current reserve {reserve:.2f} GB is below the required positive reserve "
-            f"{reserve_floor_gb:.2f} GB; reserve growth remains quota-gated"
+            f"existing models reserve {reserve:.2f} GB is below the configured minimum {reserve_floor_gb:.2f} GB; "
+            "the downloader will not grow or shrink reserve files"
         )
 
-    resized = False
-    if resize_reserve and reserve > reserve_floor_gb + 0.1:
-        command = [sys.executable, str(ROOT / "storage_manager.py"), "--set-reserve-gb", "models",
-                   "--reserve-gb", f"{reserve_floor_gb:.3f}"]
-        proc = subprocess.run(command, cwd=str(ROOT), text=True, capture_output=True, timeout=60, check=False)
-        print("RESERVE_RESIZE_COMMAND=" + json.dumps({"returncode": proc.returncode,
-              "stdout": proc.stdout[-2000:], "stderr": proc.stderr[-2000:]}, ensure_ascii=False), flush=True)
-        if proc.returncode:
-            raise RuntimeError("sanctioned StorageManager reserve shrink failed; no model downloads were started")
-        status = _read_model_storage_status()
-        state, actual, target, reserve = status["state"], status["actual_gb"], status["target_gb"], status["reserve_gb"]
-        resized = True
-        if state not in {"NORMAL", "WARNING"} or abs(reserve - reserve_floor_gb) > 0.15:
-            raise RuntimeError(
-                f"post-resize status did not verify the reserve floor "
-                f"(state={state}, reserve={reserve:.2f} GB, requested={reserve_floor_gb:.2f} GB)"
-            )
-    # A read-only plan budgets against the reserve floor that the download command
-    # will apply through StorageManager. Only a download command actually shrinks it.
-    planned_reserve = reserve if resize_reserve else reserve_floor_gb
-    projected_after = actual + float(required_gb) + MINIMUM_FREE_GB + planned_reserve
-    if projected_after > target + 0.01:
-        raise RuntimeError(f"directory budget failed: projected={projected_after:.2f} GB target={target:.2f} GB")
-    return {"state": state, "content_gb": actual, "target_gb": target, "reserve_gb": reserve,
-            "planned_reserve_after_download_gb": planned_reserve,
-            "reserve_resize_needed": reserve > reserve_floor_gb + 0.1,
-            "required_download_gb": float(required_gb), "safety_margin_gb": MINIMUM_FREE_GB,
-            "projected_total_after_download_and_reserve_gb": projected_after,
-            "reserve_floor_gb": reserve_floor_gb, "reserve_resized": resized}
+    projected = actual + float(required_gb) + MINIMUM_FREE_GB
+    if projected > target + 0.01:
+        raise RuntimeError(
+            f"models payload budget denied: content={actual:.2f} GB + download={required_gb:.2f} GB "
+            f"+ free-space margin={MINIMUM_FREE_GB:.2f} GB exceeds target={target:.2f} GB"
+        )
 
+    # Kept in the return schema for callers; resize_reserve remains accepted for
+    # backward-compatible CLI wiring but can no longer trigger a reserve resize.
+    return {
+        "state": state,
+        "content_gb": actual,
+        "target_gb": target,
+        "reserve_gb": reserve,
+        "reserve_file": reserve_file,
+        "planned_reserve_after_download_gb": reserve,
+        "reserve_resize_needed": False,
+        "reserve_resize_requested_but_ignored": bool(resize_reserve),
+        "required_download_gb": float(required_gb),
+        "safety_margin_gb": MINIMUM_FREE_GB,
+        "projected_payload_plus_free_space_gb": projected,
+        "reserve_floor_gb": reserve_floor_gb,
+        "reserve_resized": False,
+    }
+
+
+def _storage_manager_status() -> dict[str, Any]:
 
 def _storage_manager_status() -> dict[str, Any]:
     """Invoke the existing CLI's read-only --status command; never start daemon mode."""
@@ -435,13 +436,13 @@ def main() -> int:
     plan.add_argument("--use-manager-directory-only", action="store_true",
                       help="allow directory-target admission if manager quota telemetry is unavailable")
     plan.add_argument("--reserve-floor-gb", type=float, default=40.0,
-                      help="positive models reserve to keep under the configured models target")
+                      help="minimum existing models reserve to verify; model preparation never resizes the reserve")
     download = commands.add_parser("download", help="download model files one at a time through StorageManager")
     download.add_argument("--model", choices=(*MODEL_SPECS.keys(), "all"), required=True)
     download.add_argument("--use-manager-directory-only", action="store_true",
                           help="allow directory-target admission if manager quota telemetry is unavailable")
     download.add_argument("--reserve-floor-gb", type=float, default=40.0,
-                          help="positive models reserve to keep under the configured models target")
+                          help="minimum existing models reserve to verify; model preparation never resizes the reserve")
     args = parser.parse_args()
     if args.command == "status":
         return status()

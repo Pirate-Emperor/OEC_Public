@@ -27,13 +27,15 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 MEDIA = ROOT / "tools" / "media_services"
 ENV_ROOT = Path.home() / "Conda" / "envs"
+STORAGE_CLEANUP_EVENTS: list[dict[str, Any]] = []
+
 PROVIDERS = {
     "trellis": {
         "environment": "phase2_3d",
         "script": MEDIA / "trellis_api.py",
         "port": 17868,
         "startup_timeout_seconds": 900,
-        "job_timeout_seconds": 1500,
+        "job_timeout_seconds": 900,
     },
     "ltx": {
         "environment": "phase1_ltx",
@@ -225,7 +227,9 @@ def _run_job(provider: str, url: str, out_dir: Path, timeout_seconds: int) -> di
             "filename": image_path.name,
             "prompt": "A simple amber sphere on a blue-grey studio background",
             "image_base64": base64.b64encode(image_path.read_bytes()).decode("ascii"),
-            "parameters": {"max_image_size": 512, "texture_size": 512, "decimation_target": 5000},
+            # A 5,000-triangle target stalls the TRELLIS.2 remesher on this A100.
+            # 100,000 is the previously successful OEC acceptance target; retain a reduced texture size.
+            "parameters": {"max_image_size": 512, "texture_size": 512, "decimation_target": 100_000},
         }
         expected_extension = "glb"
     else:
@@ -283,6 +287,113 @@ def _run_job(provider: str, url: str, out_dir: Path, timeout_seconds: int) -> di
     }
 
 
+def _inspect_outputs_storage_lock(python: Path, env: dict[str, str]) -> dict[str, Any]:
+    """Read the output lock/lease owner metadata through the selected OEC Python."""
+    probe = r'''
+import json
+from pathlib import Path
+import core_config
+root = Path(core_config.SYSTEM_DIRS["outputs"]).expanduser().resolve()
+lock = root / ".storage_pause.lock"
+lease = root / ".storage_lease.json"
+info = {"ok": True, "outputs_root": str(root), "lock_exists": lock.exists(),
+        "lease_manifest_exists": lease.exists()}
+if lock.is_symlink():
+    info.update(ok=False, error="pause_lock_is_symlink")
+elif lock.exists():
+    if not lock.is_file():
+        info.update(ok=False, error="pause_lock_not_regular_file")
+    else:
+        values = {}
+        for line in lock.read_text(encoding="utf-8", errors="replace").splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                values[key.strip()] = value.strip()
+        try:
+            info["owner_pid"] = int(values["pid"])
+            info["lock_time"] = float(values["time"])
+        except (KeyError, ValueError):
+            info.update(ok=False, error="pause_lock_owner_metadata_invalid")
+print("OEC_OUTPUT_LOCK_INSPECTION " + json.dumps(info, sort_keys=True))
+'''
+    checked = subprocess.run(
+        [str(python), "-c", probe],
+        cwd=ROOT, env=env, text=True, capture_output=True, timeout=20, check=False,
+    )
+    for line in reversed(checked.stdout.splitlines()):
+        if line.startswith("OEC_OUTPUT_LOCK_INSPECTION "):
+            try:
+                info = json.loads(line[len("OEC_OUTPUT_LOCK_INSPECTION "):])
+                if checked.returncode:
+                    info.update(ok=False, error="inspection_python_failed")
+                return info
+            except json.JSONDecodeError:
+                break
+    return {
+        "ok": False,
+        "error": "inspection_report_missing",
+        "returncode": checked.returncode,
+        "stderr_tail": checked.stderr[-500:],
+    }
+
+
+def _recover_owned_storage_lock(
+    process: subprocess.Popen | None,
+    python: Path,
+    env: dict[str, str],
+    service_started_unix: float,
+) -> dict[str, Any]:
+    """Resume outputs only if a dead sidecar owns the exact same-host lock.
+
+    Never clears a lease manifest, a live PID, another process's lock, or a
+    lock created before this particular sidecar launch.
+    """
+    if process is None:
+        return {"status": "NOT_APPLICABLE", "reason": "service_process_not_started"}
+    if process.poll() is None:
+        return {"status": "BLOCKED", "reason": "service_process_still_running", "pid": process.pid}
+    inspected = _inspect_outputs_storage_lock(python, env)
+    if not inspected.get("ok"):
+        return {"status": "BLOCKED", "reason": inspected.get("error", "lock_inspection_failed")}
+    if not inspected.get("lock_exists"):
+        return {"status": "NO_LOCK", "reason": "no_outputs_pause_lock_after_service_exit"}
+    if inspected.get("lease_manifest_exists"):
+        return {"status": "BLOCKED", "reason": "outputs_has_unresolved_lease_manifest"}
+    if inspected.get("owner_pid") != process.pid:
+        return {
+            "status": "BLOCKED",
+            "reason": "outputs_lock_owner_does_not_match_this_sidecar",
+            "lock_owner_pid": inspected.get("owner_pid"),
+            "sidecar_pid": process.pid,
+        }
+    lock_time = inspected.get("lock_time")
+    if not isinstance(lock_time, (int, float)) or lock_time < service_started_unix - 2:
+        return {"status": "BLOCKED", "reason": "outputs_lock_predates_this_sidecar"}
+    resume = subprocess.run(
+        [str(python), str(ROOT / "storage_manager.py"), "--resume", "outputs"],
+        cwd=ROOT, env=env, text=True, capture_output=True, timeout=30, check=False,
+    )
+    if resume.returncode:
+        return {
+            "status": "BLOCKED",
+            "reason": "StorageManager_resume_failed",
+            "returncode": resume.returncode,
+            "stderr_tail": resume.stderr[-700:],
+        }
+    after = _inspect_outputs_storage_lock(python, env)
+    if after.get("ok") and not after.get("lock_exists") and not after.get("lease_manifest_exists"):
+        return {
+            "status": "RECOVERED",
+            "reason": "StorageManager_resumed_outputs_after_confirming_the_lock_owner_was_this_dead_sidecar",
+            "sidecar_pid": process.pid,
+        }
+    return {
+        "status": "BLOCKED",
+        "reason": "outputs_lock_remained_after_StorageManager_resume",
+        "verification": after,
+    }
+
+
 def _run_provider(provider: str, python: Path, preflight: dict[str, Any],
                   report_root: Path) -> dict[str, Any]:
     cfg = PROVIDERS[provider]
@@ -304,6 +415,7 @@ def _run_provider(provider: str, python: Path, preflight: dict[str, Any],
     command = [str(python), str(cfg["script"]), "--host", "127.0.0.1", "--port", str(cfg["port"])]
     service_log = report_root / f"{provider}-service.log"
     started = time.monotonic()
+    service_started_unix = time.time()
     process = None
     try:
         with service_log.open("w", encoding="utf-8") as log:
@@ -328,9 +440,13 @@ def _run_provider(provider: str, python: Path, preflight: dict[str, Any],
                 "reason": f"{type(exc).__name__}: {exc}"}
     finally:
         _terminate_owned_process(process)
+        cleanup = _recover_owned_storage_lock(process, python, env, service_started_unix)
+        STORAGE_CLEANUP_EVENTS.append({"provider": provider, **cleanup})
+        print("OEC_STORAGE_LOCK_CLEANUP " + json.dumps({"provider": provider, **cleanup}, ensure_ascii=False), flush=True)
 
 
 def main() -> int:
+    STORAGE_CLEANUP_EVENTS.clear()
     report_root = Path(os.environ.get("OEC_VISUAL_SMOKE_DIR",
                                      str(Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "oec-visual-sidecar-smoke"))).resolve()
     report_root.mkdir(parents=True, exist_ok=True)
@@ -386,6 +502,7 @@ def main() -> int:
             "ltx": _run_provider("ltx", ltx_python, ltx_preflight, report_root)
                 if ltx_python.is_file() else {"provider": "ltx", **ltx_preflight},
         }
+        report["storage_cleanup_events"] = list(STORAGE_CLEANUP_EVENTS)
         provider_statuses = [x.get("status") for x in report["providers"].values()]
         report["passed"] = provider_statuses.count("PASS")
         report["failed"] = provider_statuses.count("FAIL")
@@ -396,6 +513,7 @@ def main() -> int:
         print("OEC_VISUAL_SIDECAR_ACCEPTANCE " + json.dumps(report, ensure_ascii=False), flush=True)
         return 1 if report["failed"] else 0
     except Exception as exc:
+        report["storage_cleanup_events"] = list(STORAGE_CLEANUP_EVENTS)
         report["status"] = "FAIL"
         report["error_type"] = type(exc).__name__
         report["error"] = str(exc)

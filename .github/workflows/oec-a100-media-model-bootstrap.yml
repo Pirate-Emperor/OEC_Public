@@ -12,6 +12,12 @@ on:
       - "tools/prepare_media_models.py"
       - "tools/prepare_ace_step_runtime.py"
       - "tools/prepare_media_runtime.py"
+      - "tools/storage_reserve_probe.py"
+      - "tools/recover_dead_storage_locks.py"
+      - "tests/test_storage_reserve_probe.py"
+      - "tests/test_prepare_media_runtime.py"
+      - "tests/test_prepare_media_models_capacity.py"
+      - "tests/test_recover_dead_storage_locks.py"
       - "tools/oec_service_manager.py"
       - "asset_status.py"
       - "qa_compliance_worker.py"
@@ -94,12 +100,16 @@ jobs:
       - name: Compile and run CPU/mock regressions before any storage writes
         run: |
           set -euo pipefail
-          "$OEC_PYTHON" -m py_compile tools/prepare_media_models.py tools/prepare_ace_step_runtime.py tools/run_media_model_smokes.py tools/media_services/common.py tools/media_services/model_cache.py tools/media_services/audio_api.py tools/media_services/smoke_client.py tools/model_cache_manager.py tests/test_media_service_api.py tests/test_audio_service_validation.py tests/test_oec_service_manager_media.py tests/test_upload_status_contract.py tests/test_ace_step_runtime.py
+          "$OEC_PYTHON" -m py_compile tools/prepare_media_models.py tools/prepare_ace_step_runtime.py tools/prepare_media_runtime.py tools/storage_reserve_probe.py tools/recover_dead_storage_locks.py tools/run_media_model_smokes.py tools/media_services/common.py tools/media_services/model_cache.py tools/media_services/audio_api.py tools/media_services/smoke_client.py tools/model_cache_manager.py tests/test_media_service_api.py tests/test_audio_service_validation.py tests/test_oec_service_manager_media.py tests/test_upload_status_contract.py tests/test_ace_step_runtime.py tests/test_storage_reserve_probe.py tests/test_prepare_media_runtime.py tests/test_prepare_media_models_capacity.py tests/test_recover_dead_storage_locks.py
           "$OEC_PYTHON" -m unittest discover -s tests -p 'test_media_service_api.py' -v
           "$OEC_PYTHON" -m unittest discover -s tests -p 'test_audio_service_validation.py' -v
           "$OEC_PYTHON" -m unittest discover -s tests -p 'test_oec_service_manager_media.py' -v
           "$OEC_PYTHON" -m unittest discover -s tests -p 'test_upload_status_contract.py' -v
           "$OEC_PYTHON" -m unittest discover -s tests -p 'test_ace_step_runtime.py' -v
+          "$OEC_PYTHON" -m unittest discover -s tests -p 'test_storage_reserve_probe.py' -v
+          "$OEC_PYTHON" -m unittest discover -s tests -p 'test_prepare_media_runtime.py' -v
+          "$OEC_PYTHON" -m unittest discover -s tests -p 'test_prepare_media_models_capacity.py' -v
+          "$OEC_PYTHON" -m unittest discover -s tests -p 'test_recover_dead_storage_locks.py' -v
 
       - name: Read current StorageManager status, log tail and cached models
         run: |
@@ -111,6 +121,7 @@ jobs:
           set -euo pipefail
           # --clean only removes expired plain pause-lock files; it preserves reserves and lease manifests.
           "$OEC_PYTHON" storage_manager.py --clean
+          "$OEC_PYTHON" tools/recover_dead_storage_locks.py outputs
           "$OEC_PYTHON" storage_manager.py --status
 
       - name: Audit existing inference environments without installing packages
