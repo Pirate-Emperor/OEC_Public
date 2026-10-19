@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-19T21:14:00+05:30",
+  "last_updated": "2026-10-19T22:38:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Latest static regression run 39278190899 passed 86 tests, compilation and four notebook JSON checks. Latest visual sidecar acceptance report in A100 run 39278268411 says PASS, TRELLIS and LTX 2/2 providers passed; ZIP artifact 12198722285 downloaded and inspected locally: GLB 2,775,928 bytes SHA-256 e7a1a970..., valid glTF 2 and reopened via trimesh (48,806 vertices, 95,566 faces, not watertight); MP4 242,547 bytes SHA-256 5d7d54de..., H.264 768x512 2.083333 s confirmed by local ffprobe. No model downloads or packages installed. GitHub overall workflow/job still returned in_progress at last API poll despite report and artifact upload; do not yet call the workflow job concluded PASS. ACE-Step generation remains blocked by no idle A100; actual Qwen2-VL decisions, real HF upload/read-after-write, single-file resumable chunking, sustained Brain→QA→upload and OEC-Play remain unverified.",
+  "latest_summary": "Latest current-head static acceptance run 39291422187 passed on SHA 85431311caf28e6e3ede293fdcc959f86419c402: 90 tests, py_compile, all four notebook JSON checks (16/15/10/6), no ResourceWarning. New explicit opt-in uploader chunk protocol now passes mocked-Hub tests for part SHA validation/reassembly, resume after a simulated upload interruption, keeping source/queue on failure, and publishing the completion manifest last. This is not a real Hugging Face upload or remote read-after-write. Visual sidecar workflow 39278268411 now concludes SUCCESS; its TRELLIS GLB and LTX MP4 were downloaded, reopened/ffprobed, and hashes recorded. Actual Qwen2-VL decision, real HF upload receipt/read-after-write, full Brain→QA→upload→OEC-Play acceptance, ACE-Step generation (no idle A100) and FLUX→TRELLIS combined path remain open.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -4398,6 +4398,108 @@
         "Storage quota values are historical; a fresh admission is required for further writes."
       ],
       "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39278268411/artifacts/12198722285"
+    },
+    {
+      "id": "EXP-2026-10-19-UPLOAD-RESUMABLE-CHUNKING-PROTOCOL",
+      "date": "2026-10-19",
+      "category": "Opt-in per-file chunk upload, integrity manifest and resume after interruption",
+      "approach": "Add a bounded `--once --asset-id ID --chunk-oversize` path for a single oversized PENDING asset. Validate the row and queued size against source files, fresh-gate status/cache writes, hash source bytes, upload deterministic parts in bounded sizes, query Hub metadata to skip pre-existing parts only when their size and SHA-256/Git blob digest match, upload the metadata JSON, publish the completion manifest last, then delete only the completed row and local source pair. Simulate Hub with a fake API and inject one network failure after part 0; retry and confirm part 0 is verified and not uploaded twice, subsequent parts resume, and the manifest is only published after all parts + metadata.",
+      "reason": "Close the earlier single-file chunk/resume implementation gap without changing normal multi-asset tar.gz batching or broadening the uploader's default behavior. Make oversized upload opt-in and integrity-verifiable instead of failing solely because it exceeds the archive limit.",
+      "parameters": {
+        "source_commit": "832b3fa41d2fd333e3627b7e6eb04aa2fa06e4f1",
+        "test_commit": "85431311caf28e6e3ede293fdcc959f86419c402",
+        "branch": "fix/media-stack-supervision-20261019",
+        "workflow_run_id": 39291422187,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39291422187",
+        "job_id": 118192741690,
+        "chunk_cli": "python hf_upload_daemon.py --once --asset-id ID --chunk-oversize",
+        "protocol": "oec-asset-chunks-v1",
+        "remote_namespace": "data/chunks/asset-{asset_id}-{full_asset_sha256}/",
+        "files": [
+          "part-000000.bin ... part-NNNNNN.bin",
+          "metadata.json",
+          "manifest.json (published last)"
+        ],
+        "manifest_fields": [
+          "schema_version/protocol/status/asset_id",
+          "original_filename/asset_bytes/asset_sha256/chunk_size_bytes",
+          "ordered parts: index/path/offset_bytes/size_bytes/sha256",
+          "metadata path/bytes/sha256",
+          "assembly directions to verify each part and full source SHA-256"
+        ],
+        "test_cases": [
+          "test_explicit_chunk_mode_uploads_parts_then_manifest_and_reassembles",
+          "test_chunk_upload_failure_keeps_source_and_rolls_selected_row_back",
+          "test_chunk_oversize_requires_explicit_bounded_cli_mode",
+          "test_targeted_batch_requires_explicit_opt_in_for_oversized_asset"
+        ],
+        "prior_debug_runs": [
+          {
+            "run_id": 39290757586,
+            "conclusion": "failure",
+            "reason": "Malformed Python context-manager continuation in initial added tests; no behavior test ran."
+          },
+          {
+            "run_id": 39291119869,
+            "conclusion": "failure",
+            "reason": "Initial small-chunk fixture had metadata larger than test chunk size and old test assertion expected the former one-shot CLI call."
+          },
+          {
+            "run_id": 39291171278,
+            "conclusion": "failure",
+            "reason": "The first retry test invocation did not patch storage admission for the retry call; CLI assertion remained stale."
+          },
+          {
+            "run_id": 39291398540,
+            "conclusion": "failure",
+            "reason": "One legacy oversized-row assertion still expected 'chunking is not implemented' after the implementation became opt-in."
+          }
+        ]
+      },
+      "environment": {
+        "runner": "GitHub-hosted CI, Python 3.11.17",
+        "gpu": "not used",
+        "hub": "FakeHub; no credentials or real repository contacted"
+      },
+      "results": {
+        "status": "PASS_STATIC_MOCKED_RESUME",
+        "workflow_status": "success",
+        "tests_in_full_suite": 90,
+        "suite_counts": {
+          "trellis_notebook": 12,
+          "trellis_cli": 5,
+          "audiocraft_notebook": 6,
+          "storage_write_admission": 6,
+          "inference_storage_integration": 7,
+          "brain_ltx_queue": 5,
+          "upload_status_contract": 5,
+          "upload_daemon_storage": 11,
+          "storage_manager": 10,
+          "storage_policy": 10,
+          "quota_snapshot": 7,
+          "storage_reservation": 6
+        },
+        "py_compile": "PASS",
+        "notebook_json": "PASS (16/15/10/6 cells)",
+        "resource_warnings": "NONE",
+        "simulated_failure_and_retry": "PASS",
+        "verified_part_skip": "PASS",
+        "ordered_manifest_publication": "PASS",
+        "per_part_sha256_and_reassembly": "PASS",
+        "selected_row_failure_rollback_and_local_source_retention": "PASS",
+        "real_huggingface_upload": "NOT_RUN",
+        "remote_read_after_write": "NOT_RUN",
+        "remote_large_asset_consumer_reassembly": "NOT_RUN"
+      },
+      "interpretation": "The code now supports explicit, resumable per-file chunk uploads and passes the current hosted static/mock test suite. A failed upload returns only the selected row to PENDING and preserves local sources. Retrying consults Hub metadata to reuse an existing remote part only when size and content digest can be verified; otherwise it safely re-uploads that chunk. Manifest publication is the completion marker and happens after the parts and metadata. This is not yet proven against a real approved dataset or a downstream consumer, so no live remote-upload acceptance is claimed.",
+      "limitations": [
+        "Only --once --asset-id --chunk-oversize can select chunk mode; continuous daemon behavior and default tar.gz archive batching are unchanged.",
+        "The Hub API behavior is mocked. No live auth, remote dataset commit, post-upload list/download, or content hash verification occurred.",
+        "No active production upload queue/database was used.",
+        "No actual Qwen2-VL media policy decision or joined Brain→worker→QA→upload→OEC-Play job was performed.",
+        "The visual sidecar outputs use synthetic input/prompt and TRELLIS mesh is not watertight."
+      ],
+      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39291422187"
     }
   ]
 }
