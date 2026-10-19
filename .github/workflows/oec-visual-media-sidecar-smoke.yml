@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - feat/media-service-sidecars-20261018
+      - fix/media-stack-supervision-20261019
     paths:
       - ".github/workflows/oec-visual-media-sidecar-smoke.yml"
       - "tools/run_visual_media_sidecar_smokes.py"
@@ -85,6 +86,14 @@ jobs:
           set -euo pipefail
           "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy \
             python storage_manager.py --status 2>&1 | tee "$RUNNER_TEMP/oec-visual-storage-status.log"
+
+      - name: Recover expired plain pause locks via StorageManager only
+        run: |
+          set -euo pipefail
+          # Remove only expired plain pause locks; reserve files and unresolved lease manifests remain protected.
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python storage_manager.py --clean
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy \
+            python storage_manager.py --status 2>&1 | tee "$RUNNER_TEMP/oec-visual-storage-status-after-clean.log"
 
       - name: Test each visual sidecar in isolation without model downloads
         run: |
