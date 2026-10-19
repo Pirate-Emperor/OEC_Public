@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-19T18:28:04+05:30",
+  "last_updated": "2026-10-19T19:54:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "AudioGen and standalone TRELLIS/LTX inference passed. MusicGen contract tests passed 4/4 but generation failed before inference because the checkpoint cache was incomplete and runner network access to Hugging Face failed. FLUX→TRELLIS tests failed before inference on two test-fixture path errors. ACE-Step strict cache guard is committed but not live-verified. Actions quota gate was withdrawn by the user; StorageManager admission remains.",
+  "latest_summary": "Current static regression workflow 39268510242 passed 66 tests, compilation, and four notebook JSON checks. QA physical-GPU-before-Torch source guard passed. Latest live FLUX→TRELLIS and ACE-Step inference attempts were blocked by no eligible idle A100; no PNG/GLB or ACE audio was produced. Kokoro, Whisper and Qwen3-ASR live-smoke passed. MusicGen remains cache/egress blocked. Full Brain→QA→archive→HF upload and individual-file chunking remain unverified.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -3485,6 +3485,199 @@
         "StorageManager must be rechecked before new shared writes.",
         "No model training or deployment performed."
       ]
+    },
+    {
+      "id": "EXP-2026-10-19-OEC-STATIC-GPU-GUARD-AND-REGRESSION-39268510242",
+      "date": "2026-10-19",
+      "category": "Static and offline regression validation for model-path safety, media-service storage, and QA GPU isolation",
+      "approach": "Run the branch-scoped storage-admission workflow on hosted Python 3.11.17. Execute the repository's TRELLIS notebook/CLI, AudioCraft notebook, storage-write admission, inference/storage integration, StorageManager, StoragePolicy, quota snapshot, and storage reservation suites, then compile key sources and validate notebook JSON.",
+      "reason": "Verify new QA physical-GPU selection ordering and the FLUX path-guard fixture repair without allocating A100s or weakening storage safety.",
+      "parameters": {
+        "workflow_run_id": 39268510242,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39268510242",
+        "job_id": 118114323063,
+        "branch": "fix/media-stack-supervision-20261019",
+        "commit_sha": "d655b25c7eded5976890e717e611c9add8d127e1",
+        "runner": "GitHub-hosted",
+        "python": "3.11.17",
+        "suites": {
+          "trellis_notebook_static": 12,
+          "trellis_cli_easy_run": 5,
+          "audiocraft_notebook_static": 6,
+          "storage_write_admission": 6,
+          "inference_storage_integration": 4,
+          "storage_manager": 10,
+          "storage_policy": 10,
+          "quota_snapshot": 7,
+          "storage_reservation": 6
+        },
+        "compile_sources": [
+          "qa_compliance_worker.py",
+          "tests/test_inference_storage_integration.py",
+          "pipeline_trellis_3d.py",
+          "storage_manager.py",
+          "storage_policy.py",
+          "storage_reservation.py",
+          "tools/quota_snapshot.py"
+        ],
+        "notebooks": [
+          {
+            "path": "pipeline_trellis_3d.ipynb",
+            "cells": 16
+          },
+          {
+            "path": "pipeline_trellis_3d_only.ipynb",
+            "cells": 15
+          },
+          {
+            "path": "pipeline_flux_only.ipynb",
+            "cells": 10
+          },
+          {
+            "path": "pipeline_audiocraft.ipynb",
+            "cells": 6
+          }
+        ]
+      },
+      "environment": {
+        "runner": "GitHub-hosted",
+        "execution_type": "CPU/static; no GPU inference"
+      },
+      "results": {
+        "status": "PASS",
+        "total_tests": 66,
+        "failed_tests": 0,
+        "py_compile": "PASS",
+        "notebook_json": "PASS",
+        "qa_gpu_order_test": "PASS",
+        "production_inference": "NOT_RUN"
+      },
+      "interpretation": "This verifies static contracts and unit-level behavior, including that QA chooses CUDA_VISIBLE_DEVICES before importing Torch. It does not verify live Qwen2-VL QA, model quality, or the end-to-end production workflow.",
+      "limitations": [
+        "No live inference was performed by this CPU/static workflow.",
+        "No live QA compliance decision or media upload was performed.",
+        "Current branch remains unmerged."
+      ],
+      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39268510242"
+    },
+    {
+      "id": "EXP-2026-10-19-FLUX-TRELLIS-LIVE-ACCEPTANCE-39267211597",
+      "date": "2026-10-19",
+      "category": "Cache-only FLUX image generation to TRELLIS GLB conversion acceptance",
+      "approach": "Run current-branch FLUX and FLUX-to-TRELLIS offline contracts on the assigned oec-1 phase2_3d environment, capture StorageManager status, then invoke the real pipeline smoke and save run-scoped diagnostics.",
+      "reason": "Confirm corrected output-path regressions and acquire real PNG→GLB evidence from the current pipeline.",
+      "parameters": {
+        "workflow_run_id": 39267211597,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39267211597",
+        "job_id": 118111510929,
+        "branch": "fix/media-stack-supervision-20261019",
+        "commit_sha": "e5e4018bf7fcf46622fd7eacd029adc42a0d71aa",
+        "runner": "oec-1",
+        "environment": "phase2_3d",
+        "width": 512,
+        "height": 512,
+        "steps": 4,
+        "tests": {
+          "flux_image_pipeline": 7,
+          "flux_trellis_pipeline": 5
+        },
+        "storage_snapshot": {
+          "source": "live LFS quota as emitted by run",
+          "group_used_tb": 2.04,
+          "group_hard_tb": 2.1,
+          "hard_headroom_gb": 61.03,
+          "grace_active": true,
+          "models_actual_gb": 232.81,
+          "models_target_gb": 280,
+          "outputs_actual_mb": 294.17,
+          "outputs_target_gb": 1024
+        },
+        "artifact_id": 12194310008,
+        "artifact_url": "https://github.com/CalamityStriker/OEC/actions/runs/39267211597/artifacts/12194310008"
+      },
+      "environment": {
+        "runner": "oec-1",
+        "host_label": "oec-1",
+        "gpu": "NVIDIA A100-SXM4-40GB",
+        "conda_environment": "phase2_3d"
+      },
+      "results": {
+        "status": "BLOCKED_NO_IDLE_A100",
+        "contract_tests": "PASS",
+        "live_inference": "NOT_STARTED",
+        "error": "RuntimeError: no eligible idle A100; no process was killed or signalled",
+        "png_produced": false,
+        "glb_produced": false,
+        "artifact_kind": "diagnostic logs/status only"
+      },
+      "interpretation": "The test fixture regressions are repaired and the pipeline reaches its actual entry point. Live inference correctly failed closed because no eligible idle A100 was available. This is not a generation pass.",
+      "limitations": [
+        "No generated image or GLB from this run.",
+        "Storage values are historical run telemetry and do not authorize later writes.",
+        "No process was signalled or killed."
+      ],
+      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39267211597/artifacts/12194310008"
+    },
+    {
+      "id": "EXP-2026-10-19-SPEECH-AND-ACE-STEP-BOOTSTRAP-39268082165",
+      "date": "2026-10-19",
+      "category": "Live speech model smoke plus isolated ACE-Step runtime/bootstrap",
+      "approach": "Use the authorized oec-1 bootstrap workflow to run offline regressions, cache-only Kokoro/Whisper/Qwen3-ASR inference, then validate ACE-Step checkpoint completeness, pinned source revision, isolated environment and a required live generation smoke.",
+      "reason": "Record each provider separately and determine whether ACE-Step is genuinely runnable rather than treating checkpoint presence as inference acceptance.",
+      "parameters": {
+        "workflow_run_id": 39268082165,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39268082165",
+        "job_id": 118112826187,
+        "branch": "fix/media-stack-supervision-20261019",
+        "commit_sha": "8c75fcc4cb86981e3f208a5d0d5ae58e1e1fe9a1",
+        "runner": "oec-1",
+        "speech_providers": {
+          "kokoro": {
+            "status": "PASS",
+            "startup_plus_inference_seconds": 22.45
+          },
+          "whisper": {
+            "status": "PASS",
+            "startup_plus_inference_seconds": 18.47
+          },
+          "qwen3_asr": {
+            "status": "PASS",
+            "startup_plus_inference_seconds": 20.45
+          }
+        },
+        "ace_step": {
+          "checkpoint_root": "AIEROS_MODELS_DIR/ace-step-1.5",
+          "checkpoint_groups_complete": true,
+          "source_revision": "ca1e85fe9430179831e6bc6be790c332190a3866",
+          "source_root": "AIEROS_CACHE_DIR/third_party/ACE-Step-1.5",
+          "runtime_root": "~/.local/venvs/oec-acestep-py311",
+          "actual_python": "3.12",
+          "torch": "2.10.0+cu128",
+          "cuda": "12.8",
+          "shared_torch_mutated": false
+        }
+      },
+      "environment": {
+        "runner": "oec-1",
+        "gpu": "NVIDIA A100-SXM4-40GB",
+        "ace_runtime_cuda_available": true
+      },
+      "results": {
+        "status": "PARTIAL_PASS_ACE_INFERENCE_BLOCKED",
+        "speech_smokes": 3,
+        "speech_failures": 0,
+        "ace_runtime_bootstrap": "PASS",
+        "ace_generation": "BLOCKED_NO_IDLE_A100",
+        "ace_process_started": false,
+        "music_artifact_produced": false
+      },
+      "interpretation": "Three speech models passed live smoke in the isolated media runtime. ACE-Step checkpoints and runtime passed readiness checks, but its generation did not start because the runner could not admit an idle A100.",
+      "limitations": [
+        "No ACE-Step generated audio from this run.",
+        "One controlled speech acceptance per model does not establish broad quality or coverage.",
+        "MusicGen is separate and remains blocked before inference by incomplete cache and failed Hugging Face proxy connectivity."
+      ],
+      "artifact": null
     }
   ]
 }
