@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-19T06:26:15Z",
+  "last_updated": "2026-10-19T16:27:18.503+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "A100 run 39209090292 completed successfully on self-hosted oec-1: 35 compile/mock/media/supervisor/SQLite regression tests passed; StorageManager cleanup and isolated speech runtime preparation passed; Kokoro, Whisper Turbo and Qwen3-ASR all passed live CUDA smoke on one generated WAV. Audio outputs and text transcripts were saved under configured AIEROS outputs. ACE-Step was skipped because acestep is absent in all checked environments. Visual sidecar run 39209706982 is running after adding StorageManager-owned stale pause-lock cleanup. Production OEC-Play server health and a continuous Brain-to-worker-to-QA-to-uploader run remain unverified.",
+  "latest_summary": "Current branch 21f576b774e25c7766d7c2876b793366918f0436: AudioGen live A100 smoke run 39240127736 passed on oec-1 (3.0 s mono 16 kHz PCM WAV, 96,078 bytes, SHA-256 6be1acb0cf36cacfc5ba4464ebbecb7f6f3bbe46f8e1e3bdbf88f2eef80bde3b; 26.737 s generation; peak allocated/reserved VRAM 5.155/5.385 GiB); six static notebook tests passed. Current TRELLIS/LTX acceptance run 39240127757 is in progress; bootstrap run 39240127730 was cancelled before job assignment and carries no test/inference evidence. ACE-Step music and a fresh current-head FLUX smoke remain outstanding.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -3370,6 +3370,89 @@
         "ACE-Step music generation remains unaccepted pending isolated runtime provisioning and a live artifact.",
         "No persistent inference process was left running; the harness stopped each temporary service after its smoke.",
         "The full Brain-to-LTX-worker-to-QA-to-uploader path and production OEC-Play health remain separate acceptance gates."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-19-AUDIOGEN-LIVE-ACCEPTANCE-39240127736",
+      "category": "Live CUDA AudioGen notebook inference on current OEC model-pipeline branch",
+      "method": "Executed all code cells of pipeline_audiocraft.ipynb in the headless acceptance harness, verified cached model load, generated one fixed-prompt WAV, validated format, duration, sample rate, levels and hash, then reopened the WAV from the Actions artifact and checked the SHA-256.",
+      "rationale": "Re-validate AudioGen on the corrected OEC model-pipeline commit and preserve a reproducible output plus runner and resource evidence.",
+      "parameters": {
+        "workflow_run_id": 39240127736,
+        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/39240127736",
+        "job_id": 118018656307,
+        "commit_sha": "21f576b774e25c7766d7c2876b793366918f0436",
+        "branch": "fix/media-stack-supervision-20261019",
+        "model_id": "facebook/audiogen-medium",
+        "model_revision_snapshot": "1277dd7dfd8fa57a205a70acc5de0ee90804502f",
+        "executed_notebook_code_cells": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "dependency_changes": 0,
+        "model_downloads": 0,
+        "shared_outputs_written": false
+      },
+      "environment": {
+        "runner": "oec-1",
+        "hostname": "scn30-mn",
+        "gpu": "NVIDIA A100-SXM4-40GB",
+        "visible_cuda_device_count": 8,
+        "actual_device": "cuda:0",
+        "python_environment": "Conda phase1",
+        "torch": "2.1.0+cu118",
+        "cuda": "11.8",
+        "audiocraft": "1.3.0",
+        "gradio": "4.44.1",
+        "numpy": "1.26.4",
+        "transformers": "4.39.3"
+      },
+      "results": {
+        "status": "PASS",
+        "offline_notebook_tests": {
+          "passed": 6,
+          "failed": 0
+        },
+        "audio_bytes": 96078,
+        "audio_sha256": "6be1acb0cf36cacfc5ba4464ebbecb7f6f3bbe46f8e1e3bdbf88f2eef80bde3b",
+        "format": "WAV PCM uncompressed",
+        "duration_seconds": 3,
+        "sample_rate_hz": 16000,
+        "channels": 1,
+        "sample_width_bytes": 2,
+        "frames": 48000,
+        "generation_seconds": 26.737,
+        "notebook_execution_seconds": 174.056,
+        "peak_cuda_allocated_gib": 5.155,
+        "peak_cuda_reserved_gib": 5.385,
+        "storage_pre_and_post_checks": "PASS",
+        "artifact_id": 12181271517,
+        "artifact_url": "https://github.com/Killer4K-N/OEC/actions/runs/39240127736/artifacts/12181271517",
+        "artifact_zip_sha256": "a08d5c8e69ab1093a22f18d41773f98ee4dbd54528f89b9377c9024339d2cf53",
+        "pip_check_warning": "thinc 8.3.6 declares numpy>=2.0.0 but this pinned AudioCraft environment has numpy 1.26.4; no packages were changed",
+        "live_storage_snapshot": {
+          "models_actual_gb": 219.97,
+          "models_target_gb": 280,
+          "models_reserve_gb": 60.04,
+          "outputs_actual_mb": 290.02,
+          "outputs_target_gb": 1,
+          "outputs_reserve_mb": 734.41,
+          "group_quota_used_tb": 2.03,
+          "group_quota_soft_tb": 2,
+          "group_quota_hard_tb": 2.1,
+          "group_quota_hard_headroom_gb": 69.26,
+          "grace_active": true
+        }
+      },
+      "limitations": [
+        "One fixed-prompt clip establishes runtime and artifact validity, not broad audio-quality or prompt-coverage claims.",
+        "AudioGen remains a notebook one-shot, not yet a persistent audio-api provider.",
+        "ACE-Step has not yet produced a live music artifact; bootstrap run 39240127730 was cancelled before a job was assigned.",
+        "The current TRELLIS/LTX live acceptance run 39240127757 is in progress at the time of this record.",
+        "pip check reports a thinc/NumPy version conflict; no shared packages were changed."
       ]
     }
   ]

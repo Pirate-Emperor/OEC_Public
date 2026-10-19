@@ -1,6 +1,19 @@
 
 # OEC Active TODO
 
+
+
+## 2026-10-19 — Current model-pipeline status (2026-10-19T16:27:18.503+05:30)
+
+- [x] AudioGen was accepted on the current model-pipeline commit. Run [39240127736](https://github.com/Killer4K-N/OEC/actions/runs/39240127736), job [118018656307](https://github.com/Killer4K-N/OEC/actions/runs/39240127736/job/118018656307). All five notebook code cells ran; cached facebook/audiogen-medium loaded on oec-1 / scn30-mn (NVIDIA A100-SXM4-40GB). A 3.0-second mono 16 kHz PCM WAV was generated in 26.737 seconds: 96,078 bytes, SHA-256 6be1acb0cf36cacfc5ba4464ebbecb7f6f3bbe46f8e1e3bdbf88f2eef80bde3b. Peak allocated/reserved VRAM was 5.155/5.385 GiB. Artifact [12181271517](https://github.com/Killer4K-N/OEC/actions/runs/39240127736/artifacts/12181271517).
+- [x] All six AudioCraft notebook static tests and the pre/post StorageManager steps passed. The model cache was hit and no shared outputs were written. The downloaded WAV was independently reopened and its format, duration, rate, frame count and SHA matched the report.
+- [x] Lease-boundary fixes and read-only audio reserve preflight are committed at [21f576b7](https://github.com/Killer4K-N/OEC/commit/21f576b774e25c7766d7c2876b793366918f0436). This commit also adds an API-level TRELLIS remesh option; the standalone generator retains its original remesh-on default.
+- [ ] Visual acceptance [run 39240127757](https://github.com/Killer4K-N/OEC/actions/runs/39240127757) is in progress on this commit. Do not launch another job while it holds the shared A100/storage concurrency group. Accept TRELLIS only after a GLB is produced and reopened; accept LTX only after a playable MP4 is produced and validated.
+- [ ] Bootstrap run [39240127730](https://github.com/Killer4K-N/OEC/actions/runs/39240127730) was cancelled before job assignment. It has no tests or inference evidence. Run the speech/music bootstrap only after the visual run reaches a terminal state. ACE-Step still needs an actual music output.
+- [ ] Run a fresh FLUX PNG inference on the current branch after the serial A100 queue clears. The older successful FLUX-to-TRELLIS run is historical evidence, not current-head verification.
+- [ ] AudioGen is still a notebook one-shot, not a persistent API. MusicGen is a separate model and has non-commercial weight terms; keep it separate from the commercial path. Prioritize ACE-Step for music acceptance.
+- Environment warning: pip check reports thinc 8.3.6 wants NumPy >=2.0.0 while the pinned AudioCraft environment has NumPy 1.26.4. AudioGen passed, and no packages were changed.
+
 ## 2026-10-18 — Latest live acceptance, visual sidecar fixes, and full-pipeline follow-up
 
 - [x] **AudioGen is completed and accepted.** A100/phase1 run [39135140674](https://github.com/Killer4K-N/OEC/actions/runs/39135140674) executed notebook code cells 1–5, hit the existing `facebook/audiogen-medium` cache, loaded the model and generated a valid 3-second mono 16 kHz WAV (96,078 bytes). Generation took 20.763 s; peak allocated VRAM was 5.155 GiB. The acceptance report records SHA-256 `d4cd48e45890ec2668321a6dfbf95b3e57f3541b9d7cb414afe484cd349805cc`. Artifact: [run output and logs](https://github.com/Killer4K-N/OEC/actions/runs/39135140674/artifacts/12140085687).

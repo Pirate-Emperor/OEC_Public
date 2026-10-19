@@ -12,3 +12,13 @@
 - Next gates: execute the new tests via an already-approved $0 route, check fresh quota and identify the exact StorageManager lease owner, then stage one cache-only model at a time and validate real artifacts. Do not bypass or purge an active manager lease.
 
 - Follow-up: aligned worker_ltx_video.py's schema default to PENDING and added a static contract regression; tests not executed, existing DB untouched.
+
+## 2026-10-19T16:27:18.503+05:30 — AudioGen accepted on current model-pipeline commit; TRELLIS/LTX retest running
+
+- Batched lease-boundary fix committed on fix/media-stack-supervision-20261019 at 21f576b774e25c7766d7c2876b793366918f0436. TRELLIS/LTX adapters no longer keep an outer StorageManager lease open across inference, TRELLIS exposes a remesh flag for the bounded smoke, the audio reserve preflight no longer attempts reserve resizing, and regression tests cover the changes.
+- A100 AudioGen run [39240127736](https://github.com/Killer4K-N/OEC/actions/runs/39240127736), job [118018656307](https://github.com/Killer4K-N/OEC/actions/runs/39240127736/job/118018656307), completed PASS on oec-1 / scn30-mn. All five code cells ran, six static notebook tests passed, and the cache hit was facebook/audiogen-medium. Generated WAV: 96,078 bytes, 3 seconds, mono, 16 kHz, SHA-256 6be1acb0cf36cacfc5ba4464ebbecb7f6f3bbe46f8e1e3bdbf88f2eef80bde3b. Generation 26.737 seconds; peak CUDA allocated/reserved memory 5.155/5.385 GiB. Artifact [12181271517](https://github.com/Killer4K-N/OEC/actions/runs/39240127736/artifacts/12181271517). The final StorageManager check passed; no shared output was written.
+- Live quota remained WARNING: models 219.97/280 GB with 60.04 GB reserve; outputs 290.02 MB/1 GB with 734.41 MB reserve. Group quota recorded 2.03 TB used against 2.10 TB hard limit, with 69.26 GB hard headroom and grace active. This is timestamped evidence, not future admission approval.
+- pip check warns thinc 8.3.6 requests NumPy >=2.0.0 while the pinned phase1 environment uses NumPy 1.26.4. AudioGen inference passed; no packages were changed.
+- Current visual retest [39240127757](https://github.com/Killer4K-N/OEC/actions/runs/39240127757) is in progress on the same commit. The bootstrap attempt [39240127730](https://github.com/Killer4K-N/OEC/actions/runs/39240127730) was cancelled before job assignment due the shared concurrency group; it has no test or inference result. Do not trigger the bootstrap until the visual run reaches a terminal state.
+- Next: validate current-head TRELLIS GLB and LTX MP4, run one real output for Kokoro/Whisper/Qwen3-ASR/ACE-Step, then a fresh current-head FLUX PNG smoke. Treat MusicGen separately because its weights are non-commercially licensed.
+

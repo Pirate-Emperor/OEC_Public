@@ -1,3 +1,11 @@
+## 2026-10-19 — AudioGen live inference re-accepted on the current OEC model branch
+
+Run [39240127736](https://github.com/Killer4K-N/OEC/actions/runs/39240127736), job [118018656307](https://github.com/Killer4K-N/OEC/actions/runs/39240127736/job/118018656307), completed successfully on oec-1 / scn30-mn, commit [21f576b774e25c7766d7c2876b793366918f0436](https://github.com/Killer4K-N/OEC/commit/21f576b774e25c7766d7c2876b793366918f0436). The headless AudioCraft notebook ran all five code cells, loaded the cached facebook/audiogen-medium model and generated a 3-second mono 16 kHz PCM WAV. Generation time: 26.737 seconds; output 96,078 bytes; SHA-256 6be1acb0cf36cacfc5ba4464ebbecb7f6f3bbe46f8e1e3bdbf88f2eef80bde3b; peak VRAM 5.155 GiB allocated / 5.385 GiB reserved. The six notebook static tests passed. Artifact: [12181271517](https://github.com/Killer4K-N/OEC/actions/runs/39240127736/artifacts/12181271517). The WAV was independently reopened and matched the report’s hash, length, rate and duration.
+
+The same commit removes nested StorageManager lease scopes during TRELLIS/LTX generation, adds a boolean remesh option to the TRELLIS API (disabled for the fast smoke only; standalone default remains unchanged), makes audio output-reserve preflight read-only, and adds no-GPU regression tests. Current visual acceptance [run 39240127757](https://github.com/Killer4K-N/OEC/actions/runs/39240127757) is in progress; the TRELLIS and LTX model paths are not yet accepted on this commit. Bootstrap run 39240127730 was cancelled before job assignment and provides no test/inference evidence.
+
+The live StorageManager report showed models at 219.97/280 GB with a 60.04 GB reserve and outputs at 290.02 MB/1 GB with a 734.41 MB reserve. Group quota showed 2.03 TB used against a 2.10 TB hard limit with 69.26 GB headroom under active grace. These are captured readings, not approval for later writes. pip check also warns that thinc 8.3.6 requests NumPy >=2.0.0 while the pinned AudioCraft environment uses NumPy 1.26.4; no package was changed.
+
 # OEC Significant Results
 
 ## 2026-10-18 follow-up — guarded model downloads and live acceptance tools
