@@ -171,7 +171,32 @@ jobs:
         if: success()
         run: |
           set -euo pipefail
-          "$OEC_PYTHON" tools/prepare_ace_step_runtime.py install
+          # ACE-Step requires a Python 3.11–3.12 interpreter. The generic storage helper
+          # may select an older (e.g. Python 3.9) Conda environment, so select a compatible
+          # existing interpreter explicitly rather than installing/upgrading shared Conda.
+          ACE_BASE_PYTHON=""
+          for candidate in \
+            "$HOME/Conda/envs/oec_deploy/bin/python" \
+            "$HOME/Conda/envs/phase1_ltx/bin/python" \
+            "$HOME/Conda/envs/phase2_3d/bin/python" \
+            "$HOME/Conda/envs/phase1/bin/python"; do
+            [[ -x "$candidate" ]] || continue
+            version="$("$candidate" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || true)"
+            case "$version" in
+              3.11|3.12)
+                ACE_BASE_PYTHON="$candidate"
+                echo "ACE_STEP_BOOTSTRAP_PYTHON=$candidate"
+                echo "ACE_STEP_BOOTSTRAP_PYTHON_VERSION=$version"
+                break
+                ;;
+            esac
+          done
+          if [[ -z "$ACE_BASE_PYTHON" ]]; then
+            echo "::error::ACE-Step requires an existing Python 3.11–3.12 interpreter; no compatible Conda environment was found. No shared environment was modified."
+            exit 2
+          fi
+          "$ACE_BASE_PYTHON" -c 'import sys; assert (3, 11) <= sys.version_info[:2] < (3, 13)'
+          "$ACE_BASE_PYTHON" tools/prepare_ace_step_runtime.py install
 
       - name: Required ACE-Step CUDA music-generation acceptance
         if: success()
