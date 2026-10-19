@@ -28,6 +28,7 @@ for _entry in (str(ROOT), str(TOOLS_ROOT)):
 
 from core_config import SYSTEM_DIRS  # noqa: E402
 from storage_reserve_probe import inspect_managed_reserve  # noqa: E402
+from prepare_ace_step_runtime import checkpoint_component_complete, selected_main_components_complete  # noqa: E402
 from media_services.model_cache import MODELS_ROOT, cache_status, hf_cache_has_weights, model_targets  # noqa: E402
 from storage_manager import managed_storage_operation, storage_preflight  # noqa: E402
 
@@ -127,9 +128,9 @@ def _is_complete(model: str) -> bool:
         return _sha256(target) == WHISPER_MODELS["turbo"][0].split("/")[-2]
     if model == "ace-step-main":
         root = MODEL_SPECS[model]["target"]
-        return all(_has_weights(root / name) for name in ("acestep-v15-turbo", "vae", "Qwen3-Embedding-0.6B"))
+        return selected_main_components_complete(root)
     if model == "ace-step-lm-0.6b":
-        return _has_weights(MODEL_SPECS[model]["target"])
+        return checkpoint_component_complete(MODEL_SPECS[model]["target"], "acestep-5Hz-lm-0.6B")
     return False
 
 

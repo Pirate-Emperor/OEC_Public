@@ -25,6 +25,38 @@ REQUIRED_CHECKPOINT_DIRS = (
     "acestep-5Hz-lm-0.6B",
 )
 
+# A non-empty file or Git-LFS pointer is not proof of a complete checkpoint.
+# Floors below are intentionally conservative against the public ACE-Step 1.5
+# artifacts (DiT 4.79 GB, VAE 337 MB, Qwen embedding 1.19 GB, 0.6B LM 1.33 GB).
+# Check file sizes rather than hashing multi-gigabyte weights at every service boot.
+CHECKPOINT_LAYOUT: dict[str, dict[str, Any]] = {
+    "acestep-v15-turbo": {
+        "weight_file": "model.safetensors",
+        "min_weight_bytes": 4_700_000_000,
+        "required_files": ("config.json",),
+    },
+    "vae": {
+        "weight_file": "diffusion_pytorch_model.safetensors",
+        "min_weight_bytes": 330_000_000,
+        "required_files": ("config.json",),
+    },
+    "Qwen3-Embedding-0.6B": {
+        "weight_file": "model.safetensors",
+        "min_weight_bytes": 1_000_000_000,
+        "required_files": ("config.json", "tokenizer.json"),
+    },
+    "acestep-5Hz-lm-0.6B": {
+        "weight_file": "model.safetensors",
+        "min_weight_bytes": 1_300_000_000,
+        "required_files": ("config.json", "tokenizer.json"),
+    },
+}
+SELECTED_MAIN_COMPONENT_DIRS = (
+    "acestep-v15-turbo",
+    "vae",
+    "Qwen3-Embedding-0.6B",
+)
+
 
 def build_paths(home: Path, cache_root: Path, models_root: Path) -> dict[str, Path]:
     """Return distinct code, environment, cache and model roots."""
@@ -70,13 +102,50 @@ def has_weights(folder: Path) -> bool:
     return False
 
 
+def checkpoint_component_complete(component_root: Path, component_name: str) -> bool:
+    """Require the expected weight filename, plausible byte length and supporting config files."""
+    layout = CHECKPOINT_LAYOUT.get(component_name)
+    if layout is None:
+        return False
+    component_root = Path(component_root).expanduser()
+    if component_root.is_symlink() or not component_root.is_dir():
+        return False
+    weight_path = component_root / str(layout["weight_file"])
+    if weight_path.is_symlink() or not weight_path.is_file():
+        return False
+    try:
+        if weight_path.stat().st_size < int(layout["min_weight_bytes"]):
+            return False
+        for relative_name in layout["required_files"]:
+            required_path = component_root / str(relative_name)
+            if required_path.is_symlink() or not required_path.is_file() or required_path.stat().st_size <= 0:
+                return False
+    except OSError:
+        return False
+    return True
+
+
+def selected_main_components_complete(model_root: Path) -> bool:
+    """Validate the DiT, VAE and text encoder OEC selected, excluding the unused 1.7B LM."""
+    model_root = Path(model_root).expanduser()
+    if model_root.is_symlink() or not model_root.is_dir():
+        return False
+    return all(
+        checkpoint_component_complete(model_root / name, name)
+        for name in SELECTED_MAIN_COMPONENT_DIRS
+    )
+
+
 def checkpoint_status(model_root: Path) -> dict[str, Any]:
-    """Check every model folder required by this ACE-Step adapter."""
+    """Check the exact complete checkpoint files required by the OEC ACE-Step adapter."""
     model_root = model_root.expanduser()
     if model_root.is_symlink() or not model_root.is_dir():
         missing = list(REQUIRED_CHECKPOINT_DIRS)
         return {"root": str(model_root), "complete": False, "missing": missing}
-    missing = [name for name in REQUIRED_CHECKPOINT_DIRS if not has_weights(model_root / name)]
+    missing = [
+        name for name in REQUIRED_CHECKPOINT_DIRS
+        if not checkpoint_component_complete(model_root / name, name)
+    ]
     return {"root": str(model_root), "complete": not missing, "missing": missing}
 
 

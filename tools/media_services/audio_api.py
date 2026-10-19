@@ -139,6 +139,55 @@ class AudioProvider(MediaProvider):
         return "cpu"
 
     def _load_ace_step(self, device: str) -> None:
+        checkpoint_root = MODELS_ROOT / "ace-step-1.5"
+        if not self.allow_download:
+            from tools.prepare_ace_step_runtime import (
+                checkpoint_component_complete,
+                checkpoint_status,
+                selected_main_components_complete,
+            )
+            status = checkpoint_status(checkpoint_root)
+            if not status["complete"]:
+                raise ModelNotReady(
+                    "ACE-Step cache-only startup requires complete, validated checkpoint files under "
+                    f"{checkpoint_root}; incomplete groups: {', '.join(status['missing'])}"
+                )
+            if self.ace_config != "acestep-v15-turbo" or self.ace_lm != "acestep-5Hz-lm-0.6B":
+                raise ModelNotReady(
+                    "ACE-Step cache-only mode is configured for the validated turbo DiT and 0.6B LM only"
+                )
+
+            # OEC uses the separate 0.6B LM and intentionally omits the upstream
+            # bundle's 1.7B LM. Upstream's default completeness check demands that
+            # unused 1.7B folder and auto-downloads the entire bundle if it is absent.
+            # Narrow the check to the fully validated selected components and deny
+            # every fallback downloader in cache-only mode.
+            import acestep.core.generation.handler.init_service_downloads as ace_downloads
+
+            def _selected_main_exists(candidate_root=None):
+                return selected_main_components_complete(Path(candidate_root or checkpoint_root))
+
+            def _selected_dit_exists(model_name, candidate_root=None):
+                if model_name != self.ace_config:
+                    return False
+                return checkpoint_component_complete(
+                    Path(candidate_root or checkpoint_root) / model_name, model_name
+                )
+
+            def _deny_upstream_download(*_args, **_kwargs):
+                raise RuntimeError(
+                    "OEC cache-only policy blocked ACE-Step auto-download; "
+                    "complete checkpoints via tools/prepare_media_models.py under StorageManager"
+                )
+
+            ace_downloads.check_main_model_exists = _selected_main_exists
+            ace_downloads.check_model_exists = _selected_dit_exists
+            ace_downloads.ensure_main_model = _deny_upstream_download
+            ace_downloads.ensure_dit_model = _deny_upstream_download
+            ace_downloads.ensure_vae_model = _deny_upstream_download
+            print("ACE_STEP_CACHE_ONLY_GUARD=active selected_lm=acestep-5Hz-lm-0.6B upstream_auto_download=disabled",
+                  flush=True)
+
         if ACE_STEP_SOURCE_ROOT is None or not (
             (ACE_STEP_SOURCE_ROOT / "pyproject.toml").is_file()
             and (ACE_STEP_SOURCE_ROOT / "acestep").is_dir()
@@ -151,16 +200,6 @@ class AudioProvider(MediaProvider):
         from acestep.handler import AceStepHandler
         from acestep.llm_inference import LLMHandler
         from acestep.inference import GenerationParams, GenerationConfig, generate_music
-        checkpoint_root = MODELS_ROOT / "ace-step-1.5"
-        if not self.allow_download:
-            required = (checkpoint_root / self.ace_config, checkpoint_root / "vae",
-                        checkpoint_root / "Qwen3-Embedding-0.6B", checkpoint_root / self.ace_lm)
-            missing = [path.name for path in required if not _has_model_weights(path)]
-            if missing:
-                raise ModelNotReady(
-                    "ACE-Step cache-only startup requires complete checkpoints under "
-                    f"{checkpoint_root}; missing weight folders: {', '.join(missing)}"
-                )
         dit = AceStepHandler()
         dit_status, dit_ok = dit.initialize_service(
             project_root=str(ACE_STEP_SOURCE_ROOT), config_path=self.ace_config, device=device, offload_to_cpu=False

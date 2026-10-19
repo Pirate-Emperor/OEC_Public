@@ -4,6 +4,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tools import prepare_ace_step_runtime as runtime
 
@@ -43,20 +44,59 @@ class AceStepRuntimeTests(unittest.TestCase):
             self.assertTrue(paths["source_root"].is_relative_to(paths["cache_root"]))
             self.assertTrue(paths["model_root"].is_relative_to(paths["models_root"]))
 
-    def test_checkpoint_status_requires_all_four_model_groups(self):
-        with tempfile.TemporaryDirectory() as tmp:
+    @staticmethod
+    def _small_checkpoint_layout():
+        return {
+            name: {**spec, "min_weight_bytes": 8}
+            for name, spec in runtime.CHECKPOINT_LAYOUT.items()
+        }
+
+    @staticmethod
+    def _write_component(root: Path, name: str, weight_bytes: int = 8) -> Path:
+        layout = runtime.CHECKPOINT_LAYOUT[name]
+        folder = root / name
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / layout["weight_file"]).write_bytes(b"x" * weight_bytes)
+        for required_file in layout["required_files"]:
+            (folder / required_file).write_text("{}", encoding="utf-8")
+        return folder
+
+    def test_checkpoint_status_requires_all_four_complete_model_groups(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            runtime.CHECKPOINT_LAYOUT, self._small_checkpoint_layout()
+        ):
             root = Path(tmp) / "ace-step-1.5"
             for folder in runtime.REQUIRED_CHECKPOINT_DIRS:
-                target = root / folder
-                target.mkdir(parents=True)
-                (target / "weights.safetensors").write_bytes(b"checkpoint")
+                self._write_component(root, folder)
             status = runtime.checkpoint_status(root)
             self.assertTrue(status["complete"])
             self.assertEqual(status["missing"], [])
-            (root / "vae" / "weights.safetensors").unlink()
+            (root / "vae" / runtime.CHECKPOINT_LAYOUT["vae"]["weight_file"]).unlink()
             status = runtime.checkpoint_status(root)
             self.assertFalse(status["complete"])
             self.assertEqual(status["missing"], ["vae"])
+
+    def test_partial_turbo_checkpoint_is_not_marked_complete(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            runtime.CHECKPOINT_LAYOUT, self._small_checkpoint_layout()
+        ):
+            root = Path(tmp) / "ace-step-1.5"
+            for folder in runtime.REQUIRED_CHECKPOINT_DIRS:
+                self._write_component(root, folder)
+            self._write_component(root, "acestep-v15-turbo", weight_bytes=7)
+            status = runtime.checkpoint_status(root)
+            self.assertFalse(status["complete"])
+            self.assertEqual(status["missing"], ["acestep-v15-turbo"])
+
+    def test_selected_main_components_do_not_require_unused_bundled_17b_lm(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            runtime.CHECKPOINT_LAYOUT, self._small_checkpoint_layout()
+        ):
+            root = Path(tmp) / "ace-step-1.5"
+            for folder in runtime.SELECTED_MAIN_COMPONENT_DIRS:
+                self._write_component(root, folder)
+            self.assertTrue(runtime.selected_main_components_complete(root))
+            self.assertFalse((root / "acestep-5Hz-lm-1.7B").exists())
 
     def test_empty_files_do_not_count_as_checkpoint_weights(self):
         with tempfile.TemporaryDirectory() as tmp:

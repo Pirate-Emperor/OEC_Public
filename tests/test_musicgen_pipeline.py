@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 import pipeline_musicgen as musicgen
 
 
@@ -27,10 +28,13 @@ class MusicGenPipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)/"outputs"
             root.mkdir()
-            self.assertEqual(musicgen._output_path(root/"audio"/"music.wav",False,1),
-                             (root/"audio"/"music.wav").resolve())
-            with self.assertRaises(ValueError):
-                musicgen._output_path(Path(tmp)/"outside.wav",False,1)
+            # _output_path consults the configured OEC outputs root. Point that
+            # setting at the fixture instead of weakening production containment.
+            with mock.patch.dict(musicgen.SYSTEM_DIRS, {"outputs": str(root)}):
+                self.assertEqual(musicgen._output_path(root/"audio"/"music.wav",False,1),
+                                 (root/"audio"/"music.wav").resolve())
+                with self.assertRaises(ValueError):
+                    musicgen._output_path(Path(tmp)/"outside.wav",False,1)
 
 if __name__ == "__main__":
     unittest.main()
