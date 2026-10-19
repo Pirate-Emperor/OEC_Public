@@ -56,6 +56,29 @@ class FluxImagePipelineTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 flux._output_path(out, True, 1)
 
+    def test_existing_managed_metadata_sidecar_prevents_overwrite(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "outputs"
+            root.mkdir()
+            out = root / "images" / "existing.png"
+            out.parent.mkdir()
+            out.with_suffix(".info.json").write_text("{}", encoding="utf-8")
+            with mock.patch.dict(flux.SYSTEM_DIRS, {"outputs": str(root)}):
+                with self.assertRaises(FileExistsError):
+                    flux._output_path(out, False, 1)
+
+    def test_managed_output_rejects_symlink_escape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "outputs"
+            root.mkdir()
+            outside = Path(tmp) / "outside"
+            outside.mkdir()
+            link = root / "images"
+            link.symlink_to(outside, target_is_directory=True)
+            with mock.patch.dict(flux.SYSTEM_DIRS, {"outputs": str(root)}):
+                with self.assertRaises(ValueError):
+                    flux._output_path(link / "escaped.png", False, 1)
+
 
 if __name__ == "__main__":
     unittest.main()
