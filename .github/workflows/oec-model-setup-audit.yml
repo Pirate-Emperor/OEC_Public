@@ -130,16 +130,49 @@ jobs:
               python = prefix / "bin" / "python"
               row = {"name": name, "prefix": str(prefix), "python": str(python), "present": python.is_file()}
               if python.is_file():
-                  code = "import importlib.util,json,sys; mods=" + repr(modules) + "; print(json.dumps({'python':sys.version.split()[0],'packages':{m:bool(importlib.util.find_spec(m)) for m in mods},'executable':sys.executable},sort_keys=True))"
+                  code = """import importlib.util, importlib.metadata, json, sys
+mods = %r
+dists = ["torch", "transformers", "qwen-vl-utils", "huggingface-hub", "torchvision", "av"]
+versions = {}
+for dist in dists:
+    try: versions[dist] = importlib.metadata.version(dist)
+    except importlib.metadata.PackageNotFoundError: versions[dist] = None
+print(json.dumps({"python": sys.version.split()[0], "packages": {m: bool(importlib.util.find_spec(m)) for m in mods}, "versions": versions, "executable": sys.executable}, sort_keys=True))
+""" % repr(modules)
                   try:
                       check = subprocess.run([str(python), "-c", code], text=True, capture_output=True, timeout=20, check=False)
                       row.update({"returncode": check.returncode, "report": check.stdout.strip(), "stderr_tail": check.stderr[-1000:] if check.returncode else ""})
+                      try:
+                          presence = json.loads(check.stdout).get("packages", {})
+                      except Exception:
+                          presence = {}
+                      if presence.get("torch") and presence.get("transformers") and presence.get("qwen_vl_utils"):
+                          qwen_probe = "from transformers import Qwen2VLForConditionalGeneration, AutoProcessor; from qwen_vl_utils import process_vision_info; print('QWEN2VL_IMPORT=PASS')"
+                          try:
+                              qp = subprocess.run([str(python), "-c", qwen_probe], text=True, capture_output=True, timeout=60, check=False)
+                              row["qwen2vl_import_probe"] = {"returncode": qp.returncode, "stdout": qp.stdout[-1500:], "stderr_tail": qp.stderr[-1500:] if qp.returncode else ""}
+                          except Exception as exc:
+                              row["qwen2vl_import_probe"] = {"error": type(exc).__name__ + ": " + str(exc)}
                   except Exception as exc: row["probe_error"] = type(exc).__name__ + ": " + str(exc)
               rows.append(row)
           print(json.dumps({"matched_environment_count": len(rows), "environments": rows, "no_environment_created_or_modified": True}, indent=2, sort_keys=True))
           PY
           run_capture all-conda-env-package-inventory "$OEC_PYTHON" "$OEC_MODEL_AUDIT_DIR/inventory_conda_envs.py" "$HOME/Conda/condabin/conda"
           run_capture model-cache-manager-status "$OEC_PYTHON" tools/model_cache_manager.py status
+          cat > "$OEC_MODEL_AUDIT_DIR/probe_qwen_cache.py" <<'PY'
+          import json, sys
+          from pathlib import Path
+          from core_config import SYSTEM_DIRS
+          from huggingface_hub import snapshot_download
+          repo = "Qwen/Qwen2-VL-7B-Instruct"
+          try:
+              path = Path(snapshot_download(repo_id=repo, cache_dir=SYSTEM_DIRS["models"], local_files_only=True))
+              files = [p.name for p in path.iterdir() if p.is_file()]
+              print(json.dumps({"status":"CACHE_READY","repo_id":repo,"snapshot_path":str(path),"file_count":len(files),"has_config":"config.json" in files,"has_safetensors":any(n.endswith(".safetensors") for n in files)}, sort_keys=True))
+          except Exception as exc:
+              print(json.dumps({"status":"MISSING_OR_INCOMPLETE","repo_id":repo,"error_type":type(exc).__name__,"error":str(exc)[:1200]}, sort_keys=True))
+          PY
+          run_capture qwen2vl-local-cache-probe env HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 "$OEC_PYTHON" "$OEC_MODEL_AUDIT_DIR/probe_qwen_cache.py"
           # Strict authoritative quota only: intentionally do not pass --use-manager-directory-only.
           run_capture aggregate-model-preflight "$OEC_PYTHON" tools/prepare_media_models.py plan --preflight
           "$OEC_PYTHON" - "$OEC_MODEL_AUDIT_DIR/report.json" <<'PY'
@@ -152,7 +185,7 @@ jobs:
           for name in (
               "gpu-before", "compute-processes-before", "storage-manager-status",
               "model-preparation-status", "existing-environment-audit",
-              "selected-runtime-package-inventory", "all-conda-env-package-inventory", "model-cache-manager-status",
+              "selected-runtime-package-inventory", "all-conda-env-package-inventory", "model-cache-manager-status", "qwen2vl-local-cache-probe",
               "aggregate-model-preflight",
           ):
               try:
