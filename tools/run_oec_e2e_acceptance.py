@@ -263,6 +263,7 @@ def main() -> int:
         repo, api = verify_hf_target()
         report["hf_target"] = {"configured": True, "existing_dataset": True, "authenticated": True}
         before_paths = set(api.list_repo_files(repo_id=repo, repo_type="dataset"))
+        report["remote_dataset_files_before"] = len(before_paths)
         visual_dir = report_root / "visual"
         sidecar_env = {
             **os.environ,
@@ -340,6 +341,7 @@ def main() -> int:
             ).fetchone()
         if qa_outcome == "REJECTED":
             report["status"] = "QA_POLICY_REJECTED"
+            report["finished_unix"] = time.time()
             report["note"] = "A complete QA rejection is recorded; upload was correctly not attempted."
             write_json(report_root / "pipeline-report.json", report)
             return 2
@@ -395,8 +397,11 @@ def main() -> int:
             "repo_existing_verified": True,
             "manifest_path": manifest_remote,
         }
+        # The uploader deletes the selected local files only after remote completion.
+        # Use the pre-upload byte count retained in the report, not the deleted path.
+        expected_asset_bytes = int(report["qa_passed_asset"]["asset_bytes"])
         readback = remote_chunk_readback(
-            api, repo, report_root, asset_sha, metadata_sha, asset_path.stat().st_size
+            api, repo, report_root, asset_sha, metadata_sha, expected_asset_bytes
         )
         report["remote_read_after_write"] = readback
         with sqlite3.connect(run_db) as conn:
