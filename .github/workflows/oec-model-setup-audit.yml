@@ -68,6 +68,7 @@ jobs:
             if "$py" -c 'import core_config, huggingface_hub; from storage_manager import storage_preflight, managed_storage_operation' >/dev/null 2>&1; then
               selected="$py"
               echo "SELECTED_ENV=$name"
+              echo "OEC_SELECTED_ENV=$name" >> "$GITHUB_ENV"
               break
             fi
           done
@@ -112,6 +113,9 @@ jobs:
           run_capture storage-manager-status "$OEC_PYTHON" storage_manager.py --status
           run_capture model-preparation-status "$OEC_PYTHON" tools/prepare_media_models.py status
           run_capture existing-environment-audit "$OEC_PYTHON" tools/prepare_media_models.py env-audit
+          # Inventory relevant package presence only; do not load pipelines or allocate CUDA tensors.
+          run_capture selected-runtime-package-inventory "$OEC_PYTHON" -c 'import importlib.util,json,sys; mods=["torch","huggingface_hub","transformers","qwen_vl_utils","diffusers","accelerate","soundfile","whisper","kokoro","qwen_asr","acestep","trimesh","PIL"]; print(json.dumps({"python":sys.version.split()[0],"executable":sys.executable,"packages":{m:bool(importlib.util.find_spec(m)) for m in mods}},sort_keys=True))'
+          run_capture model-cache-manager-status "$OEC_PYTHON" tools/model_cache_manager.py status
           # Strict authoritative quota only: intentionally do not pass --use-manager-directory-only.
           run_capture aggregate-model-preflight "$OEC_PYTHON" tools/prepare_media_models.py plan --preflight
           "$OEC_PYTHON" - "$OEC_MODEL_AUDIT_DIR/report.json" <<'PY'
@@ -119,21 +123,62 @@ jobs:
           root = pathlib.Path(sys.argv[1]).parent
           report_path = pathlib.Path(sys.argv[1])
           report = json.loads(report_path.read_text())
+          report["selected_python_env"] = __import__("os").environ.get("OEC_SELECTED_ENV", "unknown")
           checks = {}
           for name in (
               "gpu-before", "compute-processes-before", "storage-manager-status",
-              "model-preparation-status", "existing-environment-audit", "aggregate-model-preflight",
+              "model-preparation-status", "existing-environment-audit",
+              "selected-runtime-package-inventory", "model-cache-manager-status",
+              "aggregate-model-preflight",
           ):
               try:
                   checks[name] = int((root / f"{name}.exit_code").read_text().strip())
               except Exception:
                   checks[name] = None
           report["checks"] = checks
-          report["preflight_passed"] = checks["aggregate-model-preflight"] == 0
+          def find_json(log_name, wanted_key):
+              text = (root / f"{log_name}.log").read_text(encoding="utf-8", errors="replace")
+              decoder = json.JSONDecoder()
+              for pos, char in enumerate(text):
+                  if char != "{":
+                      continue
+                  try:
+                      value, _ = decoder.raw_decode(text[pos:])
+                  except json.JSONDecodeError:
+                      continue
+                  if isinstance(value, dict) and wanted_key in value:
+                      return value
+              return None
+          plan = find_json("aggregate-model-preflight", "missing_models")
+          if plan is None:
+              plan = find_json("model-preparation-status", "models_root")
+          if plan is not None and "missing_models" in plan:
+              missing = plan.get("missing_models", [])
+              required = float(plan.get("estimated_remaining_download_gb", 0.0))
+              report["model_inventory"] = {
+                  "models_root": plan.get("models_root"),
+                  "missing_models": missing,
+                  "estimated_remaining_download_gb": required,
+                  "all_required_checkpoint_groups_cached": len(missing) == 0,
+              }
+              if not missing:
+                  report["download_preflight_status"] = "NOT_REQUIRED_ALL_TARGET_CHECKPOINTS_CACHED"
+                  report["storage_download_preflight_performed"] = False
+              else:
+                  aggregate = find_json("aggregate-model-preflight", "aggregate_preflight_ok")
+                  report["download_preflight_status"] = (
+                      "PASS" if aggregate and aggregate.get("aggregate_preflight_ok") is True
+                      else "BLOCKED_OR_FAILED"
+                  )
+                  report["storage_download_preflight_performed"] = aggregate is not None
+          else:
+              report["download_preflight_status"] = "UNKNOWN_PLAN_REPORT_UNPARSEABLE"
+              report["storage_download_preflight_performed"] = False
           report["model_download_decision"] = "NOT_AUTHORIZED_IN_THIS_AUDIT"
           report["notes"] = [
               "This workflow is read-only with respect to shared model/cache/output contents.",
-              "A positive preflight is necessary but does not trigger or authorize downloads in this workflow.",
+              "All required target checkpoint groups being cached means no download admission was needed; do not mislabel this as a positive storage-write preflight.",
+              "If any model is missing, the strict aggregate preflight must pass before a separate authorized download operation.",
               "Missing/stale quota telemetry remains fail-closed; filesystem free space is not a substitute.",
           ]
           report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
