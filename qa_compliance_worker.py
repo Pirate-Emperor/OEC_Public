@@ -12,7 +12,6 @@ import shutil
 import glob
 import signal
 import argparse
-import torch
 import traceback
 import random
 from pathlib import Path
@@ -76,9 +75,14 @@ except ImportError:
 class QANode:
     def __init__(self, gpu_id=0, purge_after_load=True):
         self.gpu_id = str(gpu_id)
+        if not self.gpu_id.isdigit():
+            raise ValueError("gpu_id must be a non-negative physical GPU index")
         self.purge_after_load = purge_after_load
+        # Set physical-device visibility before the first Torch import.
         os.environ["CUDA_VISIBLE_DEVICES"] = self.gpu_id
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        import torch
+        self.torch = torch
+        self.device = "cuda" if self.torch.cuda.is_available() else "cpu"
         self.processor = None
         self.model = None
         self.repo_id = "Qwen/Qwen2-VL-7B-Instruct"
@@ -144,6 +148,7 @@ class QANode:
             os.environ["HF_HUB_OFFLINE"] = offline_status
 
     def load_vlm(self):
+        torch = self.torch
         print(f"[QA-NODE-GPU{self.gpu_id}] Initializing Qwen2-VL-7B-Instruct for Strict Compliance Checking...")
         from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
         
@@ -278,8 +283,8 @@ def sweep_stuck_jobs(db_path):
     except Exception as e:
         print(f"[QA-NODE] Failed to sweep DB: {e}")
 
-def process_qa_queue(purge_after_load=True):
-    qa = QANode(gpu_id=0, purge_after_load=purge_after_load)
+def process_qa_queue(purge_after_load=True, gpu_id=0):
+    qa = QANode(gpu_id=gpu_id, purge_after_load=purge_after_load)
     
     sweep_stuck_jobs(QUEUE_DB_PATH)
     
@@ -381,8 +386,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="QA & Compliance Worker Node")
     parser.add_argument("--purge", action="store_true", help="Purge model from disk after loading into VRAM (Default)")
     parser.add_argument("--no-purge", dest="purge", action="store_false", help="Keep model on disk after loading")
+    parser.add_argument("--gpu", type=int, default=0, help="Physical GPU index selected before importing Torch")
     parser.set_defaults(purge=True)
     args = parser.parse_args()
     
     print("[SYSTEM] Starting QA Compliance Worker...")
-    process_qa_queue(purge_after_load=args.purge)
+    process_qa_queue(purge_after_load=args.purge, gpu_id=args.gpu)
