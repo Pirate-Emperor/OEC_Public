@@ -101,7 +101,13 @@ class AssetQueue:
 # ==============================================================================
 
 class HFUploadDaemon:
-    def __init__(self, auto_confirm: bool = False):
+    def __init__(
+        self,
+        auto_confirm: bool = False,
+        *,
+        cleanup_on_start: bool = True,
+        create_repo_if_missing: bool = True,
+    ):
         self.api = HfApi()
         self.batch_limit_bytes = UPLOAD_BATCH_SIZE_GB * (1024**3)
         self.partial_batch_max_age_seconds = max(
@@ -133,12 +139,18 @@ class HFUploadDaemon:
         signal.signal(signal.SIGINT, self._shutdown_handler)
         signal.signal(signal.SIGTERM, self._shutdown_handler)
         
-        # 2. Clean up any leftover tarballs from a previous crash
-        self._cleanup_orphaned_tarballs()
+        # Full-daemon startup may recover stale queue/cache state. Targeted one-shot
+        # mode must not mutate unrelated archives or ARCHIVING rows.
+        if cleanup_on_start:
+            self._cleanup_orphaned_tarballs()
         
         # Ensure repo exists with explicit confirmation
         try:
             if not self.api.repo_exists(repo_id=HF_DATASET_REPO, repo_type="dataset"):
+                if not create_repo_if_missing:
+                    raise RuntimeError(
+                        "configured dataset repository does not exist; targeted --once mode never creates remote repositories"
+                    )
                 if not auto_confirm:
                     print(f"\n[WARNING] The Hugging Face Dataset repository '{HF_DATASET_REPO}' does NOT exist.")
                     response = input("Would you like to create this repository now? (y/n): ")
