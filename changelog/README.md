@@ -1,7 +1,7 @@
 # OEC Work Changelog
 
 - [2026-10-19 — model inference handoff and Actions quota update](CHANGELOG-2026-10-19.md)
-  - Current checkpoint: AudioGen and standalone TRELLIS/LTX passed on A100; MusicGen failed before inference due to missing cached weights and Hugging Face proxy access; FLUX→TRELLIS failed pre-inference on two path-test fixture errors; ACE-Step strict cache guard is committed but not yet live-verified. The user withdrew the former $0-only Actions requirement after quota reset. See the daily record and [`TODO.md`](../TODO.md) for next steps.
+  - **Latest checkpoint 19:54 IST:** OEC static/storage run [39268510242](https://github.com/Killer4K-N/OEC/actions/runs/39268510242) passed 66 tests, compilation, and four notebook JSON checks; QA physical-GPU selection is statically tested. Current FLUX→TRELLIS run [39267211597](https://github.com/Killer4K-N/OEC/actions/runs/39267211597) passed 7+5 contract tests but refused live inference due to no eligible idle A100. Bootstrap [39268082165](https://github.com/Killer4K-N/OEC/actions/runs/39268082165) passed Kokoro/Whisper/Qwen3-ASR smoke and ACE-Step runtime preparation, but ACE music generation hit the same GPU gate. MusicGen remains network/cache-blocked. Upload uses size/age-flushed multi-asset tar.gz batches; individual-asset resumable chunking and the full Brain→QA→HF upload are unverified. The user withdrew the former $0-only Actions restriction; StorageManager admission remains mandatory. See the daily record and [`TODO.md`](../TODO.md).
 
 Daily engineering records live here. Use the local Asia/Kolkata date in each filename. Append work to the current day's file while the date remains the same; create a new `CHANGELOG-YYYY-MM-DD.md` on the next date.
 
