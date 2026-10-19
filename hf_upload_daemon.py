@@ -259,80 +259,85 @@ class HFUploadDaemon:
             return batch_ids, batch_files, current_size, True
         return [], [], 0, False
 
-    def process_queue(self):
-        logging.info("Daemon started. Polling queue in background...")
+    def process_queue(
+        self,
+        *,
+        max_batches: int | None = None,
+        asset_id: int | None = None,
+    ) -> int:
+        if max_batches is not None and max_batches < 1:
+            raise ValueError("max_batches must be positive when supplied")
+        if asset_id is not None and (isinstance(asset_id, bool) or asset_id < 1):
+            raise ValueError("asset_id must be a positive integer")
+        if max_batches is not None and asset_id is None:
+            raise ValueError("bounded upload mode requires an explicit --asset-id")
+
+        logging.info("Daemon started. Polling upload queue...")
+        processed_batches = 0
         while self.is_running:
-            batch_ids, tar_path, batch_forced = [], None, False
-            
+            batch_ids, batch_files, tar_path = [], [], None
             try:
-                batch_ids, batch_files, total_size, batch_forced = self._get_pending_batch()
-                
+                batch_ids, batch_files, total_size, batch_forced = self._get_pending_batch(
+                    asset_id=asset_id,
+                    force_flush=max_batches is not None,
+                )
                 if not batch_ids:
-                    # Short sleep loop so it responds to Ctrl+C quickly
-                    for _ in range(60): 
-                        if not self.is_running: break
+                    if max_batches is not None:
+                        raise RuntimeError("targeted upload produced no eligible batch")
+                    for _ in range(60):
+                        if not self.is_running:
+                            break
                         time.sleep(1)
                     continue
-                
+
                 if batch_forced:
                     logging.info(
-                        f"Timed partial flush: packing {len(batch_ids)//2} asset pairs "
-                        f"({total_size / (1024**3):.2f} GB)..."
+                        "Timed/targeted partial flush: packing %s asset pair(s) (%.2f GB)...",
+                        len(batch_ids), total_size / (1024**3),
                     )
                 else:
                     logging.info(
-                        f"Batch threshold reached! Packing {len(batch_ids)//2} asset pairs "
-                        f"({total_size / (1024**3):.2f} GB)..."
+                        "Batch threshold reached! Packing %s asset pair(s) (%.2f GB)...",
+                        len(batch_ids), total_size / (1024**3),
                     )
-                
                 with sqlite3.connect(self.db_path) as conn:
-                    conn.execute(f"UPDATE assets SET status = 'ARCHIVING' WHERE id IN ({','.join(map(str, batch_ids))})")
-                
-                # Extract metadata from the first JSON file in the batch to name the archive
-                asset_type = "mixed"
-                model_name = "multi_model"
+                    conn.execute(
+                        f"UPDATE assets SET status = 'ARCHIVING' WHERE id IN ({','.join(map(str, batch_ids))})"
+                    )
+
+                asset_type, model_name = "mixed", "multi_model"
                 try:
-                    # batch_files are paired: [asset_path, json_path, asset_path, json_path...]
-                    first_json = batch_files[1]
-                    with open(first_json, 'r') as f:
-                        meta = json.load(f)
-                        asset_type = meta.get("output_type", "mixed")
-                        model_name = meta.get("model_type", "multi_model").replace("/", "-")
+                    with open(batch_files[1], "r", encoding="utf-8") as handle:
+                        meta = json.load(handle)
+                    asset_type = meta.get("output_type", "mixed")
+                    model_name = meta.get("model_type", "multi_model").replace("/", "-")
                 except Exception:
                     pass
-                
-                # Construct highly descriptive timestamp-first filename
+
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 size_mb = int(total_size / (1024**2))
-                num_pairs = len(batch_ids)
-                start_id = batch_ids[0]
-                
-                tar_name = f"{timestamp}_batch_{start_id}_{num_pairs}items_{size_mb}MB_{asset_type}_{model_name}.tar.gz"
-                tar_path = os.path.join(SYSTEM_DIRS["cache"], tar_name)
-
-                archive_budget_bytes = int(
-                    total_size * self.archive_headroom_factor
-                    + 128 * 1024 * 1024
+                tar_name = (
+                    f"{timestamp}_batch_{batch_ids[0]}_{len(batch_ids)}items_"
+                    f"{size_mb}MB_{asset_type}_{model_name}.tar.gz"
                 )
-                archive_budget_gb = archive_budget_bytes / (1024**3)
+                tar_path = os.path.join(SYSTEM_DIRS["cache"], tar_name)
+                archive_budget_bytes = int(
+                    total_size * self.archive_headroom_factor + 128 * 1024 * 1024
+                )
                 ok, reason = storage_preflight_path(
                     SYSTEM_DIRS["cache"],
-                    required_gb=archive_budget_gb,
+                    required_gb=archive_budget_bytes / (1024**3),
                     require_fresh_quota=True,
                     minimum_free_gb=self.archive_min_free_gb,
                 )
                 if not ok:
-                    raise RuntimeError(
-                        f"Archive storage admission denied: {reason}"
-                    )
+                    raise RuntimeError(f"Archive storage admission denied: {reason}")
 
                 with tarfile.open(tar_path, "w:gz") as tar:
                     for file_path in batch_files:
                         tar.add(file_path, arcname=Path(file_path).name)
-                
-                logging.info(f"Archive created. Uploading {tar_name} to Hugging Face...")
-                
-                # --- FIX 3: EXPONENTIAL BACKOFF FOR HPC PROXY DROPS ---
+                logging.info("Archive created. Uploading %s to Hugging Face...", tar_name)
+
                 upload_success = False
                 for attempt in range(5):
                     try:
@@ -340,40 +345,55 @@ class HFUploadDaemon:
                             path_or_fileobj=tar_path,
                             path_in_repo=f"data/{tar_name}",
                             repo_id=HF_DATASET_REPO,
-                            repo_type="dataset"
+                            repo_type="dataset",
                         )
                         upload_success = True
                         break
                     except Exception as upload_err:
-                        sleep_time = 30 * (attempt + 1) # Waits 30s, 60s, 90s...
-                        logging.warning(f"Proxy stuttered on attempt {attempt+1}. Waiting {sleep_time}s to recover... Error: {upload_err}")
-                        if not self.is_running: break
+                        if max_batches is not None:
+                            raise ConnectionError(
+                                "targeted one-shot Hugging Face upload failed; selected row will be rolled back to PENDING"
+                            ) from upload_err
+                        sleep_time = 30 * (attempt + 1)
+                        logging.warning(
+                            "Proxy upload attempt %s failed; waiting %ss: %s",
+                            attempt + 1, sleep_time, upload_err,
+                        )
+                        if not self.is_running:
+                            break
                         time.sleep(sleep_time)
-                
                 if not upload_success:
                     raise ConnectionError("Max upload retries reached due to persistent proxy timeout.")
-                
-                logging.info("Upload successful! Cleaning up local files and clearing DB...")
-                
-                for f in batch_files:
-                    if os.path.exists(f): os.remove(f)
-                if os.path.exists(tar_path): os.remove(tar_path)
-                
-                with sqlite3.connect(self.db_path) as conn:
-                    conn.execute(f"DELETE FROM assets WHERE id IN ({','.join(map(str, batch_ids))})")
-                
-            except Exception as e:
-                logging.error(f"Daemon error during batch process: {e}")
-                
-                # --- FIX 4: SAFETY ROLLBACK IF UPLOAD ULTIMATELY FAILS ---
-                if batch_ids:
-                    logging.info(f"Safety Net: Rolling back {len(batch_ids)} records to PENDING so they aren't lost.")
-                    with sqlite3.connect(self.db_path) as conn:
-                        rollback_upload_batch(conn, batch_ids)
+
+                logging.info("Upload successful! Cleaning only selected local files and database rows...")
+                for file_path in batch_files:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
                 if tar_path and os.path.exists(tar_path):
                     os.remove(tar_path)
-                    
+                with sqlite3.connect(self.db_path) as conn:
+                    conn.execute(
+                        f"DELETE FROM assets WHERE id IN ({','.join(map(str, batch_ids))})"
+                    )
+                    conn.commit()
+                processed_batches += 1
+                logging.info("Upload batch completed; processed_batches=%s", processed_batches)
+                if max_batches is not None and processed_batches >= max_batches:
+                    return processed_batches
+
+            except Exception as exc:
+                logging.error("Daemon error during batch process: %s", exc)
+                if batch_ids:
+                    logging.info("Safety net: rolling back only selected ids %s to PENDING.", batch_ids)
+                    with sqlite3.connect(self.db_path) as conn:
+                        rollback_upload_batch(conn, batch_ids)
+                        conn.commit()
+                if tar_path and os.path.exists(tar_path):
+                    os.remove(tar_path)
+                if max_batches is not None:
+                    raise
                 time.sleep(120)
+        return processed_batches
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AIEROS Hugging Face Upload Daemon")
