@@ -8,7 +8,9 @@ on:
       - feat/media-service-sidecars-20261018
       - fix/media-stack-supervision-20261019
     paths:
-      - ".github/workflows/oec-a100-media-model-bootstrap.yml"
+      # Model bootstrap is expensive and shares the A100/storage lane. Keep QA,
+      # upload/status and workflow-file-only edits on CPU contract CI; trigger this
+      # only for model/runtime/cache/storage changes that need real model acceptance.
       - "tools/prepare_media_models.py"
       - "tools/prepare_ace_step_runtime.py"
       - "tools/prepare_media_runtime.py"
@@ -19,12 +21,8 @@ on:
       - "tests/test_prepare_media_models_capacity.py"
       - "tests/test_recover_dead_storage_locks.py"
       - "tools/oec_service_manager.py"
-      - "asset_status.py"
-      - "qa_compliance_worker.py"
-      - "hf_upload_daemon.py"
       - "worker_ltx_video.py"
       - "tests/test_oec_service_manager_media.py"
-      - "tests/test_upload_status_contract.py"
       - "tools/run_media_model_smokes.py"
       - "tests/test_ace_step_runtime.py"
       - "tools/media_services/**"
