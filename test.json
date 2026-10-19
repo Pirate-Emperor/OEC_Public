@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-19T19:54:00+05:30",
+  "last_updated": "2026-10-19T20:18:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Current static regression workflow 39268510242 passed 66 tests, compilation, and four notebook JSON checks. QA physical-GPU-before-Torch source guard passed. Latest live FLUX→TRELLIS and ACE-Step inference attempts were blocked by no eligible idle A100; no PNG/GLB or ACE audio was produced. Kokoro, Whisper and Qwen3-ASR live-smoke passed. MusicGen remains cache/egress blocked. Full Brain→QA→archive→HF upload and individual-file chunking remain unverified.",
+  "latest_summary": "Latest static/upload regression run 39272166140 passed 79 CPU tests, source compilation, and four notebook JSON checks; the uploader ResourceWarning was removed by test teardown. Latest live FLUX→TRELLIS run 39271901007 passed preflight and contracts but correctly refused inference because external PID 3347078 owned a compute process on all eight A100s. No PNG/GLB. Fresh StorageManager snapshot reported 60.38 GB hard quota headroom with grace active. Speech models previously passed controlled smoke; ACE-Step live generation remains GPU blocked; MusicGen remains network/cache blocked. Real QA decision, real HF upload, individual-file resumable chunking and sustained Brain→worker→QA→upload remain unverified.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -3678,6 +3678,158 @@
         "MusicGen is separate and remains blocked before inference by incomplete cache and failed Hugging Face proxy connectivity."
       ],
       "artifact": null
+    },
+    {
+      "id": "EXP-2026-10-19-EXTENDED-QUEUE-UPLOAD-STATIC-39272166140",
+      "date": "2026-10-19",
+      "category": "Extended static regression acceptance for Brain queue, QA status and upload batching contracts",
+      "approach": "Use feature-branch storage-admission CI on hosted Python 3.11.17; run notebook/CLI/storage tests plus Brain queue, upload daemon and upload status suites, py_compile and notebook JSON checks.",
+      "reason": "Verify the end-to-end queue's source-level and disposable-SQLite contracts without allocating an A100 or contacting a live dataset repository.",
+      "parameters": {
+        "workflow_run_id": 39272166140,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39272166140",
+        "job_id": 118127020858,
+        "branch": "fix/media-stack-supervision-20261019",
+        "commit_sha": "3db0a5294e170fd61dc95f1e84b4ead4be538dd2",
+        "runner": "GitHub-hosted",
+        "python": "3.11.17",
+        "suites": {
+          "trellis_notebook_static": 12,
+          "trellis_cli_easy_run": 5,
+          "audiocraft_notebook_static": 6,
+          "storage_write_admission": 6,
+          "inference_storage_integration": 4,
+          "brain_ltx_queue_storage": 4,
+          "upload_status_contract": 5,
+          "upload_daemon_storage": 4,
+          "storage_manager": 10,
+          "storage_policy": 10,
+          "quota_snapshot": 7,
+          "storage_reservation": 6
+        },
+        "compile": "PASS",
+        "notebooks": [
+          {
+            "path": "pipeline_trellis_3d.ipynb",
+            "cells": 16
+          },
+          {
+            "path": "pipeline_trellis_3d_only.ipynb",
+            "cells": 15
+          },
+          {
+            "path": "pipeline_flux_only.ipynb",
+            "cells": 10
+          },
+          {
+            "path": "pipeline_audiocraft.ipynb",
+            "cells": 6
+          }
+        ],
+        "upload_logger_warning": "Fixed in test teardown by closing/removing the test-created FileHandler; subsequent run emitted no ResourceWarning."
+      },
+      "environment": {
+        "runner": "GitHub-hosted",
+        "execution_type": "CPU/static/disposable SQLite; no inference or HF upload"
+      },
+      "results": {
+        "status": "PASS",
+        "total_tests": 79,
+        "failed_tests": 0,
+        "py_compile": "PASS",
+        "notebook_json": "PASS",
+        "real_hf_upload": "NOT_RUN"
+      },
+      "interpretation": "This validates deterministic queue and upload contracts only. It does not establish a live QA decision, archive upload, remote receipt/read-after-write or per-file resumable chunking.",
+      "limitations": [
+        "No real Hugging Face upload or remote read-after-write.",
+        "No actual Qwen2-VL compliance inference.",
+        "No individual-file resumable chunker has been found or verified."
+      ],
+      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39272166140"
+    },
+    {
+      "id": "EXP-2026-10-19-FLUX-TRELLIS-A100-OWNERSHIP-GATE-39271901007",
+      "date": "2026-10-19",
+      "category": "Current-head cache-only FLUX image generation and TRELLIS conversion admission acceptance",
+      "approach": "Run the assigned oec-1 / phase2_3d workflow; capture GPU compute-PID ownership without command-line or environment disclosure, validate source/contracts, read fresh StorageManager status and execute the actual combined pipeline entry point with run-scoped temp/report paths.",
+      "reason": "Acquire safe current-run GPU ownership evidence and produce a real FLUX PNG plus TRELLIS GLB if an eligible idle A100 is available.",
+      "parameters": {
+        "workflow_run_id": 39271901007,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39271901007",
+        "job_id": 118126083988,
+        "branch": "fix/media-stack-supervision-20261019",
+        "workflow_patch_commit": "60b9e85f157d931498d58b2916674e1752a46b6b",
+        "runner": "oec-1",
+        "environment": "phase2_3d",
+        "shape": [
+          512,
+          512
+        ],
+        "steps": 4,
+        "diagnostic_artifact_id": 12195338666,
+        "diagnostic_artifact_url": "https://github.com/CalamityStriker/OEC/actions/runs/39271901007/artifacts/12195338666",
+        "gpu_snapshot": {
+          "device": "NVIDIA A100-SXM4-40GB",
+          "compute_pid": 3347078,
+          "user": "rahkus",
+          "parent_pid": 3345823,
+          "process_age_at_capture": "01:36:19",
+          "process_state": "Sl+",
+          "executable_label": ".../server-components/.venv/bin/python",
+          "memory_mib": {
+            "gpu0": 6280,
+            "gpu1": 416,
+            "gpu2": 416,
+            "gpu3": 416,
+            "gpu4": 416,
+            "gpu5": 416,
+            "gpu6": 416,
+            "gpu7": 416
+          },
+          "utilization_percent": 0,
+          "interpretation": "still busy by compute-PID selector; no process was killed or signalled"
+        },
+        "storage_snapshot": {
+          "quota_used_tb": 2.04,
+          "soft_limit_tb": 2,
+          "hard_limit_tb": 2.1,
+          "hard_headroom_gb": 60.38,
+          "grace_active": true,
+          "model_root_used_gb": 232.81,
+          "model_root_target_gb": 280,
+          "output_root_used_mb": 294.61,
+          "output_root_target_gb": 1
+        },
+        "test_suites": {
+          "flux_image": 7,
+          "flux_trellis": 5
+        }
+      },
+      "environment": {
+        "runner": "oec-1",
+        "gpu": "NVIDIA A100-SXM4-40GB",
+        "conda_environment": "phase2_3d"
+      },
+      "results": {
+        "status": "BLOCKED_NO_ELIGIBLE_IDLE_A100",
+        "preflight": "PASS",
+        "contract_tests": "PASS",
+        "storage_before_after": "PASS_READ_ONLY_STATUS_CAPTURE",
+        "live_inference": "REFUSED_BY_SAFE_SELECTOR",
+        "error": "RuntimeError: no eligible idle A100; no process was killed or signalled",
+        "png_produced": false,
+        "glb_produced": false,
+        "artifacts": "diagnostics only"
+      },
+      "interpretation": "The source/contracts pass and current storage telemetry are available. However, the same process PID is allocated against all eight A100s even at 0% utilization, so the safe policy denied inference. Do not treat 0% utilization as proof of an idle GPU.",
+      "limitations": [
+        "GPU ownership telemetry is a point-in-time observation and may change.",
+        "No PNG or GLB was produced.",
+        "Storage headroom is historical after this run and does not authorize future writes.",
+        "Do not terminate the process; the owning user must release the allocation normally."
+      ],
+      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39271901007/artifacts/12195338666"
     }
   ]
 }
