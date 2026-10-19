@@ -1,5 +1,7 @@
 # OEC Active TODO
 
+**Continuation entry point — 2026-10-19T15:13:52.946+05:30:** Read [`docs/Prompt.md`](docs/Prompt.md) first, then refresh the timestamped [`docs/checklist.md`](docs/checklist.md). Use [today's daily changelog](changelog/CHANGELOG-2026-10-19.md) for events. This is a navigation note; the consolidated backlog below remains authoritative. The original start date/deadline for the 15-day project window has not been established from the records inspected; do not reset the clock or invent remaining days.
+
 ## 2026-10-16 — latest notebook acceptance and frozen-weight audit
 
 - [x] Executed the actual final UI cells on designated \`oec-1\` in [run 38912593770](https://github.com/Killer4K-N/OEC/actions/runs/38912593770): FLUX-only generation, TRELLIS-only GLB generation, combined-notebook FLUX generation and combined TRELLIS app startup. Artifact: [12052395126](https://github.com/Killer4K-N/OEC/actions/runs/38912593770/artifacts/12052395126).
