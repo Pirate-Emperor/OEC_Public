@@ -122,8 +122,8 @@ class InferenceStorageIntegrationTests(unittest.TestCase):
         self.assertTrue(bounded_sweep_guards, "targeted QA must skip sweeping unrelated PROCESSING_QA rows")
         self.assertIn("WHERE id = ? AND status = 'PENDING_QA' LIMIT 1", source)
         self.assertIn("WHERE id = ? AND status = 'PROCESSING_QA'", source)
+        self.assertIn('with managed_storage_operation(\n                "outputs", required_gb=0.001, require_fresh_quota=True', source)
         self.assertIn('parser.error("--once requires --asset-id with a positive ID")', source)
-        self.assertIn('parser.error("--asset-id can only be used with "--once")', source) if False else None
         self.assertIn('parser.error("--asset-id can only be used with --once")', source)
 
     def test_qa_worker_enforces_storage_for_model_and_transcode(self):
