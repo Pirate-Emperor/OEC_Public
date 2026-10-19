@@ -1,17 +1,17 @@
 # OEC project continuation checklist
 
-**Snapshot:** 2026-10-19 19:54 IST  
+**Snapshot:** 2026-10-19 20:18 IST  
 **Branch:** `fix/media-stack-supervision-20261019` (not merged to main)  
-**Current tracked commit before this checklist:** `b3d163d9a41832df827f82f38d4f61127776f405`  
+**Static test source SHA:** `3db0a5294e170fd61dc95f1e84b4ead4be538dd2`; subsequent commits update workflow diagnostics and records. No merge to main.  
 **Target:** user requests completion by 2026-10-21. The original 15-day start/deadline has not been recovered; do not reset or guess it.
 
 Permanent instructions are in [Prompt.md](Prompt.md); current media pipeline detail is in [MODEL_PIPELINE_CONTINUATION_PROMPT.md](MODEL_PIPELINE_CONTINUATION_PROMPT.md); daily chronological record is in [the 2026-10-19 changelog](../changelog/CHANGELOG-2026-10-19.md); consolidated engineering backlog is [TODO.md](../TODO.md).
 
 ## Verified source and test state
 
-- **Static/storage tests PASS:** [run 39268510242](https://github.com/CalamityStriker/OEC/actions/runs/39268510242), job `118114323063`, commit `d655b25c7ede`, hosted runner/Python 3.11.17. 66 tests passed: TRELLIS notebook 12, TRELLIS CLI 5, AudioCraft notebook 6, storage write admission 6, inference/storage integration 4, StorageManager 10, StoragePolicy 10, quota snapshot 7, storage reservation 6. `py_compile` passed; four notebooks parsed as valid JSON with 16/15/10/6 cells.
+- **Latest static/storage tests PASS:** [run 39272166140](https://github.com/CalamityStriker/OEC/actions/runs/39272166140), job `118127020858`, commit `3db0a5294e17`, hosted runner/Python 3.11.17. **79 tests passed**: TRELLIS notebook 12, TRELLIS CLI 5, AudioCraft notebook 6, storage write admission 6, inference/storage integration 4, Brain/LTX queue 4, upload status 5, upload daemon storage 4, StorageManager 10, StoragePolicy 10, quota snapshot 7, storage reservation 6. `py_compile` passed; four notebooks parsed as valid JSON with 16/15/10/6 cells. The uploader test logger `ResourceWarning` is now cleaned up in test teardown. Static/unit tests do not prove real model inference/upload.
 - **QA GPU-selection correction:** `qa_compliance_worker.py` now sets `CUDA_VISIBLE_DEVICES` before importing Torch, supports `--gpu`, and validates non-negative physical index. Static AST test passed; live Qwen2-VL model inference remains unverified.
-- **FLUX regression suites PASS / live integration BLOCKED:** [run 39267211597](https://github.com/CalamityStriker/OEC/actions/runs/39267211597), job `118111510929`, runner `oec-1`, environment `phase2_3d`, tested SHA `e5e4018bf7fc`. FLUX tests 7/7, combined FLUX→TRELLIS contracts 5/5. Live inference refused by GPU admission (`no eligible idle A100`); no process was killed; no PNG/GLB was produced. Diagnostic artifact [12194310008](https://github.com/CalamityStriker/OEC/actions/runs/39267211597/artifacts/12194310008).
+- **Newest FLUX→TRELLIS attempt BLOCKED:** [run 39271901007](https://github.com/CalamityStriker/OEC/actions/runs/39271901007), job `118126083988`, `oec-1`/`phase2_3d`; environment/preflight, source compilation, 7 FLUX + 5 combined-pipeline contract tests, storage before/after and artifact upload succeeded. Real inference failed safely because PID `3347078`, owner `rahkus`, parent `3345823`, had a compute context on all eight A100s (0% utilization; 6,280 MiB GPU 0 and 416 MiB GPUs 1–7; process age ~1h36m). **No process was killed and no PNG/GLB was generated.** Diagnostic artifact [12195338666](https://github.com/CalamityStriker/OEC/actions/runs/39271901007/artifacts/12195338666). This is a point-in-time observation; refresh before any retry.
 - **Speech smoke PASS:** [run 39268082165](https://github.com/CalamityStriker/OEC/actions/runs/39268082165), job `118112826187` on `oec-1`. Kokoro / Whisper / Qwen3-ASR passed controlled inference with startup+inference 22.45 / 18.47 / 20.45 s.
 - **ACE-Step runtime prepared / actual generation BLOCKED:** same run confirms selected checkpoint groups and isolated source `ca1e85fe9430179831e6bc6be790c332190a3866`; actual runtime is Python 3.12, Torch 2.10.0+cu128, CUDA 12.8, A100 detected, shared Torch unchanged. Its required generation step failed closed because no idle A100 was eligible; no music file was produced.
 - **MusicGen BLOCKED before inference:** [run 39254306725](https://github.com/Killer4K-N/OEC/actions/runs/39254306725) passed 4/4 offline contracts but cached weights were incomplete and the Hugging Face proxy returned `No route to host`. No WAV; checkpoint is CC-BY-NC research-only absent separate commercial rights.
@@ -29,7 +29,7 @@ Permanent instructions are in [Prompt.md](Prompt.md); current media pipeline det
 
 ## Storage and runner safety
 
-A historical StorageManager snapshot from run 39267211597 showed 2.04/2.10 TB group hard quota, ~61.03 GB reported hard headroom under active grace, models 232.81/280 GB and outputs 294.17 MB/1 GB. It is not future write authorization. User withdrew the Actions-only $0 veto; StorageManager admission, fresh telemetry, model licensing, exact runner/env, GPU ownership and no-overlap rules remain mandatory. A GPU listing from run 39267211597 showed PID 3347078 (`server-components/.venv/bin/python`) on all eight A100s at 0% utilization; that is historical, not proof of current state. Do not kill or signal it.
+The newest StorageManager snapshot from run 39271901007 showed 2.04/2.10 TB group hard quota, 60.38 GB reported hard headroom under active grace, models 232.81/280 GB and outputs 294.17 MB/1 GB. It is not future write authorization. User withdrew the Actions-only $0 veto; StorageManager admission, fresh telemetry, model licensing, exact runner/env, GPU ownership and no-overlap rules remain mandatory. The GPU listing from run 39271901007 showed PID 3347078 (`server-components/.venv/bin/python`, user rahkus, parent 3345823, about 1h36m old) on all eight A100s at 0% utilization; that is historical, not proof of current state. Do not kill or signal it. Do not kill or signal it.
 
 ## Next acceptance gates
 
