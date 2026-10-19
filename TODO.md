@@ -1,6 +1,6 @@
 # OEC Active TODO
 
-**Continuation entry point — 2026-10-19T15:13:52.946+05:30:** Read [`docs/Prompt.md`](docs/Prompt.md) first, then refresh the timestamped [`docs/checklist.md`](docs/checklist.md). Use [today's daily changelog](changelog/CHANGELOG-2026-10-19.md) for events. This is a navigation note; the consolidated backlog below remains authoritative. The original start date/deadline for the 15-day project window has not been established from the records inspected; do not reset the clock or invent remaining days.
+**Continuation entry point — 2026-10-19T18:28:04+05:30:** Read [`docs/Prompt.md`](docs/Prompt.md) first, then refresh [`docs/checklist.md`](docs/checklist.md). For the active model-inference workstream, use [`docs/MODEL_PIPELINE_CONTINUATION_PROMPT.md`](docs/MODEL_PIPELINE_CONTINUATION_PROMPT.md). See [today's daily changelog](changelog/CHANGELOG-2026-10-19.md). The user confirmed Actions runner quota reset and removed the previous $0-only prerequisite; use Actions as needed for model setup/inference. Keep StorageManager admission and model-storage safeguards separate. The original start date/deadline for the 15-day project window remains unverified; do not guess or reset it.
 
 ## 2026-10-16 — latest notebook acceptance and frozen-weight audit
 
