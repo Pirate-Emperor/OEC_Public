@@ -1,6 +1,6 @@
 # OEC pipeline, daemons, and media-service runbook
 
-**Evidence checkpoint:** 2026-10-19T20:18+05:30, Asia/Kolkata  
+**Evidence checkpoint:** 2026-10-19T20:36+05:30, Asia/Kolkata  
 **OEC source branch:** `fix/media-stack-supervision-20261019` (current evidence; not merged to main)  
 **Scope:** OEC implementation and verification. OEC-Deploy is read-only in this task.
 
@@ -23,7 +23,7 @@ This runbook separates confirmed live acceptance from commands that still requir
 | Brain → LTX worker → QA → HF upload | Runbook documents intended commands; components and independent smoke results do not prove the sustained queue path. | **NOT YET LIVE-ACCEPTED AS ONE PIPELINE.** Run a single short controlled job and verify each status/artifact transition before scaling. |
 | OEC-Play | OEC-Deploy feature validation runs are active/pending on their own branch; no server health request from this session. | **LIVE SERVER / CAPABILITY STATUS UNVERIFIED.** Keep adapters disabled unless their health and real artifact tests pass. |
 
-The latest static suite [39272166140](https://github.com/CalamityStriker/OEC/actions/runs/39272166140) passed 79 CPU/contract tests (including Brain/LTX queue 4, upload status 5, upload daemon storage 4), source compilation and four notebook JSON checks. Latest live StorageManager observation in run 39271901007: group 2.04/2.10 TB hard quota, 60.38 GB headroom under active grace; model 232.81/280 GB and output 294.61 MB/1 GB. These values are historical after the run and do not authorize a future write. Recheck exact runner, GPU occupancy and StorageManager immediately before each live smoke.
+Latest static suite [39275020758](https://github.com/CalamityStriker/OEC/actions/runs/39275020758) passed 83 CPU/contract tests, uploader/QA compilation and four notebook JSON checks with no ResourceWarning. Latest media bootstrap [39274961054](https://github.com/CalamityStriker/OEC/actions/runs/39274961054) passed live Kokoro/Whisper/Qwen3-ASR inference in 18.42/18.48/20.42 seconds; ACE-Step source/checkpoint/runtime were ready but generation was refused because no idle A100 was eligible. Latest FLUX→TRELLIS run [39271901007](https://github.com/CalamityStriker/OEC/actions/runs/39271901007) is blocked by external PID 3347078 on all eight A100s; no process was killed and no PNG/GLB was generated. Latest StorageManager snapshot: 60.38 GB hard headroom under active grace, model 232.81/280 GB, outputs 295.91 MB/1 GB. Historical only; it does not authorize future writes.
 
 ## 2. What \`brain_config.json\` means for queue chunking
 
@@ -106,16 +106,31 @@ conda run --no-capture-output -n "$OEC_QA_ENV" \\
 
 Set \`OEC_QA_ENV\` only after the dependency check. \`--no-purge\` avoids deleting the QA model cache; this is intentional. Set OEC_QA_GPU to the assigned physical GPU index after checking the active allocation and nvidia-smi; do not guess an index or share a device with another large model. The QA worker sets CUDA_VISIBLE_DEVICES before importing Torch.
 
-**HF upload daemon** — verify the configured dataset destination and Hugging Face authentication before starting it. \`--yes\` avoids an interactive create-repository prompt but still requires valid credentials.
+**HF upload daemon — targeted acceptance first.** Do not start the indefinite normal daemon while unrelated rows may be PENDING; it consumes the regular pending batch. The new `--once --asset-id ID` mode selects exactly one existing PENDING row, avoids startup cleanup of unrelated state, refuses to auto-create the dataset repository, and exits after one API upload attempt. On success, it deletes that selected row and local asset/JSON; on failure it rolls the selected row back to PENDING. Use a new, small, approved test asset and retain its metadata/hash somewhere safe before upload.
 
-\`\`\`bash
+Verify the remote dataset destination and existing authentication without printing any token:
+
+```bash
 cd "$HOME/OEC"
-conda run --no-capture-output -n oec_deploy \\
-  python "$HOME/OEC/hf_upload_daemon.py" --yes
-\`\`\`
+test -n "${AIEROS_HF_DATASET_REPO:-}" || { echo "Set AIEROS_HF_DATASET_REPO to the approved existing dataset repo"; exit 2; }
+conda run --no-capture-output -n oec_deploy python - <<'PY'
+import os
+from huggingface_hub import HfApi
+repo = os.environ["AIEROS_HF_DATASET_REPO"]
+api = HfApi()
+if not api.repo_exists(repo_id=repo, repo_type="dataset"):
+    raise SystemExit("Configured target dataset does not exist; approve/create it separately before the one-shot upload")
+print("HF authentication passed; existing dataset target verified:", repo)
+PY
 
-Do not add \`--generate-dummy\`: that option creates large dummy media and is not a production acceptance test.
+# Replace N with the one verified QA-passed PENDING row for the run-scoped test asset.
+conda run --no-capture-output -n oec_deploy \
+  python "$HOME/OEC/hf_upload_daemon.py" --once --asset-id N
+```
 
+After the command succeeds, confirm the printed asset ID matches the selected test row, obtain the archive name from logs/remote listing, verify the archive appears under `data/` using `HfApi().list_repo_files(repo_id=..., repo_type="dataset")`, and compare its contents/hash to a pre-upload local copy. CLI success means the Hub upload call returned successfully; read-after-write and remote-content hashing are separate acceptance checks and were **not** performed this session.
+
+The selected source asset + JSON and DB row are deleted after the upload API reports success, so preserve the test asset's metadata and hashes before upload. Do not add `--generate-dummy`; it creates dummy media. Assets above the configured archive batch limit fail closed; per-file resumable chunking is not implemented.
 ## 5. Separate loopback JSON media services
 
 These sidecars are a separate interface from Brain's batch queue. They bind to loopback, use the configured OEC output/model targets, and should only be exposed to OEC-Play after their own live \`/health\` and artifact acceptance succeed.
@@ -193,4 +208,4 @@ Use \`http://127.0.0.1:7987\` via an approved SSH tunnel for the desktop client;
 
 Stop a process by pressing Ctrl+C in its own terminal or terminating its verified exact PID after confirming the command line. Do not run broad \`pkill -f\` patterns. After stopping the daemons, rerun \`storage_manager.py --status\` and preserve logs/results.
 
-Latest evidence checkpoint: 2026-10-19 19:54 IST. AudioGen, standalone TRELLIS, standalone LTX, Kokoro, Whisper and Qwen3-ASR each have a prior controlled live artifact PASS; the latest Kokoro/Whisper/Qwen3-ASR bootstrap smoke also passed. ACE-Step weights/runtime are prepared but live generation is blocked by the idle-A100 admission guard. FLUX→TRELLIS offline suites pass but its latest live attempt is blocked by the same GPU gate. MusicGen remains blocked by incomplete cached weights and unavailable Hugging Face proxy. QA GPU-selection ordering is statically tested, but live Qwen2-VL compliance decisions, the sustained Brain→worker→QA→tarball→Hugging Face upload chain, individual-file resumable chunking, and the live OEC-Play server remain unverified. The most recent OEC static/storage workflow (39268510242) passed 66 tests, compilation and four notebook JSON checks; it is not model inference.
+Latest evidence checkpoint: 2026-10-19 20:36 IST. Static/contract CI [39275020758] passed 83 tests, py_compile and four notebook JSON checks without ResourceWarning. AudioGen, standalone TRELLIS, standalone LTX, Kokoro, Whisper and Qwen3-ASR have controlled live inference passes. Latest bootstrap [39274961054] passed the three speech providers and ACE-Step runtime prep, but its required music generation failed closed because no idle A100 was eligible; no music file. FLUX→TRELLIS [39271901007] is also blocked by external PID 3347078 on all eight A100s; no PNG/GLB from that attempt. MusicGen remains incomplete-cache/proxy-blocked. The new bounded upload CLI is contract-tested only; no remote upload was performed. Live Qwen2-VL decision, HF receipt/read-after-write, per-file chunk/resume, sustained Brain→worker→QA→upload, and live OEC-Play service remain unverified.
