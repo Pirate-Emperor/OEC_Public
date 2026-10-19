@@ -43,7 +43,7 @@ Recheck each workflow's `runs-on`, branch/ref, checkout SHA, runner hostname, wo
 
 ## 4. Resource, storage, security and Actions billing
 
-- Treat **$0 GitHub Actions spend as a hard requirement**. Before any push, PR, rerun, workflow dispatch, schedule change or trigger-file write, inspect live YAML event/path/branch filters, runner type, account-cost implications and artifact-retention route. Do not deliberately trigger Actions unless the complete operation is verified to cost $0. Do not assume self-hosted means free. Avoid all unnecessary Actions use.
+- **GitHub Actions quota policy (user update, 2026-10-19):** The user confirmed the runner quota was reset and withdrew the earlier special requirement to prove a workflow costs $0 before pushing, rerunning or dispatching. Do not re-impose that veto or artificially cap Actions usage. Use the assigned A100 runners for the necessary model setup, inference and acceptance tests; batch related work sensibly and avoid competing pending runs in the shared `oec-media-gpu-storage-serial` group. This change applies to Actions runner quota only; it does not disable StorageManager admission, model-storage limits, network checks, licenses, path safety, concurrency or evidence requirements.
 - Prefer read-only GitHub inspection and local/offline validation when authorized. Batch related safe documentation updates. After any allowed documentation-only push, re-read the branch and check recent Action runs to confirm whether anything triggered.
 - Never directly read, hash, resize, create, overwrite, move or delete `.storage_reserve.bin` or other protected reserve/lock files. Use only the sanctioned OEC StorageManager interface for storage/reserve state and operations.
 - Before any shared write, model/dataset download, package install or substantial compute, require fresh authoritative quota, StorageManager admission, path ownership, output capacity, no conflicting lease/lock and resource occupancy checks. Missing or stale telemetry means fail closed. Filesystem free space is not quota evidence.
@@ -85,4 +85,4 @@ Update the checklist and daily changelog after meaningful work. Report:
 6. what is still unverified;
 7. the single most important next step.
 
-Do not stop at a plan when safe work is possible. Do not start an expensive or shared-state operation while its approval, quota, runner or $0 billing gates are unresolved.
+Do not stop at a plan when safe work is possible. Do not start a shared-state operation while its approval, StorageManager admission, runner, network or license gates are unresolved. The prior $0-only Actions veto is retired; use Actions when it materially advances model setup and inference.
