@@ -115,6 +115,30 @@ jobs:
           run_capture existing-environment-audit "$OEC_PYTHON" tools/prepare_media_models.py env-audit
           # Inventory relevant package presence only; do not load pipelines or allocate CUDA tensors.
           run_capture selected-runtime-package-inventory "$OEC_PYTHON" -c 'import importlib.util,json,sys; mods=["torch","huggingface_hub","transformers","qwen_vl_utils","diffusers","accelerate","soundfile","whisper","kokoro","qwen_asr","acestep","trimesh","PIL"]; print(json.dumps({"python":sys.version.split()[0],"executable":sys.executable,"packages":{m:bool(importlib.util.find_spec(m)) for m in mods}},sort_keys=True))'
+          cat > "$OEC_MODEL_AUDIT_DIR/inventory_conda_envs.py" <<'PY'
+          import json, re, subprocess, sys
+          from pathlib import Path
+          conda = sys.argv[1]
+          name_filter = re.compile(r"(oec|phase|qa|vl|audio|ltx|3d|freeze|moe|trellis|flux)", re.I)
+          modules = ["torch", "transformers", "qwen_vl_utils", "torchvision", "decord", "av", "PIL", "huggingface_hub", "qwen_asr", "kokoro", "whisper", "soundfile", "acestep", "diffusers", "accelerate", "trimesh"]
+          proc = subprocess.run([conda, "env", "list", "--json"], text=True, capture_output=True, timeout=30, check=True)
+          envs = json.loads(proc.stdout).get("envs", [])
+          rows = []
+          for raw in envs:
+              prefix = Path(raw); name = prefix.name
+              if not name_filter.search(name): continue
+              python = prefix / "bin" / "python"
+              row = {"name": name, "prefix": str(prefix), "python": str(python), "present": python.is_file()}
+              if python.is_file():
+                  code = "import importlib.util,json,sys; mods=" + repr(modules) + "; print(json.dumps({'python':sys.version.split()[0],'packages':{m:bool(importlib.util.find_spec(m)) for m in mods},'executable':sys.executable},sort_keys=True))"
+                  try:
+                      check = subprocess.run([str(python), "-c", code], text=True, capture_output=True, timeout=20, check=False)
+                      row.update({"returncode": check.returncode, "report": check.stdout.strip(), "stderr_tail": check.stderr[-1000:] if check.returncode else ""})
+                  except Exception as exc: row["probe_error"] = type(exc).__name__ + ": " + str(exc)
+              rows.append(row)
+          print(json.dumps({"matched_environment_count": len(rows), "environments": rows, "no_environment_created_or_modified": True}, indent=2, sort_keys=True))
+          PY
+          run_capture all-conda-env-package-inventory "$OEC_PYTHON" "$OEC_MODEL_AUDIT_DIR/inventory_conda_envs.py" "$HOME/Conda/condabin/conda"
           run_capture model-cache-manager-status "$OEC_PYTHON" tools/model_cache_manager.py status
           # Strict authoritative quota only: intentionally do not pass --use-manager-directory-only.
           run_capture aggregate-model-preflight "$OEC_PYTHON" tools/prepare_media_models.py plan --preflight
@@ -128,7 +152,7 @@ jobs:
           for name in (
               "gpu-before", "compute-processes-before", "storage-manager-status",
               "model-preparation-status", "existing-environment-audit",
-              "selected-runtime-package-inventory", "model-cache-manager-status",
+              "selected-runtime-package-inventory", "all-conda-env-package-inventory", "model-cache-manager-status",
               "aggregate-model-preflight",
           ):
               try:
