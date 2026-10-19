@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-19T20:36:00+05:30",
+  "last_updated": "2026-10-19T20:59:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Current-head static/queue/upload acceptance run 39275020758 passed 83 tests, py_compile, and four notebook JSON checks with no ResourceWarning. Added exact asset-ID one-shot upload mode with fail-closed no-fallback, oversize-file, shared cleanup and missing remote dataset protections; remote HF upload/read-after-write remains untested. Latest media bootstrap run 39274961054 passed Kokoro/Whisper/Qwen3-ASR live smokes (18.42/18.48/20.42 s) and ACE-Step runtime preparation, but ACE music generation was refused by the no-idle-A100 gate. Earlier FLUX→TRELLIS run 39271901007 still blocked by external compute PID 3347078 across all eight A100s. No new PNG/GLB/music file or live HF upload.",
+  "latest_summary": "Latest completed static acceptance 39277515469 passed 84 tests, compilation and four notebook JSON checks. New QA regression hardening committed at 249b34e (separate .mp4/.webm/.avi frame output; fresh StorageManager quota for transcode) with executable isolated tests at 486e467; current-head CI 39278190899 is queued, so those two latest tests are pending rather than passed. Commit a7b513b narrows future model-bootstrap triggers for QA/upload-only edits. Bootstrap 39277286186 remains in progress with logs currently unavailable and a prior duplicate 39278145617 queued; do not infer model-inference results. No live Qwen2-VL QA or HF upload.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -4006,6 +4006,80 @@
         "No generalized WER/audio quality evaluation was performed."
       ],
       "artifact": null
+    },
+    {
+      "id": "EXP-2026-10-19-QA-FRAME-PATH-AND-FRESH-TRANSCODE-GATE",
+      "date": "2026-10-19",
+      "category": "QA/compliance regression hardening for non-MP4 video frame extraction and output quota admission",
+      "approach": "Use Path.stem to produce a separate sibling JPEG for video frame extraction; clean up only the exact partial frame if ffmpeg fails. Require fresh StorageManager quota telemetry for transcode output writes. Execute the actual extracted method from the source AST with mocked ffmpeg for .mp4, .webm, and .avi without importing core_config or loading Torch.",
+      "reason": "Prevent source overwrite for accepted .webm/.avi assets, verify source file byte integrity, and enforce fresh output-storage admission for QA transcoding.",
+      "parameters": {
+        "source_commit": "249b34e7738cda7596b5019c8b096144825955bc",
+        "test_commit": "486e467d8bb2b178c5b6501a376c9295b03708a3",
+        "branch": "fix/media-stack-supervision-20261019",
+        "tests": [
+          "test_qa_frame_extraction_preserves_webm_and_avi_inputs",
+          "test_qa_video_transcode_requires_fresh_storage_admission"
+        ],
+        "workflows": [
+          {
+            "run_id": 39278190899,
+            "sha": "486e467d8bb2b178c5b6501a376c9295b03708a3",
+            "state": "queued"
+          },
+          {
+            "run_id": 39278145652,
+            "sha": "249b34e7738cda7596b5019c8b096144825955bc",
+            "state": "queued"
+          },
+          {
+            "run_id": 39278043510,
+            "sha": "7c3cccc819f0bde0978e103cdc01980ecb6d5316",
+            "state": "in_progress_at_last_check"
+          }
+        ],
+        "validation_design": {
+          "media_extensions": [
+            ".mp4",
+            ".webm",
+            ".avi"
+          ],
+          "fake_ffmpeg_output_bytes": 10,
+          "require_input_bytes_unchanged": true,
+          "require_distinct_output_path": true,
+          "require_fresh_quota": true
+        }
+      },
+      "environment": {
+        "runner": "CI pending; isolated test avoids GPU/model import",
+        "gpu": "not used"
+      },
+      "results": {
+        "status": "PENDING_CI",
+        "source_change_committed": true,
+        "tests_added": 2,
+        "latest_complete_suite": {
+          "run_id": 39277515469,
+          "status": "PASS",
+          "tests": 84,
+          "sha": "620ab348a16f468124db6610ac3eab2308446f40"
+        },
+        "current_head_suite": {
+          "run_id": 39278190899,
+          "status": "QUEUED",
+          "sha": "486e467d8bb2b178c5b6501a376c9295b03708a3"
+        },
+        "actual_qa_inference": "NOT_RUN",
+        "source_asset_mutation_test": "NOT_YET_RUN_IN_CI",
+        "transcode_quota_guard_test": "NOT_YET_RUN_IN_CI"
+      },
+      "interpretation": "The previous 84-test run passed but predates this patch. The two regression tests are designed and committed, but must not be called passed until the current-head workflow finishes.",
+      "limitations": [
+        "No Qwen2-VL model is loaded or run by these tests.",
+        "No shared source asset was used.",
+        "Fresh StorageManager telemetry, actual policy decision, upload and OEC-Play are still separate acceptance gates."
+      ],
+      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39278190899"
     }
   ]
 }
