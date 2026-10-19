@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from common import MediaJobService, MediaProvider, RequestError, managed_write, safe_child, serve, validate_glb
+from common import MediaJobService, MediaProvider, RequestError, safe_child, serve, validate_glb
 
 LOG = logging.getLogger("oec.media_service.trellis")
 MODEL_ID = "microsoft/TRELLIS.2-4B"
@@ -50,12 +50,15 @@ class TrellisProvider(MediaProvider):
         params = payload.get("parameters", {})
         if not isinstance(params, dict):
             raise RequestError("parameters must be a JSON object")
-        unknown = set(params) - {"max_image_size", "texture_size", "decimation_target"}
+        unknown = set(params) - {"max_image_size", "texture_size", "decimation_target", "remesh"}
         if unknown:
             raise RequestError(f"unsupported TRELLIS parameters: {', '.join(sorted(unknown))}")
         max_size = params.get("max_image_size", 1024)
         texture_size = params.get("texture_size", 2048)
         decimation_target = params.get("decimation_target", 100_000)
+        remesh = params.get("remesh", False)
+        if not isinstance(remesh, bool):
+            raise RequestError("remesh must be true or false")
         if isinstance(max_size, bool) or not isinstance(max_size, int) or max_size not in {512, 768, 1024, 1280}:
             raise RequestError("max_image_size must be one of 512, 768, 1024, 1280")
         if isinstance(texture_size, bool) or not isinstance(texture_size, int) or texture_size not in {512, 1024, 2048, 4096}:
@@ -66,7 +69,7 @@ class TrellisProvider(MediaProvider):
             raise RequestError("image_base64 is required for image_to_3d")
         return {"task": "image_to_3d", "prompt": prompt, "filename": filename,
                 "parameters": {"max_image_size": max_size, "texture_size": texture_size,
-                               "decimation_target": decimation_target}, "expects_image": True}
+                               "decimation_target": decimation_target, "remesh": remesh}, "expects_image": True}
 
     def load_runtime(self) -> None:
         import pipeline_trellis_3d as trellis
@@ -103,18 +106,21 @@ class TrellisProvider(MediaProvider):
         output_path = safe_child(job_dir, f"{job_id}.glb")
         params = request["parameters"]
         start = time.monotonic()
-        with managed_write("outputs", 0.25, minimum_free_gb=0.05):
-            generated = self.module.generate_glb(
-                image=image,
-                pipeline=self.pipeline,
-                o_voxel=self.runtime["o_voxel"],
-                system_dirs=dirs,
-                output_dir=None,
-                output_path=output_path,
-                max_image_size=params["max_image_size"],
-                decimation_target=params["decimation_target"],
-                texture_size=params["texture_size"],
-            )
+        # generate_glb performs its own pre-inference quota checks and opens a
+        # managed write lease only for export. Do not hold an outer lease during
+        # GPU inference or export: nested StorageManager leases can deadlock.
+        generated = self.module.generate_glb(
+            image=image,
+            pipeline=self.pipeline,
+            o_voxel=self.runtime["o_voxel"],
+            system_dirs=dirs,
+            output_dir=None,
+            output_path=output_path,
+            max_image_size=params["max_image_size"],
+            decimation_target=params["decimation_target"],
+            texture_size=params["texture_size"],
+            remesh=params["remesh"],
+        )
         path = Path(generated).resolve()
         geometry = validate_glb(path)
         return path, {
@@ -124,7 +130,7 @@ class TrellisProvider(MediaProvider):
             # TRELLIS.2's current entry point is image-conditioned; this optional
             # prompt is retained as job metadata and is not passed as a model input.
             "prompt_metadata_only": request["prompt"],
-            "geometry_validation": geometry,
+            "geometry_validation": geometry, "remesh_enabled": params["remesh"],
             "generation_seconds": round(time.monotonic() - start, 3),
         }
 

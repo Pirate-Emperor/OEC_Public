@@ -52,46 +52,54 @@ def _read_status() -> dict[str, dict[str, float | str]]:
 
 
 def _prepare_output_reserve() -> dict[str, Any]:
+    """Read StorageManager state and budget a short audio smoke without resizing reserves.
+
+    Reserve operations belong to StorageManager. This preflight must not read or
+    modify protected reserve files, or change the reserve while another operation
+    owns a lease. Actual model/output writes re-run their own live admission.
+    """
     config_path = ROOT / "storage_config.json"
     config = json.loads(config_path.read_text(encoding="utf-8"))
     output_policy = next((d for d in config.get("directories", []) if d.get("name") == "outputs"), None)
     if not isinstance(output_policy, dict):
         raise RuntimeError("outputs reserve policy is missing from the active storage_config.json")
-    reserve_floor = max(
-        float(output_policy.get("minimum_reserve_gb", config.get("minimum_reserve_gb", 0.25))),
-        float(output_policy.get("reserve_target_gb", 0.5)),
-    )
+
+    minimum_reserve = float(output_policy.get("minimum_reserve_gb", config.get("minimum_reserve_gb", 0.25)))
+    reserve_floor = max(minimum_reserve, float(output_policy.get("reserve_target_gb", minimum_reserve)))
     rows = _read_status()
     models, outputs = rows["models"], rows["outputs"]
     if models["state"] not in {"NORMAL", "WARNING"} or float(models["reserve_gb"]) < 39.5:
-        raise RuntimeError(f"model-target gate failed; expected the 40 GB reserve floor: {models}")
+        raise RuntimeError(f"model-target gate failed; expected the existing 40 GB reserve floor: {models}")
     if outputs["state"] not in {"NORMAL", "WARNING"}:
         raise RuntimeError(f"outputs state is {outputs['state']}; refusing to start model inference")
-    # Budget for short audio and text artifacts plus a small margin, with a positive outputs reserve.
+
+    current_reserve = float(outputs["reserve_gb"])
+    if current_reserve + 0.02 < reserve_floor:
+        raise RuntimeError(
+            f"outputs reserve {current_reserve:.3f} GB is below the configured {reserve_floor:.3f} GB floor; "
+            "refusing reserve mutation"
+        )
+
+    # Directory content and the protected reserve are separate StorageManager
+    # quantities. Budget just generated content plus an explicit safety margin.
     artifact_budget_gb, safety_margin_gb = 0.10, 0.05
-    projected = float(outputs["actual_gb"]) + artifact_budget_gb + safety_margin_gb + reserve_floor
+    projected = float(outputs["actual_gb"]) + artifact_budget_gb + safety_margin_gb
     if projected > float(outputs["target_gb"]) + 0.005:
         raise RuntimeError(
-            f"outputs budget denied: content={outputs['actual_gb']:.3f} GB + artifacts={artifact_budget_gb:.2f} GB "
-            f"+ margin={safety_margin_gb:.2f} GB + reserve={reserve_floor:.2f} GB > target={outputs['target_gb']:.2f} GB"
+            f"outputs artifact budget denied: content={outputs['actual_gb']:.3f} GB "
+            f"+ artifacts={artifact_budget_gb:.2f} GB + margin={safety_margin_gb:.2f} GB "
+            f"> target={outputs['target_gb']:.2f} GB"
         )
-    resized = False
-    if float(outputs["reserve_gb"]) > reserve_floor + 0.02:
-        command = [sys.executable, str(ROOT / "storage_manager.py"), "--set-reserve-gb",
-                   "outputs", "--reserve-gb", f"{reserve_floor:.3f}"]
-        adjust = _run(command, timeout=60)
-        if adjust.returncode:
-            raise RuntimeError(f"StorageManager outputs reserve adjustment failed: {adjust.stderr[-1500:]}")
-        rows = _read_status()
-        models, outputs = rows["models"], rows["outputs"]
-        if outputs["state"] not in {"NORMAL", "WARNING"} or abs(float(outputs["reserve_gb"]) - reserve_floor) > 0.03:
-            raise RuntimeError(f"outputs reserve verification failed after manager command: {outputs}")
-        if models["state"] not in {"NORMAL", "WARNING"} or float(models["reserve_gb"]) < 39.5:
-            raise RuntimeError(f"model reserve changed unexpectedly: {models}")
-        resized = True
-    return {"models": models, "outputs": outputs, "output_reserve_floor_gb": reserve_floor,
-            "projected_output_usage_with_reserve_gb": projected, "output_reserve_resized": resized,
-            "manager_quota": "group quota telemetry unavailable; using live logical-directory status and positive reserve for this bounded smoke workload"}
+
+    return {
+        "models": models,
+        "outputs": outputs,
+        "output_reserve_floor_gb": reserve_floor,
+        "projected_output_usage_with_artifacts_gb": projected,
+        "output_reserve_resized": False,
+        "reserve_mutation_attempted": False,
+        "reserve_policy": "read-only StorageManager status; existing reserve preserved",
+    }
 
 
 def _base_python() -> Path:

@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - feat/media-service-sidecars-20261018
+      - fix/media-stack-supervision-20261019
     paths:
       - ".github/workflows/oec-audiogen-notebook-smoke.yml"
       - "pipeline_audiocraft.ipynb"

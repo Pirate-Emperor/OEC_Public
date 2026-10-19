@@ -122,27 +122,30 @@ class LtxProvider(MediaProvider):
         output_root = Path(dirs["outputs"]).expanduser().resolve() / "media_services" / "ltx" / "jobs"
         job_dir = safe_child(output_root, job_id)
         params = request["parameters"]
-        output_budget = self.module._estimate_output_gb(params["duration_seconds"], "video")
         old_output_dir = self.module.AIEROS_OUTPUT_DIR
         self.module.AIEROS_OUTPUT_DIR = job_dir
         start = time.monotonic()
         try:
-            with managed_write("outputs", max(0.02, output_budget), minimum_free_gb=0.05):
+            # Create only the per-job directory under a short managed lease.
+            # worker_ltx_video.generate_asset acquires its own lease for encode/
+            # output writes. Holding a lease around the whole generation call
+            # deadlocks when the worker opens its nested managed operation.
+            with managed_write("outputs", 0.002, minimum_free_gb=0.01):
                 job_dir.mkdir(parents=True, exist_ok=False)
-                video_path, metadata_path, actual_seed = self.module.generate_asset(
-                    pipeline=self.pipeline,
-                    target_gpu_id=self.gpu_id,
-                    input_image=str(input_file) if input_file else None,
-                    prompt=request["prompt"],
-                    duration=params["duration_seconds"],
-                    enhance_prompt=params["enhance_prompt"],
-                    seed=params["seed"],
-                    randomize_seed=params["randomize_seed"],
-                    height=params["height"],
-                    width=params["width"],
-                    output_type="video",
-                    fps=params["fps"],
-                )
+            video_path, metadata_path, actual_seed = self.module.generate_asset(
+                pipeline=self.pipeline,
+                target_gpu_id=self.gpu_id,
+                input_image=str(input_file) if input_file else None,
+                prompt=request["prompt"],
+                duration=params["duration_seconds"],
+                enhance_prompt=params["enhance_prompt"],
+                seed=params["seed"],
+                randomize_seed=params["randomize_seed"],
+                height=params["height"],
+                width=params["width"],
+                output_type="video",
+                fps=params["fps"],
+            )
         finally:
             self.module.AIEROS_OUTPUT_DIR = old_output_dir
         if not video_path or not metadata_path:

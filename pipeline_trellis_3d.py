@@ -262,6 +262,7 @@ def generate_glb(
     max_image_size: int,
     decimation_target: int,
     texture_size: int,
+    remesh: bool = True,
 ) -> str:
     from storage_manager import managed_storage_operation, storage_preflight, storage_preflight_path
     import json
@@ -315,7 +316,7 @@ def generate_glb(
         coords=mesh.coords, attr_layout=mesh.layout, voxel_size=mesh.voxel_size,
         aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
         decimation_target=int(decimation_target), texture_size=int(texture_size),
-        remesh=True, remesh_band=1, remesh_project=0, verbose=False,
+        remesh=bool(remesh), remesh_band=1, remesh_project=0, verbose=False,
     )
     with managed_storage_operation(
         "outputs", required_gb=0.20, require_fresh_quota=True, minimum_free_gb=0.05,
