@@ -10,15 +10,33 @@ from tools import prepare_ace_step_runtime as runtime
 
 
 class AceStepRuntimeTests(unittest.TestCase):
-    def test_pristine_no_checkout_clone_is_recognized_only_when_empty(self):
+    def test_pristine_no_checkout_clone_allows_only_empty_parent_directories(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "ACE-Step-1.5"
             root.mkdir()
             (root / ".git").mkdir()
-            status = "D  examples/example.json\nD  pyproject.toml\nD  uv.lock"
+            (root / "examples" / "simple_mode").mkdir(parents=True)
+            status = "D  examples/simple_mode/example.json\nD  pyproject.toml\nD  uv.lock"
             self.assertTrue(runtime._is_pristine_no_checkout_tree(root, status))
-            (root / "local-note.txt").write_text("preserve me", encoding="utf-8")
+            (root / "examples" / "simple_mode" / "local-note.txt").write_text(
+                "preserve me", encoding="utf-8"
+            )
             self.assertFalse(runtime._is_pristine_no_checkout_tree(root, status))
+
+    def test_preexisting_dirty_no_checkout_is_never_reclassified_as_recoverable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "ACE-Step-1.5"
+            root.mkdir()
+            (root / ".git").mkdir()
+            (root / "examples" / "simple_mode").mkdir(parents=True)
+            status = "D  examples/simple_mode/example.json\nD  pyproject.toml\nD  uv.lock"
+            with mock.patch.object(runtime, "_run") as run:
+                with mock.patch.object(runtime, "_git", side_effect=[
+                    "https://github.com/ace-step/ACE-Step-1.5.git", status
+                ]):
+                    with self.assertRaisesRegex(RuntimeError, "dirty; refusing"):
+                        runtime._ensure_source_checkout(root)
+            run.assert_not_called()
 
     def test_no_checkout_recovery_rejects_modified_untracked_or_ambiguous_status(self):
         with tempfile.TemporaryDirectory() as tmp:

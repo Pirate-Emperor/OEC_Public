@@ -183,26 +183,42 @@ def _git(source_root: Path, *args: str, timeout: int = 1800) -> str:
 
 
 def _is_pristine_no_checkout_tree(source_root: Path, status: str) -> bool:
-    """Recognize an empty no-checkout clone, not a modified source tree."""
+    """Recognize a no-checkout worktree with only empty directories and staged deletions."""
     if source_root.is_symlink() or not source_root.is_dir():
         return False
+    rows = [line for line in status.splitlines() if line.strip()]
+    if not rows or not all(line[:2].strip() == "D" for line in rows):
+        return False
+
+    # Git may leave empty parent directories when a clone has no checked-out files.
+    # Allow those directories, but never classify a file, symlink, or other object
+    # as disposable no-checkout state.
     try:
-        entries = [item for item in source_root.iterdir() if item.name != ".git"]
+        for item in source_root.iterdir():
+            if item.name == ".git":
+                continue
+            if item.is_symlink() or not item.is_dir():
+                return False
+            for current, dirs, files in os.walk(item, followlinks=False):
+                base = Path(current)
+                if any((base / name).is_symlink() for name in dirs):
+                    return False
+                if files:
+                    return False
     except OSError:
         return False
-    if entries:
-        return False
-    rows = [line for line in status.splitlines() if line.strip()]
-    return bool(rows) and all(line[:2].strip() == "D" for line in rows)
+    return True
 
 
 def _ensure_source_checkout(source_root: Path) -> str:
     """Create or update a tool-owned checkout to one immutable public commit."""
     if source_root.is_symlink():
         raise RuntimeError(f"refusing symlink for ACE-Step checkout: {source_root}")
+    created_now = False
     if not source_root.exists():
         source_root.parent.mkdir(parents=True, exist_ok=True)
         _run(["git", "clone", "--filter=blob:none", "--no-checkout", SOURCE_URL, str(source_root)], timeout=900)
+        created_now = True
     if not source_root.is_dir() or not (source_root / ".git").is_dir():
         raise RuntimeError(f"ACE-Step source path is not a git checkout: {source_root}")
     origin = _git(source_root, "remote", "get-url", "origin")
@@ -210,8 +226,10 @@ def _ensure_source_checkout(source_root: Path) -> str:
         raise RuntimeError(f"unexpected ACE-Step git origin; refusing to reuse checkout: {origin}")
     status = _git(source_root, "status", "--porcelain", "--untracked-files=normal")
     if status:
-        if _is_pristine_no_checkout_tree(source_root, status):
-            print("ACE_STEP_EMPTY_NO_CHECKOUT=detected; restoring the pinned worktree", flush=True)
+        # Only a clone created by this invocation may be treated as no-checkout
+        # state. An older checkout is always presumed user-owned if it is dirty.
+        if created_now and _is_pristine_no_checkout_tree(source_root, status):
+            print("ACE_STEP_EMPTY_NO_CHECKOUT=fresh_clone; restoring the pinned worktree", flush=True)
         else:
             raise RuntimeError("ACE-Step cached source checkout is dirty; refusing to overwrite local changes")
     elif not any(item.name != ".git" for item in source_root.iterdir()):
@@ -339,9 +357,51 @@ def status() -> int:
     return 0
 
 
+def _admit_runtime_writes(paths: dict[str, Path]) -> None:
+    """Require fresh StorageManager admission for the source/cache and isolated venv writes."""
+    sys.path.insert(0, str(ROOT))
+    from storage_manager import storage_preflight_path
+
+    if not paths["cache_root"].is_dir():
+        raise RuntimeError(
+            f"configured AIEROS cache root is unavailable: {paths['cache_root']}; refusing runtime writes"
+        )
+    home = Path.home().expanduser().resolve()
+    operations = (
+        {
+            "operation": "ACE-Step pinned source checkout and UV cache",
+            "path": str(paths["cache_root"]),
+            "required_gb": 10.0,
+            "minimum_free_gb": 2.0,
+        },
+        {
+            "operation": "isolated ACE-Step virtual environment",
+            "path": str(home),
+            "required_gb": 12.0,
+            "minimum_free_gb": 2.0,
+        },
+    )
+    for operation in operations:
+        ok, reason = storage_preflight_path(
+            operation["path"],
+            required_gb=operation["required_gb"],
+            require_fresh_quota=True,
+            minimum_free_gb=operation["minimum_free_gb"],
+        )
+        report = {**operation, "admitted": bool(ok), "reason": reason, "quota_must_be_fresh": True}
+        print("ACE_STEP_STORAGE_ADMISSION " + json.dumps(report, sort_keys=True), flush=True)
+        if not ok:
+            raise RuntimeError(
+                f"StorageManager denied {operation['operation']}: {reason}; no runtime writes started"
+            )
+
+
 def install() -> int:
     directories = _system_dirs()
     paths = build_paths(Path.home(), directories["cache"], directories["models"])
+    # Validate exact paths and get a fresh quota admission before cloning source,
+    # creating the isolated venv/UV cache, or installing runtime dependencies.
+    _admit_runtime_writes(paths)
     # Check the complete model layout before spending time building the isolated runtime.
     model_report = checkpoint_status(paths["model_root"])
     print("ACE_STEP_MODEL_PREFLIGHT " + json.dumps(model_report, sort_keys=True), flush=True)
