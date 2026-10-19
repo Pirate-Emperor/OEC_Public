@@ -113,6 +113,20 @@ def _git(source_root: Path, *args: str, timeout: int = 1800) -> str:
     return result.stdout.strip()
 
 
+def _is_pristine_no_checkout_tree(source_root: Path, status: str) -> bool:
+    """Recognize an empty no-checkout clone, not a modified source tree."""
+    if source_root.is_symlink() or not source_root.is_dir():
+        return False
+    try:
+        entries = [item for item in source_root.iterdir() if item.name != ".git"]
+    except OSError:
+        return False
+    if entries:
+        return False
+    rows = [line for line in status.splitlines() if line.strip()]
+    return bool(rows) and all(line[:2].strip() == "D" for line in rows)
+
+
 def _ensure_source_checkout(source_root: Path) -> str:
     """Create or update a tool-owned checkout to one immutable public commit."""
     if source_root.is_symlink():
@@ -125,8 +139,14 @@ def _ensure_source_checkout(source_root: Path) -> str:
     origin = _git(source_root, "remote", "get-url", "origin")
     if origin.rstrip("/").removesuffix(".git").lower() != SOURCE_URL.rstrip("/").removesuffix(".git").lower():
         raise RuntimeError(f"unexpected ACE-Step git origin; refusing to reuse checkout: {origin}")
-    if _git(source_root, "status", "--porcelain", "--untracked-files=normal"):
-        raise RuntimeError("ACE-Step cached source checkout is dirty; refusing to overwrite local changes")
+    status = _git(source_root, "status", "--porcelain", "--untracked-files=normal")
+    if status:
+        if _is_pristine_no_checkout_tree(source_root, status):
+            print("ACE_STEP_EMPTY_NO_CHECKOUT=detected; restoring the pinned worktree", flush=True)
+        else:
+            raise RuntimeError("ACE-Step cached source checkout is dirty; refusing to overwrite local changes")
+    elif not any(item.name != ".git" for item in source_root.iterdir()):
+        raise RuntimeError("ACE-Step checkout is empty without a no-checkout deletion status; refusing recovery")
     _run(["git", "-C", str(source_root), "fetch", "--depth", "1", "origin", SOURCE_COMMIT], timeout=900)
     _run(["git", "-C", str(source_root), "checkout", "--detach", SOURCE_COMMIT], timeout=120)
     actual = _git(source_root, "rev-parse", "HEAD")

@@ -9,6 +9,25 @@ from tools import prepare_ace_step_runtime as runtime
 
 
 class AceStepRuntimeTests(unittest.TestCase):
+    def test_pristine_no_checkout_clone_is_recognized_only_when_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "ACE-Step-1.5"
+            root.mkdir()
+            (root / ".git").mkdir()
+            status = "D  examples/example.json\nD  pyproject.toml\nD  uv.lock"
+            self.assertTrue(runtime._is_pristine_no_checkout_tree(root, status))
+            (root / "local-note.txt").write_text("preserve me", encoding="utf-8")
+            self.assertFalse(runtime._is_pristine_no_checkout_tree(root, status))
+
+    def test_no_checkout_recovery_rejects_modified_untracked_or_ambiguous_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "ACE-Step-1.5"
+            root.mkdir()
+            (root / ".git").mkdir()
+            self.assertFalse(runtime._is_pristine_no_checkout_tree(root, " M pyproject.toml"))
+            self.assertFalse(runtime._is_pristine_no_checkout_tree(root, "?? local-note.txt"))
+            self.assertFalse(runtime._is_pristine_no_checkout_tree(root, ""))
+
     def test_source_revision_is_immutable_and_valid(self):
         self.assertRegex(runtime.SOURCE_COMMIT, r"^[0-9a-f]{40}$")
         self.assertEqual(runtime.SOURCE_URL, "https://github.com/ace-step/ACE-Step-1.5.git")
