@@ -99,8 +99,13 @@ class QANode:
             )
             print(f"[QA-NODE-GPU{self.gpu_id}] Model verified in local HF cache.")
             return
-        except Exception:
-            pass
+        except Exception as cache_exc:
+            cache_only = os.environ.get("OEC_QA_CACHE_ONLY", "").strip().lower() in {"1", "true", "yes"}
+            if cache_only:
+                raise RuntimeError(
+                    f"{self.repo_id} is not fully available in the local Hugging Face cache; "
+                    "OEC_QA_CACHE_ONLY=1 forbids any model download"
+                ) from cache_exc
 
         print(f"[QA-NODE-GPU{self.gpu_id}] Model missing or incomplete. Estimating required download size...")
         required_gb = estimate_hf_repo_bytes(self.repo_id) / BYTES_PER_GB
@@ -469,13 +474,35 @@ if __name__ == "__main__":
     parser.add_argument("--gpu", type=int, default=0, help="Physical GPU index selected before importing Torch")
     parser.add_argument("--once", action="store_true", help="Process only the exact selected PENDING_QA row and exit.")
     parser.add_argument("--asset-id", type=int, help="Positive asset ID; required for --once, no fallback to other rows.")
+    parser.add_argument(
+        "--db-path",
+        help="Optional run-scoped SQLite DB path; only accepted beneath outputs/oec-e2e-acceptance/ with --once --asset-id.",
+    )
     parser.set_defaults(purge=True)
     args = parser.parse_args()
     if args.once and (args.asset_id is None or args.asset_id < 1):
         parser.error("--once requires --asset-id with a positive ID")
     if not args.once and args.asset_id is not None:
         parser.error("--asset-id can only be used with --once")
-    
+    if args.db_path:
+        if not args.once or args.asset_id is None or args.asset_id < 1:
+            parser.error("--db-path is permitted only with --once --asset-id ID")
+        raw_db = Path(args.db_path).expanduser()
+        if raw_db.is_symlink():
+            parser.error("--db-path must not be a symlink")
+        allowed_root = (Path(SYSTEM_DIRS["outputs"]).expanduser().resolve() / "oec-e2e-acceptance")
+        try:
+            resolved_db = raw_db.resolve(strict=True)
+        except OSError:
+            parser.error("--db-path must point to an existing run-scoped SQLite file")
+        if (
+            not resolved_db.is_file()
+            or resolved_db.name != "upload_queue.db"
+            or allowed_root not in resolved_db.parents
+        ):
+            parser.error("--db-path must be upload_queue.db beneath outputs/oec-e2e-acceptance/<run-id>/")
+        QUEUE_DB_PATH = str(resolved_db)
+
     print("[SYSTEM] Starting QA Compliance Worker...")
     if args.once:
         try:
