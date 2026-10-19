@@ -457,3 +457,44 @@ Run [39209090292](https://github.com/Killer4K-N/OEC/actions/runs/39209090292) pa
 Live cache-only inference passed for Kokoro, Whisper Turbo and Qwen3-ASR. Kokoro generated a valid mono 24 kHz, 4.7-second WAV (225,644 bytes) under the configured outputs root. Whisper and Qwen3-ASR both processed that WAV and returned the same 56-character transcript; each text artefact is 57 bytes and both have SHA-256 0d8e457da884656285032be2a06b38e00a801822df8682ae125a10058297e080. All three services reported ready=true, model_loaded=true and device=cuda; the temporary smoke processes were stopped after the jobs completed.
 
 ACE-Step remains SKIPPED because its package is absent in all three checked Conda environments. The runtime dependency plan reported zero candidate package installs and preserved shared Torch; no model weights were downloaded. This validates one controlled speech clip, not broad ASR accuracy or the full persistent Brain-to-worker-to-QA-to-uploader pipeline. Visual run [39209706982](https://github.com/Killer4K-N/OEC/actions/runs/39209706982) is still running and must produce a validated GLB and MP4 before visual acceptance is claimed. Production OEC-Play server health remains unverified.
+
+
+## 2026-10-19T19:54 IST — Current-head regressions, GPU gates, and QA isolation repair
+
+### Source and static validation
+
+- Current feature branch `fix/media-stack-supervision-20261019` has latest source/test change `d655b25c7eded5976890e717e611c9add8d127e1`; no merge to main was made.
+- [Static/storage regression run 39268510242](https://github.com/CalamityStriker/OEC/actions/runs/39268510242), job [118114323063](https://github.com/CalamityStriker/OEC/actions/runs/39268510242/job/118114323063), completed SUCCESS at commit `d655b25c7ede`. The hosted Python 3.11.17 runner passed 66 tests: TRELLIS notebook static 12, TRELLIS easy-run 5, AudioCraft notebook 6, storage-write admission 6, inference/storage integration 4, StorageManager 10, StoragePolicy 10, quota snapshot 7, storage reservation 6. `py_compile` passed for QA/storage/CLI sources; all four notebooks parsed as nbformat 4 JSON with 16, 15, 10 and 6 cells.
+- Historical [run 39268246492](https://github.com/CalamityStriker/OEC/actions/runs/39268246492) failed one outdated source-order assertion: the assertion found the runner-local HEADLESS_SMOKE directory creation rather than the later production managed-write directory creation. Test-only correction now checks the last (production) mkdir; the identical suite passed in 39268510242.
+- FLUX regression tests were extended to cover an existing managed-output `.info.json` sidecar and symlink-based output-root escape. Production output-root, overwrite and scratch-path rejection remain fail-closed.
+
+### QA/compliance GPU-selection correction
+
+- Commit `8c75fcc4cb86981e3f208a5d0d5ae58e1e1fe9a1` removes module-level `import torch` from `qa_compliance_worker.py`, sets `CUDA_VISIBLE_DEVICES` before importing Torch inside `QANode.__init__`, validates the requested physical index, and adds `--gpu` through to `process_qa_queue`. Transitive `purge_manager.py`, `storage_manager.py`, and `storage_policy.py` were inspected and do not import Torch at module scope.
+- New `test_qa_sets_physical_gpu_before_torch_import` and existing inference/storage checks passed 4/4 in run 39268510242. This proves the source-level ordering contract only; actual Qwen2-VL-7B compliance inference, media rejection/approval, and queue state transitions under the live model remain unverified.
+
+### FLUX→TRELLIS current A100 acceptance
+
+- [Run 39267211597](https://github.com/CalamityStriker/OEC/actions/runs/39267211597), job `118111510929`, branch `fix/media-stack-supervision-20261019`, tested SHA `e5e4018bf7fcf46622fd7eacd029adc42a0d71aa`, assigned runner `oec-1`, environment `phase2_3d`.
+- Source compile passed. FLUX offline regression suite: 7/7 passed. FLUX→TRELLIS suite: 5/5 passed. Live StorageManager pre-check succeeded and recorded model root 232.81/280 GB, output root 294.17 MB/1 GB, LFS quota 2.04/2.10 TB hard with 61.03 GB reported headroom under active grace (about 19:18 IST; stale for future admission).
+- The real smoke reached the exact `pipeline_flux_trellis.py --source-mode flux` entry point but failed at `select_idle_a100_gpu`: `RuntimeError: no eligible idle A100; no process was killed or signalled`. No FLUX PNG or TRELLIS GLB was produced. Artifact [12194310008](https://github.com/CalamityStriker/OEC/actions/runs/39267211597/artifacts/12194310008) is the small diagnostic bundle, not a generated model artifact. This remains BLOCKED, not PASS.
+
+### Speech and ACE-Step bootstrap
+
+- [Run 39268082165](https://github.com/CalamityStriker/OEC/actions/runs/39268082165), job `118112826187`, used assigned `oec-1`. Fresh StorageManager checks, CPU/mock regressions, environment audits, and runtime preparation passed. Live cache-only inference passed for Kokoro, Whisper and Qwen3-ASR; startup+inference was 22.45 s, 18.47 s and 20.45 s respectively. Artifacts were emitted under the configured `aireos_output/media_services/smoke` root.
+- ACE-Step model bootstrap and isolated runtime validation passed: selected checkpoint components complete, source revision `ca1e85fe9430179831e6bc6be790c332190a3866`, isolated venv `~/.local/venvs/oec-acestep-py311`, actual Python 3.12, Torch 2.10.0+cu128, CUDA 12.8, A100 detected, `shared_torch_mutated=false`. The required live ACE-Step inference step failed closed because no eligible idle A100 was available; no music artifact was generated and no ACE process was started. Therefore the workflow ends FAILURE despite successful speech and runtime/bootstrap substeps.
+- Earlier MusicGen [run 39254306725](https://github.com/CalamityStriker/OEC/actions/runs/39254306725) remains failed before inference: 4/4 offline contracts passed, but model files were incomplete and the Hugging Face proxy returned `No route to host`; no WAV exists. MusicGen licensing remains research/non-commercial-only unless separate rights are established.
+
+### Upload/chunking and pipeline integration boundary
+
+- Live source inspection of `hf_upload_daemon.py` confirms pending asset records are collected as paired `[asset_path, json_path, ...]` entries, grouped by `UPLOAD_BATCH_SIZE_GB` and a maximum partial-batch age, archived as one `.tar.gz`, and uploaded through the Hugging Face API. This is **multi-asset archive batching**, not independently chunking/resuming a single very large asset. `brain_config.json:max_batch_size=10` controls prompt/job batches and is not file-chunking.
+- The disposable SQLite status contract supports QA success → canonical `PENDING`, uploader selection, `ARCHIVING` recovery and exact-batch rollback, but this Actions turn did not perform a complete QA-model → database → tarball → live Hugging Face upload. No existing shared upload destination or database was modified for acceptance.
+- Independent prior model evidence remains: AudioGen single-clip pass [39240127736](https://github.com/CalamityStriker/OEC/actions/runs/39240127736); standalone TRELLIS GLB and LTX MP4 pass [39240127757](https://github.com/CalamityStriker/OEC/actions/runs/39240127757); earlier one-clip Kokoro→Whisper Turbo/Qwen3-ASR pass [39209090292](https://github.com/CalamityStriker/OEC/actions/runs/39209090292). These independent passes do not prove the whole Brain→worker→QA→uploader product flow.
+
+### Acceptance decision
+
+- Implemented and static-tested: FLUX output path guards/tests; QA GPU-selection ordering; static storage/inference contracts; notebook JSON; isolated ACE runtime bootstrap; canonical upload status helper source.
+- Live-inference-tested: AudioGen; TRELLIS standalone; LTX standalone; Kokoro; Whisper; Qwen3-ASR.
+- Live inference blocked: current FLUX→TRELLIS smoke and ACE-Step, both refused by the idle-A100 gate; MusicGen blocked earlier by missing cached weights and network egress.
+- Not yet end-to-end tested: real Qwen2-VL compliance decision, the sustained Brain→LTX queue worker→QA→archive batch→HF upload lifecycle, individual-file resumable chunking, and OEC-Play server reachability.
+- The user-requested completion target is 2026-10-21. The authoritative original 15-day start/deadline has not been recovered; no remaining-days claim is made for that original clock.
