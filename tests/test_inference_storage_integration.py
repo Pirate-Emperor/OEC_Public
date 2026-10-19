@@ -35,6 +35,50 @@ class InferenceStorageIntegrationTests(unittest.TestCase):
         self.assertIn("_estimate_ltx_model_download_gb", functions)
         self.assertIn("_estimate_output_gb", functions)
 
+
+    def test_qa_sets_physical_gpu_before_torch_import(self):
+        source = self._read("qa_compliance_worker.py")
+        tree = ast.parse(source, filename="qa_compliance_worker.py")
+
+        top_level_torch_imports = [
+            node for node in tree.body
+            if isinstance(node, ast.Import)
+            and any(alias.name == "torch" for alias in node.names)
+        ]
+        self.assertEqual(top_level_torch_imports, [], "Torch must not initialize before QA selects its GPU")
+
+        qa_class = next(
+            node for node in tree.body
+            if isinstance(node, ast.ClassDef) and node.name == "QANode"
+        )
+        ctor = next(
+            node for node in qa_class.body
+            if isinstance(node, ast.FunctionDef) and node.name == "__init__"
+        )
+        visibility_index = next(
+            i for i, node in enumerate(ctor.body)
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Subscript)
+                and isinstance(target.value, ast.Attribute)
+                and isinstance(target.value.value, ast.Name)
+                and target.value.value.id == "os"
+                and target.value.attr == "environ"
+                and isinstance(target.slice, ast.Constant)
+                and target.slice.value == "CUDA_VISIBLE_DEVICES"
+                for target in node.targets
+            )
+        )
+        torch_import_index = next(
+            i for i, node in enumerate(ctor.body)
+            if isinstance(node, ast.Import)
+            and any(alias.name == "torch" for alias in node.names)
+        )
+        self.assertLess(visibility_index, torch_import_index)
+
+        self.assertIn('parser.add_argument("--gpu", type=int, default=0', source)
+        self.assertIn("process_qa_queue(purge_after_load=args.purge, gpu_id=args.gpu)", source)
+
     def test_qa_worker_enforces_storage_for_model_and_transcode(self):
         source = self._read("qa_compliance_worker.py")
         self.assertNotIn("release_reserve", source)
