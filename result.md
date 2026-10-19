@@ -498,3 +498,29 @@ ACE-Step remains SKIPPED because its package is absent in all three checked Cond
 - Live inference blocked: current FLUX→TRELLIS smoke and ACE-Step, both refused by the idle-A100 gate; MusicGen blocked earlier by missing cached weights and network egress.
 - Not yet end-to-end tested: real Qwen2-VL compliance decision, the sustained Brain→LTX queue worker→QA→archive batch→HF upload lifecycle, individual-file resumable chunking, and OEC-Play server reachability.
 - The user-requested completion target is 2026-10-21. The authoritative original 15-day start/deadline has not been recovered; no remaining-days claim is made for that original clock.
+
+
+## 2026-10-19T20:18 IST — Expanded 79-test suite and repeated A100 gate observation
+
+### Latest static/contract acceptance
+
+- [Run 39272166140](https://github.com/CalamityStriker/OEC/actions/runs/39272166140), job [118127020858](https://github.com/CalamityStriker/OEC/actions/runs/39272166140/job/118127020858), tested source head `3db0a5294e170fd61dc95f1e84b4ead4be538dd2`; hosted GitHub runner, Python 3.11.17; job conclusion SUCCESS.
+- 79 tests passed, grouped as: TRELLIS notebook static 12, TRELLIS CLI/easy run 5, AudioCraft notebook static 6, storage write-admission 6, inference/storage integration 4, Brain/LTX queue storage 4, uploader status contract 5, uploader daemon storage 4, StorageManager 10, StoragePolicy 10, quota snapshot 7, storage reservation 6. `py_compile` passed; notebook JSON checks passed for the 16/15/10/6-cell notebooks.
+- New suites validate atomic Brain prompt-job publication/worker queue contract; QA-success→canonical PENDING visibility; ARCHIVING recovery to PENDING; batch-specific rollback; uploader timed partial-batch selection and fresh storage preflight; plus fail-closed invalid row handling. These are source/unit and disposable-SQLite contracts only, not a real upload.
+- The prior unclosed upload log `ResourceWarning` was fixed in test teardown by removing/closing the uploader module's test-created `FileHandler`; production daemon logging behavior was not changed.
+
+### New current-head FLUX→TRELLIS live attempt
+
+- [Run 39271901007](https://github.com/CalamityStriker/OEC/actions/runs/39271901007), job `118126083988`, assigned self-hosted runner `oec-1`, environment `phase2_3d`, job FAILURE. Environment/dependency check, compilation, both offline regression suites, StorageManager before-state, final-state capture and diagnostic artifact upload passed; only the actual generation step failed closed.
+- The new safe GPU diagnostic captured compute PID `3347078` on every one of the eight A100-SXM4-40GB GPUs. The process table showed owner `rahkus`, parent PID `3345823`, elapsed `01:36:19`, state `Sl+`, command `python`, executable label `.../server-components/.venv/bin/python`; per-GPU memory was 6,280 MiB on GPU 0 and 416 MiB on GPUs 1–7. GPU utilization was 0%, but the compute process/PID makes the device ineligible. This is an observation from the 20:17 IST run, not permanent/current state.
+- The pipeline reached `tools/run_flux_pipeline_smoke.py` and failed in `pipeline_flux_trellis.py` → `pipeline_flux_image.select_idle_a100_gpu` with `RuntimeError: no eligible idle A100; no process was killed or signalled`. No PNG or GLB was generated. Diagnostic artifact [12195338666](https://github.com/CalamityStriker/OEC/actions/runs/39271901007/artifacts/12195338666), approximately 1.5 KB; it is logs/status and not a media artifact.
+- Fresh StorageManager before/after readings were group quota 2.04 TB used, 2.00 TB soft, 2.10 TB hard; 60.38 GB hard headroom, grace active for about 6d22h28m. Models root 232.81/280 GB; output root about 294.61 MB/1.00 GB. These readings are snapshots; each future write must pass fresh admission. No model/data download or storage reserve mutation occurred.
+- Because the same long-running external process is still visible in this latest capture and the current attempt already failed at the safe selector, no further duplicate GPU job was launched.
+
+### Acceptance and next action
+
+- **Static/contract PASS:** 79 tests, py_compile and notebook JSON; QA GPU initialization order, Brain/worker queue contract, QA/uploader state transition and rollback, size/age batch selection.
+- **Live PASS from prior controlled runs:** AudioGen, standalone TRELLIS, standalone LTX, Kokoro, Whisper, Qwen3-ASR.
+- **Live blocked:** FLUX→TRELLIS by external A100 ownership; ACE-Step by the same no-idle-A100 policy; MusicGen by incomplete model cache plus Hugging Face proxy egress failure.
+- **Still not accepted:** live Qwen2-VL compliance decision; full Brain→LTX worker→QA→SQLite→archive→real Hugging Face upload/read-after-write; resumable individual-file chunking (no such implementation found); production OEC-Play server reachability. A tar.gz holding several complete asset+JSON pairs is batch archiving, not per-file byte-range chunk/resume.
+- The one actionable blocker for image-to-3D and ACE-Step is release of the shared compute by its owner/normal service lifecycle, then one-at-a-time acceptance. Do not kill or signal PID `3347078`. The near-term target remains 2026-10-21; the authoritative original 15-day start/deadline is still not recovered.
