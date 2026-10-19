@@ -168,9 +168,10 @@ class UploadDaemonStorageTests(unittest.TestCase):
         import tempfile
         from unittest import mock
         import hf_upload_daemon as uploader
+        from types import SimpleNamespace
 
         payload = b"ABCDEFGHIJKLMNO"
-        metadata_bytes = b'{"output_type":"asset","model_type":"unit-test"}'
+        metadata_bytes = b'{}'
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             cache = root / "cache"
@@ -194,6 +195,16 @@ class UploadDaemonStorageTests(unittest.TestCase):
                 def upload_file(self, path_or_fileobj, path_in_repo, repo_id, repo_type):
                     self.objects[path_in_repo] = Path(path_or_fileobj).read_bytes()
                     self.order.append(path_in_repo)
+                def get_paths_info(self, repo_id, paths, repo_type):
+                    return [
+                        SimpleNamespace(
+                            path=path,
+                            size=len(self.objects[path]),
+                            lfs=SimpleNamespace(sha256=hashlib.sha256(self.objects[path]).hexdigest()),
+                            blob_id=None,
+                        )
+                        for path in paths if path in self.objects
+                    ]
 
             daemon = uploader.HFUploadDaemon.__new__(uploader.HFUploadDaemon)
             daemon.api = FakeHub()
@@ -258,13 +269,29 @@ class UploadDaemonStorageTests(unittest.TestCase):
                 conn.execute("INSERT INTO assets VALUES (42, ?, ?, ?, 'PENDING', '2000-01-01 00:00:00')", (str(asset), str(metadata), len(payload) + len(metadata_bytes)))
                 conn.commit()
 
+            from types import SimpleNamespace
+
             class FailingHub:
                 def __init__(self):
                     self.objects = {}
+                    self.calls = []
+                    self.fail_once = True
                 def upload_file(self, path_or_fileobj, path_in_repo, repo_id, repo_type):
-                    if path_in_repo.endswith("part-000001.bin"):
+                    self.calls.append(path_in_repo)
+                    if path_in_repo.endswith("part-000001.bin") and self.fail_once:
+                        self.fail_once = False
                         raise OSError("simulated network outage")
                     self.objects[path_in_repo] = Path(path_or_fileobj).read_bytes()
+                def get_paths_info(self, repo_id, paths, repo_type):
+                    return [
+                        SimpleNamespace(
+                            path=path,
+                            size=len(self.objects[path]),
+                            lfs=SimpleNamespace(sha256=hashlib.sha256(self.objects[path]).hexdigest()),
+                            blob_id=None,
+                        )
+                        for path in paths if path in self.objects
+                    ]
 
             daemon = uploader.HFUploadDaemon.__new__(uploader.HFUploadDaemon)
             daemon.api = FailingHub()
@@ -284,13 +311,21 @@ class UploadDaemonStorageTests(unittest.TestCase):
             self.assertNotIn("manifest.json", "".join(daemon.api.objects.keys()))
             with sqlite3.connect(db) as conn:
                 self.assertEqual(conn.execute("SELECT status FROM assets WHERE id=42").fetchone()[0], "PENDING")
+            # Retry sees and verifies part 0 by its remote SHA-256, skips it, and resumes at part 1.
+            self.assertEqual(daemon.process_queue(max_batches=1, asset_id=42, chunk_oversize=True), 1)
+            first_part = next(name for name in daemon.api.objects if name.endswith("part-000000.bin"))
+            self.assertEqual(daemon.api.calls.count(first_part), 1)
+            self.assertFalse(asset.exists())
+            self.assertFalse(metadata.exists())
+            with sqlite3.connect(db) as conn:
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM assets").fetchone()[0], 0)
             self.assertEqual(list(cache.iterdir()), [])
 
     def test_chunk_oversize_requires_explicit_bounded_cli_mode(self):
         source = (self.ROOT / "hf_upload_daemon.py").read_text(encoding="utf-8")
         self.assertIn('"--chunk-oversize"', source)
         self.assertIn('parser.error("--chunk-oversize requires --once --asset-id")', source)
-        self.assertIn("chunk_oversize= args.chunk_oversize", source.replace("chunk_oversize=args.chunk_oversize", "chunk_oversize= args.chunk_oversize"))
+        self.assertIn("max_batches=1, asset_id=args.asset_id, chunk_oversize=args.chunk_oversize", source)
 
 if __name__ == "__main__":
     unittest.main()
