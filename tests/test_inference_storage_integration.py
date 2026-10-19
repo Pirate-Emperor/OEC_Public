@@ -129,6 +129,23 @@ class InferenceStorageIntegrationTests(unittest.TestCase):
         self.assertIn('parser.error("--once requires --asset-id with a positive ID")', source)
         self.assertIn('parser.error("--asset-id can only be used with --once")', source)
 
+    def test_qa_db_override_is_limited_to_run_scoped_one_shot(self):
+        source = self._read("qa_compliance_worker.py")
+        self.assertIn('parser.add_argument(\n        "--db-path"', source)
+        self.assertIn('--db-path is permitted only with --once --asset-id ID', source)
+        self.assertIn('Path(SYSTEM_DIRS["outputs"]).expanduser().resolve() / "oec-e2e-acceptance"', source)
+        self.assertIn('resolved_db.name != "upload_queue.db"', source)
+        self.assertIn('allowed_root not in resolved_db.parents', source)
+        self.assertIn('raw_db.is_symlink()', source)
+
+    def test_qa_cache_only_mode_refuses_to_download_missing_weights(self):
+        source = self._read("qa_compliance_worker.py")
+        self.assertIn('os.environ.get("OEC_QA_CACHE_ONLY", "")', source)
+        self.assertIn('OEC_QA_CACHE_ONLY=1 forbids any model download', source)
+        cache_only_guard = source.index('if cache_only:')
+        fallback_start = source.index('print(f"[QA-NODE-GPU{self.gpu_id}] Model missing or incomplete.')
+        self.assertLess(cache_only_guard, fallback_start)
+
     def test_qa_frame_extraction_preserves_webm_and_avi_inputs(self):
         source = self._read("qa_compliance_worker.py")
         tree = ast.parse(source, filename="qa_compliance_worker.py")
