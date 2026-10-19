@@ -34,9 +34,10 @@ class StorageReserveProbeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             reserve = root / ".storage_reserve.bin"
-            reserve.write_bytes(b"r" * (1024 * 1024))
+            payload = b"reserve-sample"
+            reserve.write_bytes(payload)
             system_dirs = {"outputs": str(root)}
-            report = inspect_managed_reserve("outputs", 0.0009765625, system_dirs)
+            report = inspect_managed_reserve("outputs", len(payload) / (1024**3), system_dirs)
             self.assertEqual(report["area"], "outputs")
             with self.assertRaises(RuntimeError):
                 inspect_managed_reserve("outputs", 0.5, system_dirs)

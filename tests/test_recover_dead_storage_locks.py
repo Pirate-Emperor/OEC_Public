@@ -14,7 +14,7 @@ class RecoverDeadStorageLocksTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="oec-dead-lock-test-")
         self.root = Path(self.temp.name)
         self.reserve = self.root / ".storage_reserve.bin"
-        self.reserve.write_bytes(b"r" * 4096)
+        self.reserve.write_bytes(b"reserve-sample")
         self.system_dirs = {"outputs": str(self.root)}
         self.lock = self.root / ".storage_pause.lock"
         self.lease = self.root / ".storage_lease.json"
