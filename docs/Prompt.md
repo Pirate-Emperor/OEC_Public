@@ -1,6 +1,6 @@
 # OEC Engineering Continuation — Permanent Rules and Navigation
 
-**Purpose:** This is the first entry point for every new OEC continuation chat or engineering session. It contains durable instructions and repository navigation, not today's status. The live state belongs in [`checklist.md`](checklist.md), ongoing work belongs in [`TODO.md`](../TODO.md), and dated events belong in [the daily changelog](../changelog/README.md).
+**Purpose:** This is the first entry point for every new OEC continuation chat or engineering session. It contains durable instructions and repository navigation, not today's status. The live state belongs in [`checklist.md`](checklist.md), ongoing work belongs in [`TODO.md`](../TODO.md), and dated events belong in [the daily changelog](../changelog/README.md). For the active model-setup and inference workstream, use the task-specific [model-pipeline continuation prompt](MODEL_PIPELINE_CONTINUATION_PROMPT.md).
 
 ## 1. Required reading order
 
