@@ -226,8 +226,6 @@ def _manager_directory_capacity(required_gb: float, reserve_floor_gb: float, *, 
 
 
 def _storage_manager_status() -> dict[str, Any]:
-
-def _storage_manager_status() -> dict[str, Any]:
     """Invoke the existing CLI's read-only --status command; never start daemon mode."""
     command = [sys.executable, str(ROOT / "storage_manager.py"), "--status"]
     try:
