@@ -36,5 +36,18 @@ class BrainLtxQueueStorageTests(unittest.TestCase):
         self.assertIn('Temporary LTX input cleanup deferred by StorageManager', source)
 
 
+    def test_brain_exposes_bounded_single_use_case_orchestration(self):
+        source = (Path(__file__).resolve().parents[1] / "brain.py").read_text(encoding="utf-8")
+        self.assertIn('"--config"', source)
+        self.assertIn('"--once"', source)
+        self.assertIn('"--use-case"', source)
+        self.assertIn('parser.error("--once requires --use-case")', source)
+        self.assertIn('parser.error("--use-case can only be used with --once")', source)
+        self.assertIn('if self.use_case_filter and use_case["id"] != self.use_case_filter:', source)
+        self.assertIn('self.jobs_created += 1', source)
+        self.assertIn('self.is_running = False', source)
+        self.assertIn('raise SystemExit(1)', source)
+        self.assertIn('config_path=args.config, once=args.once, use_case=args.use_case', source)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
