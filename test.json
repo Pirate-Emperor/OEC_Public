@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-19T21:05:00+05:30",
+  "last_updated": "2026-10-19T21:08:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Current QA frame-path/transcode quota hardening passed the current-head static workflow 39278190899 at commit 486e467d8bb2: 86 tests total, py_compile, four notebook JSON checks, no ResourceWarning. Executable mocked-ffmpeg tests passed for .mp4/.webm/.avi and confirmed source bytes remain unchanged; fresh transcode quota guard passed. Latest A100 bootstrap 39277286186 ended FAILURE after three live speech smokes passed and ACE-Step checkpoint/runtime preparation passed; ACE-Step generation was blocked by no eligible idle A100, no song. A newer bootstrap 39278145617 remains in progress on oec-1; no result assumed. No live Qwen2-VL QA or remote HF upload.",
+  "latest_summary": "Current-head static acceptance 39278190899 passed 86 tests, py_compile, four notebook JSON checks and no ResourceWarning. The executable QA frame-path regression passed for .mp4/.webm/.avi without changing source bytes, and fresh transcode-quota assertion passed. Latest completed A100 bootstrap 39278145617 on oec-1 again passed Kokoro/Whisper/Qwen3-ASR (22.48/18.47/20.45 s) and ACE-Step checkpoint/isolated runtime setup, but required ACE-Step inference was blocked by no eligible idle A100; no music output. FLUX→TRELLIS latest completed run remains GPU-admission blocked. No live Qwen2-VL QA, no real HF upload/read-after-write, and no individual-file resumable chunking.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -4145,6 +4145,81 @@
         "No ACE-Step generated audio.",
         "The no-idle-A100 gate is an infrastructure blocker, not evidence of model quality failure.",
         "Current GPU/process state may differ; no process was killed."
+      ],
+      "artifact": null
+    },
+    {
+      "id": "EXP-2026-10-19-SPEECH-ACE-STEP-BOOTSTRAP-39278145617",
+      "date": "2026-10-19",
+      "category": "Sequential live speech provider inference and ACE-Step runtime/generation acceptance",
+      "approach": "Run the bootstrap workflow on the assigned oec-1 runner using existing/cached checkpoint sets; validate isolated ACE-Step source/runtime, then invoke required music generation only if the GPU admission selector finds an idle A100.",
+      "reason": "Recheck live speech service smokes and ACE-Step generation on a newer source head while preserving StorageManager admission and isolated Torch.",
+      "parameters": {
+        "workflow_run_id": 39278145617,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39278145617",
+        "job_id": 118147435541,
+        "branch": "fix/media-stack-supervision-20261019",
+        "source_sha": "249b34e7738cda7596b5019c8b096144825955bc",
+        "runner": "oec-1",
+        "speech": {
+          "kokoro": {
+            "status": "PASS",
+            "startup_plus_inference_seconds": 22.48
+          },
+          "whisper": {
+            "status": "PASS",
+            "startup_plus_inference_seconds": 18.47
+          },
+          "qwen3_asr": {
+            "status": "PASS",
+            "startup_plus_inference_seconds": 20.45
+          }
+        },
+        "ace_step": {
+          "checkpoints_complete": true,
+          "source_commit": "ca1e85fe9430179831e6bc6be790c332190a3866",
+          "isolated_python": "3.12",
+          "torch": "2.10.0+cu128",
+          "cuda": "12.8",
+          "gpu_detected": "NVIDIA A100-SXM4-40GB",
+          "shared_torch_mutated": false,
+          "storage_preflight": {
+            "model_quota_used_tb": 2.04,
+            "model_soft_tb": 2,
+            "model_hard_tb": 2.1,
+            "hard_headroom_gb": 61.19,
+            "grace_active": true,
+            "model_root_used_gb": 232.81,
+            "model_root_limit_gb": 280,
+            "output_root_used_mb": 296.78,
+            "output_root_limit_gb": 1
+          },
+          "generation_error": "GPU admission failed: RuntimeError: no idle A100 available; no ACE-Step process was started"
+        },
+        "musicgen_network_errors": [
+          "Hugging Face CDN/proxy timed out and returned No route to host for cached model files."
+        ]
+      },
+      "environment": {
+        "runner": "oec-1",
+        "gpu": "NVIDIA A100-SXM4-40GB",
+        "ace_runtime_isolated": true
+      },
+      "results": {
+        "status": "PARTIAL_PASS_ACE_GENERATION_BLOCKED",
+        "speech_passed": 3,
+        "speech_failed": 0,
+        "ace_step_runtime": "PASS",
+        "ace_step_generation": "BLOCKED_NO_IDLE_A100",
+        "ace_step_audio_produced": false,
+        "workflow_conclusion": "FAILURE"
+      },
+      "interpretation": "All three speech provider live smokes passed, and the pinned ACE-Step runtime plus complete checkpoint manifest passed. Actual ACE-Step inference was refused before a generation process started because no idle A100 was eligible. Treat the workflow as FAILURE and do not claim a generated music asset. Storage telemetry is a snapshot only.",
+      "limitations": [
+        "No ACE-Step output was produced.",
+        "No accepted FLUX PNG or TRELLIS GLB from this run.",
+        "Live Qwen2-VL compliance decisions and real HF upload were not exercised.",
+        "Storage telemetry does not authorize future writes; rerun fresh admission before any write."
       ],
       "artifact": null
     }
