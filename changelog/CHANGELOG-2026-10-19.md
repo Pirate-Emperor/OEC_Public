@@ -22,3 +22,10 @@
 - Current visual retest [39240127757](https://github.com/Killer4K-N/OEC/actions/runs/39240127757) is in progress on the same commit. The bootstrap attempt [39240127730](https://github.com/Killer4K-N/OEC/actions/runs/39240127730) was cancelled before job assignment due the shared concurrency group; it has no test or inference result. Do not trigger the bootstrap until the visual run reaches a terminal state.
 - Next: validate current-head TRELLIS GLB and LTX MP4, run one real output for Kokoro/Whisper/Qwen3-ASR/ACE-Step, then a fresh current-head FLUX PNG smoke. Treat MusicGen separately because its weights are non-commercially licensed.
 
+
+
+## 2026-10-19T18:28:04+05:30 — latest inference status
+
+- Actions runner quota reset per user; $0-only workflow gate withdrawn. Use Actions for needed A100 work, while keeping StorageManager admission and shared concurrency rules.
+- AudioGen passed (39240127736); standalone TRELLIS/LTX passed with validated GLB/MP4 (39240127757). MusicGen tests passed 4/4, but inference failed before generation because the model cache is incomplete and Hugging Face proxy access failed (39254306725). FLUX→TRELLIS failed before inference on two path-guard test fixture errors (39254474617). ACE-Step strict cache gate is committed at b84398af but bootstrap 39254306716 was cancelled before runner assignment; prior attempt 39246077924 timed out during the 4.46 GiB DiT download.
+- Next: repair FLUX fixtures, rerun combined A100 visual inference, run ACE-Step managed bootstrap and real generation, diagnose MusicGen cache/egress, then create the local multimodal orchestration. Not full-model training or deployment.
