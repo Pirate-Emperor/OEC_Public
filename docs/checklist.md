@@ -1,8 +1,8 @@
 # OEC project continuation checklist
 
-**Snapshot:** 2026-10-19 21:08 IST  
+**Snapshot:** 2026-10-19 21:10 IST  
 **Branch:** `fix/media-stack-supervision-20261019` (not merged to main)  
-**Current feature-branch head:** `481ca070910d68fa22e7d519467fd650ec1a8071`; latest tested source/test SHA `486e467d8bb2b178c5b6501a376c9295b03708a3` passed 86 tests. No merge to main.  
+**Current feature-branch head:** `ae86e14921b4ce2ad970521721087c79430c1343`; latest tested source/test SHA `486e467d8bb2b178c5b6501a376c9295b03708a3` passed 86 tests. No merge to main.  
 **Target:** user requests completion by 2026-10-21. The original 15-day start/deadline has not been recovered; do not reset or guess it.
 
 Permanent instructions are in [Prompt.md](Prompt.md); current media pipeline detail is in [MODEL_PIPELINE_CONTINUATION_PROMPT.md](MODEL_PIPELINE_CONTINUATION_PROMPT.md); daily chronological record is in [the 2026-10-19 changelog](../changelog/CHANGELOG-2026-10-19.md); consolidated engineering backlog is [TODO.md](../TODO.md).
