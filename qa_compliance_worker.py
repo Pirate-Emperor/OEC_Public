@@ -66,12 +66,6 @@ sys.excepthook = global_exception_handler
 REJECTED_DIR = os.path.join(SYSTEM_DIRS['outputs'], "rejected")
 os.makedirs(REJECTED_DIR, exist_ok=True)
 
-try:
-    from qwen_vl_utils import process_vision_info
-except ImportError:
-    process_vision_info = None
-    print("[QA-NODE] qwen-vl-utils is not installed; VLM QA cannot run until the dependency is installed.")
-
 class QANode:
     def __init__(self, gpu_id=0, purge_after_load=True):
         self.gpu_id = str(gpu_id)
@@ -83,6 +77,14 @@ class QANode:
         import torch
         self.torch = torch
         self.device = "cuda" if self.torch.cuda.is_available() else "cpu"
+        # qwen-vl-utils can import Torch transitively too; import it only after the
+        # physical CUDA device has been selected for this QA worker.
+        try:
+            from qwen_vl_utils import process_vision_info
+            self.process_vision_info = process_vision_info
+        except ImportError:
+            self.process_vision_info = None
+            print("[QA-NODE] qwen-vl-utils is not installed; VLM QA cannot run until the dependency is installed.")
         self.processor = None
         self.model = None
         self.repo_id = "Qwen/Qwen2-VL-7B-Instruct"
@@ -199,7 +201,9 @@ class QANode:
         ]
         
         text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        image_inputs, video_inputs = process_vision_info(messages)
+        if self.process_vision_info is None:
+            raise RuntimeError("qwen-vl-utils is unavailable; cannot perform Qwen2-VL QA")
+        image_inputs, video_inputs = self.process_vision_info(messages)
         inputs = self.processor(
             text=[text], images=image_inputs, videos=video_inputs, padding=True, return_tensors="pt"
         ).to(self.device)
@@ -283,112 +287,200 @@ def sweep_stuck_jobs(db_path):
     except Exception as e:
         print(f"[QA-NODE] Failed to sweep DB: {e}")
 
-def process_qa_queue(purge_after_load=True, gpu_id=0):
-    qa = QANode(gpu_id=gpu_id, purge_after_load=purge_after_load)
-    
-    sweep_stuck_jobs(QUEUE_DB_PATH)
-    
-    print(f"\n[QA-NODE] Assembly Line Active. Polling database for 'PENDING_QA' assets...")
+def process_qa_queue(purge_after_load=True, gpu_id=0, asset_id=None, once=False):
+    if once:
+        if isinstance(asset_id, bool) or not isinstance(asset_id, int) or asset_id < 1:
+            raise ValueError("targeted QA mode requires a positive --asset-id")
+        if not os.path.isfile(QUEUE_DB_PATH):
+            return "QUEUE_DATABASE_NOT_FOUND"
+        # Check the selected row before importing/loading the 7B VLM.
+        with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
+            eligible = conn.execute(
+                "SELECT 1 FROM assets WHERE id = ? AND status = 'PENDING_QA'",
+                (asset_id,),
+            ).fetchone()
+        if not eligible:
+            return "NOT_PENDING_QA"
 
+    qa = QANode(gpu_id=gpu_id, purge_after_load=purge_after_load)
+    # The continuous daemon recovers its own abandoned QA rows as before. A targeted
+    # acceptance must never sweep unrelated PROCESSING_QA rows in the shared database.
+    if not once:
+        sweep_stuck_jobs(QUEUE_DB_PATH)
+
+    print("\\n[QA-NODE] Assembly Line Active. Polling database for 'PENDING_QA' assets...")
     is_running = True
     def handle_sig(sig, frame):
         nonlocal is_running
-        print("\n[QA-NODE] Shutdown signal received. Exiting loop safely...")
+        print("\\n[QA-NODE] Shutdown signal received. Exiting loop safely...")
         is_running = False
-    
+
     signal.signal(signal.SIGINT, handle_sig)
     signal.signal(signal.SIGTERM, handle_sig)
 
     while is_running:
+        record_id = asset_id if once else None
         try:
             with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT id, asset_path, json_path FROM assets WHERE status = 'PENDING_QA' LIMIT 1")
+                if once:
+                    cursor.execute(
+                        "SELECT id, asset_path, json_path FROM assets WHERE id = ? AND status = 'PENDING_QA' LIMIT 1",
+                        (asset_id,),
+                    )
+                else:
+                    cursor.execute(
+                        "SELECT id, asset_path, json_path FROM assets WHERE status = 'PENDING_QA' LIMIT 1"
+                    )
                 row = cursor.fetchone()
-                
+
             if not row:
+                if once:
+                    return "NOT_PENDING_QA"
                 time.sleep(5)
                 if random.random() < 0.1:
                     sweep_stuck_jobs(QUEUE_DB_PATH)
                 continue
-                
+
             record_id, raw_vid_path, json_path = row
-            
             with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                conn.execute("UPDATE assets SET status = 'PROCESSING_QA' WHERE id = ?", (record_id,))
-                
-            print(f"\n[QA-NODE] Evaluating Asset ID: {record_id} | {os.path.basename(raw_vid_path)}")
-            
+                cursor = conn.execute(
+                    "UPDATE assets SET status = 'PROCESSING_QA' WHERE id = ? AND status = 'PENDING_QA'",
+                    (record_id,),
+                )
+                if cursor.rowcount != 1:
+                    if once:
+                        return "NOT_PENDING_QA"
+                    continue
+
+            print(f"\\n[QA-NODE] Evaluating Asset ID: {record_id} | {os.path.basename(raw_vid_path)}")
             if not os.path.exists(raw_vid_path) or not os.path.exists(json_path):
-                print(f"[QA-NODE] Files missing from disk. Deleting record.")
+                print("[QA-NODE] Files missing from disk.")
                 with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                    conn.execute("DELETE FROM assets WHERE id = ?", (record_id,))
+                    if once:
+                        conn.execute(
+                            "UPDATE assets SET status = 'FAILED_MISSING_FILE' WHERE id = ?",
+                            (record_id,),
+                        )
+                    else:
+                        conn.execute("DELETE FROM assets WHERE id = ?", (record_id,))
+                    conn.commit()
+                if once:
+                    return "FAILED_MISSING_FILE"
                 continue
-            
-            with open(json_path, 'r') as f:
-                metadata = json.load(f)
-                
+
+            with open(json_path, 'r', encoding='utf-8') as handle:
+                metadata = json.load(handle)
             frame_path, is_extracted = qa.extract_evaluation_frame(raw_vid_path)
             if frame_path:
                 analysis = qa.analyze_and_tag(frame_path)
                 if is_extracted:
-                    os.remove(frame_path) 
-                
+                    os.remove(frame_path)
                 category = analysis.get("category", 1)
-                
+
                 if category == 1:
                     reason = analysis.get("rejection_reason", "Failed Adobe Stock Guidelines")
-                    print(f"[QA-NODE] ❌ REJECTED: {reason}. Moving to trash.")
-                    
-                    shutil.move(raw_vid_path, os.path.join(REJECTED_DIR, os.path.basename(raw_vid_path)))
-                    os.remove(json_path)
-                    
+                    print(f"[QA-NODE] REJECTED: {reason}. Moving to rejected.")
+                    raw_size = os.path.getsize(raw_vid_path) if os.path.isfile(raw_vid_path) else 0
+                    with managed_storage_operation(
+                        "outputs", required_gb=max(0.001, raw_size / BYTES_PER_GB),
+                        require_fresh_quota=True, minimum_free_gb=0.05,
+                    ):
+                        os.makedirs(REJECTED_DIR, exist_ok=True)
+                        shutil.move(raw_vid_path, os.path.join(REJECTED_DIR, os.path.basename(raw_vid_path)))
+                        if os.path.exists(json_path):
+                            os.remove(json_path)
                     with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
                         conn.execute("DELETE FROM assets WHERE id = ?", (record_id,))
+                        conn.commit()
+                    if once:
+                        return "REJECTED"
                     continue
-                    
+
                 cat_string = "Photorealistic / Human-Created" if category == 3 else "AI-Generated Style"
-                print(f"[QA-NODE] ✅ PASSED. Category: {cat_string}")
-                
+                print(f"[QA-NODE] PASSED. Category: {cat_string}")
                 metadata["qa_category"] = category
                 metadata["seo_title"] = analysis.get("title", "Cinematic AI Generation")
                 metadata["seo_keywords"] = analysis.get("keywords", [])
                 metadata["qa_passed"] = True
-            
                 improved_vid_path = raw_vid_path.replace(".mp4", "_improved.mp4")
                 success = qa.improve_and_standardize_video(raw_vid_path, improved_vid_path)
-                
                 if success:
                     if raw_vid_path.lower().endswith(('.mp4', '.webm', '.avi')):
                         os.replace(improved_vid_path, raw_vid_path)
-                        
-                    with open(json_path, "w") as f:
-                        json.dump(metadata, f, indent=4)
-                        
+                    with managed_storage_operation(
+                        "outputs", required_gb=0.001, require_fresh_quota=True, minimum_free_gb=0.05
+                    ):
+                        with open(json_path, "w", encoding="utf-8") as handle:
+                            json.dump(metadata, handle, indent=4)
                     new_size = os.path.getsize(raw_vid_path) + os.path.getsize(json_path)
                     with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
                         mark_upload_pending(conn, record_id, new_size)
-                    print(f"[QA-NODE] QA Complete. Asset handed over to HF Upload Daemon.")
+                        conn.commit()
+                    print("[QA-NODE] QA Complete. Asset handed over to HF Upload Daemon.")
+                    if once:
+                        return "PENDING_UPLOAD"
                 else:
-                    print(f"[QA-NODE] Quality Improver failed. Rejecting asset.")
+                    print("[QA-NODE] Quality Improver failed.")
                     with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
                         conn.execute("UPDATE assets SET status = 'FAILED_IMPROVER' WHERE id = ?", (record_id,))
+                        conn.commit()
+                    if once:
+                        return "FAILED_IMPROVER"
             else:
-                 print(f"[QA-NODE] QA Extraction failed. Check if FFmpeg is installed/working.")
-                 with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
-                        conn.execute("UPDATE assets SET status = 'FAILED_QA_EXTRACTION' WHERE id = ?", (record_id,))
-                        
-        except Exception as e:
-            print(f"[QA-NODE] Fatal error in QA loop: {e}")
+                print("[QA-NODE] QA frame extraction failed. Check FFmpeg and input media.")
+                with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
+                    conn.execute("UPDATE assets SET status = 'FAILED_QA_EXTRACTION' WHERE id = ?", (record_id,))
+                    conn.commit()
+                if once:
+                    return "FAILED_QA_EXTRACTION"
+
+        except Exception as exc:
+            print(f"[QA-NODE] Fatal error in QA loop: {type(exc).__name__}: {exc}")
+            if once:
+                try:
+                    with sqlite3.connect(QUEUE_DB_PATH, timeout=30) as conn:
+                        conn.execute(
+                            "UPDATE assets SET status = 'FAILED_QA_RUNTIME' WHERE id = ? AND status = 'PROCESSING_QA'",
+                            (record_id,),
+                        )
+                        conn.commit()
+                except Exception as state_exc:
+                    print(f"[QA-NODE] Could not record targeted QA runtime failure: {type(state_exc).__name__}")
+                raise
             time.sleep(10)
+
+    return "STOPPED"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="QA & Compliance Worker Node")
     parser.add_argument("--purge", action="store_true", help="Purge model from disk after loading into VRAM (Default)")
     parser.add_argument("--no-purge", dest="purge", action="store_false", help="Keep model on disk after loading")
     parser.add_argument("--gpu", type=int, default=0, help="Physical GPU index selected before importing Torch")
+    parser.add_argument("--once", action="store_true", help="Process only the exact selected PENDING_QA row and exit.")
+    parser.add_argument("--asset-id", type=int, help="Positive asset ID; required for --once, no fallback to other rows.")
     parser.set_defaults(purge=True)
     args = parser.parse_args()
+    if args.once and (args.asset_id is None or args.asset_id < 1):
+        parser.error("--once requires --asset-id with a positive ID")
+    if not args.once and args.asset_id is not None:
+        parser.error("--asset-id can only be used with --once")
     
     print("[SYSTEM] Starting QA Compliance Worker...")
+    if args.once:
+        try:
+            outcome = process_qa_queue(
+                purge_after_load=args.purge, gpu_id=args.gpu, asset_id=args.asset_id, once=True
+            )
+        except Exception as exc:
+            print(f"[QA_ONCE] FAIL {type(exc).__name__}: {exc}", file=sys.stderr)
+            raise SystemExit(1) from exc
+        if outcome == "PENDING_UPLOAD":
+            print(f"[QA_ONCE] PASS asset_id={args.asset_id} status=PENDING_UPLOAD")
+            raise SystemExit(0)
+        if outcome == "REJECTED":
+            print(f"[QA_ONCE] REJECTED asset_id={args.asset_id} (policy decision completed)")
+            raise SystemExit(0)
+        print(f"[QA_ONCE] FAIL asset_id={args.asset_id} outcome={outcome}", file=sys.stderr)
+        raise SystemExit(1)
     process_qa_queue(purge_after_load=args.purge, gpu_id=args.gpu)
