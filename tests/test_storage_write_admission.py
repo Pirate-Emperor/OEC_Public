@@ -78,8 +78,10 @@ class StorageWriteAdmissionTests(unittest.TestCase):
             self.assertLess(source.index("os.makedirs(OUTPUT_DIR, exist_ok=True)"),
                             source.index("glb.export(glb_path, extension_webp=True)"))
         audio = next(s for _, s in code_cells("pipeline_audiocraft.ipynb") if "audio_write(" in s)
+        # HEADLESS_SMOKE writes to runner-local ephemeral storage by design. Check
+        # the last (managed-production) mkdir, not the earlier scratch-path mkdir.
         self.assertLess(audio.rindex("Storage admission denied inside managed write"),
-                        audio.index("AUDIOGEN_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)"))
+                        audio.rindex("AUDIOGEN_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)"))
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
         self.assertLess(cli.index('_preflight_output("inside managed write")'),
                         cli.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
