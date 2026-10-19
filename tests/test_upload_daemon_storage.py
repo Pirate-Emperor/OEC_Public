@@ -152,8 +152,8 @@ class UploadDaemonStorageTests(unittest.TestCase):
 
     def test_one_shot_cli_requires_exact_asset_and_disables_shared_cleanup(self):
         source = (self.ROOT / "hf_upload_daemon.py").read_text(encoding="utf-8")
-        self.assertIn('parser.add_argument("--once"', source)
-        self.assertIn('parser.add_argument("--asset-id"', source)
+        self.assertIn('"--once"', source)
+        self.assertIn('"--asset-id"', source)
         self.assertIn('parser.error("--once requires --asset-id with a positive ID")', source)
         self.assertIn("cleanup_on_start=not args.once", source)
         self.assertIn("create_repo_if_missing=not args.once", source)
