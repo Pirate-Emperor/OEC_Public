@@ -31,7 +31,12 @@ class DualLogger:
         self.log_file.flush()
         
 class TheBrain:
-    def __init__(self, config_path="brain_config.json"):
+    def __init__(self, config_path="brain_config.json", *, once=False, use_case=None):
+        if once and not use_case:
+            raise ValueError("bounded Brain mode requires an explicit use-case ID")
+        self.once = once
+        self.use_case_filter = use_case
+        self.jobs_created = 0
         log_path = os.path.join(SYSTEM_DIRS['logs'], "brain.log")
         sys.stdout = DualLogger(log_path)
         sys.stderr = sys.stdout
@@ -49,6 +54,12 @@ class TheBrain:
             os.makedirs(self.jobs_dir, exist_ok=True)
         
         self.load_config()
+        if self.use_case_filter and not any(
+            item.get("id") == self.use_case_filter
+            for item in self.config.get("use_cases", [])
+        ):
+            print(f"[CRITICAL] Unknown use-case ID: {self.use_case_filter}")
+            sys.exit(2)
         self.is_running = True
 
         self._setup_signals()
@@ -249,8 +260,10 @@ class TheBrain:
             queue_write_failed = False
 
             for use_case in self.config["use_cases"]:
-                if queue_write_failed:
+                if queue_write_failed or not self.is_running:
                     break
+                if self.use_case_filter and use_case["id"] != self.use_case_filter:
+                    continue
                 current_count = self.get_current_job_count(use_case["id"])
                 target_count = use_case["target_queue_count"]
                 deficit = target_count - current_count
@@ -311,11 +324,21 @@ class TheBrain:
                             print(f"     + Queued [{out_type} | {dur}s]: {prompt_data['text'][:55]}...")
                             total_deficit += 1
                             deficit -= 1
+                            self.jobs_created += 1
+                            if self.once:
+                                print("[THE BRAIN] Bounded one-shot accepted one job; exiting after publication.")
+                                self.is_running = False
+                                break
 
-                        if queue_write_failed:
+                        if queue_write_failed or not self.is_running:
                             break
                 else:
                     print(f"[THE BRAIN] {use_case['id']} queue is healthy ({current_count}/{target_count}).")
+
+            if self.once:
+                if self.jobs_created != 1:
+                    print("[THE BRAIN] One-shot pass did not publish a job; no second polling cycle will run.")
+                break
 
             if queue_write_failed:
                 self.polling_interval = self.min_interval
@@ -328,6 +351,8 @@ class TheBrain:
                     break
                 time.sleep(1)
 
+        return self.jobs_created
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AIEROS Brain Orchestrator")
     parser.add_argument(
@@ -335,7 +360,25 @@ if __name__ == "__main__":
         action="store_true",
         help="Disable proxy routing (Use this when running on the Login Node)"
     )
+    parser.add_argument(
+        "--config",
+        default="brain_config.json",
+        help="Path to the Brain config JSON (supports a run-scoped smoke config).",
+    )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Publish at most one new prompt job, then exit without another polling cycle.",
+    )
+    parser.add_argument(
+        "--use-case",
+        help="Restrict --once to this exact configured use-case ID.",
+    )
     args = parser.parse_args()
+    if args.once and not args.use_case:
+        parser.error("--once requires --use-case")
+    if not args.once and args.use_case:
+        parser.error("--use-case can only be used with --once")
 
     if args.no_proxy:
         print("[SYSTEM] '--no-proxy' flag detected. Entering Offline/Local-Only Mode.")
@@ -344,5 +387,10 @@ if __name__ == "__main__":
         for p in proxies_to_remove:
             os.environ.pop(p, None)
 
-    brain = TheBrain()
-    brain.run()
+    brain = TheBrain(config_path=args.config, once=args.once, use_case=args.use_case)
+    jobs_created = brain.run()
+    if args.once:
+        if jobs_created != 1:
+            print(f"[BRAIN_ONCE] FAIL expected exactly one new job, created={jobs_created}", file=sys.stderr)
+            raise SystemExit(1)
+        print(f"[BRAIN_ONCE] PASS jobs_created={jobs_created} use_case={args.use_case}")
