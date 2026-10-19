@@ -5,6 +5,18 @@ import unittest
 class UploadDaemonStorageTests(unittest.TestCase):
     ROOT = Path(__file__).resolve().parents[1]
 
+    def tearDown(self):
+        # The production daemon configures a process-wide FileHandler at import.
+        # Close only that test-created log handler so the isolated contract test
+        # leaves no unclosed file descriptor or ResourceWarning behind.
+        import logging
+
+        root_logger = logging.getLogger()
+        for handler in tuple(root_logger.handlers):
+            if isinstance(handler, logging.FileHandler) and Path(handler.baseFilename).name == "upload_daemon.log":
+                root_logger.removeHandler(handler)
+                handler.close()
+
     def test_upload_daemon_has_timed_partial_flush(self):
         source = (self.ROOT / "hf_upload_daemon.py").read_text(encoding="utf-8")
         self.assertIn("partial_batch_max_age_seconds", source)
