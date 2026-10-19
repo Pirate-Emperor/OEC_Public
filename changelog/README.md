@@ -1,7 +1,7 @@
 # OEC Work Changelog
 
-- [2026-10-19 — continuation entry point and live state recovery](CHANGELOG-2026-10-19.md)
-  - Added `docs/Prompt.md` as the permanent session entry point and `docs/checklist.md` as the timestamped cross-repository status/acceptance checklist. Updated the top of `TODO.md` with navigation links. Live observations include an active visual-sidecar smoke and pending bootstrap in OEC core, the completed real TUM RGB-D configuration-parallel comparison, and the unresolved original 15-day deadline date. Documentation-only changes; no workflow was deliberately triggered.
+- [2026-10-19 — continuation entry point and media-inference handoff](CHANGELOG-2026-10-19.md)
+  - Added `docs/Prompt.md`, refreshed `docs/checklist.md` and `TODO.md`, and created `docs/MODEL_PIPELINE_CONTINUATION_PROMPT.md`. The user confirmed Actions runner quota reset and withdrew the prior $0-only prerequisite. Current model status: AudioGen and standalone TRELLIS/LTX pass; MusicGen is blocked before inference by cache/egress; FLUX→TRELLIS failed on path-guard test fixtures; ACE-Step guard is committed but not yet A100-verified. See the dated record and task prompt for run links and next steps.
 
 Daily engineering records live here. Use the local Asia/Kolkata date in each filename. Append work to the current day's file while the date remains the same; create a new `CHANGELOG-YYYY-MM-DD.md` on the next date.
 
