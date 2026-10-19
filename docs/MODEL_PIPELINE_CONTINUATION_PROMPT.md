@@ -3,7 +3,7 @@
 **Evidence checkpoint:** 2026-10-19, 21:10 IST  
 **Primary repository:** [Killer4K-N/OEC](https://github.com/Killer4K-N/OEC)  
 **Implementation branch:** `fix/media-stack-supervision-20261019`  
-**Current feature-branch head:** `599dc682774725133f2278e13b42bde15e6d4d04` at snapshot; latest tested source/test SHA is `85431311caf28e6e3ede293fdcc959f86419c402`. Latest tracker/documentation commits follow the tested code; no main merge.  
+**Latest tested source/test SHA:** `85431311caf28e6e3ede293fdcc959f86419c402` (90-test pass in [run 39291422187](https://github.com/CalamityStriker/OEC/actions/runs/39291422187)). Newer feature-branch commits update experiment/status/docs only; no source-code changes after this tested SHA and no merge to main.  
 **Scope:** prepare model runtimes and checkpoints, generate real inference outputs on the assigned A100s, connect the model calls into a repeatable local media-production pipeline, validate artifacts and track every result.
 
 ## Core instruction
