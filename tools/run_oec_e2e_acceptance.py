@@ -20,12 +20,13 @@ import time
 import traceback
 import uuid
 from pathlib import Path
-from asset_status import UPLOAD_PENDING
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+from asset_status import UPLOAD_PENDING
 
 
 class GateBlocked(RuntimeError):

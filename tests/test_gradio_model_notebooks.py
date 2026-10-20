@@ -68,6 +68,11 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn("Enforce independent speech and ACE-Step acceptance", workflow)
         self.assertIn('ACE_LIVE_OUTCOME: ${{ steps.ace_step_live.outcome }}', workflow)
 
+    def test_gradio_client_uses_typed_file_data_for_asr_inputs(self):
+        source = (ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
+        self.assertIn("from gradio_client import Client, handle_file", source)
+        self.assertIn("handle_file(str(audio_file))", source)
+
     def test_service_ui_does_not_import_provider_ml_packages(self):
         for name in ("pipeline_acestep_gradio.ipynb","pipeline_kokoro_gradio.ipynb",
                      "pipeline_whisper_gradio.ipynb","pipeline_qwen3_asr_gradio.ipynb"):

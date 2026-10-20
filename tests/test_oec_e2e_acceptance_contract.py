@@ -24,6 +24,12 @@ class OecE2EAcceptanceContractTests(unittest.TestCase):
         self.assertIn("processes_are_never_killed", admission)
         self.assertIn("no A100 has at least 30 GiB free VRAM", self.source)
 
+    def test_upload_pending_import_follows_root_path_setup(self):
+        root_setup = self.source.index("ROOT = Path(__file__).resolve().parents[1]")
+        import_position = self.source.index("from asset_status import UPLOAD_PENDING")
+        self.assertGreater(import_position, root_setup)
+        self.assertIn("row[0] != UPLOAD_PENDING", self.source)
+
     def test_runner_override_does_not_disable_gpu_admission(self):
         self.assertIn("if runner != expected_runner:", self.source)
         self.assertIn("min_free_mib=30000", self.source)
