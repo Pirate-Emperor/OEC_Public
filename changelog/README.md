@@ -99,3 +99,6 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 - [2026-10-20 — latest static pass and persistent A100 checkout diagnosis](CHANGELOG-2026-10-20.md)
   - Static run [39379628368](https://github.com/CalamityStriker/OEC/actions/runs/39379628368) passed all 14 test command groups (102 logged test cases); new notebook suite 3/3 passed.
   - Sync diagnostic [39379628387](https://github.com/CalamityStriker/OEC/actions/runs/39379628387) found detached HEAD 081aaf34f6379873bdc925d1dcf6b9c3d50349d3 and 662 dirty/untracked entries in the persistent checkout. Sync remained blocked, without modifying local files.
+
+
+- Additional model audit: the repository also contains legacy `pipeline_wan_video.ipynb` (Wan 2.1), which is not currently accepted: it has no Gradio UI, an unbound `SYSTEM_DIRS` reference, and selects GPU based on free memory alone. A dedicated environment/worker audit remains open; shared `phase1` was not modified.

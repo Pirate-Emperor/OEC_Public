@@ -7,8 +7,8 @@
 
 | Model / workflow | Notebook | UI kernel / inference environment | Backend | Current evidence |
 |---|---|---|---|---|
-| LTX-2.3 text/image-to-video | pipeline_ltx_video.ipynb | phase1_ltx | Existing LTX worker/sidecar, loopback port 7869 | Valid MP4 from [A100 run 39278268411](https://github.com/CalamityStriker/OEC/actions/runs/39278268411); joined Brain→QA→upload remains open |
-| TRELLIS.2 image-to-3D | pipeline_trellis_3d.ipynb, pipeline_trellis_3d_only.ipynb | phase2_3d | Existing worker/sidecar, loopback port 7868 | GLB generated and reopened; mesh was not watertight |
+| LTX-2.3 text/image-to-video | pipeline_ltx_video.ipynb | phase1_ltx | Existing LTX worker/sidecar, manager default loopback port 17869 (smoke may override) | Valid MP4 from [A100 run 39278268411](https://github.com/CalamityStriker/OEC/actions/runs/39278268411); joined Brain→QA→upload remains open |
+| TRELLIS.2 image-to-3D | pipeline_trellis_3d.ipynb, pipeline_trellis_3d_only.ipynb | phase2_3d | Existing worker/sidecar, manager default loopback port 17868 (smoke may override) | GLB generated and reopened; mesh was not watertight |
 | FLUX image generation | pipeline_flux_only.ipynb | phase2_3d | pipeline_flux_image.py; combined CLI pipeline_flux_trellis.py | Current-head PNG→GLB A100 acceptance still open |
 | AudioGen sound effects | pipeline_audiogen_gradio.ipynb; existing pipeline_audiocraft.ipynb retained | phase1 / AudioCraft 1.3.0, Torch 2.1.0, CUDA 11.8 | pipeline_audiogen.py --offline | Previous short WAV smoke PASS; CC-BY-NC 4.0 weights |
 | MusicGen music | pipeline_musicgen_gradio.ipynb | phase1 / AudioCraft 1.3.0, Torch 2.1.0, CUDA 11.8 | pipeline_musicgen.py --offline | BLOCKED before inference by incomplete cache and HF proxy/egress failure; no WAV |
@@ -102,3 +102,8 @@ A fail-closed workflow attempts to fast-forward the persistent $HOME/OEC checkou
 ## Exact persistent checkout status (2026-10-20)
 
 Read-only preflight in run 39379628387/job 118485509739 confirmed: origin matches CalamityStriker/OEC; $HOME/OEC is detached at 081aaf34f6379873bdc925d1dcf6b9c3d50349d3; the expected local branch does not exist; the origin tracking ref does exist; 662 dirty/untracked entries are present. The sync helper correctly stopped. Do not run reset/clean/checkout over this state. Review the local status/diffs and back up user work first, or prepare a separate clean worktree once storage and path capacity are verified.
+
+
+## Additional repository model: Wan 2.1 (not yet accepted)
+
+The existing `pipeline_wan_video.ipynb` declares the `phase1` Python 3.9.25 kernel and embeds a Wan2.1-T2V-14B class in a notebook cell; it is not a separate worker or Gradio application. It references `SYSTEM_DIRS` without binding that name (it imports `core_config` only), selects GPU by free memory alone, and includes historical saved outputs. Therefore it is **not** counted as working or integrated. Do not install additional packages into shared `phase1` to make it run. First verify the cached Wan model, PyTorch/diffusers versions, and an isolated environment; then implement a dedicated, process-aware, StorageManager-gated worker plus a Gradio client and static/runtime checks.

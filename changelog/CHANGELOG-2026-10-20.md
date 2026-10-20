@@ -31,3 +31,6 @@
 - Latest static/storage workflow [39379628368](https://github.com/CalamityStriker/OEC/actions/runs/39379628368), job 118485509728, passed on source SHA b6de4b086705caa30a1705039baf4ac49996725a. All 14 command groups passed (102 logged test cases), including new Gradio notebook tests 3/3.
 - Read-only A100 checkout diagnostic [39379628387](https://github.com/CalamityStriker/OEC/actions/runs/39379628387), job 118485509739, found origin=EXPECTED, detached HEAD `081aaf34f6379873bdc925d1dcf6b9c3d50349d3`, no local feature branch, and 662 dirty/untracked entries. Safe sync refused; no checkout/merge/reset/file changes were made. Preserve those local entries and manually review before synchronization.
 - Live E2E remains blocked before inference by external PID 3347078 attached to all eight A100s. No LTX generation, Qwen2-VL decision, HF upload or read-after-write took place.
+
+
+- Additional model audit: found the existing `pipeline_wan_video.ipynb` (Wan 2.1). The legacy notebook has no Gradio UI, uses historical saved cell outputs, references `SYSTEM_DIRS` without binding it, and picks GPU based only on free memory. Logged as an unaccepted model to refactor under an isolated environment; no Wan package install was attempted.

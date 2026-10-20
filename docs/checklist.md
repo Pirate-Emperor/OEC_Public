@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-10-20 — model-specific Gradio rollout added; live acceptance status below  
 **Branch:** `fix/media-stack-supervision-20261019` (not merged to main)  
-**Latest tested code SHA:** `c79401c00182e94f3bc3f4d38109174f0662c7f5` passed the complete static/storage workflow in [run 39379246551](https://github.com/CalamityStriker/OEC/actions/runs/39379246551), job `118484298605`; the new Gradio notebook suite passed 3/3. Current branch head may advance with the tracker update; branch `fix/media-stack-supervision-20261019`; not merged to main.  
+**Latest tested code SHA:** `b6de4b086705caa30a1705039baf4ac49996725a` passed the complete static/storage workflow in [run 39379628368](https://github.com/CalamityStriker/OEC/actions/runs/39379628368), job `118485509728`; the new Gradio notebook suite passed 3/3. Current branch head may advance with the tracker update; branch `fix/media-stack-supervision-20261019`; not merged to main.  
 **Target:** user requests completion by 2026-10-21. The original 15-day start/deadline has not been recovered; do not reset or guess it.
 
 Permanent instructions are in [Prompt.md](Prompt.md); current media pipeline detail is in [MODEL_PIPELINE_CONTINUATION_PROMPT.md](MODEL_PIPELINE_CONTINUATION_PROMPT.md); daily chronological record is in [the 2026-10-19 changelog](../changelog/CHANGELOG-2026-10-19.md); consolidated engineering backlog is [TODO.md](../TODO.md).
@@ -70,7 +70,7 @@ The newest StorageManager snapshot from run 39271901007 showed 2.04/2.10 TB grou
 
 ## Remaining acceptance gates
 
-1. [ ] Read-only diagnose the persistent `$HOME/OEC` checkout (actual HEAD, branch list, dirty count and whether the intended local branch exists), then manually resolve the detached-HEAD state without discarding user data; re-run the fail-closed sync and require `OEC_A100_SYNC=PASS` plus matching expected/actual SHA.
+1. [ ] Recover the persistent `$HOME/OEC` checkout safely. Read-only diagnostics are complete: origin is correct; HEAD is `081aaf34f6379873bdc925d1dcf6b9c3d50349d3`; checkout is detached; expected local branch missing; 662 dirty/untracked entries; expected remote-tracking ref exists. Back up/review the dirty state, then use a reviewed named branch or separate clean worktree and require `OEC_A100_SYNC=PASS` plus matching expected/actual SHA.
 2. [ ] Obtain normal release of all A100 contexts by the external process owner; do not kill/signal PID 3347078. Recheck `nvidia-smi` and fresh StorageManager state afterward.
 3. [ ] Run current-head FLUX→TRELLIS on the assigned A100 and validate a generated PNG plus a reopened GLB.
 4. [ ] Generate an actual ACE-Step FLAC in its isolated venv; no accepted music artifact exists yet.
@@ -102,3 +102,6 @@ git ls-files --others --exclude-standard | sed -n '1,100p'
 ```
 
 Review/backup those 662 entries first. Do not reset, clean or overwrite them. After preserving needed changes, make a reviewed named branch or a separate clean worktree for the OEC feature branch; only then retry a normal fast-forward and compare exact SHAs.
+
+
+10. [ ] **Wan 2.1 (additional model found):** `pipeline_wan_video.ipynb` is an old `phase1`/Python 3.9 notebook with stored July outputs, no Gradio UI cell, GPU selection based only on free memory, and code that refers to `SYSTEM_DIRS` without importing/binding it. Treat it as unverified; refactor only after the available Wan dependencies/cache/environment are identified and a separate worker with GPU-ownership + StorageManager gates can be tested. Do not install Wan dependencies into `phase1` as a shortcut.
