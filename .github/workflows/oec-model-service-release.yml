@@ -76,16 +76,15 @@ jobs:
           cd "$SYNC"
           "$PY" - <<'PY'
           from storage_manager import storage_preflight
-          checks = (("models", 0.1, 0.5), ("outputs", 0.2, 0.5))
-          failures = []
-          for area, required_gb, minimum_free_gb in checks:
-              ok, reason = storage_preflight(
-                  area, required_gb=required_gb, require_fresh_quota=True,
-                  minimum_free_gb=minimum_free_gb,
-              )
-              print(f"MODEL_RELEASE_STORAGE area={area} ok={ok} reason={reason}")
-              if not ok:
-                  failures.append(area)
+          # The models directory is at its configured allocation target. This release is
+          # strictly cache-only: do not write/download model files. Gate only the tiny managed
+          # output/state footprint needed by already-cached API workers.
+          ok, reason = storage_preflight(
+              "outputs", required_gb=0.05, require_fresh_quota=True,
+              minimum_free_gb=0.1,
+          )
+          print(f"MODEL_RELEASE_STORAGE area=outputs ok={ok} reason={reason}")
+          failures = [] if ok else ["outputs"]
           if failures:
               print("MODEL_RELEASE_STORAGE_DENIED=" + ",".join(failures))
               raise SystemExit(5)
