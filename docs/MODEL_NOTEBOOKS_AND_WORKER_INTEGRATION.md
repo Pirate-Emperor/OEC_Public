@@ -109,16 +109,16 @@ Read-only preflight in run 39379628387/job 118485509739 confirmed: origin matche
 The existing `pipeline_wan_video.ipynb` declares the `phase1` Python 3.9.25 kernel and embeds a Wan2.1-T2V-14B class in a notebook cell; it is not a separate worker or Gradio application. It references `SYSTEM_DIRS` without binding that name (it imports `core_config` only), selects GPU by free memory alone, and includes historical saved outputs. Therefore it is **not** counted as working or integrated. Do not install additional packages into shared `phase1` to make it run. First verify the cached Wan model, PyTorch/diffusers versions, and an isolated environment; then implement a dedicated, process-aware, StorageManager-gated worker plus a Gradio client and static/runtime checks.
 
 
-## Clean local A100 test checkout
+## Canonical local A100 checkout
 
-The existing `$HOME/OEC` checkout has 662 dirty/untracked entries and is detached. The sync workflow never resets or overwrites it. If the in-place fast-forward guard blocks, `tools/create_clean_a100_test_worktree.sh` checks StorageManager admission first and creates or updates only the dedicated, clean `$HOME/OEC_feature_sync` worktree. It refuses a pre-existing unregistered/dirty target, uses `--detach` and verifies actual SHA equals origin. Look for `OEC_CLEAN_WORKTREE_SYNC=PASS` and `A100_CHECKOUT_ACTUAL_SHA=<expected>` in [the sync workflow](../.github/workflows/oec-a100-local-sync.yml). If StorageManager denies the operation or the target is dirty, it does not force a write.
+`$HOME/OEC` is the only supported working checkout. The former sync helper created `$HOME/OEC_feature_sync` when the primary checkout was dirty or detached, which split commands and tests across two roots. That fallback is retired. Every push to `fix/media-stack-supervision-20261019` now starts the bounded `.github/workflows/oec-root-sync.yml` workflow on `oec-2` (12-minute job cap). It checks fresh StorageManager admission, refuses to change source while known OEC inference/queue processes are active, saves the original HEAD and tracked edits in Git recovery refs/stash, preserves non-ignored untracked files in Git metadata, and advances `$HOME/OEC` to the exact remote SHA. It removes `OEC_feature_sync` only after verifying that the path is a registered linked worktree of the canonical checkout.
 
-Once the workflow passes, use `cd "$HOME/OEC_feature_sync"` for notebook/test commands below. This is a separate checkout; the old 662-entry `$HOME/OEC` tree remains untouched.
+For every notebook/test command, use `OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"` and `cd "$OEC_ROOT"`. Compare `git -C "$HOME/OEC" rev-parse HEAD` with the current branch tip after the root-sync workflow succeeds. Do not run the retired `tools/create_clean_a100_test_worktree.sh` helper.
 
 
-## Sync result for this session
+## Historical sync result
 
-Latest run [39380928762](https://github.com/CalamityStriker/OEC/actions/runs/39380928762), job 118489623737, passed by advancing `$HOME/OEC_feature_sync` after fresh StorageManager admission. Exact target and actual source SHA: `132a8a5820a104ec27c14a87c9af3d4f84e83b98`. The existing `$HOME/OEC` detached/dirty checkout was preserved. The static workflow [39380928743](https://github.com/CalamityStriker/OEC/actions/runs/39380928743) passed on that source candidate; this is not a live inference pass.
+The former worktree-based run [39380928762](https://github.com/CalamityStriker/OEC/actions/runs/39380928762), job 118489623737, advanced `$HOME/OEC_feature_sync` to `132a8a5820a104ec27c14a87c9af3d4f84e83b98` while deliberately preserving the old dirty/detached `$HOME/OEC` checkout. That result is historical; verify the latest canonical-root workflow for the actual A100 checkout SHA. The static workflow [39380928743](https://github.com/CalamityStriker/OEC/actions/runs/39380928743) validated source/static tests, not live inference.
 
 
 ## Live Gradio callback acceptance

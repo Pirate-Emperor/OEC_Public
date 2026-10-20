@@ -49,10 +49,13 @@ Before a real upload, verify the target dataset repository and licence/consent c
 
 ## 3. Safe preflight before launching anything
 
+**Canonical source path:** `OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"`. `$HOME/OEC` is the only supported checkout. Do not create or use `OEC_feature_sync`; the bounded `.github/workflows/oec-root-sync.yml` workflow reconciles the canonical path with GitHub, preserving tracked edits and loose files in Git recovery metadata before switching. Run the read-only preflight below after sync and before starting any model or daemon.
+
+
 Run these on the **approved cluster host/allocation that owns the OEC paths**, not in a new GitHub Actions shell:
 
 \`\`\`bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 source "$HOME/Conda/bin/activate"
 
@@ -75,7 +78,7 @@ These are the OEC scripts used by the current design. Start each in the environm
 **Storage manager** — the no-argument invocation runs the continuous monitor. \`--status\` is read-only.
 
 \`\`\`bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 conda run --no-capture-output -n oec_deploy python "$OEC_ROOT/storage_manager.py"
 \`\`\`
@@ -83,7 +86,7 @@ conda run --no-capture-output -n oec_deploy python "$OEC_ROOT/storage_manager.py
 **Brain prompt/queue orchestrator** — confirm that the configured DeepSeek-R1 model is complete in the model cache before launch. Missing weights require the script's fresh-quota StorageManager admission.
 
 \`\`\`bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 conda run --no-capture-output -n "$OEC_BRAIN_ENV" python "$OEC_ROOT/brain.py"
 \`\`\`
@@ -93,7 +96,7 @@ Before using this command, set \`OEC_BRAIN_ENV\` to the **existing environment t
 **LTX multi-GPU queue worker** — the established worker arguments from the OEC/Deploy integration contract are shown below; execute them only in the assigned LTX allocation with the existing node-to-GPU mapping. \`--no-purge\` deliberately retains the model cache.
 
 \`\`\`bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 conda run --no-capture-output -n phase1_ltx \\
   python "$OEC_ROOT/worker_ltx_video.py" \\
@@ -107,7 +110,7 @@ The above is the documented worker invocation; it is **not** proof that all 11 c
 Read-only preflight:
 
 ```bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 nvidia-smi
 conda run --no-capture-output -n "$OEC_QA_ENV" python -c 'import torch, transformers, qwen_vl_utils; print("torch", torch.__version__, "cuda", torch.cuda.is_available()); print("transformers", transformers.__version__)'
@@ -134,7 +137,7 @@ Set `OEC_QA_ENV` only after the import preflight. `--no-purge` retains the model
 Verify the remote dataset destination and existing authentication without printing any token:
 
 ```bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 test -n "${AIEROS_HF_DATASET_REPO:-}" || { echo "Set AIEROS_HF_DATASET_REPO to the approved existing dataset repo"; exit 2; }
 conda run --no-capture-output -n oec_deploy python - <<'PY'

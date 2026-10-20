@@ -1,22 +1,6 @@
-name: OEC safe A100 checkout sync
+name: OEC canonical A100 source sync
 
 on:
-  push:
-    branches:
-      - feat/media-service-sidecars-20261018
-    paths:
-      - "pipeline_*_gradio.ipynb"
-      - "tools/sync_feature_branch_a100.sh"
-      - "tools/run_gradio_model_notebook_smokes.py"
-      - "tools/create_clean_a100_test_worktree.sh"
-      - "oec_gpu_admission.py"
-      - "docs/checklist.md"
-      - "docs/MODEL_NOTEBOOKS_AND_WORKER_INTEGRATION.md"
-      - "TODO.md"
-      - "result.md"
-      - "test.json"
-      - "changelog/**"
-      - ".github/workflows/oec-a100-local-sync.yml"
   workflow_dispatch:
 
 permissions:
@@ -27,88 +11,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  safe-fast-forward:
+  canonical-root-sync:
+    name: Reconcile the single canonical checkout
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
-    timeout-minutes: 5
+    timeout-minutes: 12
     defaults:
       run:
         shell: bash
     steps:
-      - name: Checkout the exact candidate revision in an isolated Actions workspace
+      - name: Checkout selected OEC branch in the Actions workspace
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-
-      - name: Read-only diagnose persistent checkout before sync
-        run: |
-          set -euo pipefail
-          repo="$HOME/OEC"
-          if [[ ! -e "$repo/.git" ]]; then
-            echo "OEC_LOCAL_CHECKOUT=ABSENT"
-            exit 0
-          fi
-          branch="$(git -C "$repo" branch --show-current 2>/dev/null || true)"
-          head_sha="$(git -C "$repo" rev-parse HEAD 2>/dev/null || echo UNKNOWN)"
-          dirty_count="$(git -C "$repo" status --porcelain --untracked-files=all 2>/dev/null | wc -l | tr -d '[:space:]')"
-          origin="$(git -C "$repo" remote get-url origin 2>/dev/null || true)"
-          case "$origin" in
-            *github.com/CalamityStriker/OEC.git|*github.com/CalamityStriker/OEC|*github.com:CalamityStriker/OEC.git|*github.com:CalamityStriker/OEC)
-              origin_state=EXPECTED
-              ;;
-            *)
-              origin_state=OTHER_OR_UNKNOWN
-              ;;
-          esac
-          if git -C "$repo" show-ref --verify --quiet refs/heads/fix/media-stack-supervision-20261019; then
-            expected_local_branch=YES
-          else
-            expected_local_branch=NO
-          fi
-          if git -C "$repo" show-ref --verify --quiet refs/remotes/origin/fix/media-stack-supervision-20261019; then
-            expected_remote_tracking_ref=YES
-          else
-            expected_remote_tracking_ref=NO
-          fi
-          printf 'OEC_LOCAL_ORIGIN=%s\n' "$origin_state"
-          printf 'OEC_LOCAL_BRANCH=%s\n' "$branch"
-          printf 'OEC_LOCAL_HEAD_SHA=%s\n' "$head_sha"
-          printf 'OEC_LOCAL_DIRTY_ENTRY_COUNT=%s\n' "$dirty_count"
-          printf 'OEC_EXPECTED_LOCAL_BRANCH_EXISTS=%s\n' "$expected_local_branch"
-          printf 'OEC_EXPECTED_REMOTE_TRACKING_REF_EXISTS=%s\n' "$expected_remote_tracking_ref"
-          # This step performs no fetch, checkout, merge, reset or file write.
-      - name: Try fast-forward sync without overwriting local content
-        id: inplace
+      - name: Sync $HOME/OEC to the approved GitHub branch
         env:
           OEC_SYNC_BRANCH: fix/media-stack-supervision-20261019
         run: |
-          set -uo pipefail
-          test "$RUNNER_NAME" = "oec-2" || {
-            echo "::error::Expected oec-2, got $RUNNER_NAME"
-            exit 2
-          }
-          if bash tools/sync_feature_branch_a100.sh; then
-            echo "OEC_SYNC_MODE=in_place" >> "$GITHUB_ENV"
-            echo "OEC_EXISTING_CHECKOUT_SYNC=PASS"
-          else
-            rc=$?
-            echo "OEC_EXISTING_CHECKOUT_SYNC=BLOCKED exit=$rc"
-            echo "Primary checkout was not altered; attempting a separate clean worktree after StorageManager admission."
-            bash tools/create_clean_a100_test_worktree.sh
-            echo "OEC_SYNC_MODE=clean_worktree" >> "$GITHUB_ENV"
-          fi
-
-      - name: Verify exact SHA in the selected local test checkout
-        run: |
           set -euo pipefail
-          expected="$(git rev-parse HEAD)"
-          if [[ "${OEC_SYNC_MODE:-}" == "in_place" ]]; then
-            selected="$HOME/OEC"
-          else
-            selected="$HOME/OEC_feature_sync"
-          fi
-          actual="$(git -C "$selected" rev-parse HEAD)"
-          printf 'A100_CHECKOUT_EXPECTED_SHA=%s\n' "$expected"
-          printf 'A100_CHECKOUT_ACTUAL_SHA=%s\n' "$actual"
-          printf 'A100_CHECKOUT_PATH=%s\n' "$selected"
-          test "$actual" = "$expected"
-          test -z "$(git -C "$selected" status --porcelain --untracked-files=all)"
+          test "$RUNNER_NAME" = "oec-2"
+          bash -n tools/reconcile_a100_oec_root.sh tools/sync_feature_branch_a100.sh
+          timeout --signal=INT --kill-after=15s 600s bash tools/reconcile_a100_oec_root.sh

@@ -1,0 +1,37 @@
+name: OEC canonical A100 root synchronization
+
+on:
+  push:
+    branches:
+      - fix/media-stack-supervision-20261019
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One bounded source-only job; full media/inference acceptance is a separate manual action.
+concurrency:
+  group: oec-media-gpu-storage-serial
+  cancel-in-progress: false
+
+jobs:
+  canonical-root-sync:
+    name: Sync A100's canonical OEC checkout to GitHub
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    timeout-minutes: 12
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout the exact pushed source in an isolated Actions workspace
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Reconcile persistent root without discarding local work
+        env:
+          OEC_SYNC_BRANCH: fix/media-stack-supervision-20261019
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-2"
+          bash -n tools/reconcile_a100_oec_root.sh tools/sync_feature_branch_a100.sh
+          timeout --signal=INT --kill-after=15s 600s bash tools/reconcile_a100_oec_root.sh

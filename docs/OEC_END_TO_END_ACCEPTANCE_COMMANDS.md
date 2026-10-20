@@ -8,17 +8,13 @@ These commands are intentionally staged. A successful static suite is not live m
 
 ## 0. Checkout and preflight
 
-Run on the assigned OEC host, not a random runner. First inspect your working tree. Do not switch branches with uncommitted changes.
+Run on the assigned OEC host/allocation that owns the single canonical checkout. **Use `$HOME/OEC` only**; do not create or point commands at `$HOME/OEC_feature_sync`.
+
+The previous helper created a sibling worktree when the primary checkout was dirty/detached, splitting commands and tests across two roots. That workaround is retired. Pushes to `fix/media-stack-supervision-20261019` now invoke the bounded canonical-root sync workflow. It checks fresh StorageManager admission, refuses source changes while known OEC inference/queue processes are active, preserves the prior HEAD and tracked edits in Git recovery refs/stash, moves non-ignored loose files into the Git metadata recovery area, and reconciles `$HOME/OEC` to the remote branch. It removes `OEC_feature_sync` only after verifying that it is a registered linked worktree of the canonical checkout.
 
 ```bash
-# Inspect the original checkout read-only; do not switch/reset/clean it.
-git -C "$HOME/OEC" status --short
-git -C "$HOME/OEC" branch --show-current
-git -C "$HOME/OEC" rev-parse HEAD
-
-# Use the clean isolated worktree verified by the authorized A100 sync workflow.
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
-test -d "$OEC_ROOT/.git" || { echo "Clean isolated worktree missing; sync it through the authorized workflow first." >&2; exit 2; }
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
+test -e "$OEC_ROOT/.git" || { echo "Canonical OEC checkout missing; use the bounded root-sync workflow." >&2; exit 2; }
 cd "$OEC_ROOT"
 git status --short
 git branch --show-current
@@ -52,7 +48,7 @@ done
 Use the same Python environment/dependencies as the Actions static job. No model weights or external dataset writes are needed for these contract tests.
 
 ```bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 python -m py_compile \
   brain.py qa_compliance_worker.py hf_upload_daemon.py \
@@ -75,7 +71,7 @@ The canonical full static suite is workflow `.github/workflows/storage-admission
 Run sequentially and stop on any nonzero exit. These are controlled smoke inputs, not broad WER or sound-quality benchmarks.
 
 ```bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 # Kokoro TTS, Whisper-Turbo ASR, and Qwen3-ASR; no model download requested here.
 "$CONDA" run --no-capture-output -n phase1 python tools/run_media_model_smokes.py \
@@ -95,7 +91,7 @@ Do not run these against the active shared GPU allocation. Retain each run repor
 Only after current GPU admission passes and StorageManager reports fresh quota:
 
 ```bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 export OEC_VISUAL_SMOKE_DIR="$RUNNER_TEMP/oec-visual-$RUN_ID"
 export OEC_LTX_SMOKE_DIR="$RUNNER_TEMP/oec-ltx-$RUN_ID"
@@ -110,7 +106,7 @@ The script starts and tests the repo's TRELLIS/LTX sidecars and validates their 
 This is the combined pipeline entry point—not the standalone TRELLIS-only smoke. Run only when `nvidia-smi`, runner ownership and StorageManager all admit this exact run.
 
 ```bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 export RUNNER_TEMP="${RUNNER_TEMP:-/tmp}"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
@@ -127,7 +123,7 @@ Require a real PNG, then a real GLB created from that PNG, validated report meta
 ACE-Step must be a **separate** run after the other GPU smoke has exited and a fresh idle-A100 check passes:
 
 ```bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 "$CONDA" run --no-capture-output -n phase1 python tools/run_media_model_smokes.py \
   --providers ace-step --require-pass
@@ -138,7 +134,7 @@ This must produce and validate an audio artifact. Checkpoint presence/runtime pr
 MusicGen's last attempt failed before inference because its cache was incomplete and the HF proxy returned `No route to host`. Do not repeat that known download failure. First verify the complete, revision-matched cached checkpoint and egress. Only after cache-only readiness passes, run a short generation to a new run-scoped output with the existing pipeline entry point:
 
 ```bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 OUT="$RUNNER_TEMP/oec-musicgen-$RUN_ID.wav"
 "$CONDA" run --no-capture-output -n phase1 python pipeline_musicgen.py \
@@ -153,7 +149,7 @@ Do not add `--allow-download` while cache/network admission is unresolved. Music
 The bounded Brain mode is designed to keep the test from filling the default queue. The example uses the existing `ltx_2_3_commercial_broll` use-case. Model inference and filesystem writes still need a fresh resource admission before running it.
 
 ```bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 CASE_ID="ltx_2_3_commercial_broll"
 SMOKE_CONFIG="$RUNNER_TEMP/brain-e2e-$RUN_ID.json"
@@ -185,7 +181,7 @@ Require `[BRAIN_ONCE] PASS jobs_created=1` and record the new job filename/ID. T
 Before starting a long-lived worker, inspect the job queue. The current LTX worker is a polling service, not a guaranteed single-job consumer; use it only when the only eligible job in its queue is this new smoke job and no other owner is processing the queue. Verify the launch environment and selected GPU list against the current OEC runbook. Do not use `--clean-state`.
 
 ```bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 # Set this only to the physical GPU(s) actually allocated to this run; do not guess.
 : "${OEC_LTX_GPUS:?Set OEC_LTX_GPUS to the currently assigned free physical GPU IDs}"
@@ -211,7 +207,7 @@ Expected successful QA outcomes are either `[QA_ONCE] PASS ... status=PENDING_UP
 Run only for the same smoke asset after QA passed and its asset row is now `PENDING`. This one-shot mode uploads only the selected asset + metadata pair; it deletes the selected local pair and DB row after Hub upload succeeds. Preserve SHA-256 and metadata before calling it.
 
 ```bash
-OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 : "${AIEROS_HF_DATASET_REPO:?Set this to the approved, already-existing dataset repo ID}"
 "$CONDA" run --no-capture-output -n oec_deploy python - <<'PY'

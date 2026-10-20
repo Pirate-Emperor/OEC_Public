@@ -2,56 +2,8 @@ name: OEC ordered live acceptance suite
 run-name: "OEC live acceptance suite - ${{ github.ref_name }}"
 
 on:
-  push:
-    branches:
-      - fix/media-stack-supervision-20261019
-    paths:
-      - ".github/workflows/oec-live-acceptance-suite.yml"
-      - ".github/workflows/oec-a100-local-sync.yml"
-      - ".github/workflows/oec-a100-media-model-bootstrap.yml"
-      - ".github/workflows/oec-audiogen-notebook-smoke.yml"
-      - ".github/workflows/oec-musicgen-smoke.yml"
-      - ".github/workflows/oec-visual-media-sidecar-smoke.yml"
-      - ".github/workflows/oec-flux-pipeline-smoke.yml"
-      - ".github/workflows/oec-e2e-acceptance.yml"
-      - "pipeline_*_gradio.ipynb"
-      - "oec_gpu_admission.py"
-      - "pipeline_audiogen.py"
-      - "pipeline_musicgen.py"
-      - "pipeline_flux_image.py"
-      - "pipeline_flux_trellis.py"
-      - "pipeline_trellis_3d.py"
-      - "worker_ltx_video.py"
-      - "brain.py"
-      - "brain_config.json"
-      - "qa_compliance_worker.py"
-      - "hf_upload_daemon.py"
-      - "asset_status.py"
-      - "tools/run_gradio_model_notebook_smokes.py"
-      - "tools/check_media_service_readiness.py"
-      - "tools/run_media_model_smokes.py"
-      - "tools/run_audiogen_notebook_smoke.py"
-      - "tools/run_visual_media_sidecar_smokes.py"
-      - "tools/run_flux_pipeline_smoke.py"
-      - "tools/run_oec_e2e_acceptance.py"
-      - "tools/prepare_media_models.py"
-      - "tools/prepare_media_runtime.py"
-      - "tools/prepare_ace_step_runtime.py"
-      - "tools/oec_service_manager.py"
-      - "tools/media_services/**"
-      - "tools/storage_reserve_probe.py"
-      - "tools/recover_dead_storage_locks.py"
-      - "storage_manager.py"
-      - "storage_policy.py"
-      - "storage_config.json"
-      - "core_config.py"
-      - "tests/**"
-      - "docs/checklist.md"
-      - "docs/MODEL_NOTEBOOKS_AND_WORKER_INTEGRATION.md"
-      - "TODO.md"
-      - "result.md"
-      - "test.json"
-      - "changelog/**"
+  # Manual only: a full live run previously exceeded the 30-minute operator limit.
+  # Source pushes reconcile the canonical checkout; they must not launch inference automatically.
   workflow_dispatch:
 
 permissions:
@@ -82,12 +34,8 @@ jobs:
           test -x "$HOME/Conda/condabin/conda"
           test -f "$HOME/OEC/storage_config.json"
           install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
-          if bash tools/sync_feature_branch_a100.sh; then
-            selected="$HOME/OEC"
-          else
-            bash tools/create_clean_a100_test_worktree.sh
-            selected="$HOME/OEC_feature_sync"
-          fi
+          bash tools/reconcile_a100_oec_root.sh
+          selected="$HOME/OEC"
           expected="$(git rev-parse HEAD)"
           actual="$(git -C "$selected" rev-parse HEAD)"
           test "$actual" = "$expected"
