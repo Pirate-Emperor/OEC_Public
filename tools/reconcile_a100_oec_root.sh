@@ -17,7 +17,7 @@ finish_recovery_record() {
   local rc=$?
   if [[ -n "${BACKUP_ROOT:-}" && -d "$BACKUP_ROOT" && ! -f "$BACKUP_ROOT/README.txt" ]]; then
     {
-      printf "OEC sync recovery record\nRun: %s\nCanonical root: %s\nBranch: %s\nPrevious HEAD: %s\nTarget SHA: %s\nExit code: %s\n" \
+      printf "OEC sync recovery record\\nRun: %s\\nCanonical root: %s\\nBranch: %s\\nPrevious HEAD: %s\\nTarget SHA: %s\\nExit code: %s\\n" \
         "${RUN_ID:-unknown}" "${ROOT:-unknown}" "${EXPECTED_BRANCH:-unknown}" "${BEFORE_SHA:-unknown}" "${TARGET_SHA:-unknown}" "$rc"
       echo "Preserved files are identified by the NUL-delimited manifests under this directory."
       echo "Tracked changes are held under refs/oec-sync-recovery/<run-id>/*-stash; prior HEAD is under *-head."
@@ -175,44 +175,9 @@ git -C "$ROOT" checkout -B "$EXPECTED_BRANCH" "$TARGET_SHA"
 ACTUAL_SHA="$(git -C "$ROOT" rev-parse HEAD)"
 [[ "$ACTUAL_SHA" == "$TARGET_SHA" ]] || fail "canonical checkout SHA differs from remote target" 28
 
-# Make initialized submodule worktrees match the exact gitlink revisions pinned by this OEC commit.
-# Never switch a submodule with local edits/untracked files; preserve its state and fail closed instead.
-while IFS=
-
-cat > "$BACKUP_ROOT/README.txt" <<EOF
-OEC canonical A100 checkout reconciliation
-Run: $RUN_ID
-Canonical path: $ROOT
-Remote branch: $EXPECTED_BRANCH
-Previous HEAD: $BEFORE_SHA
-Synchronized SHA: $TARGET_SHA
-Tracked root changes: refs/oec-sync-recovery/$RUN_ID/root-stash (if created)
-Previous root HEAD: refs/oec-sync-recovery/$RUN_ID/root-head
-Previous sibling worktree HEAD: refs/oec-sync-recovery/$RUN_ID/feature-sync-head (if present)
-Untracked files from each checkout are preserved under this directory with NUL-delimited path manifests.
-No model cache or storage reserve file was intentionally deleted.
-EOF
-
-{
-  printf 'OEC_CANONICAL_SYNC=PASS\n'
-  printf 'OEC_CANONICAL_ROOT=%s\n' "$ROOT"
-  printf 'OEC_CANONICAL_BRANCH=%s\n' "$EXPECTED_BRANCH"
-  printf 'OEC_CANONICAL_SHA=%s\n' "$ACTUAL_SHA"
-  printf 'OEC_RECOVERY_METADATA=%s\n' "$BACKUP_ROOT"
-} | tee "$BACKUP_ROOT/report.txt"
-
-if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-  {
-    echo "## OEC canonical A100 source reconciliation"
-    echo
-    printf -- '- Canonical path: %s\n' "$ROOT"
-    printf -- '- Branch: %s\n' "$EXPECTED_BRANCH"
-    printf -- '- Exact remote SHA: %s\n' "$ACTUAL_SHA"
-    printf -- '- Previous local HEAD and recovery payloads: %s\n' "$BACKUP_ROOT"
-    printf -- '- OEC_feature_sync removed only after registered-worktree verification.\n'
-  } >> "$GITHUB_STEP_SUMMARY"
-fi
-\t' read -r meta subpath; do
+# Match initialized submodule worktrees to the gitlink revisions pinned by this OEC commit.
+# Never switch a submodule with local edits or non-ignored untracked files; fail closed instead.
+while IFS=$'\t' read -r meta subpath; do
   [[ -n "$subpath" ]] || continue
   read -r mode type expected_sub_sha <<< "$meta"
   [[ "$mode" == "160000" && "$type" == "commit" ]] || continue
