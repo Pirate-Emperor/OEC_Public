@@ -207,3 +207,9 @@ This section distinguishes model inference from UI acceptance. All results below
 - [ ] The same old run's Kokoro UI reached HTTP 200 but its event call failed because Gradio 6.0.1 exposes a different endpoint name; Whisper/Qwen3-ASR were then blocked because no Kokoro WAV was produced. The harness now uses the one-interface function index (fn_index=0), awaiting the new exact-head retry.
 - [ ] MusicGen's current live job was still generating when this note was written; do not call its dedicated Gradio acceptance passed until the artifact/report is retrieved.
 - [ ] ACE-Step remains unaccepted; the current candidate now runs ACE independently of speech failure, then applies an explicit final gate.
+## Dedicated AudioCraft Gradio event acceptance — exact recorded run 39404646877
+
+- [x] AudioGen UI/event request passed: HTTP 200; validated callback WAV 96,044 bytes, 3 seconds, mono 16 kHz, SHA-256 02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58. Existing notebook smoke also passed and used physical GPU 4, peak allocated 5.155 GiB.
+- [x] MusicGen UI/event request passed: HTTP 200; validated callback WAV 192,044 bytes, 3 seconds, mono 32 kHz, SHA-256 0b6ada01eed76ac2a8a325c2c4f688cdc51072d31773f62b793ffd7ddf75ab9d. Existing inference smoke passed on physical GPU 4, peak allocated 4.352 GiB.
+- [ ] These passes are specific to source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844 and Gradio 4.44.1 in phase1. The next candidate changes speech calls to function-index endpoint selection for the phase2_3d/Gradio 6.0.1 UI. Speech and ACE-Step still need successful current-candidate jobs.
+- [ ] LTX/TRELLIS, FLUX→TRELLIS and the QA-to-HF path in the old run are still in their job chain; only update those statuses after their logs/artifacts finish.

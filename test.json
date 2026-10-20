@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-20T15:55:00+05:30",
+  "last_updated": "2026-10-20T16:05:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Readiness/integration commit 3476407add55d5fcb52f70f570f93cba35992a8b passed the static/storage regression suite (run 39408266075). Older live run 39404646877 confirmed AudioGen's real Gradio HTTP-event callback now passes: 3-second mono 16 kHz WAV, 96044 bytes, SHA-256 02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58, GPU 4 peak 5.155 GiB. Speech UI failed because Gradio 6.0.1 exposed a non-/predict endpoint; candidate now uses fn_index=0 and requires rerun. MusicGen and ACE-Step current outcomes are still pending/unaccepted.",
+  "latest_summary": "Static readiness/service-manager regression suite passed on SHA 3476407add55d5fcb52f70f570f93cba35992a8b, and the follow-up function-index harness change is committed at the latest candidate. Run 39404646877 on SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844 passed real AudioGen and MusicGen Gradio event callbacks (artifacts and SHA-256s recorded). Speech UI failed only because the older harness hard-coded /predict under Gradio 6.0.1; next candidate uses fn_index=0. ACE-Step and remaining ordered pipeline outcomes are pending.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -5132,13 +5132,18 @@
         },
         {
           "provider": "MusicGen",
-          "status": "CLI_INFERENCE_PASS_WORKFLOW_POSTCHECK_FAILED",
+          "status": "CLI_AND_GRADIO_EVENT_PASS_ON_OLDER_SHA",
           "run_id": 39401991943,
           "artifact": "3s mono 32kHz WAV",
           "bytes": 192044,
           "sha256": "0cbb209e90f823ef309457410d72ac53899d378b5df6d19db476189d30e61d7b",
           "peak_allocated_vram_gib": 4.352,
-          "limitation": "generation succeeded; .info.json copy path was wrong; fixed in candidate"
+          "limitation": "no supervised HTTP job API for OEC_Deploy; this pass is run- and source-specific",
+          "ui_run_id": 39404646877,
+          "ui_source_sha": "a558d2d52a5f6f93afabd5c0aaa14f6e721cf844",
+          "ui_artifact_bytes": 192044,
+          "ui_artifact_sha256": "0b6ada01eed76ac2a8a325c2c4f688cdc51072d31773f62b793ffd7ddf75ab9d",
+          "ui_transport": "gradio_client HTTP/event API /predict"
         },
         {
           "provider": "ACE-Step",
@@ -5201,6 +5206,39 @@
         "Verify MusicGen output and Gradio event result in the active run",
         "Fix Gradio 6 speech endpoint naming with fn_index=0 and rerun Kokoro before ASR",
         "Run ACE-Step independently, require real FLAC/metadata and event acceptance"
+      ]
+    },
+    {
+      "id": "TEST-2026-10-20-MUSICGEN-GRADIO-EVENT",
+      "date": "2026-10-20",
+      "category": "Actual Gradio event acceptance",
+      "source_sha": "a558d2d52a5f6f93afabd5c0aaa14f6e721cf844",
+      "runner": "oec-2",
+      "environments": {
+        "ui_and_inference": "phase1",
+        "audiocraft": "1.3.0",
+        "torch": "2.1.0+cu118",
+        "cuda": "11.8"
+      },
+      "results": [
+        {
+          "provider": "MusicGen",
+          "status": "PASS",
+          "run_id": 39404646877,
+          "ui_http_status": 200,
+          "transport": "gradio_client HTTP/event API /predict",
+          "artifact": "3s mono 32kHz WAV",
+          "bytes": 192044,
+          "sha256": "0b6ada01eed76ac2a8a325c2c4f688cdc51072d31773f62b793ffd7ddf75ab9d",
+          "physical_gpu": 4,
+          "peak_allocated_vram_gib": 4.352
+        }
+      ],
+      "next_actions": [
+        "Rerun speech clients with function-index endpoint selection on the latest candidate",
+        "Run ACE-Step through real API/UI generation",
+        "Complete FLUX-to-TRELLIS and QA/HF read-after-write",
+        "Keep AudioGen/MusicGen labeled NOT_EXPOSED until supervised HTTP APIs exist"
       ]
     }
   ]

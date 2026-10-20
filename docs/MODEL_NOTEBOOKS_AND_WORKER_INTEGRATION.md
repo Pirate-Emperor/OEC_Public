@@ -163,3 +163,6 @@ AudioGen and MusicGen are still not exposed via the shared /v1/jobs API; they mu
 ## Latest Gradio acceptance update — 2026-10-20
 
 The AudioGen dedicated Gradio app now passed an actual gradio_client event on loopback in run 39404646877 (source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844): HTTP 200 and a valid 3-second WAV with SHA-256 02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58. That run exposed an API naming difference in the speech-client UI under Gradio 6.0.1, so the candidate harness now uses fn_index=0 for its single-function Interface rather than assuming /predict. Speech must be rerun before those capabilities are accepted.
+## AudioCraft event acceptance results
+
+On run 39404646877 (source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844), both AudioGen and MusicGen Gradio UIs reached HTTP 200 and their actual gradio_client event calls generated validated WAVs. AudioGen result: 96,044 bytes, SHA-256 02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58. MusicGen result: 192,044 bytes, SHA-256 0b6ada01eed76ac2a8a325c2c4f688cdc51072d31773f62b793ffd7ddf75ab9d. Both used physical GPU 4 in phase1. Their availability is still CLI/Gradio rather than supervised /v1/jobs for deployment integration.

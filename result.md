@@ -32,3 +32,11 @@ The feature branch contains six new Gradio notebooks for AudioGen, MusicGen, ACE
 Live suite run [39404646877](https://github.com/CalamityStriker/OEC/actions/runs/39404646877), source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844, passed the dedicated AudioGen Gradio UI and event callback. The UI returned HTTP 200; the test submitted through gradio_client and got a validated 3-second mono 16 kHz WAV (96,044 bytes, SHA-256 02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58), peak allocated VRAM 5.155 GiB on physical A100 4.
 
 The same run's speech step failed because the Kokoro Gradio 6.0.1 endpoint did not expose /predict; ASR callbacks were then correctly blocked because Kokoro had not created the input WAV. The new candidate submits the one-function interface by function index. MusicGen was still in progress at the time of this update. ACE-Step remains not accepted.
+## 2026-10-20 — Both AudioCraft Gradio event callbacks passed
+
+Run [39404646877](https://github.com/CalamityStriker/OEC/actions/runs/39404646877) on source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844 passed both dedicated Gradio event flows:
+
+- AudioGen: 3-second mono 16 kHz WAV, 96,044 bytes, SHA-256 02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58; physical A100 4; peak allocated VRAM 5.155 GiB.
+- MusicGen: 3-second mono 32 kHz WAV, 192,044 bytes, SHA-256 0b6ada01eed76ac2a8a325c2c4f688cdc51072d31773f62b793ffd7ddf75ab9d; physical A100 4; peak allocated VRAM 4.352 GiB.
+
+The test launches the actual loopback Gradio UI and sends a gradio_client event request. These successes establish working CLI/Gradio paths on that source SHA; they do not create the supervised HTTP job API needed for direct OEC_Deploy access. Speech Gradio 6.0.1 endpoint selection is fixed in the newer candidate by using function index 0 and remains to be live-verified.

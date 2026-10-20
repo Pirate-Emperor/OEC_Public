@@ -461,3 +461,8 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - AudioGen's real Gradio event acceptance passed in run 39404646877 on old candidate SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844: HTTP 200, gradio_client event completed, WAV 96,044 bytes, SHA-256 02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58, 5.155 GiB peak allocated.
 - Gradio 6's API name for the speech notebook did not match /predict. Candidate harness now submits by function index 0 for the single-function Interface; re-run required.
 - MusicGen run is still in progress, and ACE-Step is not yet accepted. Wait for the actual job/artifact results before updating statuses.
+## AudioCraft Gradio live callbacks verified — 2026-10-20
+
+- AudioGen and MusicGen both passed their actual Gradio HTTP event callbacks on run 39404646877 (source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844). The artifacts and SHA-256 values are recorded in docs/checklist.md and test.json.
+- This does not make either provider HTTP-ready for OEC_Deploy; neither has a supervised OEC /v1/jobs API. Use the readiness report status NOT_EXPOSED.
+- Speech/ASR requires the Gradio 6.0.1 fn_index=0 fix validation; ACE-Step remains pending independent model/API acceptance.

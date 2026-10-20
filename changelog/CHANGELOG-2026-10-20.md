@@ -116,3 +116,7 @@
 
 - AudioGen dedicated Gradio event acceptance passed in run 39404646877: HTTP 200 and actual gradio_client event result WAV, 96,044 bytes, SHA-256 02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58.
 - The speech UI test found Gradio 6.0.1 did not expose the assumed /predict name. The candidate harness uses fn_index=0 for the single-function interface; speech, ASR and ACE-Step live acceptance remains to be verified.
+## 2026-10-20 — AudioGen and MusicGen Gradio event flows verified
+
+- Run 39404646877 on source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844 passed actual Gradio event requests for AudioGen and MusicGen, with validated 3-second WAV artifacts and SHA-256 values recorded in docs/checklist.md.
+- Both remain NOT_EXPOSED to OEC_Deploy through the supervised HTTP job contract until their CLI flows are wrapped in managed typed APIs. Speech UI endpoint indexing and ACE-Step inference are still pending.
