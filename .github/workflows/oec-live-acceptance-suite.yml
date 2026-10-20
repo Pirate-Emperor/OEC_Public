@@ -311,7 +311,7 @@ jobs:
           OUT="/tmp/oec-musicgen-suite-$GITHUB_RUN_ID.wav"
           "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python pipeline_musicgen.py --mode generate --allow-download --scratch-output --output "$OUT" --duration 3 --seed 42 --prompt "A short gentle instrumental cue with warm piano and mellow strings" 2>&1 | tee "$R/model-generation.log"
           cp "$OUT" "$R/"
-          cp "$OUT.info.json" "$R/"
+          cp "${OUT%.wav}.info.json" "$R/"
           "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -c 'import soundfile,sys; info=soundfile.info(sys.argv[1]); print("MUSICGEN_WAV_VALIDATION=PASS", info); assert info.frames>0 and info.samplerate>0' "$R/$(basename "$OUT")"
       - name: Launch MusicGen Gradio and invoke real generation callback
         run: |

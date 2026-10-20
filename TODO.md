@@ -433,3 +433,14 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - Speech environment prep was blocked by an obsolete hard-coded 40 GB reserve floor. Current StorageManager status reported 29.83 GB existing reserve in the 280 GB model allocation; the environment prep does not need a larger reserve. Its gate now uses the configured model minimum and never resizes the reserve.
 - MusicGen did not load/generate: its GPU admission refused because no physical A100 met the idle/process/memory/utilization policy. A diagnostic audit was added; do not weaken the guard or stop other owners.
 - No all-model pass and no joined QA/upload pass yet. Verify the output for each provider and the Hugging Face remote manifest/part hashes before checking off the corresponding items.
+
+
+## Latest confirmed live evidence and blockers — 2026-10-20
+
+- AudioGen model inference passed in `phase1` on `oec-2` physical A100 4: 3s mono/16kHz WAV, 96,078 bytes, SHA-256 `c543c2e6a45a44a89f45d22a135ac5000b154f0025d2e93592a31c672589e7ba`, 5.155 GiB peak allocated VRAM. Its Gradio page returned HTTP 200 but callback failed because the notebook picked runner temp instead of `/tmp` required by `--scratch-output`; the notebook path and static test are corrected in the new candidate.
+- MusicGen inference passed in `phase1` on physical A100 4: 3s mono/32kHz WAV, 192,044 bytes, SHA-256 `0cbb209e90f823ef309457410d72ac53899d378b5df6d19db476189d30e61d7b`, 4.352 GiB peak allocated VRAM. Its job then failed at an incorrect shell copy of `.info.json`; the workflow copy path is corrected to match `Path.with_suffix`.
+- GPU admission/sharing contract tests and static/storage regressions passed at `d037bfff24f7ffef7bc2ac640071f6eb6d3dea71` in [run 39402803588](https://github.com/CalamityStriker/OEC/actions/runs/39402803588).
+- The live speech job prepared its environment but failed before invoking Kokoro/Whisper/Qwen3-ASR because the smoke entrypoint lacked the repository root on `sys.path`. The root import path is fixed in the candidate, awaiting a new live run.
+- ACE-Step was skipped due to the speech job's fail-fast dependency. It has not been verified. Do not check it off without a real generated FLAC, validated metadata, and a passing Gradio event request.
+- Prior live run [39388844316](https://github.com/CalamityStriker/OEC/actions/runs/39388844316) generated/validated an LTX MP4 and TRELLIS GLB in `phase1_ltx` and `phase2_3d`; repeat on current candidate.
+- Remaining: real Gradio event callbacks for both AudioCraft models; live Kokoro/Whisper/Qwen3-ASR; ACE-Step; FLUX PNG → TRELLIS GLB; joined Brain/LTX/Qwen2-VL QA, chunked HF upload, remote manifest/part hash read-after-write; model-specific purge-safety and restart tests. Keep cache purge off and preserve `.storage_reserve.bin`.

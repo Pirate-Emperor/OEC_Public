@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-20T13:05:00+05:30",
+  "last_updated": "2026-10-20T15:00:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Current live suite 39386215687 on oec-2: safe source sync passed to SHA 128fdf6be1647e99d0b56ff28447d951126a2ba3. Existing AudioGen notebook inference passed with a non-silent 3s mono 16kHz WAV; dedicated Gradio UI failed because gradio_client 1.3.0 crashes on boolean JSON-schema in /; speech runtime prep failed on a hard-coded 40GB reserve floor despite StorageManager reporting 29.83GB existing reserve in a 280GB models target; MusicGen failed closed because no eligible idle A100. The visual-sidecar job was still in progress at the last query. Current candidate adds a process-local Gradio schema shim, configured-minimum reserve check, AudioGen GPU pinning, and detailed GPU-admission diagnostics. Full per-model and QA/HF chunk/readback acceptance remain pending.",
+  "latest_summary": "Latest verified evidence: static/storage suite passed at d037bfff24f7ffef7bc2ac640071f6eb6d3dea71 (run 39402803588). Ordered A100 suite for that SHA is pending behind the serialized GPU run. At source 9db29e82c8346ee245dfe7db6a527feb0dde2d99, AudioGen inference passed (3s/16kHz mono WAV, 96078 bytes; SHA c543c2e6a45a44a89f45d22a135ac5000b154f0025d2e93592a31c672589e7ba; 5.155 GiB peak allocated) and MusicGen inference passed (3s/32kHz mono WAV, 192044 bytes; SHA 0cbb209e90f823ef309457410d72ac53899d378b5df6d19db476189d30e61d7b; 4.352 GiB peak allocated). AudioGen Gradio root reached HTTP 200 but its callback failed due to a scratch path outside /tmp; MusicGen job failed after successful generation due to wrong .info.json shell path. Kokoro/Whisper/Qwen3-ASR environment prep passed, but their smoke failed before inference due to a missing root import path. ACE-Step steps were skipped and have not passed. Prior run 39388844316 passed LTX and TRELLIS output generation; current candidate still needs repeat acceptance, FLUX→TRELLIS, end-to-end QA/HF upload/read-back.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -5024,6 +5024,62 @@
       "limitations": [
         "Speech services/Gradio callbacks have not yet run.",
         "Next workflow must confirm runtime bootstrap succeeds on this exact reserve."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-20-LIVE-INFERENCE-SEPARATED-FROM-UI",
+      "date": "2026-10-20",
+      "category": "A100 live model inference and UI acceptance",
+      "source_sha": "9db29e82c8346ee245dfe7db6a527feb0dde2d99",
+      "runner": "oec-2",
+      "environments": {
+        "audiogen": "phase1",
+        "musicgen": "phase1",
+        "ltx": "phase1_ltx",
+        "trellis": "phase2_3d"
+      },
+      "results": [
+        {
+          "model": "AudioGen",
+          "status": "MODEL_INFERENCE_PASS_UI_CALLBACK_FAIL",
+          "artifact": "3s mono 16kHz WAV",
+          "bytes": 96078,
+          "sha256": "c543c2e6a45a44a89f45d22a135ac5000b154f0025d2e93592a31c672589e7ba",
+          "peak_allocated_vram_gib": 5.155,
+          "reason": "The dedicated UI launch returned HTTP 200, but callback output was placed under runner temp rather than /tmp."
+        },
+        {
+          "model": "MusicGen",
+          "status": "MODEL_INFERENCE_PASS_WORKFLOW_POSTCHECK_FAIL",
+          "artifact": "3s mono 32kHz WAV",
+          "bytes": 192044,
+          "sha256": "0cbb209e90f823ef309457410d72ac53899d378b5df6d19db476189d30e61d7b",
+          "peak_allocated_vram_gib": 4.352,
+          "reason": "Audio output validated; workflow failed copying the sidecar due to using $OUT.info.json instead of ${OUT%.wav}.info.json."
+        },
+        {
+          "model": "Kokoro/Whisper/Qwen3-ASR",
+          "status": "BLOCKED_BEFORE_INFERENCE",
+          "reason": "Environment prep passed; smoke entrypoint failed to import root-level oec_gpu_admission.py. Root import path is fixed on the next candidate."
+        },
+        {
+          "model": "ACE-Step",
+          "status": "SKIPPED",
+          "reason": "Dependency step skipped after upstream speech smoke failure; no inference acceptance artifact."
+        },
+        {
+          "model": "LTX/TRELLIS",
+          "status": "PASS_PRIOR_RUN",
+          "run_id": 39388844316,
+          "reason": "Prior live run produced and validated MP4 and GLB; repeat on current SHA remains required."
+        }
+      ],
+      "next_actions": [
+        "Run current candidate through real Gradio /predict event acceptance",
+        "Retry speech inference through fixed import path",
+        "Run ACE-Step only if fresh StorageManager admission permits it",
+        "Complete FLUX->TRELLIS and QA/HF upload/read-after-write E2E",
+        "Do not purge any model cache before second-inference and restart/reload evidence"
       ]
     }
   ]

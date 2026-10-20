@@ -7,3 +7,13 @@ The A100 source sync workflow [39380928762](https://github.com/CalamityStriker/O
 Live E2E is still blocked. Run [39320471955, attempt 2](https://github.com/CalamityStriker/OEC/actions/runs/39320471955) stopped before inference because external PID `3347078` was attached to all eight A100s. No inference, real QA decision, HF upload, chunk reassembly, remote read-after-write, or final source cleanup was reached. No external process was killed/signalled.
 
 The feature branch contains six new Gradio notebooks for AudioGen, MusicGen, ACE-Step, Kokoro, Whisper Turbo and Qwen3-ASR, retaining the existing LTX/TRELLIS/FLUX notebooks. Follow `docs/MODEL_NOTEBOOKS_AND_WORKER_INTEGRATION.md` for environments and commands. Remaining blockers: normal GPU release; current-head FLUX→TRELLIS PNG→GLB acceptance; ACE-Step audio artifact generation; MusicGen cache/egress; real persistent audio API/Gradio artifact checks; and the joined Brain/LTX→Qwen2-VL→HF chunk manifest/readback/reassembly/hash path.
+
+
+## 2026-10-20 — Live model inference versus UI/worker acceptance
+
+- Candidate source `d037bfff24f7ffef7bc2ac640071f6eb6d3dea71` passed [static/storage regression run 39402803588](https://github.com/CalamityStriker/OEC/actions/runs/39402803588), including GPU-admission safety tests. An ordered A100 re-run for that SHA is queued behind the current serialized GPU run.
+- Real AudioGen inference passed on `oec-2` in `phase1`: 3-second, mono 16 kHz WAV, 96,078 bytes, SHA-256 `c543c2e6a45a44a89f45d22a135ac5000b154f0025d2e93592a31c672589e7ba`, peak allocated VRAM 5.155 GiB.
+- Real MusicGen inference passed on `oec-2` in `phase1`: 3-second, mono 32 kHz WAV, 192,044 bytes, SHA-256 `0cbb209e90f823ef309457410d72ac53899d378b5df6d19db476189d30e61d7b`, peak allocated VRAM 4.352 GiB. The workflow failed after inference because it referenced the wrong sidecar filename; corrected in the next candidate.
+- The AudioGen Gradio page reached HTTP 200, but callback invocation failed because the notebook output resolved under `RUNNER_TEMP`, outside the CLI's `/tmp` scratch policy. AudioCraft notebook output paths now use explicit `/tmp`; the harness has been updated to use a real `gradio_client` event request.
+- Kokoro/Whisper/Qwen3-ASR environment preparation passed but their smoke job stopped at an import-path error; fixed before the next live run. ACE-Step was skipped and remains unverified.
+- Prior live run [39388844316](https://github.com/CalamityStriker/OEC/actions/runs/39388844316) passed LTX/TRELLIS artifact generation, but this evidence is not a full pipeline pass. Full Gradio acceptance, current-source FLUX→TRELLIS, ACE-Step, QA/compliance, HF chunked upload and remote hash read-back remain incomplete.

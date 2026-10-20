@@ -36,6 +36,9 @@ class ModelNotebookTests(unittest.TestCase):
             self.assertIn('server_name="127.0.0.1"', text, name)
             self.assertIn("share=False", text, name)
             self.assertNotIn("pip install", text.lower(), name)
+            if name in {"pipeline_audiogen_gradio.ipynb", "pipeline_musicgen_gradio.ipynb"}:
+                self.assertIn('Path("/tmp") / f"oec-', text, name)
+                self.assertNotIn('Path(tempfile.gettempdir()) / f"oec-', text, name)
     def test_live_gradio_smoke_harness_is_valid_python(self):
         source = (ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
         ast.parse(source, filename="tools/run_gradio_model_notebook_smokes.py")

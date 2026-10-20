@@ -94,3 +94,13 @@
 - The Gradio callback harness now has a process-local compatibility shim for the boolean JSON-schema bug and sends localhost probes directly rather than through the runner proxy.
 - The isolated speech venv preparation gate now respects the configured minimum reserve rather than a hard-coded 40 GB floor. It still performs no reserve mutation.
 - AudioGen live smoke chooses and pins a truly idle A100 before importing Torch. The common idle-GPU selector logs per-GPU failure reasons if it blocks.
+
+
+## 2026-10-20 — GPU admission and live inference evidence
+
+- Added fail-closed A100 admission shared by FLUX/media smoke/E2E paths. Explicit sharing tolerates only the known same-user OEC-Play server-components Python context at low utilisation and at most 2 GiB on the card; unknown process owners remain blocking and no process is killed. Static regression [39402803588](https://github.com/CalamityStriker/OEC/actions/runs/39402803588) passed.
+- A100 sync evidence from live run 39401991943 shows the clean sibling checkout `$HOME/OEC_feature_sync` exactly matched the candidate SHA; the dirty `$HOME/OEC` checkout was preserved.
+- AudioGen live inference passed (3s/16kHz/mono WAV, 96,078 bytes; SHA-256 `c543c2e6a45a44a89f45d22a135ac5000b154f0025d2e93592a31c672589e7ba`). The separate Gradio callback failed due to using runner temp rather than `/tmp` for a CLI scratch output; path fixed.
+- MusicGen live inference passed (3s/32kHz/mono WAV, 192,044 bytes; SHA-256 `0cbb209e90f823ef309457410d72ac53899d378b5df6d19db476189d30e61d7b`). The workflow's metadata-copy path was wrong after a successful generation; corrected.
+- Kokoro/Whisper/Qwen3-ASR prepared their runtime but the inference step stopped at a missing repo-root import; corrected in the candidate. ACE-Step was skipped because the previous required job failed and remains unverified.
+- Next live run must prove actual Gradio event requests, speech generation/transcription, ACE-Step FLAC, current-source FLUX→TRELLIS artifact chain, and QA → chunked HF upload → remote hash read-back. Do not purge shared caches until model-specific second-inference and restart/reload tests pass; never modify `.storage_reserve.bin`.
