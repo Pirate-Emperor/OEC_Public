@@ -169,3 +169,10 @@ On run 39404646877 (source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844), both A
 ### FLUX status
 
 FLUX.2 Klein uses model identifier black-forest-labs/FLUX.2-klein-4B and the phase2_3d runtime in pipeline_flux_image.py. It is included in the readiness inventory, but is marked NOT_EXPOSED until a supervised standalone HTTP job API exists. The combined FLUX-to-TRELLIS CLI pipeline must not be represented as an independent remote FLUX service.
+## Latest live readiness snapshot — run 39422087711
+
+Confirmed during that A100 run: Kokoro, Whisper and Qwen3-ASR all completed service-backed Gradio event calls; LTX and TRELLIS sidecars each reported healthy/model-loaded and emitted validated video/3D artifacts; AudioGen/MusicGen Gradio events passed; FLUX.2 Klein→TRELLIS produced a reopened GLB; the joined QA→HF chunk-upload→remote hash read-back job succeeded. Current artifacts/hashes are in `docs/checklist.md`.
+
+ACE-Step remains unaccepted. The read-only checker found complete selected checkpoints and a present isolated Python with torch/acestep. The installer failed its cache write admission because 10,888,517,632 bytes of hard-quota headroom were available versus 12,884,901,888 bytes required, and no writes were attempted. The acceptance workflow now calls `prepare_ace_step_runtime.py ensure`: it verifies and reuses only the fully pinned/complete existing runtime, and it fails closed rather than implicitly reinstalling an existing invalid environment. Exact-head A100 confirmation is pending.
+
+After each live smoke the job closes its sidecars; therefore the saved post-run readiness snapshot appropriately says those ports are `UNREACHABLE`. Deployment readiness needs the service supervisor to start the desired provider in the persistent checkout and an immediate fresh `tools/check_media_service_readiness.py --json` result showing `READY`. The sync job recorded that the dirty persistent `~/OEC` checkout was preserved, so do not claim deployment-path synchronization until a safe, non-destructive sync is verified.

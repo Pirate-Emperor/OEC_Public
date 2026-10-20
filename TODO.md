@@ -468,3 +468,13 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - Speech/ASR requires the Gradio 6.0.1 fn_index=0 fix validation; ACE-Step remains pending independent model/API acceptance.
 - [x] Included FLUX.2 Klein (black-forest-labs/FLUX.2-klein-4B, phase2_3d) in the readiness matrix and marked it NOT_EXPOSED because no standalone supervised HTTP job API exists.
 - [ ] Add a standalone FLUX API only if direct image requests from OEC_Deploy are required; the combined FLUX-to-TRELLIS pipeline remains a CLI path.
+## Current live readiness and ACE-Step safe runtime reuse — 2026-10-20
+
+- [x] Exact candidate run 39422087711 passed Kokoro, Whisper, Qwen3-ASR, LTX, TRELLIS, AudioGen, MusicGen, FLUX.2 Klein→TRELLIS, and joined QA/HF remote hash read-back (artifact/hash details in docs/checklist.md and result.md).
+- [x] Static workflow 39422087706 passed, including readiness and service-manager regressions.
+- [x] Readiness JSON distinguishes model/runtime readiness from current endpoint reachability. Action-scoped sidecars stop after each smoke job; current endpoints must be started under the persistent supervisor and rechecked before deployment use.
+- [x] ACE-Step preflight found the pinned source directory, complete selected checkpoints, isolated Python, torch and acestep modules, but install was blocked because cache quota headroom was 10,888,517,632 bytes and StorageManager required 12,884,901,888 bytes.
+- [x] Added a read-only verified-reuse path to the ACE-Step runtime helper and changed the live acceptance workflow to use it first. It only reuses when source revision and checkpoints match and `_verify_runtime` confirms CUDA/A100/import roots; a failed verification refuses implicit reinstall.
+- [ ] Run the current-head static suite and A100 suite. Only mark ACE-Step ready after actual generation, live health and Gradio event pass.
+- [ ] Do not edit/reset the dirty persistent `~/OEC` checkout. The current sync helper reported it preserved that checkout; a safe per-file/worktree sync is still needed before claiming the tested commit is installed at the deployment path.
+- [ ] Add supervised typed HTTP job APIs for AudioGen/MusicGen (and standalone FLUX only if requested) before marking those providers `READY` to OEC_Deploy. Existing CLI/Gradio passes do not make them HTTP-exposed.

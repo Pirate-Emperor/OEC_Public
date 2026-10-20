@@ -43,3 +43,10 @@ The test launches the actual loopback Gradio UI and sends a gradio_client event 
 ## FLUX readiness representation
 
 FLUX.2 Klein is included in the read-only readiness inventory (black-forest-labs/FLUX.2-klein-4B, phase2_3d) as a real CLI/Gradio provider, but is explicitly NOT_EXPOSED through the shared HTTP job contract. The combined FLUX-to-TRELLIS pipeline is real but is not a standalone remote FLUX API.
+## 2026-10-20 — Latest live model readiness and ACE-Step blocked gate
+
+Run [39422087711](https://github.com/CalamityStriker/OEC/actions/runs/39422087711) (source SHA `cee722188fb4bd2b999b2b4fdfabc504bafc0087`) passed live inference plus UI/event acceptance for Kokoro, Whisper, Qwen3-ASR, LTX-2.3, TRELLIS.2, AudioGen and MusicGen; FLUX.2 Klein→TRELLIS also passed, and the joined LTX→Qwen2-VL QA→HF upload→remote hash read-back job succeeded. Full artifact metadata and SHA-256s are recorded in `docs/checklist.md` and the experiment ledger.
+
+ACE-Step was the only provider gate preventing the combined live workflow from going green. Read-only readiness found its source directory and all selected checkpoints complete, and the existing isolated Python had both `torch` and `acestep`. The install stage then refused a source/cache write: live cache hard-quota headroom was 10,888,517,632 bytes while StorageManager required 12,884,901,888 bytes. No install writes were started. A guarded `ensure` path is added to verify and reuse an already-complete pinned runtime without package/cache mutation; otherwise it falls back to the same guarded installer. Re-run is pending.
+
+The post-smoke readiness report marks action-scoped sidecar ports unreachable because those services are stopped at job exit. Do not interpret a successful inference artifact as proof of a persistently running deployment endpoint. AudioGen/MusicGen and standalone FLUX remain `NOT_EXPOSED` to the shared HTTP API until supervised job APIs are implemented.

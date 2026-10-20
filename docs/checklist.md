@@ -214,3 +214,19 @@ This section distinguishes model inference from UI acceptance. All results below
 - [ ] These passes are specific to source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844 and Gradio 4.44.1 in phase1. The next candidate changes speech calls to function-index endpoint selection for the phase2_3d/Gradio 6.0.1 UI. Speech and ACE-Step still need successful current-candidate jobs.
 - [ ] LTX/TRELLIS, FLUX→TRELLIS and the QA-to-HF path in the old run are still in their job chain; only update those statuses after their logs/artifacts finish.
 - [x] Added FLUX.2 Klein to the readiness matrix as NOT_EXPOSED through supervised HTTP. Its exact model identifier is black-forest-labs/FLUX.2-klein-4B in phase2_3d; its existing combined FLUX-to-TRELLIS CLI path is not a standalone Deploy API.
+## Exact-head live media readiness — 2026-10-20 (run 39422087711)
+
+- [x] Static regressions passed on commit `cee722188fb4bd2b999b2b4fdfabc504bafc0087`: [run 39422087706](https://github.com/CalamityStriker/OEC/actions/runs/39422087706).
+- [x] Kokoro live API + Gradio event passed: `/health` was ready with the model loaded; 319,244-byte 24 kHz WAV, SHA-256 `9b6d00581146135e2d57c0a1874e48d45a3c7faf99c32df37accc3bb8943b326`, physical GPU 4.
+- [x] Whisper live API + Gradio transcription passed: transcript artifact 82 bytes, SHA-256 `cef5bc6899fa64ba3a7f485f3e718f90227abe269cebc2862ce978390d0bc764`, physical GPU 2.
+- [x] Qwen3-ASR-0.6B live API + Gradio transcription passed independently: transcript artifact 85 bytes, SHA-256 `9869b37e985b9d9678a508b7ee3b771d015e8b8473b6eddcf64997fa36f2dfe6`, physical GPU 4.
+- [x] LTX-2.3 live sidecar generated and validated a 242,547-byte MP4, SHA-256 `5d7d54de4354936f66867fecd19d20c0ab6972b5d997ca00c145ab0c1e54ec51`; health reported ready/model-loaded.
+- [x] TRELLIS.2 live sidecar generated and validated a 2,782,228-byte GLB, SHA-256 `2fe3dcfbb542c34116934f8be54042e3e1d569bf76205b43d94ad129139e5f02`; geometry validation passed (1 mesh, 1 primitive); health reported ready/model-loaded.
+- [x] AudioGen actual generation and Gradio event passed: 3-second mono 16 kHz WAV 96,044 bytes; SHA-256 `02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58`; physical GPU 4, peak allocated 5.155 GiB.
+- [x] MusicGen actual generation and Gradio event passed: 3-second mono 32 kHz WAV 192,044 bytes; SHA-256 `0b6ada01eed76ac2a8a325c2c4f688cdc51072d31773f62b793ffd7ddf75ab9d`; physical GPU 4, peak allocated 4.352 GiB.
+- [x] FLUX.2 Klein → TRELLIS pipeline passed: validated 188,924-byte GLB, SHA-256 `0b9577fd0ead6ed4d910910c7ad9c56626b194b1c3c96210cbd3ca5b5411857c`; GLB reopened with trimesh (2,815 vertices, 4,580 faces).
+- [x] Joined LTX → Qwen2-VL QA → chunked Hugging Face upload → remote hash read-back job completed successfully in run 39422087711.
+- [ ] ACE-Step source checkout, selected checkpoints, isolated interpreter, `torch` and `acestep` module presence all passed read-only preflight, but no real generation was accepted. Runtime setup was denied by StorageManager: cache hard-quota headroom 10,888,517,632 bytes versus required 12,884,901,888 bytes. No runtime writes were started by the denied install.
+- [x] Added `ensure` logic so ACE-Step can reuse an existing runtime only when the pinned source commit, checkpoint completeness and isolated Python are present and actual runtime verification passes. If it is stale/missing, the unchanged guarded installer is used; a present-but-invalid runtime fails closed rather than being implicitly rewritten.
+- [ ] Exact-head rerun of ACE-Step `ensure` and real FLAC generation is pending. Do not claim ACE-Step ready until its API health and Gradio inference pass.
+- [ ] All Actions smoke sidecars stop at job exit. The post-run readiness report is therefore `UNREACHABLE` for the tested loopback ports; persistent OEC service startup and a new readiness check are still required before OEC_Deploy can use those HTTP endpoints.

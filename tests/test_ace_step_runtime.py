@@ -1,6 +1,9 @@
 """Offline path and checkpoint-layout tests for the isolated ACE-Step bootstrap."""
 from __future__ import annotations
 
+import contextlib
+import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -141,6 +144,77 @@ class AceStepRuntimeTests(unittest.TestCase):
             status = runtime.checkpoint_status(Path(tmp) / "not-downloaded")
             self.assertFalse(status["complete"])
             self.assertEqual(status["missing"], list(runtime.REQUIRED_CHECKPOINT_DIRS))
+
+    def test_ensure_reuses_a_complete_pinned_runtime_without_storage_writes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            home, cache, models = root / "home", root / "cache", root / "models"
+            paths = runtime.build_paths(home, cache, models)
+            paths["source_root"].mkdir(parents=True)
+            (paths["source_root"] / ".git").mkdir()
+            paths["python"].parent.mkdir(parents=True)
+            paths["python"].write_text("# verified fixture interpreter", encoding="utf-8")
+            dirs = {"cache": str(cache), "models": str(models)}
+            runtime_report = {"source_commit": runtime.SOURCE_COMMIT,
+                              "runtime": {"torch_cuda": "fixture", "cuda_available": True}}
+            output = io.StringIO()
+            with mock.patch.object(Path, "home", return_value=home), \
+                 mock.patch.object(runtime, "_system_dirs", return_value=dirs), \
+                 mock.patch.object(runtime, "_git", return_value=runtime.SOURCE_COMMIT), \
+                 mock.patch.object(runtime, "checkpoint_status", return_value={"complete": True, "missing": []}), \
+                 mock.patch.object(runtime, "_verify_runtime", return_value=runtime_report) as verify, \
+                 mock.patch.object(runtime, "_admit_runtime_writes", side_effect=AssertionError("must not request writes")), \
+                 mock.patch.object(runtime, "install", side_effect=AssertionError("must not reinstall")):
+                with contextlib.redirect_stdout(output):
+                    result = runtime.ensure()
+            self.assertEqual(result, 0)
+            verify.assert_called_once_with(paths, require_models=True)
+            record = json.loads(output.getvalue().split("ACE_STEP_RUNTIME_ACCEPTANCE ", 1)[1])
+            self.assertEqual(record["action"], "reused_existing_verified_runtime")
+            self.assertFalse(record["storage_write_admission_required"])
+            self.assertFalse(record["reserve_file_accessed"])
+
+    def test_ensure_falls_back_to_guarded_install_when_existing_source_is_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            home, cache, models = root / "home", root / "cache", root / "models"
+            paths = runtime.build_paths(home, cache, models)
+            paths["source_root"].mkdir(parents=True)
+            (paths["source_root"] / ".git").mkdir()
+            paths["python"].parent.mkdir(parents=True)
+            paths["python"].write_text("# fixture interpreter", encoding="utf-8")
+            dirs = {"cache": str(cache), "models": str(models)}
+            with mock.patch.object(Path, "home", return_value=home), \
+                 mock.patch.object(runtime, "_system_dirs", return_value=dirs), \
+                 mock.patch.object(runtime, "_git", return_value="0" * 40), \
+                 mock.patch.object(runtime, "checkpoint_status", return_value={"complete": True, "missing": []}), \
+                 mock.patch.object(runtime, "install", return_value=0) as install, \
+                 mock.patch.object(runtime, "_verify_runtime") as verify:
+                result = runtime.ensure()
+            self.assertEqual(result, 0)
+            install.assert_called_once_with()
+            verify.assert_not_called()
+
+    def test_ensure_fails_closed_if_existing_candidate_fails_runtime_verify(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            home, cache, models = root / "home", root / "cache", root / "models"
+            paths = runtime.build_paths(home, cache, models)
+            paths["source_root"].mkdir(parents=True)
+            (paths["source_root"] / ".git").mkdir()
+            paths["python"].parent.mkdir(parents=True)
+            paths["python"].write_text("# fixture interpreter", encoding="utf-8")
+            dirs = {"cache": str(cache), "models": str(models)}
+            with mock.patch.object(Path, "home", return_value=home), \
+                 mock.patch.object(runtime, "_system_dirs", return_value=dirs), \
+                 mock.patch.object(runtime, "_git", return_value=runtime.SOURCE_COMMIT), \
+                 mock.patch.object(runtime, "checkpoint_status", return_value={"complete": True, "missing": []}), \
+                 mock.patch.object(runtime, "_verify_runtime", side_effect=RuntimeError("CUDA verification failed")), \
+                 mock.patch.object(runtime, "install") as install:
+                with self.assertRaisesRegex(RuntimeError, "CUDA verification failed"):
+                    runtime.ensure()
+            install.assert_not_called()
+
 
 
 if __name__ == "__main__":

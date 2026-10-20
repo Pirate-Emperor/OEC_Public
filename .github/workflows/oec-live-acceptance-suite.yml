@@ -217,7 +217,9 @@ jobs:
             case "$version" in 3.11|3.12) ACE_BASE_PYTHON="$candidate"; break;; esac
           done
           test -n "$ACE_BASE_PYTHON" || { echo "::error::No existing Python 3.11/3.12 runtime for isolated ACE-Step"; exit 2; }
-          "$ACE_BASE_PYTHON" tools/prepare_ace_step_runtime.py install
+          R="$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/media-services"
+          mkdir -p "$R"
+          "$ACE_BASE_PYTHON" tools/prepare_ace_step_runtime.py ensure 2>&1 | tee "$R/ace-step-runtime-ensure.log"
       - name: Live ACE-Step generation and Gradio notebook callback
         id: ace_step_live
         run: |

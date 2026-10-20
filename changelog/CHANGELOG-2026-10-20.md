@@ -123,3 +123,9 @@
 ## 2026-10-20 — FLUX included in readiness inventory
 
 - Added FLUX.2 Klein (black-forest-labs/FLUX.2-klein-4B, phase2_3d) to the read-only readiness report. It is accurately marked NOT_EXPOSED because current code has CLI/Gradio and a combined FLUX-to-TRELLIS pipeline but no standalone supervised HTTP API.
+## 2026-10-20 — ACE-Step verified reuse and current model readiness
+
+- Added a read-only existing-runtime verification command and an `ensure` action for ACE-Step. The runtime is reused only if the pinned source commit, checkpoint completeness, isolated Python and actual CUDA/A100/import-root verification pass; incomplete/stale setups still use the guarded installer.
+- The latest A100 run passed live service-backed Kokoro, Whisper and Qwen3-ASR; LTX/TRELLIS generation; AudioGen/MusicGen real Gradio event callbacks; FLUX.2 Klein→TRELLIS; and joined QA/HF remote hash read-back.
+- ACE-Step remains blocked pending a current-head verified-runtime reuse/generation result. The last run correctly refused installation due insufficient fresh cache quota headroom; no write gate was bypassed.
+- Post-run readiness is `UNREACHABLE` for action-scoped services because the smoke jobs tear them down. Persistent deployment endpoints require supervisor startup and a fresh `READY` probe. The persistent `~/OEC` checkout was preserved by the sync gate and must not be overwritten blindly.

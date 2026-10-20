@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-20T16:12:00+05:30",
+  "last_updated": "2026-10-20T19:17:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Read-only readiness inventory includes LTX, TRELLIS, FLUX, ACE-Step, Kokoro, Whisper, Qwen3-ASR, AudioGen and MusicGen. FLUX and AudioGen/MusicGen are marked NOT_EXPOSED until standalone supervised HTTP job APIs exist. Static suite passed on prior candidate 807bf322ad5afb94e4bde2b67b70b67c8a34ab59; latest A100 live suite is pending behind an older serialized run.",
+  "latest_summary": "Latest live run 39422087711 on source SHA cee722188fb4bd2b999b2b4fdfabc504bafc0087 passed Kokoro, Whisper, Qwen3-ASR, LTX-2.3, TRELLIS.2, AudioGen, MusicGen, FLUX.2 Klein-to-TRELLIS, and the joined LTX→QA→HF upload→remote hash read-back job. Combined workflow failed solely at ACE-Step install because fresh StorageManager admission found 10,888,517,632 bytes cache headroom vs 12,884,901,888 required; no writes were attempted. A new guarded ensure command reuses ACE only after exact pinned source/checkpoint/venv checks plus runtime CUDA/A100/import verification, otherwise invokes the same guarded installer. Post-smoke endpoints are UNREACHABLE because test services stop at job exit; persistent deployment readiness and safe sync to dirty ~/OEC remain open.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -5269,6 +5269,144 @@
         "Run updated static suite on exact commit",
         "Confirm FLUX is NOT_EXPOSED in readiness JSON",
         "Only build a standalone service if direct FLUX-to-Deploy requests are required"
+      ]
+    },
+    {
+      "id": "LIVE-2026-10-20-CEE722-MEDIA-READINESS",
+      "date": "2026-10-20",
+      "category": "Live A100 model/service readiness and downstream integration",
+      "source_sha": "cee722188fb4bd2b999b2b4fdfabc504bafc0087",
+      "runner": "oec-2",
+      "run_id": 39422087711,
+      "static_run_id": 39422087706,
+      "environments": {
+        "visual_ltx": "phase1_ltx",
+        "visual_trellis": "phase2_3d",
+        "speech": "oec-audio-py311",
+        "speech_ui": "phase2_3d",
+        "audiogen_musicgen": "phase1",
+        "ace_step": "oec-acestep-py311"
+      },
+      "results": [
+        {
+          "provider": "Kokoro-82M",
+          "status": "PASS_LIVE_INFERENCE_AND_GRADIO",
+          "artifact": "WAV",
+          "bytes": 319244,
+          "sample_rate_hz": 24000,
+          "sha256": "9b6d00581146135e2d57c0a1874e48d45a3c7faf99c32df37accc3bb8943b326",
+          "physical_gpu": 4,
+          "health_ready": true
+        },
+        {
+          "provider": "Whisper Turbo",
+          "status": "PASS_LIVE_TRANSCRIPTION_AND_GRADIO",
+          "artifact": "text",
+          "bytes": 82,
+          "sha256": "cef5bc6899fa64ba3a7f485f3e718f90227abe269cebc2862ce978390d0bc764",
+          "physical_gpu": 2,
+          "health_ready": true,
+          "transcript_chars": 81
+        },
+        {
+          "provider": "Qwen3-ASR-0.6B",
+          "status": "PASS_LIVE_TRANSCRIPTION_AND_GRADIO",
+          "artifact": "text",
+          "bytes": 85,
+          "sha256": "9869b37e985b9d9678a508b7ee3b771d015e8b8473b6eddcf64997fa36f2dfe6",
+          "physical_gpu": 4,
+          "health_ready": true,
+          "transcript_chars": 84
+        },
+        {
+          "provider": "LTX-2.3",
+          "status": "PASS_LIVE_SIDECAR",
+          "artifact": "MP4",
+          "bytes": 242547,
+          "sha256": "5d7d54de4354936f66867fecd19d20c0ab6972b5d997ca00c145ab0c1e54ec51",
+          "health_ready": true,
+          "generation_seconds": 144.453
+        },
+        {
+          "provider": "TRELLIS.2",
+          "status": "PASS_LIVE_SIDECAR",
+          "artifact": "GLB",
+          "bytes": 2782228,
+          "sha256": "2fe3dcfbb542c34116934f8be54042e3e1d569bf76205b43d94ad129139e5f02",
+          "health_ready": true,
+          "mesh_count": 1,
+          "primitive_count": 1,
+          "generation_seconds": 108.034
+        },
+        {
+          "provider": "AudioGen medium",
+          "status": "PASS_LIVE_GENERATION_AND_GRADIO",
+          "artifact": "WAV",
+          "bytes": 96044,
+          "sha256": "02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58",
+          "physical_gpu": 4,
+          "peak_allocated_vram_gib": 5.155,
+          "license": "CC-BY-NC-4.0",
+          "api_exposure": "NOT_EXPOSED"
+        },
+        {
+          "provider": "MusicGen medium",
+          "status": "PASS_LIVE_GENERATION_AND_GRADIO",
+          "artifact": "WAV",
+          "bytes": 192044,
+          "sha256": "0b6ada01eed76ac2a8a325c2c4f688cdc51072d31773f62b793ffd7ddf75ab9d",
+          "physical_gpu": 4,
+          "peak_allocated_vram_gib": 4.352,
+          "license": "CC-BY-NC-4.0",
+          "api_exposure": "NOT_EXPOSED"
+        },
+        {
+          "provider": "FLUX.2 Klein to TRELLIS",
+          "status": "PASS_LIVE_PIPELINE",
+          "artifact": "GLB",
+          "bytes": 188924,
+          "sha256": "0b9577fd0ead6ed4d910910c7ad9c56626b194b1c3c96210cbd3ca5b5411857c",
+          "mesh_count": 1,
+          "primitive_count": 1,
+          "trimesh_reopen": "PASS",
+          "standalone_http_api": "NOT_EXPOSED"
+        },
+        {
+          "provider": "ACE-Step 1.5",
+          "status": "BLOCKED_BEFORE_INFERENCE",
+          "source_checkout_present": true,
+          "selected_checkpoints_complete": true,
+          "isolated_python_present": true,
+          "torch_module_present": true,
+          "acestep_module_present": true,
+          "install_admission": {
+            "available_bytes": 10888517632,
+            "required_bytes": 12884901888
+          },
+          "reason": "StorageManager denied ACE-Step source/cache write admission; no runtime writes started. Ensure/reuse path added but has not yet run on this source SHA."
+        },
+        {
+          "provider": "QA-to-HF remote readback",
+          "status": "PASS",
+          "run_id": 39422087711,
+          "workflow_job_conclusion": "success"
+        }
+      ],
+      "readiness_snapshot": {
+        "timing": "after smoke jobs",
+        "result": "UNREACHABLE for action-scoped service ports",
+        "reason": "CI smoke jobs stopped the temporary servers at job exit; do not confuse this with failed inference during the tests."
+      },
+      "deployment_sync": {
+        "persistent_checkout": "PRESERVED_NOT_SYNCED",
+        "reason": "sync helper stopped because persistent ~/OEC had an unexpected/empty local branch state and dirty worktree; no checkout/switch was attempted."
+      },
+      "next_actions": [
+        "Validate ensure reuses the already-present pinned ACE-Step runtime without writes, then pass real FLAC generation and Gradio event",
+        "Rerun static and A100 suite on new HEAD",
+        "Start only required providers in the persistent OEC checkout after safe non-destructive sync, then verify live READY endpoints",
+        "Keep AudioGen/MusicGen/standalone FLUX NOT_EXPOSED until supervised HTTP job APIs exist",
+        "Do not merge to main until behind/ahead divergence (branch is diverged from main) is reconciled"
       ]
     }
   ]

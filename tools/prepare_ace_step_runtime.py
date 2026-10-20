@@ -334,16 +334,14 @@ print(json.dumps({
     return report
 
 
-def status() -> int:
-    directories = _system_dirs()
-    paths = build_paths(Path.home(), directories["cache"], directories["models"])
+def _status_report(paths: dict[str, Path]) -> dict[str, Any]:
     source_commit = None
     if (paths["source_root"] / ".git").is_dir() and not paths["source_root"].is_symlink():
         try:
             source_commit = _git(paths["source_root"], "rev-parse", "HEAD")
         except Exception:
             source_commit = "unavailable"
-    report = {
+    return {
         "source_url": SOURCE_URL,
         "source_commit_pinned": SOURCE_COMMIT,
         "source_root": str(paths["source_root"]),
@@ -353,8 +351,56 @@ def status() -> int:
         "models": checkpoint_status(paths["model_root"]),
         "reserve_file_accessed": False,
     }
-    print(json.dumps(report, indent=2, sort_keys=True))
+
+
+def status() -> int:
+    directories = _system_dirs()
+    paths = build_paths(Path.home(), directories["cache"], directories["models"])
+    print(json.dumps(_status_report(paths), indent=2, sort_keys=True))
     return 0
+
+
+def ensure() -> int:
+    """Reuse a fully installed, pinned runtime after read-only verification.
+
+    An absent/stale source, missing interpreter or incomplete checkpoint set
+    falls through to the existing guarded installer. If an existing candidate
+    fails actual runtime verification, fail closed rather than implicitly
+    mutating a large environment as a recovery action.
+    """
+    directories = _system_dirs()
+    paths = build_paths(Path.home(), directories["cache"], directories["models"])
+    current = _status_report(paths)
+    models = current.get("models") or {}
+    reusable = (
+        current.get("venv_present") is True
+        and current.get("cached_source_commit") == SOURCE_COMMIT
+        and models.get("complete") is True
+        and not paths["source_root"].is_symlink()
+        and not paths["venv_root"].is_symlink()
+    )
+    if reusable:
+        verified = _verify_runtime(paths, require_models=True)
+        verified.update({
+            "status": "PASS",
+            "action": "reused_existing_verified_runtime",
+            "storage_write_admission_required": False,
+            "shared_torch_mutated": False,
+            "model_downloads_by_installer": False,
+            "reserve_file_accessed": False,
+        })
+        print("ACE_STEP_RUNTIME_ACCEPTANCE " + json.dumps(verified, sort_keys=True), flush=True)
+        return 0
+
+    print("ACE_STEP_RUNTIME_REUSE_NOT_READY " + json.dumps({
+        "cached_source_commit": current.get("cached_source_commit"),
+        "source_commit_pinned": SOURCE_COMMIT,
+        "venv_present": current.get("venv_present"),
+        "models_complete": models.get("complete"),
+        "missing_checkpoints": models.get("missing", []),
+        "reserve_file_accessed": False,
+    }, sort_keys=True), flush=True)
+    return install()
 
 
 def _admit_runtime_writes(paths: dict[str, Path]) -> None:
@@ -441,10 +487,25 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("status", help="report pinned source, isolated venv and existing model-checkpoint status")
+    commands.add_parser("verify", help="verify an existing pinned isolated runtime without package installs or model downloads")
+    commands.add_parser("ensure", help="reuse a verified existing runtime or run the guarded installer only if it is absent/stale")
     commands.add_parser("install", help="install the pinned official source into an isolated venv, without model downloads")
     args = parser.parse_args()
     try:
-        return status() if args.command == "status" else install()
+        if args.command == "status":
+            return status()
+        if args.command == "verify":
+            directories = _system_dirs()
+            paths = build_paths(Path.home(), directories["cache"], directories["models"])
+            report = _verify_runtime(paths, require_models=True)
+            report.update({"status": "PASS", "action": "verified_existing_runtime",
+                           "storage_write_admission_required": False, "shared_torch_mutated": False,
+                           "model_downloads_by_installer": False, "reserve_file_accessed": False})
+            print("ACE_STEP_RUNTIME_VERIFICATION " + json.dumps(report, sort_keys=True), flush=True)
+            return 0
+        if args.command == "ensure":
+            return ensure()
+        return install()
     except Exception as exc:
         print(json.dumps({
             "status": "FAIL", "error_type": type(exc).__name__, "error": str(exc),
