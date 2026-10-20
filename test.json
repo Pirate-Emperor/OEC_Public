@@ -4,7 +4,7 @@
   "last_updated": "2026-10-20T21:45:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Current code SHA 72b71f861bba72b78da1cec330e4273b00baaabb has exact-head static pass (run 39452849501). Live A100 suite 39452849617 remains non-terminal: source sync and authorized lock recovery passed; the actual Whisper callback returned new segment_timestamps; Kokoro/Qwen3-ASR passed; ACE-Step generated a real FLAC; AudioGen actual inference and Gradio callback passed. MusicGen job 118741175823 was cancelled before starting with no inference output and no reported reason; LTX/TRELLIS job 118743897523 remains at storage/cache preflight. Latest completed full suite is parent SHA 0c53f6a... run 39435100568 (8/8 jobs, including LTX→QA→HF chunk upload/read-back). Persistent services remain unproven; FLUX, AudioGen, MusicGen not exposed via shared /v1/jobs.",
+  "latest_summary": "Private generated asset in strikerhell/Vault verified with remote hash read-back (asset 1, 228845 bytes, SHA-256 3d66b13693184eb7f76841f96836ded2f3407dc1e11b810f2e91c1db8b465392). Live run #39452849617 passed the LTX→Qwen2-VL QA→HF upload/read-back path and most live model inference jobs; MusicGen was cancelled, so overall suite is failed. Persistent API release attempts did not start services; latest #39464232552 passed sync, output storage and four audio runtime/cache preflight checks, then failed because service manager CLI rejects instance ID audio-api-kokoro (only group choices such as audio-api are accepted). No model weights were downloaded, no public model-weight release was made, and no persistent API start succeeded. Next: fix group status parsing/instance lookup and LTX runtime preflight, then rerun the short guarded release.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -5646,6 +5646,49 @@
         "No standalone FLUX/AudioGen/MusicGen /v1/jobs API.",
         "Original 15-day deadline not recovered; repository target 2026-10-21."
       ]
+    },
+    {
+      "id": "LIVE-2026-10-20-PERSISTENT-MODEL-API-RELEASE",
+      "date": "2026-10-20",
+      "category": "Persistent model API release and private artifact publication",
+      "status": "BLOCKED_BEFORE_SERVICE_START_CLI_INSTANCE_LOOKUP",
+      "source": {
+        "branch": "fix/media-stack-supervision-20261019",
+        "inference_sha": "72b71f861bba72b78da1cec330e4273b00baaabb",
+        "latest_release_attempt_sha": "d68fa32f0542e4481a972b45eaf2fcbb22465842",
+        "live_acceptance_run": "https://github.com/CalamityStriker/OEC/actions/runs/39452849617",
+        "api_release_run": "https://github.com/CalamityStriker/OEC/actions/runs/39464232552",
+        "prior_attempts": [
+          "https://github.com/CalamityStriker/OEC/actions/runs/39463291348",
+          "https://github.com/CalamityStriker/OEC/actions/runs/39463516709",
+          "https://github.com/CalamityStriker/OEC/actions/runs/39463702968",
+          "https://github.com/CalamityStriker/OEC/actions/runs/39463952004"
+        ]
+      },
+      "results": {
+        "private_asset_published": true,
+        "dataset_repo": "strikerhell/Vault",
+        "asset_id": 1,
+        "asset_bytes": 228845,
+        "asset_sha256": "3d66b13693184eb7f76841f96836ded2f3407dc1e11b810f2e91c1db8b465392",
+        "remote_manifest_and_chunks_readback": "PASS",
+        "latest_audio_provider_preflight": "PASS (Kokoro, Whisper Turbo, Qwen3-ASR-0.6B, ACE-Step 1.5)",
+        "service_manager_status": "FAILED before start: CLI rejected audio-api-kokoro; valid CLI group is audio-api",
+        "services_started_by_latest_attempt": [],
+        "ltx_runtime_preflight": "BLOCKED_OR_INCOMPLETE despite live inference pass in prior acceptance suite",
+        "model_weight_downloads": 0,
+        "public_model_weights_released": false,
+        "api_release_complete": false,
+        "modelgen_job_in_latest_suite": "cancelled before inference"
+      },
+      "next_actions": [
+        "Change the release workflow to call status audio-api and select provider instances/ports from its JSON output, or extend/test service-manager exact-instance status lookup.",
+        "Investigate LTX preflight module mismatch without downloading packages; preserve the successful isolated inference evidence.",
+        "Rerun the existing short timeout release workflow only for providers that pass current runtime/cache checks and verify ready=true plus model_loaded=true.",
+        "Keep loopback endpoints private; no third-party weights are to be rehosted without explicit license/provenance review."
+      ]
     }
-  ]
+  ],
+  "updated_at": "2026-10-20T22:45:00+05:30",
+  "updated_date": "2026-10-20"
 }
