@@ -131,3 +131,7 @@ Review/backup those 662 entries first. Do not reset, clean or overwrite them. Af
 - [x] Added `tools/run_gradio_model_notebook_smokes.py`: executes notebook code, launches the actual Gradio UI on loopback, checks HTTP 200 HTML, calls the real generation/transcription callback, validates WAV/FLAC headers or non-empty transcript, records artifact SHA-256 and closes the UI.
 - [x] Hardened `tools/run_media_model_smokes.py` to select/pin an actually idle A100 for all four speech/music API providers based on process owner, memory use and GPU utilization; previously only ACE-Step was explicitly pinned.
 - [ ] The new oec-2 Actions runs are triggered by this commit. Do not mark any model/UI/full-pipeline task passed until the run-specific artifacts show generated assets and the E2E report confirms QA→HF upload→remote read-back/reassembly/hash.
+
+
+- [x] Corrected the stale E2E runner-name check to accept an explicit `OEC_EXPECTED_RUNNER`; current ordered oec-2 job sets it to `oec-2`. All GPU process ownership and VRAM checks remain fail-closed.
+- [ ] Full end-to-end QA→HF acceptance remains pending; only mark pass after current oec-2 job produces the expected report and upload/read-back evidence.

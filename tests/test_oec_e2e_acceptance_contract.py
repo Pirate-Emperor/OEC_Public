@@ -16,11 +16,19 @@ class OecE2EAcceptanceContractTests(unittest.TestCase):
         cls.source = (ROOT / "tools" / "run_oec_e2e_acceptance.py").read_text(encoding="utf-8")
 
     def test_gpu_gate_refuses_unowned_compute_processes(self):
-        self.assertIn('runner != "oec-1"', self.source)
+        self.assertIn('expected_runner = os.environ.get("OEC_EXPECTED_RUNNER", "oec-1")', self.source)
+        self.assertIn("if runner != expected_runner:", self.source)
         self.assertIn("nvidia-smi", self.source)
         self.assertIn("active_compute", self.source)
         self.assertIn("refusing overlap", self.source)
         self.assertIn("free_mib", self.source)
+
+    def test_runner_override_does_not_disable_gpu_process_ownership_gate(self):
+        self.assertIn('expected_runner = os.environ.get("OEC_EXPECTED_RUNNER", "oec-1")', self.source)
+        self.assertIn("if runner != expected_runner:", self.source)
+        self.assertIn("active_compute = [line.strip() for line in process_check.stdout.splitlines() if line.strip()]", self.source)
+        self.assertIn("if active_compute:", self.source)
+        self.assertIn("no A100 has at least 30 GiB free VRAM", self.source)
 
     def test_upload_target_requires_auth_and_existing_dataset(self):
         self.assertIn("api.whoami()", self.source)

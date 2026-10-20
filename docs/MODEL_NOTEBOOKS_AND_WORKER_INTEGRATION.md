@@ -133,3 +133,8 @@ The provider workflow can run both backend/API and UI callback acceptance using:
 The live worker harness now selects a currently idle A100 using process ownership, memory and utilization telemetry for **all** providers, then sets `CUDA_VISIBLE_DEVICES` to that physical card. If the status query fails or no device is idle, it fails closed. This prevents accidental defaulting to GPU 0 while it is owned by another process.
 
 The live workflows are routed to the runner label `oec-2` because the previous `oec-1` attempt failed the GPU ownership guard. Routing is not a test pass; inspect the current run's job and artifact evidence before marking any model accepted.
+
+
+### E2E runner selection
+
+The E2E harness defaults to `OEC_EXPECTED_RUNNER=oec-1` for older/manual invocations. The current ordered acceptance suite runs on `oec-2` and sets `OEC_EXPECTED_RUNNER=oec-2`. This only relaxes the stale hostname expectation; it does **not** relax the required idle-GPU/process ownership guard, 30 GiB free-memory gate, fresh StorageManager admission, offline QA cache requirement or existing HF dataset authentication.

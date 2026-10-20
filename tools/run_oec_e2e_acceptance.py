@@ -2,7 +2,7 @@
 """One-row live OEC E2E acceptance: LTX -> Qwen2-VL QA -> chunked HF upload -> remote verification.
 
 This is an opt-in operational smoke, not a quality benchmark. It requires the
-assigned oec-1 runner, an idle A100, fresh StorageManager admission, an existing
+configured assigned runner (oec-1 by default), an idle A100, fresh StorageManager admission, an existing
 authenticated dataset repository, and existing/cacheable dependencies. It never
 touches the shared upload queue or starts the continuous daemons.
 """
@@ -61,8 +61,9 @@ def run_logged(command: list[str], log_path: Path, *, env: dict[str, str] | None
 
 def gpu_preflight() -> dict[str, Any]:
     runner = os.environ.get("RUNNER_NAME", "")
-    if runner != "oec-1":
-        raise GateBlocked(f"expected assigned runner oec-1, got {runner or 'unknown'}")
+    expected_runner = os.environ.get("OEC_EXPECTED_RUNNER", "oec-1")
+    if runner != expected_runner:
+        raise GateBlocked(f"expected assigned runner {expected_runner}, got {runner or 'unknown'}")
     smi = subprocess.run(
         ["nvidia-smi", "--query-gpu=index,name,memory.total,memory.used",
          "--format=csv,noheader,nounits"],

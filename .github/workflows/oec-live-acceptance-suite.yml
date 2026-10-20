@@ -407,6 +407,8 @@ jobs:
           "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python -m unittest discover -s tests -p 'test_oec_e2e_acceptance_contract.py' -v
           "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python storage_manager.py --status
       - name: Run the joined Brain/LTX/Qwen2-VL/HF chunk/read-back acceptance
+        env:
+          OEC_EXPECTED_RUNNER: oec-2
         run: |
           set -euo pipefail
           R="$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/e2e"

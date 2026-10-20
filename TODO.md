@@ -405,3 +405,9 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - For each model-specific notebook, start its actual Gradio interface on loopback, verify the UI responds HTTP 200, invoke the wired callback against the live isolated backend, validate generated WAV/FLAC or ASR transcript, and record the SHA-256 of generated audio.
 - Select/pin a process-checked, low-use A100 for every live speech/music provider. If no device is admitted, fail closed rather than letting the provider default to GPU 0.
 - Static checks and source sync are not live acceptance. Require current Actions artifacts for AudioGen, MusicGen, ACE-Step, Kokoro, Whisper, Qwen3-ASR, FLUX→TRELLIS, LTX/TRELLIS, and full QA/upload/read-back.
+
+
+## E2E runner correction — 2026-10-20
+
+- Previous current-candidate E2E run on oec-2 correctly failed closed before inference because the Python harness still hardcoded expected runner `oec-1`. Added explicit `OEC_EXPECTED_RUNNER` (defaults to oec-1 for backward compatibility) and configured the ordered oec-2 suite to set it to oec-2.
+- This changes only runner identity validation. The harness still refuses any active compute process and requires an idle A100 with at least 30 GiB free, current StorageManager status, existing authenticated HF dataset and cache-only QA.

@@ -59,3 +59,9 @@
 - Added headless launch gating to the six model notebooks and a smoke helper that executes notebook cells, launches the real Gradio Interface on loopback, checks its HTML response, invokes the actual callback, validates generated audio/transcripts, preserves report artifacts plus SHA-256 and closes the UI without a public share.
 - Hardened the live audio provider smoke to choose and pin a physically idle A100 for Kokoro, Whisper, Qwen3-ASR and ACE-Step. It now refuses if GPU/process telemetry is unavailable or no device is available.
 - Current live Actions results are pending; no model/QA/upload pass is implied by these source changes.
+
+
+## E2E runner guard fix
+
+- Previous new-run E2E log from `39384279157` reports `OEC_E2E_BLOCKED=expected assigned runner oec-1, got oec-2`, before GPU/storage inference acceptance. Updated the harness to use explicit `OEC_EXPECTED_RUNNER` (default oec-1) and configured the ordered oec-2 job accordingly. Existing GPU process ownership/VRAM gates remain enabled.
+- Test status pending next suite run.

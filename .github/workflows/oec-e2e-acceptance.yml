@@ -61,6 +61,8 @@ jobs:
       - name: Run guarded live LTX -> QA -> resumable upload -> remote verification
         id: e2e
         env:
+          OEC_EXPECTED_RUNNER: oec-2
+        env:
           OEC_E2E_REPORT_DIR: ${{ runner.temp }}/oec-e2e-acceptance-${{ github.run_id }}
         run: |
           set -uo pipefail

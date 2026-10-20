@@ -115,3 +115,6 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 
 
 - [2026-10-20 — oec-2 live acceptance and real Gradio callbacks](CHANGELOG-2026-10-20.md): live model workflows now target `oec-2`. The API smoke can launch each notebook UI on loopback, call the wired callback against the live backend, validate outputs and capture SHA-256 evidence. Pending Actions artifacts.
+
+
+- E2E runner guard now accepts `OEC_EXPECTED_RUNNER=oec-2` for the ordered suite while preserving the idle-GPU/process checks; see current checklist for live run result.
