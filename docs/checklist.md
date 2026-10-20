@@ -135,3 +135,11 @@ Review/backup those 662 entries first. Do not reset, clean or overwrite them. Af
 
 - [x] Corrected the stale E2E runner-name check to accept an explicit `OEC_EXPECTED_RUNNER`; current ordered oec-2 job sets it to `oec-2`. All GPU process ownership and VRAM checks remain fail-closed.
 - [ ] Full end-to-end QA→HF acceptance remains pending; only mark pass after current oec-2 job produces the expected report and upload/read-back evidence.
+
+
+## 2026-10-20 — Authorized storage recovery gate
+
+- [x] Latest live suite proved source sync to oec-2 works, but the speech-model preparation job failed before model downloads because `recover_dead_storage_locks.py` is explicitly authorized only on `oec-1/scn30-mn`; it refused to run on oec-2.
+- [x] Ordered suite corrected: a separate non-inference `recover-storage-locks` job runs that helper only on oec-1, while all model-generation jobs remain on oec-2. Downstream GPU tests are gated on successful storage recovery.
+- [x] oec-2 now performs read-only checks for remaining `.storage_pause.lock` or `.storage_lease.json` and fails closed if either remains; it no longer tries unauthorized legacy-lock recovery.
+- [ ] Verify the new authorized recovery gate on the next ordered suite. No live speech model was tested in the failed preparation stage.

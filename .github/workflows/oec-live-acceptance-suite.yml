@@ -95,10 +95,41 @@ jobs:
           printf 'OEC_LIVE_EXPECTED_SHA=%s\n' "$expected"
           printf 'OEC_LIVE_ACTUAL_SHA=%s\n' "$actual"
 
-  prepare-media-services:
-    name: Real Kokoro, Whisper, Qwen3-ASR and ACE-Step inference + Gradio callbacks
+  recover-storage-locks:
+    name: Authorized legacy storage-lock recovery (oec-1 only)
     needs: sync-source
     if: ${{ always() && needs.sync-source.result == 'success' }}
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout candidate source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run only authorized conservative legacy lock recovery
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-1" || {
+            echo "::error::Legacy recovery is permitted only on oec-1."
+            exit 2
+          }
+          test -x "$HOME/Conda/condabin/conda"
+          test -f "$HOME/OEC/storage_config.json"
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          C="$HOME/Conda/condabin/conda"
+          "$C" run --no-capture-output -n oec_deploy python storage_manager.py --status
+          "$C" run --no-capture-output -n oec_deploy python storage_manager.py --clean
+          # This verifies lock age, dead owner PID, no lease manifest, and unchanged reserve.
+          "$C" run --no-capture-output -n oec_deploy python tools/recover_dead_storage_locks.py outputs
+          "$C" run --no-capture-output -n oec_deploy python storage_manager.py --status
+
+  prepare-media-services:
+    name: Real Kokoro, Whisper, Qwen3-ASR and ACE-Step inference + Gradio callbacks
+    needs: [sync-source, recover-storage-locks]
+    if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 180
     defaults:
@@ -142,9 +173,8 @@ jobs:
           mkdir -p "$R"
           "$OEC_PYTHON" tools/prepare_media_models.py status 2>&1 | tee "$R/cache-before.log"
           "$OEC_PYTHON" storage_manager.py --status 2>&1 | tee "$R/storage-before.log"
-          "$OEC_PYTHON" storage_manager.py --clean
-          "$OEC_PYTHON" tools/recover_dead_storage_locks.py outputs
-          "$OEC_PYTHON" storage_manager.py --status 2>&1 | tee "$R/storage-after-lock-recovery.log"
+          "$OEC_PYTHON" -c 'from pathlib import Path; from core_config import SYSTEM_DIRS; blocked=[str(Path(SYSTEM_DIRS[a])/n) for a in ("models","outputs") for n in (".storage_pause.lock",".storage_lease.json") if (Path(SYSTEM_DIRS[a])/n).exists() or (Path(SYSTEM_DIRS[a])/n).is_symlink()]; print("STORAGE_LOCK_GUARD=" + ("BLOCKED " + ",".join(blocked) if blocked else "PASS no lock/lease files")); raise SystemExit(3 if blocked else 0)'
+          "$OEC_PYTHON" storage_manager.py --status 2>&1 | tee "$R/storage-after-authorized-recovery.log"
       - name: Download only missing speech checkpoints through StorageManager admission
         run: |
           set -euo pipefail
@@ -198,8 +228,8 @@ jobs:
 
   audiogen-notebook:
     name: AudioGen actual inference and Gradio callback
-    needs: prepare-media-services
-    if: ${{ always() && needs.sync-source.result == 'success' }}
+    needs: [prepare-media-services, sync-source, recover-storage-locks]
+    if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 60
     defaults:
@@ -244,8 +274,8 @@ jobs:
 
   musicgen-notebook:
     name: MusicGen actual inference and Gradio callback
-    needs: audiogen-notebook
-    if: ${{ always() && needs.sync-source.result == 'success' }}
+    needs: [audiogen-notebook, sync-source, recover-storage-locks]
+    if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 60
     defaults:
@@ -297,8 +327,8 @@ jobs:
 
   visual-sidecars:
     name: LTX and TRELLIS real sidecar inference
-    needs: musicgen-notebook
-    if: ${{ always() && needs.sync-source.result == 'success' }}
+    needs: [musicgen-notebook, sync-source, recover-storage-locks]
+    if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 150
     defaults:
@@ -325,8 +355,7 @@ jobs:
           R="$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/visual"
           mkdir -p "$R"
           "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python storage_manager.py --status 2>&1 | tee "$R/storage-before.log"
-          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python storage_manager.py --clean
-          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python tools/recover_dead_storage_locks.py outputs
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python -c 'from pathlib import Path; from core_config import SYSTEM_DIRS; blocked=[str(Path(SYSTEM_DIRS[a])/n) for a in ("models","outputs") for n in (".storage_pause.lock",".storage_lease.json") if (Path(SYSTEM_DIRS[a])/n).exists() or (Path(SYSTEM_DIRS[a])/n).is_symlink()]; print("STORAGE_LOCK_GUARD=" + ("BLOCKED " + ",".join(blocked) if blocked else "PASS no lock/lease files")); raise SystemExit(3 if blocked else 0)'
           export OEC_VISUAL_SMOKE_DIR="$R"
           export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
           timeout 6900s "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python tools/run_visual_media_sidecar_smokes.py 2>&1 | tee "$R/sidecar-run.log"
@@ -342,8 +371,8 @@ jobs:
 
   flux-trellis:
     name: FLUX PNG to TRELLIS GLB actual inference
-    needs: visual-sidecars
-    if: ${{ always() && needs.sync-source.result == 'success' }}
+    needs: [visual-sidecars, sync-source, recover-storage-locks]
+    if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 150
     defaults:
@@ -384,8 +413,8 @@ jobs:
 
   qa-hf-e2e:
     name: LTX -> Qwen2-VL QA -> HF resumable upload -> remote hash read-back
-    needs: flux-trellis
-    if: ${{ always() && needs.sync-source.result == 'success' }}
+    needs: [flux-trellis, sync-source, recover-storage-locks]
+    if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 180
     defaults:

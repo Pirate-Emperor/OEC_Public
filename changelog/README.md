@@ -118,3 +118,6 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 
 
 - E2E runner guard now accepts `OEC_EXPECTED_RUNNER=oec-2` for the ordered suite while preserving the idle-GPU/process checks; see current checklist for live run result.
+
+
+- [2026-10-20 — authorized storage recovery gate](CHANGELOG-2026-10-20.md): moved conservative legacy lock recovery to oec-1 and gated all oec-2 inference on successful recovery plus read-only no-lock/no-lease checks.

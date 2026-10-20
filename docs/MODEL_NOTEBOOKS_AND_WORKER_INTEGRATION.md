@@ -138,3 +138,10 @@ The live workflows are routed to the runner label `oec-2` because the previous `
 ### E2E runner selection
 
 The E2E harness defaults to `OEC_EXPECTED_RUNNER=oec-1` for older/manual invocations. The current ordered acceptance suite runs on `oec-2` and sets `OEC_EXPECTED_RUNNER=oec-2`. This only relaxes the stale hostname expectation; it does **not** relax the required idle-GPU/process ownership guard, 30 GiB free-memory gate, fresh StorageManager admission, offline QA cache requirement or existing HF dataset authentication.
+
+
+## Storage recovery gate after runner split
+
+The first ordered run's model-preparation step failed closed before downloads because `tools/recover_dead_storage_locks.py` allows legacy pause-lock recovery only on `oec-1/scn30-mn`. That helper's safety restriction is preserved. The suite now has a dedicated `recover-storage-locks` job on oec-1, ordered after source sync and before model setup. It runs StorageManager status/clean and the existing conservative recovery helper. Model setup and subsequent oec-2 GPU jobs depend on that step succeeding.
+
+On oec-2, model setup and the visual sidecar stage only check for remaining `.storage_pause.lock` or `.storage_lease.json`; they do not delete, resume or manually edit them. Any remaining lock/lease is a blocking status that must be resolved by the authorized manager/owner before inference. This preserves the no-bypass rule.

@@ -65,3 +65,9 @@
 
 - Previous new-run E2E log from `39384279157` reports `OEC_E2E_BLOCKED=expected assigned runner oec-1, got oec-2`, before GPU/storage inference acceptance. Updated the harness to use explicit `OEC_EXPECTED_RUNNER` (default oec-1) and configured the ordered oec-2 job accordingly. Existing GPU process ownership/VRAM gates remain enabled.
 - Test status pending next suite run.
+
+
+## Authorized storage recovery gate correction
+
+- Latest oec-2 live run was blocked at storage preparation by the existing helper's explicit `oec-1/scn30-mn` restriction, before downloads/inference. The helper must not be run on oec-2.
+- The ordered suite now recovers eligible legacy locks in a separate oec-1 job (dead PID, minimum lock age, no lease manifest, unchanged reserve). All oec-2 inference jobs require that recovery stage to pass and fail closed if any lock/lease remains.

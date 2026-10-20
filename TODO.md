@@ -411,3 +411,10 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 
 - Previous current-candidate E2E run on oec-2 correctly failed closed before inference because the Python harness still hardcoded expected runner `oec-1`. Added explicit `OEC_EXPECTED_RUNNER` (defaults to oec-1 for backward compatibility) and configured the ordered oec-2 suite to set it to oec-2.
 - This changes only runner identity validation. The harness still refuses any active compute process and requires an idle A100 with at least 30 GiB free, current StorageManager status, existing authenticated HF dataset and cache-only QA.
+
+
+## 2026-10-20 — Storage recovery moved to its authorized runner
+
+- Current oec-2 model prep stopped with `legacy lock recovery is restricted to oec-1/scn30-mn; current identity=oec-2/scn30-mn`. This was a safety policy failure before checkpoint downloads, not model inference.
+- Added an ordered `recover-storage-locks` stage on oec-1; it uses only the conservative existing recovery helper, which checks lock age, owner PID, absence of a lease manifest, and invariant reserve size before calling StorageManager `--resume`.
+- Model jobs on oec-2 are now gated on the authorized recovery job succeeding and independently verify there are no remaining pause locks or lease manifests. Any unresolved lock/lease blocks inference; no reserve file is manually deleted or resized.
