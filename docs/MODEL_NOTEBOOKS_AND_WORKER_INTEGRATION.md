@@ -90,3 +90,10 @@ Keep models in OEC core worker/service processes; do not import model packages i
 ## Persistent A100 checkout synchronization
 
 A fail-closed workflow attempts to fast-forward the persistent $HOME/OEC checkout after branch updates. It will not clone, switch branches, reset files, overwrite local changes or replace a divergent history. It proceeds only when the checkout exists, origin identifies CalamityStriker/OEC, the local branch is fix/media-stack-supervision-20261019, the working tree is clean and origin is a fast-forward descendant. The workflow must show OEC_A100_SYNC=PASS and matching before/after/target SHAs before we claim that the long-lived checkout is synced. If it blocks, preserve the local tree and resolve its branch/dirty/origin issue manually.
+
+
+## Latest state and local sync caveat (2026-10-20)
+
+- Static workflow run 39379246551 on source c79401c00182e94f3bc3f4d38109174f0662c7f5 passed all steps, including the new notebook tests 3/3.
+- The live E2E attempt 39320471955 (attempt 2) is blocked by the external GPU process noted in docs/checklist.md; no inference/QA/upload was reached.
+- Safe sync run 39379246680 blocked because $HOME/OEC is on detached HEAD. The script refused to switch it; its working-tree cleanliness is unknown. Diagnose before taking a manual action.

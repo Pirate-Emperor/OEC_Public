@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-19T23:33:00+05:30",
+  "last_updated": "2026-10-20T11:45:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Current static regression workflow 39300850953 passed on SHA 80cc89480ee79f18d1ec7c101f97cfc310379ed1: 96 tests across notebook/CLI, storage, QA/frame, Brain/LTX queue, uploader/chunking, new E2E acceptance contracts, StorageManager/Policy, quota and reservation; compilation and all 4 notebook JSON checks passed. New guarded live E2E run 39300850928 on assigned oec-1 completed BLOCKED before inference because external process PID 3347078 (Biome server-components Python) had CUDA contexts on all eight A100s. The exact artifact report confirms no model inference, shared queue use, remote repo creation, process kill or upload attempt. This is an infrastructure admission block; it does not test live Qwen2-VL or real HF upload. Visual sidecar run 39278268411 succeeded with inspected TRELLIS GLB and LTX MP4. ACE-Step remains no-idle-A100 blocked; combined FLUX→TRELLIS no accepted output. End-to-end LTX→QA→HF upload/readback remains open pending normal release of GPU ownership.",
+  "latest_summary": "Static regression PASS on feature branch source c79401c00182e94f3bc3f4d38109174f0662c7f5, run 39379246551/job 118484298605: all 14 test command groups succeeded (logs total 102 tests); new Gradio notebook tests 3/3 passed, existing notebook JSON checks passed. New six-model Gradio clients and integration runbook are committed. Live E2E run 39320471955 attempt 2 is BLOCKED before inference by external PID 3347078 across all 8 A100s; no model inference/QA/HF upload/read-after-write. Safe persistent checkout sync run 39379246680 blocked because $HOME/OEC is detached HEAD; no branch switch or file write was attempted; local dirty state unknown.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -4584,6 +4584,86 @@
         "No full pipeline success claim is justified."
       ],
       "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39300850928/artifacts/12211286861"
+    },
+    {
+      "id": "EXP-2026-10-20-GRADIO-NOTEBOOK-STATIC-PASS-39379246551",
+      "date": "2026-10-20",
+      "category": "Static regression and notebook source-contract validation",
+      "approach": "Run the repository's storage-admission and regression workflow after adding six per-model Gradio notebooks, checking Jupyter nbformat JSON, parsing every code cell via AST, asserting declared UI/backend environments and loopback Gradio, and ensuring service-client cells do not import provider ML stacks.",
+      "reason": "Validate notebook structure and environment isolation without a model download or GPU allocation.",
+      "parameters": {
+        "workflow_run_id": 39379246551,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39379246551",
+        "job_id": 118484298605,
+        "source_sha": "c79401c00182e94f3bc3f4d38109174f0662c7f5",
+        "branch": "fix/media-stack-supervision-20261019",
+        "runner": "GitHub-hosted ubuntu-latest / Python 3.11",
+        "test_command_groups": 14,
+        "new_notebook_test_count": 3,
+        "no_model_downloads": true,
+        "gpu_inference": false,
+        "github_actions_triggered": true
+      },
+      "environment": {
+        "runner": "GitHub-hosted ubuntu-latest",
+        "purpose": "CPU/static tests; no A100 model inference"
+      },
+      "results": {
+        "status": "PASS",
+        "workflow_conclusion": "success",
+        "test_command_groups_passed": 14,
+        "total_test_cases_from_log_summaries": 102,
+        "new_notebook_tests_passed": 3,
+        "py_ast": "PASS",
+        "runtime_and_gradio_contract": "PASS",
+        "provider_ml_stack_isolation": "PASS",
+        "existing_notebook_json": "PASS"
+      },
+      "interpretation": "The notebooks are structurally valid and their environment/API contracts pass static tests. This does not prove Gradio browser interaction, model loading, live artifacts, GPU utilization, or OEC-Deploy end-to-end integration.",
+      "limitations": [
+        "No A100 inference was run by this hosted static suite.",
+        "ACE-Step generation and MusicGen inference remain unaccepted; speech live evidence exists only from earlier bounded one-clip tests.",
+        "Live Gradio browser interactions were not exercised."
+      ],
+      "artifacts": "https://github.com/CalamityStriker/OEC/actions/runs/39379246551"
+    },
+    {
+      "id": "EXP-2026-10-20-PERSISTENT-A100-SYNC-BLOCKED-39379246680",
+      "date": "2026-10-20",
+      "category": "Persistent A100 repository sync safety gate",
+      "approach": "Run a guarded fast-forward-only sync helper on the assigned oec-1 runner. The helper validates repo origin and requires the expected feature branch, clean working tree and fast-forward ancestry before merging.",
+      "reason": "Keep the long-lived $HOME/OEC checkout synchronized to GitHub without overwriting local changes or silently changing branch/history.",
+      "parameters": {
+        "workflow_run_id": 39379246680,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39379246680",
+        "job_id": 118484298968,
+        "expected_branch": "fix/media-stack-supervision-20261019",
+        "runner": "oec-1",
+        "origin_validation": "passed (helper proceeded to branch check)",
+        "local_branch_output": "",
+        "branch_check": "BLOCKED",
+        "working_tree_check": "NOT_REACHED",
+        "local_head_sha": "NOT_CAPTURED",
+        "persistent_checkout_modified": false
+      },
+      "environment": {
+        "runner": "self-hosted oec-1",
+        "path": "$HOME/OEC",
+        "execution": "read/inspect and guard only"
+      },
+      "results": {
+        "status": "BLOCKED_DETACHED_HEAD",
+        "workflow_conclusion": "failure",
+        "error": "git branch --show-current returned empty; no branch switch attempted",
+        "files_changed": false
+      },
+      "interpretation": "The helper deliberately refused to switch branch or fast-forward because the persistent checkout has detached HEAD. It stopped before the dirty-tree check; do not assume the checkout is clean. A read-only diagnosis is required before a manual branch recovery and sync.",
+      "limitations": [
+        "Local working-tree cleanliness is not known from this run.",
+        "No expected/actual synced SHA comparison occurred.",
+        "This run did not make the persistent checkout match GitHub."
+      ],
+      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39379246680"
     }
   ]
 }

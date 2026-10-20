@@ -6,9 +6,6 @@ on:
       - fix/media-stack-supervision-20261019
     paths:
       - "pipeline_*_gradio.ipynb"
-      - "docs/checklist.md"
-      - "docs/MODEL_NOTEBOOKS_AND_WORKER_INTEGRATION.md"
-      - "TODO.md"
       - "tools/sync_feature_branch_a100.sh"
       - ".github/workflows/oec-a100-local-sync.yml"
   workflow_dispatch:
@@ -33,6 +30,43 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Read-only diagnose persistent checkout before sync
+        run: |
+          set -euo pipefail
+          repo="$HOME/OEC"
+          if [[ ! -e "$repo/.git" ]]; then
+            echo "OEC_LOCAL_CHECKOUT=ABSENT"
+            exit 0
+          fi
+          branch="$(git -C "$repo" branch --show-current 2>/dev/null || true)"
+          head_sha="$(git -C "$repo" rev-parse HEAD 2>/dev/null || echo UNKNOWN)"
+          dirty_count="$(git -C "$repo" status --porcelain --untracked-files=all 2>/dev/null | wc -l | tr -d '[:space:]')"
+          origin="$(git -C "$repo" remote get-url origin 2>/dev/null || true)"
+          case "$origin" in
+            *github.com/CalamityStriker/OEC.git|*github.com/CalamityStriker/OEC|*github.com:CalamityStriker/OEC.git|*github.com:CalamityStriker/OEC)
+              origin_state=EXPECTED
+              ;;
+            *)
+              origin_state=OTHER_OR_UNKNOWN
+              ;;
+          esac
+          if git -C "$repo" show-ref --verify --quiet refs/heads/fix/media-stack-supervision-20261019; then
+            expected_local_branch=YES
+          else
+            expected_local_branch=NO
+          fi
+          if git -C "$repo" show-ref --verify --quiet refs/remotes/origin/fix/media-stack-supervision-20261019; then
+            expected_remote_tracking_ref=YES
+          else
+            expected_remote_tracking_ref=NO
+          fi
+          printf 'OEC_LOCAL_ORIGIN=%s\n' "$origin_state"
+          printf 'OEC_LOCAL_BRANCH=%s\n' "$branch"
+          printf 'OEC_LOCAL_HEAD_SHA=%s\n' "$head_sha"
+          printf 'OEC_LOCAL_DIRTY_ENTRY_COUNT=%s\n' "$dirty_count"
+          printf 'OEC_EXPECTED_LOCAL_BRANCH_EXISTS=%s\n' "$expected_local_branch"
+          printf 'OEC_EXPECTED_REMOTE_TRACKING_REF_EXISTS=%s\n' "$expected_remote_tracking_ref"
+          # This step performs no fetch, checkout, merge, reset or file write.
       - name: Fail-closed fast-forward of persistent checkout
         env:
           OEC_SYNC_BRANCH: fix/media-stack-supervision-20261019
