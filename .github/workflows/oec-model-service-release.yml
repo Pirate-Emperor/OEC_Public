@@ -18,7 +18,7 @@ concurrency:
 jobs:
   release-model-apis:
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
-    timeout-minutes: 24
+    timeout-minutes: 7
     env:
       # Existing OEC-Play contexts are permitted only by the existing trusted-owner,
       # <2 GiB per-card shared-context admission guard. Unknown GPU owners still block.
@@ -47,7 +47,6 @@ jobs:
             OEC_STORAGE_PYTHON_ENV=oec_deploy OEC_CONDA_BIN="$HOME/Conda/condabin/conda" \
             bash "$GITHUB_WORKSPACE/tools/create_clean_a100_test_worktree.sh"
           test "$(git -C "$SYNC" rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git -C "$SYNC" branch --show-current)" = "fix/media-stack-supervision-20261019"
           test -z "$(git -C "$SYNC" status --porcelain --untracked-files=all)"
           echo "MODEL_RELEASE_SOURCE_SHA=$(git -C "$SYNC" rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "MODEL_RELEASE_SOURCE_DIR=$SYNC" >> "$GITHUB_ENV"
@@ -187,9 +186,9 @@ jobs:
             exit 6
           done
 
-          # Poll all providers on the same runner; fail within 15 minutes so the 24-minute
-          # job has time to record evidence and roll back only newly started service groups.
-          deadline=$((SECONDS + 900))
+          # This is a bounded release attempt: roll back only services started by this attempt
+          # unless every API becomes ready within four minutes.
+          deadline=$((SECONDS + 240))
           while (( SECONDS < deadline )); do
             all_ready=1
             for spec in "${SERVICES[@]}"; do
@@ -209,7 +208,7 @@ jobs:
             sleep 10
           done
           if [[ "$all_ready" != "1" ]]; then
-            echo "::error::Not all six APIs reached HTTP 200, ready=true, model_loaded=true within 15 minutes."
+            echo "::error::Not all six APIs reached HTTP 200, ready=true, model_loaded=true within four minutes."
             exit 7
           fi
 
