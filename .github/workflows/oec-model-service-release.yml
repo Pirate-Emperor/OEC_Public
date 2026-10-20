@@ -5,7 +5,6 @@ on:
     branches:
       - fix/media-stack-supervision-20261019
     paths:
-      - .github/workflows/oec-model-service-release.yml
       - tools/model_service_release.trigger
 
 permissions:
@@ -18,7 +17,6 @@ concurrency:
 
 jobs:
   release-model-apis:
-    if: contains(github.event.head_commit.added, 'tools/model_service_release.trigger') || contains(github.event.head_commit.modified, 'tools/model_service_release.trigger')
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 24
     env:
