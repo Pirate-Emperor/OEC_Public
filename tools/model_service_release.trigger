@@ -15,3 +15,4 @@ Retry trigger after narrowing the workflow push filter: 2026-10-20T17:07:14.051Z
 Retry with approved detached-worktree updater; no model starts were attempted in previous sync-gate failures.
 Retry with detached-worktree HEAD verification and a bounded 7-minute job timeout. No service was started in prior attempts.
 Retry cache-only persistent API release: fresh quota must pass for outputs; model cache writes/downloads are prohibited.
+Bounded first batch: launch only Kokoro, Whisper Turbo, Qwen3-ASR and ACE-Step after fresh outputs admission and runtime/cache checks; LTX held by runtime preflight.
