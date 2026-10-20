@@ -160,26 +160,24 @@ These sidecars are a separate interface from Brain's batch queue. They bind to l
 **TRELLIS** (phase2_3d, loopback port 17868; image-to-GLB):
 
 \`\`\`bash
-cd "$HOME/OEC"
 conda run --no-capture-output -n phase2_3d \\
-  python "$HOME/OEC/tools/media_services/trellis_api.py" --host 127.0.0.1 --port 17868
+  python "$OEC_ROOT/tools/media_services/trellis_api.py" --host 127.0.0.1 --port 17868
 \`\`\`
 
 **LTX** (phase1_ltx, loopback port 17869; text/image-to-video). Run 39435100568 generated a real MP4 accepted by ffprobe. That proves test-scoped inference, not persistent deployment readiness; recheck `/health` after starting the service on the intended host.
 
 \`\`\`bash
-cd "$HOME/OEC"
 conda run --no-capture-output -n phase1_ltx \\
-  python "$HOME/OEC/tools/media_services/ltx_api.py" --host 127.0.0.1 --port 17869
+  python "$OEC_ROOT/tools/media_services/ltx_api.py" --host 127.0.0.1 --port 17869
 \`\`\`
 
 **Speech/audio services** use the isolated runtime already tested on A100 at \`$HOME/.local/venvs/oec-audio-py311\`. For each model use a separate terminal/process:
 
 \`\`\`bash
-export PYTHONPATH="$HOME/OEC:$HOME/OEC/tools/media_services\${PYTHONPATH:+:$PYTHONPATH}"
-"$HOME/.local/venvs/oec-audio-py311/bin/python" "$HOME/OEC/tools/media_services/audio_api.py" --model kokoro --host 127.0.0.1 --port 7871
-"$HOME/.local/venvs/oec-audio-py311/bin/python" "$HOME/OEC/tools/media_services/audio_api.py" --model whisper --host 127.0.0.1 --port 7872
-"$HOME/.local/venvs/oec-audio-py311/bin/python" "$HOME/OEC/tools/media_services/audio_api.py" --model qwen3-asr --host 127.0.0.1 --port 7873
+export PYTHONPATH="$HOME/OEC:$OEC_ROOT/tools/media_services\${PYTHONPATH:+:$PYTHONPATH}"
+"$HOME/.local/venvs/oec-audio-py311/bin/python" "$OEC_ROOT/tools/media_services/audio_api.py" --model kokoro --host 127.0.0.1 --port 7871
+"$HOME/.local/venvs/oec-audio-py311/bin/python" "$OEC_ROOT/tools/media_services/audio_api.py" --model whisper --host 127.0.0.1 --port 7872
+"$HOME/.local/venvs/oec-audio-py311/bin/python" "$OEC_ROOT/tools/media_services/audio_api.py" --model qwen3-asr --host 127.0.0.1 --port 7873
 \`\`\`
 
 ACE-Step uses loopback port 7870 and the isolated `$HOME/.local/venvs/oec-acestep-py311` runtime. Real generation and Gradio callback passed in run 39435100568. The current-head run 39452849617 is retesting this provider after the Whisper metadata fix. Start only after fresh storage/GPU preflight and verify live health; do not combine its dependencies into shared Conda. AudioGen/MusicGen remain CLI/Gradio-only and are not exposed through the shared `/v1/jobs` API.
