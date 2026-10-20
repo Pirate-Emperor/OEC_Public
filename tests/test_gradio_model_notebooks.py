@@ -1,0 +1,47 @@
+"""Static checks for model-specific Gradio notebooks; no providers are loaded."""
+from __future__ import annotations
+import ast
+import json
+from pathlib import Path
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+NOTEBOOKS = {
+    "pipeline_audiogen_gradio.ipynb": ("phase1", "pipeline_audiogen.py"),
+    "pipeline_musicgen_gradio.ipynb": ("phase1", "pipeline_musicgen.py"),
+    "pipeline_acestep_gradio.ipynb": ("phase2_3d", "oec-acestep-py311"),
+    "pipeline_kokoro_gradio.ipynb": ("phase2_3d", "oec-audio-py311"),
+    "pipeline_whisper_gradio.ipynb": ("phase2_3d", "oec-audio-py311"),
+    "pipeline_qwen3_asr_gradio.ipynb": ("phase2_3d", "oec-audio-py311"),
+}
+class ModelNotebookTests(unittest.TestCase):
+    def test_json_and_code_cells_compile(self):
+        for name in NOTEBOOKS:
+            nb = json.loads((ROOT / name).read_text(encoding="utf-8"))
+            self.assertEqual(nb.get("nbformat"), 4, name)
+            self.assertGreaterEqual(len(nb.get("cells", [])), 3, name)
+            for index, cell in enumerate(nb["cells"]):
+                if cell.get("cell_type") == "code":
+                    source = "".join(cell.get("source", []))
+                    if source.strip():
+                        ast.parse(source, filename=f"{name}:cell-{index}")
+    def test_runtime_and_gradio_contract(self):
+        for name, (env, backend) in NOTEBOOKS.items():
+            nb = json.loads((ROOT / name).read_text(encoding="utf-8"))
+            text = "\n".join("".join(c.get("source", [])) for c in nb["cells"])
+            self.assertIn(env, text, name)
+            self.assertIn(backend, text, name)
+            self.assertIn("gr.Interface(", text, name)
+            self.assertIn("demo.queue(", text, name)
+            self.assertIn('server_name="127.0.0.1"', text, name)
+            self.assertIn("share=False", text, name)
+            self.assertNotIn("pip install", text.lower(), name)
+    def test_service_ui_does_not_import_provider_ml_packages(self):
+        for name in ("pipeline_acestep_gradio.ipynb","pipeline_kokoro_gradio.ipynb",
+                     "pipeline_whisper_gradio.ipynb","pipeline_qwen3_asr_gradio.ipynb"):
+            nb = json.loads((ROOT / name).read_text(encoding="utf-8"))
+            text = "\n".join("".join(c.get("source", [])) for c in nb["cells"] if c.get("cell_type")=="code")
+            for forbidden in ("import torch","import whisper","from kokoro","import acestep","from qwen_asr"):
+                self.assertNotIn(forbidden, text, name)
+if __name__ == "__main__":
+    unittest.main()

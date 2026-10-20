@@ -1,5 +1,11 @@
 # OEC Work Changelog
 
+- [2026-10-20 — model-specific Gradio clients and guarded E2E retry](CHANGELOG-2026-10-20.md)
+  - Added dedicated AudioGen, MusicGen, ACE-Step, Kokoro, Whisper and Qwen3-ASR notebooks with explicit UI/backend environments; the API-facing notebooks use isolated service workers rather than combining provider dependencies. Added a static notebook policy test and OEC-Deploy worker contract runbook.
+  - E2E run [39320471955](https://github.com/CalamityStriker/OEC/actions/runs/39320471955), attempt 2, failed closed before inference because external PID 3347078 was still attached to all eight A100s. Artifact [12244625569](https://github.com/CalamityStriker/OEC/actions/runs/39320471955/artifacts/12244625569) records the block. No GPU process was stopped and no real QA/upload/read-after-write is claimed.
+  - The new notebook static check is pending this candidate commit's Actions result; live Gradio, ACE-Step, MusicGen, current-head FLUX→TRELLIS and the full Brain/LTX→QA→HF chunk/readback path remain open.
+
+
 - [2026-10-19 — model inference handoff and Actions quota update](CHANGELOG-2026-10-19.md)
   - **Latest checkpoint 23:33 IST:** static run [39300850953](https://github.com/CalamityStriker/OEC/actions/runs/39300850953) passed 96 tests, `py_compile`, all four notebook JSON checks, and no ResourceWarning. New guarded E2E run [39300850928](https://github.com/CalamityStriker/OEC/actions/runs/39300850928) ran on `oec-1` but stopped before inference because external PID `3347078` was attached to all eight A100s. Artifact [12211286861](https://github.com/CalamityStriker/OEC/actions/runs/39300850928/artifacts/12211286861) confirms BLOCKED, no process kill, no shared queue, no repository creation and no upload. Wait for normal GPU-owner release; actual Qwen2-VL decision, HF upload/readback, remote chunk consumer and Brain→OEC-Play remain open. Visual sidecar run [39278268411](https://github.com/CalamityStriker/OEC/actions/runs/39278268411) is terminal SUCCESS with inspected TRELLIS/LTX artifacts; ACE-Step remains no-idle-A100 blocked.
 

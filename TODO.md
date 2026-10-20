@@ -2,6 +2,17 @@
 # OEC Active TODO
 
 
+## 2026-10-20 — New Gradio clients and live E2E retry
+
+- Repository inspected: CalamityStriker/OEC, branch fix/media-stack-supervision-20261019, parent source 2ca832a5e814d5f8bce43617ca04d2f7fdfee682.
+- Added dedicated model UI notebooks for AudioGen, MusicGen, ACE-Step, Kokoro, Whisper Turbo and Qwen3-ASR, plus a static notebook source-policy test. Each notebook declares its UI kernel and inference environment. Speech and ACE-Step UI clients call the existing loopback API and do not import their backend ML packages.
+- A new model/environment and OEC-Deploy integration runbook is being committed with the notebook set. CPU contract validation is pending until the Actions result/logs are retrieved.
+- E2E run 39320471955, attempt 2, job 118480769324, ended FAILURE at the GPU-ownership gate. A100 PID 3347078 (external Biome server-components Python process) was attached to all eight visible A100s; usage ranged from about 974 MiB to 8,986 MiB per device, and the runner explicitly refused overlap. E2E artifact 12244625569 (1,758 bytes) confirms this is a pre-inference block: no LTX output, no Qwen2-VL decision, no actual HF upload and no read-after-write occurred.
+- Do not kill/signal PID 3347078 or launch another heavy GPU job against it. The user removed the Actions minutes restriction only; GPU ownership and StorageManager admission are still mandatory.
+- Remaining: inspect candidate Actions static result, safely sync branch into the persistent $HOME/OEC checkout after local status checks, live Gradio tests for every UI, current-head FLUX→TRELLIS, ACE-Step generation, MusicGen cache/egress, full LTX→QA→chunked HF upload/readback and deployment client integration.
+
+
+
 
 ## 2026-10-19 — Current live checkpoint (23:33 IST)
 
