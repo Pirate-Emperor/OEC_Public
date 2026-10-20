@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-20T15:45:14.924+05:30",
+  "last_updated": "2026-10-20T15:55:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "OEC media-readiness candidate: added read-only provider readiness semantics and an OEC_Deploy integration contract; aligned supervised service GPU admission with the shared process-aware selector and provider VRAM floors; fixed known FLUX fixture, QA DB status comparison and AudioCraft Gradio/workflow output bugs. Prior live run 39401991943 passed LTX/TRELLIS actual asset generation and AudioGen/MusicGen CLI inference. Speech and ACE-Step are not yet accepted; OEC-Deploy remains unmodified; exact-head acceptance of candidate changes is pending.",
+  "latest_summary": "Readiness/integration commit 3476407add55d5fcb52f70f570f93cba35992a8b passed the static/storage regression suite (run 39408266075). Older live run 39404646877 confirmed AudioGen's real Gradio HTTP-event callback now passes: 3-second mono 16 kHz WAV, 96044 bytes, SHA-256 02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58, GPU 4 peak 5.155 GiB. Speech UI failed because Gradio 6.0.1 exposed a non-/predict endpoint; candidate now uses fn_index=0 and requires rerun. MusicGen and ACE-Step current outcomes are still pending/unaccepted.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -5117,13 +5117,18 @@
         },
         {
           "provider": "AudioGen",
-          "status": "CLI_INFERENCE_PASS_UI_ACCEPTANCE_PENDING",
+          "status": "GRADIO_EVENT_PASS_ON_OLDER_SHA",
           "run_id": 39401991943,
           "artifact": "3s mono 16kHz WAV",
           "bytes": 96078,
           "sha256": "c543c2e6a45a44a89f45d22a135ac5000b154f0025d2e93592a31c672589e7ba",
           "peak_allocated_vram_gib": 5.155,
-          "limitation": "prior Gradio callback failed due output outside /tmp; fix awaits rerun"
+          "limitation": "speech UI endpoint naming issue is fixed in later candidate; this evidence is only for AudioGen and prior source SHA",
+          "ui_run_id": 39404646877,
+          "ui_source_sha": "a558d2d52a5f6f93afabd5c0aaa14f6e721cf844",
+          "ui_artifact_bytes": 96044,
+          "ui_artifact_sha256": "02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58",
+          "ui_transport": "gradio_client event, fn_index=0-equivalent single interface; that old run used /predict and passed in AudioGen's Gradio 4.44.1 environment"
         },
         {
           "provider": "MusicGen",
@@ -5164,6 +5169,38 @@
         "Rerun QA->HF upload->remote hash read-back",
         "Keep AudioGen/MusicGen NOT_EXPOSED until supervised HTTP job APIs are implemented",
         "Do not merge to main until current candidate validates and branch divergence is reconciled"
+      ]
+    },
+    {
+      "id": "TEST-2026-10-20-AUDIOGEN-GRADIO-EVENT",
+      "date": "2026-10-20",
+      "category": "Actual Gradio event acceptance",
+      "source_sha": "a558d2d52a5f6f93afabd5c0aaa14f6e721cf844",
+      "runner": "oec-2",
+      "environments": {
+        "ui_and_inference": "phase1",
+        "audiocraft": "1.3.0",
+        "torch": "2.1.0+cu118",
+        "cuda": "11.8"
+      },
+      "results": [
+        {
+          "provider": "AudioGen",
+          "status": "PASS",
+          "run_id": 39404646877,
+          "ui_http_status": 200,
+          "transport": "gradio_client event API",
+          "artifact": "3s mono 16kHz WAV",
+          "bytes": 96044,
+          "sha256": "02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58",
+          "physical_gpu": 4,
+          "peak_allocated_vram_gib": 5.155
+        }
+      ],
+      "next_actions": [
+        "Verify MusicGen output and Gradio event result in the active run",
+        "Fix Gradio 6 speech endpoint naming with fn_index=0 and rerun Kokoro before ASR",
+        "Run ACE-Step independently, require real FLAC/metadata and event acceptance"
       ]
     }
   ]

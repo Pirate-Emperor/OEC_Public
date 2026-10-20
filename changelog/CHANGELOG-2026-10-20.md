@@ -112,3 +112,7 @@
 - Fixed a missing nvidia-smi memory.total field in FLUX test fixtures and corrected the E2E QA handoff assertion to use asset_status.UPLOAD_PENDING rather than the QA outcome marker.
 - Fixed AudioGen/MusicGen scratch output under /tmp and the MusicGen .info.json copy path.
 - The ordered workflow now runs ACE-Step stages independently of speech-stage failure and retains a final overall gate. Exact-head run results remain pending.
+## 2026-10-20 — AudioGen Gradio event accepted; speech endpoint naming fix
+
+- AudioGen dedicated Gradio event acceptance passed in run 39404646877: HTTP 200 and actual gradio_client event result WAV, 96,044 bytes, SHA-256 02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58.
+- The speech UI test found Gradio 6.0.1 did not expose the assumed /predict name. The candidate harness uses fn_index=0 for the single-function interface; speech, ASR and ACE-Step live acceptance remains to be verified.

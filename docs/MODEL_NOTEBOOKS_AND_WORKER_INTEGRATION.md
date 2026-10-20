@@ -160,3 +160,6 @@ See [OEC_DEPLOY_MEDIA_SERVICE_READINESS.md](OEC_DEPLOY_MEDIA_SERVICE_READINESS.m
 Latest live evidence: run 39401991943 verified LTX MP4 generation and TRELLIS GLB generation through the existing loopback job APIs. The same run verified AudioGen and MusicGen CLI inference, but the dedicated Gradio/workflow acceptance exposed scratch output and sidecar-copy issues, now fixed in the candidate. The joined QA test reached a PASS decision but failed an incorrect DB-state assertion; the corrected code uses the canonical uploader status constant. Exact-head rerun remains required.
 
 AudioGen and MusicGen are still not exposed via the shared /v1/jobs API; they must remain NOT_EXPOSED in the OEC_Deploy integration report until supervised APIs exist. OEC_Deploy was not modified.
+## Latest Gradio acceptance update — 2026-10-20
+
+The AudioGen dedicated Gradio app now passed an actual gradio_client event on loopback in run 39404646877 (source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844): HTTP 200 and a valid 3-second WAV with SHA-256 02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58. That run exposed an API naming difference in the speech-client UI under Gradio 6.0.1, so the candidate harness now uses fn_index=0 for its single-function Interface rather than assuming /predict. Speech must be rerun before those capabilities are accepted.

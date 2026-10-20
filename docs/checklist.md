@@ -200,3 +200,10 @@ This section distinguishes model inference from UI acceptance. All results below
 - [ ] These current candidate changes need exact-head static and A100 Actions validation. Do not report ACE-Step, speech or persistent endpoints ready before the next results prove them.
 - [ ] AudioGen/MusicGen remain unavailable to OEC_Deploy via HTTP until supervised job APIs are added, even though prior real CLI inference generated WAV files.
 - [ ] Run the new readiness command on the persistent OEC host after starting each service. Smoke sidecars launched inside Actions stop at the end of their job.
+## Dedicated AudioGen Gradio event acceptance — 2026-10-20
+
+- [x] On source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844, run 39404646877 passed the dedicated AudioGen Gradio test: loopback UI HTTP 200; a real gradio_client event request completed; generated WAV validated (96,044 bytes, 3 seconds, mono 16 kHz; SHA-256 02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58). Physical GPU 4, peak allocated 5.155 GiB.
+- [x] The test actually exercises the Gradio HTTP/event API, not a direct Python callback call. This confirms the /tmp scratch-path fix.
+- [ ] The same old run's Kokoro UI reached HTTP 200 but its event call failed because Gradio 6.0.1 exposes a different endpoint name; Whisper/Qwen3-ASR were then blocked because no Kokoro WAV was produced. The harness now uses the one-interface function index (fn_index=0), awaiting the new exact-head retry.
+- [ ] MusicGen's current live job was still generating when this note was written; do not call its dedicated Gradio acceptance passed until the artifact/report is retrieved.
+- [ ] ACE-Step remains unaccepted; the current candidate now runs ACE independently of speech failure, then applies an explicit final gate.

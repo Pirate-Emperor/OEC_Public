@@ -27,3 +27,8 @@ The feature branch contains six new Gradio notebooks for AudioGen, MusicGen, ACE
 - The joined E2E job reached a real Qwen2-VL QA PASS outcome, but the harness compared the QA outcome marker PENDING_UPLOAD against the DB's canonical upload status PENDING. The candidate compares against asset_status.UPLOAD_PENDING instead. Upload and remote hash read-back still need a successful rerun.
 - ACE-Step and speech services have not yet passed current candidate inference acceptance. AudioGen/MusicGen are still CLI/Gradio only and must not be labelled HTTP-usable by OEC_Deploy until their job APIs are implemented.
 - Do not merge to main while the feature branch remains heavily diverged; don't modify OEC_Deploy or the protected storage reserve.
+## 2026-10-20 — AudioGen true Gradio event accepted
+
+Live suite run [39404646877](https://github.com/CalamityStriker/OEC/actions/runs/39404646877), source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844, passed the dedicated AudioGen Gradio UI and event callback. The UI returned HTTP 200; the test submitted through gradio_client and got a validated 3-second mono 16 kHz WAV (96,044 bytes, SHA-256 02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58), peak allocated VRAM 5.155 GiB on physical A100 4.
+
+The same run's speech step failed because the Kokoro Gradio 6.0.1 endpoint did not expose /predict; ASR callbacks were then correctly blocked because Kokoro had not created the input WAV. The new candidate submits the one-function interface by function index. MusicGen was still in progress at the time of this update. ACE-Step remains not accepted.

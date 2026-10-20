@@ -47,7 +47,7 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn("--check-gradio-notebooks", runner)
         self.assertIn("_free_a100_gpu()", runner)
         self.assertIn("invoke_via_gradio_client", source)
-        self.assertIn('api_name="/predict"', source)
+        self.assertIn("fn_index=0", source)
         self.assertIn('callback_transport', source)
         self.assertIn('for key in ("NO_PROXY", "no_proxy")', source)
         self.assertIn('loopback_hosts = ("localhost", "127.0.0.1", "::1")', source)

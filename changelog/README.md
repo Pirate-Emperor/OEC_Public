@@ -131,3 +131,4 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 - [2026-10-20 — live model acceptance and fixes](CHANGELOG-2026-10-20.md): real AudioGen and MusicGen inference both produced validated WAVs on A100 4; UI acceptance exposed a scratch-path issue and the MusicGen workflow exposed a metadata filename bug. Speech smoke import path was fixed; ACE-Step remains untested and current integrated acceptance is pending.
 
 - [2026-10-20 — readiness contract and candidate integration fixes](CHANGELOG-2026-10-20.md): Added read-only provider readiness, OEC_Deploy integration documentation, shared GPU admission in the service supervisor, and fixes for FLUX/E2E/AudioCraft live-acceptance failures.
+- [2026-10-20 — AudioGen Gradio event accepted; speech endpoint naming fix](CHANGELOG-2026-10-20.md): AudioGen passed a real Gradio HTTP-event callback; speech UI needs a Gradio-version-safe function-index call, now fixed pending rerun.
