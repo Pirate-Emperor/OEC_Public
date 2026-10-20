@@ -11,15 +11,18 @@ These commands are intentionally staged. A successful static suite is not live m
 Run on the assigned OEC host, not a random runner. First inspect your working tree. Do not switch branches with uncommitted changes.
 
 ```bash
+# Inspect the original checkout read-only; do not switch/reset/clean it.
+git -C "$HOME/OEC" status --short
+git -C "$HOME/OEC" branch --show-current
+git -C "$HOME/OEC" rev-parse HEAD
+
+# Use the clean isolated worktree verified by the authorized A100 sync workflow.
 OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+test -d "$OEC_ROOT/.git" || { echo "Clean isolated worktree missing; sync it through the authorized workflow first." >&2; exit 2; }
 cd "$OEC_ROOT"
 git status --short
 git branch --show-current
 git rev-parse HEAD
-git fetch origin
-# Only after confirming the worktree is clean:
-git switch fix/media-stack-supervision-20261019
-git pull --ff-only origin fix/media-stack-supervision-20261019
 
 export CONDA="$HOME/Conda/condabin/conda"
 export RUNNER_TEMP="${RUNNER_TEMP:-/tmp}"
