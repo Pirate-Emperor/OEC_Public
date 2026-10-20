@@ -154,7 +154,7 @@ class AceStepRuntimeTests(unittest.TestCase):
             (paths["source_root"] / ".git").mkdir()
             paths["python"].parent.mkdir(parents=True)
             paths["python"].write_text("# verified fixture interpreter", encoding="utf-8")
-            dirs = {"cache": str(cache), "models": str(models)}
+            dirs = {"cache": cache, "models": models}
             runtime_report = {"source_commit": runtime.SOURCE_COMMIT,
                               "runtime": {"torch_cuda": "fixture", "cuda_available": True}}
             output = io.StringIO()
@@ -183,7 +183,7 @@ class AceStepRuntimeTests(unittest.TestCase):
             (paths["source_root"] / ".git").mkdir()
             paths["python"].parent.mkdir(parents=True)
             paths["python"].write_text("# fixture interpreter", encoding="utf-8")
-            dirs = {"cache": str(cache), "models": str(models)}
+            dirs = {"cache": cache, "models": models}
             with mock.patch.object(Path, "home", return_value=home), \
                  mock.patch.object(runtime, "_system_dirs", return_value=dirs), \
                  mock.patch.object(runtime, "_git", return_value="0" * 40), \
@@ -204,7 +204,7 @@ class AceStepRuntimeTests(unittest.TestCase):
             (paths["source_root"] / ".git").mkdir()
             paths["python"].parent.mkdir(parents=True)
             paths["python"].write_text("# fixture interpreter", encoding="utf-8")
-            dirs = {"cache": str(cache), "models": str(models)}
+            dirs = {"cache": cache, "models": models}
             with mock.patch.object(Path, "home", return_value=home), \
                  mock.patch.object(runtime, "_system_dirs", return_value=dirs), \
                  mock.patch.object(runtime, "_git", return_value=runtime.SOURCE_COMMIT), \
