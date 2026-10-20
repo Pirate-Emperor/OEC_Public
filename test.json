@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-20T11:49:00+05:30",
+  "last_updated": "2026-10-20T12:00:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Latest static regression PASS on source b6de4b086705caa30a1705039baf4ac49996725a, run 39379628368/job 118485509728: all workflow steps succeeded, 14 test command groups/102 test cases from logs, new Gradio notebook suite 3/3, previous TRELLIS/FLUX/AudioCraft notebook JSON checks pass. Persistent A100 checkout diagnostic run 39379628387/job 118485509739 found expected origin but detached HEAD 081aaf34f6379873bdc925d1dcf6b9c3d50349d3, no local feature branch, 662 dirty/untracked entries. Sync correctly made no changes. Live E2E run 39320471955 attempt 2 remains BLOCKED before inference due external PID 3347078 on all 8 A100s.",
+  "latest_summary": "Latest static/storage acceptance PASS on source SHA 32e1a5f9203ed94214f4151c51e2504fe6589002, run 39380653548/job 118488776376: 14 unittest command groups, 102 test cases in logged summaries; new notebook test suite 3/3; existing notebook JSON checks passed. A100 sync run 39380653563/job 118488776455 passed: StorageManager preflight approved a clean sibling worktree $HOME/OEC_feature_sync; actual SHA matches target SHA 32e1a5f9203ed94214f4151c51e2504fe6589002. Original $HOME/OEC preserved detached at 081aaf34f6379873bdc925d1dcf6b9c3d50349d3 with 662 dirty/untracked entries. Live E2E still blocked before inference by external PID 3347078 occupying all eight A100s.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -4785,6 +4785,78 @@
       "limitations": [
         "Storage/HF preflight was not reached.",
         "No live QA decision or remote upload occurred."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-20-CLEAN-A100-WORKTREE-SYNC-PASS-39380653563",
+      "date": "2026-10-20",
+      "category": "Persistent A100 test source synchronization",
+      "approach": "Run a branch-specific guarded fast-forward; when the user-owned primary checkout fails due detached HEAD/dirty state, fetch the branch and create a clean sibling Git worktree only after fresh StorageManager quota/capacity preflight.",
+      "reason": "Make the current model notebooks/tests available in a local A100 checkout without overwriting pre-existing local user state.",
+      "parameters": {
+        "workflow_run_id": 39380653563,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39380653563",
+        "job_id": 118488776455,
+        "branch": "fix/media-stack-supervision-20261019",
+        "target_path": "$HOME/OEC_feature_sync",
+        "source_path": "$HOME/OEC",
+        "target_sha": "32e1a5f9203ed94214f4151c51e2504fe6589002",
+        "actual_sha": "32e1a5f9203ed94214f4151c51e2504fe6589002",
+        "storage_preflight": "PASS; fresh live quota result, source live LFS quota, current age 0s",
+        "available_bytes": 4549531648,
+        "required_bytes": 1342177280,
+        "primary_checkout_head": "081aaf34f6379873bdc925d1dcf6b9c3d50349d3",
+        "primary_checkout_branch": "(detached HEAD)",
+        "primary_checkout_dirty_entries": 662
+      },
+      "environment": {
+        "runner": "oec-1",
+        "git_operation": "worktree add --detach; no GPU model inference"
+      },
+      "results": {
+        "status": "PASS_CLEAN_SIBLING_WORKTREE",
+        "actual_target_sha_match": true,
+        "primary_checkout_changed": false,
+        "storage_admission_passed": true
+      },
+      "interpretation": "The source is available at the dedicated clean worktree. This is a local source synchronization result, not a live model inference result. Primary $HOME/OEC remains detached/dirty and should not be modified without manual review.",
+      "limitations": [
+        "No model weights were loaded or inference launched.",
+        "The sibling worktree is a clean code checkout and shares the repo Git object store, not the user's pre-existing untracked files."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-20-STATIC-CI-PASS-39380653548",
+      "date": "2026-10-20",
+      "category": "Static regression and notebook source contract",
+      "approach": "Run the full storage-admission/static regression workflow against the commit containing all six new Gradio notebooks, the clean-worktree sync guard, and static notebook checks.",
+      "reason": "Establish source correctness and environment isolation while live GPUs are safely unavailable.",
+      "parameters": {
+        "workflow_run_id": 39380653548,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39380653548",
+        "job_id": 118488776376,
+        "source_sha": "32e1a5f9203ed94214f4151c51e2504fe6589002",
+        "runner": "GitHub-hosted ubuntu-latest / Python 3.11",
+        "command_groups": 14,
+        "test_cases_from_logs": 102,
+        "new_notebook_tests": 3
+      },
+      "environment": {
+        "runner": "GitHub-hosted ubuntu-latest",
+        "purpose": "CPU/static checks"
+      },
+      "results": {
+        "status": "PASS",
+        "workflow_conclusion": "success",
+        "command_groups_passed": 14,
+        "logged_test_cases": 102,
+        "new_notebook_tests_passed": 3,
+        "existing_notebook_json": "PASS"
+      },
+      "interpretation": "Static validation only; no model generation or Gradio browser session was exercised.",
+      "limitations": [
+        "No A100 model inference in this job.",
+        "Live end-to-end pipeline remains blocked by GPU ownership."
       ]
     }
   ]

@@ -8,6 +8,12 @@ on:
       - "pipeline_*_gradio.ipynb"
       - "tools/sync_feature_branch_a100.sh"
       - "tools/create_clean_a100_test_worktree.sh"
+      - "docs/checklist.md"
+      - "docs/MODEL_NOTEBOOKS_AND_WORKER_INTEGRATION.md"
+      - "TODO.md"
+      - "result.md"
+      - "test.json"
+      - "changelog/**"
       - ".github/workflows/oec-a100-local-sync.yml"
   workflow_dispatch:
 

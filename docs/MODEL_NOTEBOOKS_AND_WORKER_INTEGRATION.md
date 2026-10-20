@@ -114,3 +114,8 @@ The existing `pipeline_wan_video.ipynb` declares the `phase1` Python 3.9.25 kern
 The existing `$HOME/OEC` checkout has 662 dirty/untracked entries and is detached. The sync workflow never resets or overwrites it. If the in-place fast-forward guard blocks, `tools/create_clean_a100_test_worktree.sh` checks StorageManager admission first and creates or updates only the dedicated, clean `$HOME/OEC_feature_sync` worktree. It refuses a pre-existing unregistered/dirty target, uses `--detach` and verifies actual SHA equals origin. Look for `OEC_CLEAN_WORKTREE_SYNC=PASS` and `A100_CHECKOUT_ACTUAL_SHA=<expected>` in [the sync workflow](../.github/workflows/oec-a100-local-sync.yml). If StorageManager denies the operation or the target is dirty, it does not force a write.
 
 Once the workflow passes, use `cd "$HOME/OEC_feature_sync"` for notebook/test commands below. This is a separate checkout; the old 662-entry `$HOME/OEC` tree remains untouched.
+
+
+## Sync result for this session
+
+Run [39380653563](https://github.com/CalamityStriker/OEC/actions/runs/39380653563), job 118488776455, passed by creating `$HOME/OEC_feature_sync` after fresh StorageManager admission. Exact target and actual source SHA: `32e1a5f9203ed94214f4151c51e2504fe6589002`. The existing `$HOME/OEC` detached/dirty checkout was preserved. The static workflow [39380653548](https://github.com/CalamityStriker/OEC/actions/runs/39380653548) passed on the same code source; this is not a live inference pass.

@@ -383,3 +383,10 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 
 - Added `tools/create_clean_a100_test_worktree.sh`. When the existing $HOME/OEC fails fast-forward gates, the workflow may create/update only a dedicated sibling test worktree after fresh StorageManager admission of 0.25 GB requested and at least 1.0 GB free. It refuses path collisions or dirty/unregistered existing targets and validates fetched/ref and actual SHA.
 - This does not claim success before the next sync workflow log confirms it. $HOME/OEC's detached HEAD and 662 dirty/untracked entries are preserved.
+
+
+## 2026-10-20 — Sync fallback accepted
+
+- Current static/storage acceptance run 39380653548/job 118488776376 passed on source SHA `32e1a5f9203ed94214f4151c51e2504fe6589002`; 14 command groups/102 logged tests succeeded, including notebook tests 3/3.
+- Sync run 39380653563/job 118488776455 successfully created `$HOME/OEC_feature_sync` after the current StorageManager preflight passed. Output `OEC_CLEAN_WORKTREE_SYNC=PASS`, actual SHA equals target SHA `32e1a5f9203ed94214f4151c51e2504fe6589002`. Source path is the clean sibling worktree. Existing `$HOME/OEC` stayed at detached HEAD `081aaf34f6379873bdc925d1dcf6b9c3d50349d3` with 662 dirty/untracked entries; no files were overwritten.
+- The sync workflow is now configured to re-run for checklist/result/runbook/tracker changes as well as notebook/script changes, so the sibling test worktree can be advanced to the final documentation commit only while clean and after another StorageManager preflight.

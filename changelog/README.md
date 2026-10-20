@@ -105,3 +105,7 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 
 
 - [2026-10-20 — clean A100 test worktree fallback](CHANGELOG-2026-10-20.md): updated the existing safe sync workflow to use a fresh-StorageManager-gated isolated `$HOME/OEC_feature_sync` worktree when the primary 662-entry detached checkout cannot be fast-forwarded. Pending workflow result.
+
+
+- [2026-10-20 — successful static acceptance and local A100 source sync](CHANGELOG-2026-10-20.md)
+  - Static pass [39380653548](https://github.com/CalamityStriker/OEC/actions/runs/39380653548) validated notebook JSON/Python/env contracts. The clean worktree sync [39380653563](https://github.com/CalamityStriker/OEC/actions/runs/39380653563) created `$HOME/OEC_feature_sync` at the exact expected SHA after StorageManager admission; original dirty checkout preserved.

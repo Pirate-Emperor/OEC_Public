@@ -37,3 +37,10 @@
 
 
 - Added a safer clean-worktree fallback to the A100 sync flow. If the heavily dirty/detached primary checkout cannot be fast-forwarded, the script checks current StorageManager quota/capacity and creates/updates only `$HOME/OEC_feature_sync`, refuses to overwrite dirty paths, and verifies exact SHA. Outcome pending a new workflow run.
+
+
+## Latest successful checkpoint
+
+- Static storage/regression workflow [39380653548](https://github.com/CalamityStriker/OEC/actions/runs/39380653548) passed at source `32e1a5f9203ed94214f4151c51e2504fe6589002`: 14 command groups/102 logged tests, new Gradio notebook tests 3/3.
+- A100 sync workflow [39380653563](https://github.com/CalamityStriker/OEC/actions/runs/39380653563) passed by creating `$HOME/OEC_feature_sync` after fresh StorageManager admission; actual SHA matched target SHA `32e1a5f9203ed94214f4151c51e2504fe6589002`. The older detached/dirty `$HOME/OEC` with 662 entries was preserved unchanged.
+- The live inference gate remains blocked by external process PID 3347078 using CUDA contexts across all eight A100s. No inference/QA/upload occurred.
