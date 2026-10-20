@@ -7,6 +7,7 @@ must stay under core_config.SYSTEM_DIRS['models'] (AIEROS_MODELS_DIR).
 from __future__ import annotations
 import argparse
 import logging
+import math
 import os
 import sys
 import time
@@ -318,12 +319,42 @@ class AudioProvider(MediaProvider):
             if params.get("language"): opts["language"] = params["language"]
             if params.get("initial_prompt"): opts["initial_prompt"] = params["initial_prompt"]
             result = self.runtime.transcribe(str(input_file), **opts)
-            transcript, language, segments = str(result.get("text", "")).strip(), result.get("language"), len(result.get("segments", []))
+            raw_segments = result.get("segments", [])
+            if not isinstance(raw_segments, list):
+                raise RuntimeError("Whisper returned an invalid segment list")
+            segment_timestamps = []
+            for segment in raw_segments:
+                if not isinstance(segment, dict):
+                    raise RuntimeError("Whisper returned an invalid segment record")
+                try:
+                    if isinstance(segment.get("start"), bool) or isinstance(segment.get("end"), bool):
+                        raise ValueError("boolean timestamp")
+                    segment_start = float(segment["start"])
+                    segment_end = float(segment["end"])
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise RuntimeError("Whisper returned a segment without valid start/end timestamps") from exc
+                segment_text = segment.get("text", "")
+                if (
+                    not math.isfinite(segment_start)
+                    or not math.isfinite(segment_end)
+                    or segment_start < 0
+                    or segment_end < segment_start
+                    or not isinstance(segment_text, str)
+                ):
+                    raise RuntimeError("Whisper returned invalid timestamp values or segment text")
+                segment_timestamps.append({"start": segment_start, "end": segment_end, "text": segment_text.strip()})
+            transcript = str(result.get("text", "")).strip()
+            language = result.get("language")
+            segments = len(raw_segments)
         if not transcript: raise RuntimeError("speech recognition returned an empty transcript")
         target = safe_child(output_dir, f"{job_id}.txt")
         with managed_write("outputs", 0.02, minimum_free_gb=0.02): target.write_text(transcript + "\n", encoding="utf-8")
-        return target, {"language": language, "segments": segments, "audio_input_bytes": input_file.stat().st_size,
-                        "elapsed_seconds": round(time.monotonic() - start, 3), "task": "transcribe"}
+        metadata = {"language": language, "segments": segments, "audio_input_bytes": input_file.stat().st_size,
+                    "elapsed_seconds": round(time.monotonic() - start, 3), "task": "transcribe"}
+        if self.kind == "whisper":
+            # Keep the existing segment count while exposing model-returned timestamps.
+            metadata["segment_timestamps"] = segment_timestamps
+        return target, metadata
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)

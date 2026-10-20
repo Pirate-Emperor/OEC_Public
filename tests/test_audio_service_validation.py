@@ -68,6 +68,60 @@ class AudioValidationTests(unittest.TestCase):
         with self.assertRaises(audio_api.RequestError):
             provider.validate_request({"task": "transcribe", "parameters": {"temperature": 2}})
 
+    def test_whisper_response_preserves_segment_timestamps_in_metadata(self):
+        provider = audio_api.AudioProvider("whisper", require_cuda=False)
+        provider.device_name = "cpu"
+        provider.runtime = mock.Mock()
+        provider.runtime.transcribe.return_value = {
+            "text": "hello world", "language": "en",
+            "segments": [
+                {"start": 0.0, "end": 0.6, "text": " hello "},
+                {"start": 0.6, "end": 1.2, "text": " world"},
+            ],
+        }
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            outputs = root / "outputs"
+            outputs.mkdir()
+            audio_input = root / "input.wav"
+            audio_input.write_bytes(b"test audio input")
+            request = provider.validate_request({"task": "transcribe"})
+            with mock.patch.object(
+                audio_api, "SYSTEM_DIRS", {**audio_api.SYSTEM_DIRS, "outputs": str(outputs)}
+            ), mock.patch.object(
+                audio_api, "managed_write", side_effect=lambda *args, **kwargs: nullcontext()
+            ):
+                artifact, metadata = provider.run_job("job_WhisperTest1234", request, audio_input)
+            self.assertEqual(artifact.read_text(encoding="utf-8"), "hello world\n")
+            self.assertEqual(metadata["segments"], 2)
+            self.assertEqual(metadata["segment_timestamps"], [
+                {"start": 0.0, "end": 0.6, "text": "hello"},
+                {"start": 0.6, "end": 1.2, "text": "world"},
+            ])
+
+    def test_whisper_rejects_missing_segment_timestamps(self):
+        provider = audio_api.AudioProvider("whisper", require_cuda=False)
+        provider.device_name = "cpu"
+        provider.runtime = mock.Mock()
+        provider.runtime.transcribe.return_value = {
+            "text": "hello", "language": "en",
+            "segments": [{"text": "hello", "start": 0.0}],
+        }
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            outputs = root / "outputs"
+            outputs.mkdir()
+            audio_input = root / "input.wav"
+            audio_input.write_bytes(b"test audio input")
+            request = provider.validate_request({"task": "transcribe"})
+            with mock.patch.object(
+                audio_api, "SYSTEM_DIRS", {**audio_api.SYSTEM_DIRS, "outputs": str(outputs)}
+            ), mock.patch.object(
+                audio_api, "managed_write", side_effect=lambda *args, **kwargs: nullcontext()
+            ):
+                with self.assertRaisesRegex(RuntimeError, "start/end timestamps"):
+                    provider.run_job("job_WhisperTest1234", request, audio_input)
+
     def test_qwen_asr_accepts_transcribe_task(self):
         provider = audio_api.AudioProvider("qwen3-asr", require_cuda=False)
         result = provider.validate_request({"task": "transcribe", "parameters": {"language": "hi"}})
