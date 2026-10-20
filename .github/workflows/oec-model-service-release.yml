@@ -18,7 +18,7 @@ concurrency:
 jobs:
   release-model-apis:
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
-    timeout-minutes: 7
+    timeout-minutes: 3
     env:
       # Existing OEC-Play contexts are permitted only by the existing trusted-owner,
       # <2 GiB per-card shared-context admission guard. Unknown GPU owners still block.
@@ -94,7 +94,7 @@ jobs:
           "$PY" "$SYNC/tools/check_media_service_readiness.py" --json > "$R/readiness-before.json"
           "$PY" - "$R/readiness-before.json" <<'PY'
           import json, sys
-          required = ("kokoro", "whisper", "qwen3-asr", "ace-step", "ltx", "trellis")
+          required = ("kokoro", "whisper", "qwen3-asr", "ace-step")
           report = json.load(open(sys.argv[1], encoding="utf-8"))
           rows = {row["provider"]: row for row in report["services"]}
           problems = []
@@ -125,15 +125,14 @@ jobs:
           C="$HOME/Conda/condabin/conda"
           MANAGER="$SYNC/tools/oec_service_manager.py"
           cd "$SYNC"
-          # Map each large model to its own physical A100; API servers bind only to 127.0.0.1.
-          # AudioGen/MusicGen and FLUX are intentionally excluded: no supervised job API exists.
+          # Map each cached audio provider to its own physical A100; API servers bind only to 127.0.0.1.
+          # LTX is held until its runtime preflight passes; FLUX, AudioGen and MusicGen have no
+          # supervised shared HTTP job API and are intentionally excluded.
           SERVICES=(
             "audio-api-kokoro|audio-api|kokoro|1"
             "audio-api-whisper|audio-api|whisper|2"
             "audio-api-qwen3-asr|audio-api|qwen3-asr|3"
             "audio-api-ace-step|audio-api|ace-step|4"
-            "trellis-sidecar|trellis-sidecar||5"
-            "ltx-sidecar|ltx-sidecar||6"
           )
           STARTED=()
           KEEP_SERVICES=0
@@ -185,9 +184,8 @@ jobs:
             exit 6
           done
 
-          # This is a bounded release attempt: roll back only services started by this attempt
-          # unless every API becomes ready within four minutes.
-          deadline=$((SECONDS + 240))
+          # This bounded first batch rolls back only newly started APIs unless all become ready.
+          deadline=$((SECONDS + 105))
           while (( SECONDS < deadline )); do
             all_ready=1
             for spec in "${SERVICES[@]}"; do
@@ -207,22 +205,22 @@ jobs:
             sleep 10
           done
           if [[ "$all_ready" != "1" ]]; then
-            echo "::error::Not all six APIs reached HTTP 200, ready=true, model_loaded=true within four minutes."
+            echo "::error::Not all six APIs reached HTTP 200, ready=true, model_loaded=true within 105 seconds."
             exit 7
           fi
 
-          for provider in kokoro whisper qwen3-asr ace-step ltx trellis; do
+          for provider in kokoro whisper qwen3-asr ace-step; do
             "$C" run --no-capture-output -n oec_deploy python "$SYNC/tools/check_media_service_readiness.py" \
               --provider "$provider" --strict --json > "$R/readiness-after-$provider.json"
             echo "MODEL_RELEASE_STRICT_READINESS_PASS provider=$provider"
           done
-          for id in audio-api-kokoro audio-api-whisper audio-api-qwen3-asr audio-api-ace-step trellis-sidecar ltx-sidecar; do
+          for id in audio-api-kokoro audio-api-whisper audio-api-qwen3-asr audio-api-ace-step; do
             status_service "$id" > "$R/final-status-$id.txt"
           done
           nvidia-smi --query-gpu=index,name,memory.used,memory.free,utilization.gpu --format=csv \
             > "$R/gpu-after.csv"
           echo "MODEL_API_RELEASE_STATUS=PASS"
-          echo "MODEL_API_ENDPOINTS=kokoro:7871,whisper:7872,qwen3-asr:7873,ace-step:7870,ltx:17869,trellis:17868"
+          echo "MODEL_API_ENDPOINTS=kokoro:7871,whisper:7872,qwen3-asr:7873,ace-step:7870"
           echo "MODEL_API_NETWORK=loopback-only; use SSH forwarding; do not expose these ports publicly"
           KEEP_SERVICES=1
 
