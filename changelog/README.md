@@ -94,3 +94,8 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 - Archive: [`docs/runner_migration/connector_1_actions_runs.json`](../docs/runner_migration/connector_1_actions_runs.json).
 - Migration method and next steps: [`docs/runner_migration/README.md`](../docs/runner_migration/README.md).
 - Inventory [run 38610558599](https://github.com/Killer4K-N/OEC/actions/runs/38610558599) passed for all three new OEC labels, with per-runner reports. The first cache-only FLUX runtime [38611186955](https://github.com/Killer4K-N/OEC/actions/runs/38611186955) failed without a retrievable log or PNG. Follow-up attempts [38613199844](https://github.com/Killer4K-N/OEC/actions/runs/38613199844) and [38613575959](https://github.com/Killer4K-N/OEC/actions/runs/38613575959) remain queued without runner assignment. Candidate CI [38613904439](https://github.com/Killer4K-N/OEC/actions/runs/38613904439) passed 46 tests and Python/notebook static checks, but Flux runtime remains unaccepted.
+
+
+- [2026-10-20 — latest static pass and persistent A100 checkout diagnosis](CHANGELOG-2026-10-20.md)
+  - Static run [39379628368](https://github.com/CalamityStriker/OEC/actions/runs/39379628368) passed all 14 test command groups (102 logged test cases); new notebook suite 3/3 passed.
+  - Sync diagnostic [39379628387](https://github.com/CalamityStriker/OEC/actions/runs/39379628387) found detached HEAD 081aaf34f6379873bdc925d1dcf6b9c3d50349d3 and 662 dirty/untracked entries in the persistent checkout. Sync remained blocked, without modifying local files.

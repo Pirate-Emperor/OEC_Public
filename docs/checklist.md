@@ -56,7 +56,7 @@ The newest StorageManager snapshot from run 39271901007 showed 2.04/2.10 TB grou
 - [ ] Follow-up: current-head FLUX→TRELLIS, live ACE-Step, cache/egress resolution for MusicGen, persistent audio service health/result tests, Qwen2-VL compliance decision, real HF manifest/chunk upload and independent read-after-write/reassembly/hash validation.
 - [ ] Sync remains blocked: run [39379246680](https://github.com/CalamityStriker/OEC/actions/runs/39379246680) found `$HOME/OEC` has detached HEAD (empty `git branch --show-current`) and stopped before branch switch. It has not checked dirty status or changed files. Diagnose first, then fast-forward only after safely restoring the expected named branch.
 
-- [ ] Candidate validation follow-up: Action 39378972546 is a preserved historical failure; require a new passing static run on the corrected commit before describing notebook syntax as validated.
+- [x] Candidate validation follow-up closed: initial run 39378972546 remains a historical cell-count failure; notebook syntax/static contract subsequently passed in runs 39379119055, 39379246551 and 39379628368.
 
 - [ ] A fail-closed A100 sync workflow/script has been added; it must run and prove OEC_A100_SYNC=PASS plus expected==actual SHA before claiming the long-lived $HOME/OEC checkout was updated. The workflow intentionally blocks on dirty checkout, wrong origin/branch, or divergent history.
 
@@ -79,3 +79,26 @@ The newest StorageManager snapshot from run 39271901007 showed 2.04/2.10 TB grou
 7. [ ] Complete actual Brain/LTX→Qwen2-VL accept/reject→upload-pending→HF chunk manifest/upload→remote read-after-write/reassembly/hash validation; current mock chunk tests are not live Hugging Face acceptance.
 8. [ ] Complete OEC-Deploy clients/worker dispatch against the accepted APIs and supervised AudioGen/MusicGen CLIs; add typed job state, license metadata and artifact validation.
 9. [ ] Audit existing Wan and other catalogued model workflows and environment/license/cache gaps before adding more model runtimes.
+
+
+## 2026-10-20 — Persistent-checkout diagnostic and newest static run
+
+- **Static suite PASS on commit `b6de4b086705caa30a1705039baf4ac49996725a`:** [run 39379628368](https://github.com/CalamityStriker/OEC/actions/runs/39379628368), job [118485509728](https://github.com/CalamityStriker/OEC/actions/runs/39379628368/job/118485509728). All 14 unittest command groups passed (102 test cases from logged summaries), including the new notebook suite (3/3); existing TRELLIS/FLUX/AudioCraft JSON checks passed. Still static/contract evidence, not inference.
+- **A100 checkout diagnostics are conclusive enough to forbid automatic sync:** [run 39379628387](https://github.com/CalamityStriker/OEC/actions/runs/39379628387), job [118485509739](https://github.com/CalamityStriker/OEC/actions/runs/39379628387/job/118485509739). `$HOME/OEC` origin matches the intended repo, but the checkout is detached (`git branch --show-current` empty), current HEAD is `081aaf34f6379873bdc925d1dcf6b9c3d50349d3`, the intended local branch does **not** exist, and the tree has **662 dirty/untracked entries**. The expected remote-tracking ref exists. Sync correctly stopped before any branch switch/merge; no files were changed by the sync step. Do **not** run reset/clean, checkout, or bulk-overwrite. Review the local dirty state and recover on a reviewed branch/new checkout first.
+- **Live media E2E remains blocked:** attempt 2 of run [39320471955](https://github.com/CalamityStriker/OEC/actions/runs/39320471955) found external PID 3347078 on all eight A100s. No inference/QA/upload occurred and no process was stopped.
+
+## User-owned persistent checkout recovery steps (non-destructive)
+
+Run these read-only commands on the A100 host. They list dirty paths but do not change the checkout:
+
+```bash
+cd "$HOME/OEC"
+git status --short --branch --untracked-files=all
+git rev-parse HEAD
+git branch --all --no-color
+git diff --stat
+git diff --cached --stat
+git ls-files --others --exclude-standard | sed -n '1,100p'
+```
+
+Review/backup those 662 entries first. Do not reset, clean or overwrite them. After preserving needed changes, make a reviewed named branch or a separate clean worktree for the OEC feature branch; only then retry a normal fast-forward and compare exact SHAs.

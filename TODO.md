@@ -365,3 +365,10 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 7. [ ] Complete actual Brain/LTX→Qwen2-VL accept/reject→upload-pending→HF chunk manifest/upload→remote read-after-write/reassembly/hash validation; current mock chunk tests are not live Hugging Face acceptance.
 8. [ ] Complete OEC-Deploy clients/worker dispatch against the accepted APIs and supervised AudioGen/MusicGen CLIs; add typed job state, license metadata and artifact validation.
 9. [ ] Audit existing Wan and other catalogued model workflows and environment/license/cache gaps before adding more model runtimes.
+
+
+## 2026-10-20 — Persistent A100 checkout state discovered
+
+- The read-only preflight in run 39379628387/job 118485509739 reports origin=EXPECTED, branch is detached/empty, HEAD 081aaf34f6379873bdc925d1dcf6b9c3d50349d3, expected local feature branch missing, expected origin remote-tracking ref present, and 662 dirty/untracked entries. No filenames/content were overwritten and the sync stopped before mutation.
+- **Do not automatically sync/reset/clean the existing checkout.** Review/back up the 662 entries, then recover on a reviewed branch or separate worktree. The current branch source remains in GitHub at this feature branch; the persistent $HOME/OEC checkout is not synced.
+- Latest static suite run 39379628368 passed on tested source b6de4b086705caa30a1705039baf4ac49996725a, including notebook tests 3/3. Live E2E run 39320471955 attempt 2 remains blocked by external PID 3347078 occupying all eight A100s; do not kill it.

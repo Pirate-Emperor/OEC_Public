@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-20T11:45:00+05:30",
+  "last_updated": "2026-10-20T11:49:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Static regression PASS on feature branch source c79401c00182e94f3bc3f4d38109174f0662c7f5, run 39379246551/job 118484298605: all 14 test command groups succeeded (logs total 102 tests); new Gradio notebook tests 3/3 passed, existing notebook JSON checks passed. New six-model Gradio clients and integration runbook are committed. Live E2E run 39320471955 attempt 2 is BLOCKED before inference by external PID 3347078 across all 8 A100s; no model inference/QA/HF upload/read-after-write. Safe persistent checkout sync run 39379246680 blocked because $HOME/OEC is detached HEAD; no branch switch or file write was attempted; local dirty state unknown.",
+  "latest_summary": "Latest static regression PASS on source b6de4b086705caa30a1705039baf4ac49996725a, run 39379628368/job 118485509728: all workflow steps succeeded, 14 test command groups/102 test cases from logs, new Gradio notebook suite 3/3, previous TRELLIS/FLUX/AudioCraft notebook JSON checks pass. Persistent A100 checkout diagnostic run 39379628387/job 118485509739 found expected origin but detached HEAD 081aaf34f6379873bdc925d1dcf6b9c3d50349d3, no local feature branch, 662 dirty/untracked entries. Sync correctly made no changes. Live E2E run 39320471955 attempt 2 remains BLOCKED before inference due external PID 3347078 on all 8 A100s.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -4664,6 +4664,128 @@
         "This run did not make the persistent checkout match GitHub."
       ],
       "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39379246680"
+    },
+    {
+      "id": "EXP-2026-10-20-STATIC-REGRESSION-PASS-39379628368",
+      "date": "2026-10-20",
+      "category": "Static notebook and storage-admission regression",
+      "approach": "Run all regression commands in the OEC storage-admission workflow after committing the six model-specific Gradio notebooks, static notebook contract tests, and fail-closed persistent-checkout diagnostic.",
+      "reason": "Ensure notebook structures, code cells, model environment boundaries and pre-existing CLI/storage/QA/uploader regression contracts remain valid without consuming A100 inference resources.",
+      "parameters": {
+        "workflow_run_id": 39379628368,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39379628368",
+        "job_id": 118485509728,
+        "source_sha": "b6de4b086705caa30a1705039baf4ac49996725a",
+        "branch": "fix/media-stack-supervision-20261019",
+        "runner": "GitHub-hosted ubuntu-latest / Python 3.11",
+        "test_command_groups": 14,
+        "new_notebook_test_count": 3,
+        "gpu_inference": false,
+        "model_downloads": false
+      },
+      "environment": {
+        "runner": "GitHub-hosted ubuntu-latest",
+        "purpose": "Static source regression"
+      },
+      "results": {
+        "status": "PASS",
+        "workflow_conclusion": "success",
+        "test_command_groups_passed": 14,
+        "total_test_cases_from_log_summaries": 102,
+        "new_notebook_tests_passed": 3,
+        "existing_notebook_json": "PASS"
+      },
+      "interpretation": "The code/notebook contract tests pass on this source SHA. The result does not establish live inference, real Gradio browser calls, GPU utilization, or end-to-end deployment.",
+      "limitations": [
+        "No model weights were loaded and no live inference was run.",
+        "The sync-helper outcome is separately tracked as a blocked persistent-checkout state."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-20-PERSISTENT-CHECKOUT-DIAGNOSTIC-BLOCKED-39379628387",
+      "date": "2026-10-20",
+      "category": "Read-only persistent OEC checkout diagnosis and guarded sync",
+      "approach": "Run read-only metadata checks followed by the fail-closed fast-forward helper against $HOME/OEC on oec-1.",
+      "reason": "Understand why the long-lived checkout was not synchronized without overwriting local state.",
+      "parameters": {
+        "workflow_run_id": 39379628387,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39379628387",
+        "job_id": 118485509739,
+        "runner": "oec-1",
+        "expected_branch": "fix/media-stack-supervision-20261019",
+        "origin_state": "EXPECTED",
+        "local_branch": "(detached HEAD; empty branch --show-current)",
+        "local_head_sha": "081aaf34f6379873bdc925d1dcf6b9c3d50349d3",
+        "dirty_entry_count": 662,
+        "expected_local_branch_exists": false,
+        "expected_remote_tracking_ref_exists": true,
+        "branch_checkout_or_merge_attempted": false
+      },
+      "environment": {
+        "host_runner": "oec-1",
+        "path": "$HOME/OEC",
+        "operation": "read-only metadata diagnostics and fail-closed sync attempt"
+      },
+      "results": {
+        "status": "BLOCKED_DIRTY_DETACHED_CHECKOUT",
+        "workflow_conclusion": "failure at intentional safety gate",
+        "local_tree_changed": false,
+        "working_tree_entries": "662 dirty/untracked",
+        "sync_sha_equal": false
+      },
+      "interpretation": "The local checkout contains user/local state and is not on the expected named branch. The gate safely refused to switch or overwrite files. Local modifications must be reviewed/backed up and reconciled on a named branch or separate clean worktree before the feature commit can be synchronized.",
+      "limitations": [
+        "The exact 662 paths were counted, not printed in workflow logs.",
+        "No local files were copied, checkout/switched, reset or removed."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-20-LIVE-E2E-GPU-ADMISSION-BLOCKED-39320471955-ATTEMPT2",
+      "date": "2026-10-20",
+      "category": "Guarded live LTX→Qwen2-VL QA→HF chunk upload→remote read-after-write",
+      "approach": "Retry the guarded live E2E acceptance on assigned oec-1 with current runner/environment/GPU admission checks.",
+      "reason": "Verify the joined OEC media lifecycle after separate component acceptance.",
+      "parameters": {
+        "workflow_run_id": 39320471955,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39320471955",
+        "run_attempt": 2,
+        "job_id": 118480769324,
+        "source_sha": "2ca832a5e814d5f8bce43617ca04d2f7fdfee682",
+        "runner": "oec-1",
+        "report_artifact_id": 12244625569,
+        "report_artifact_url": "https://github.com/CalamityStriker/OEC/actions/runs/39320471955/artifacts/12244625569",
+        "gpu_process_pid": 3347078,
+        "gpu_memory_mib": {
+          "gpu0": 8194,
+          "gpu1": 1072,
+          "gpu2": 974,
+          "gpu3": 1046,
+          "gpu4": 970,
+          "gpu5": 1212,
+          "gpu6": 1126,
+          "gpu7": 8986
+        },
+        "process_killed": false
+      },
+      "environment": {
+        "runner": "oec-1",
+        "action": "preflight guard; no model job started"
+      },
+      "results": {
+        "status": "BLOCKED_GPU_OWNERSHIP",
+        "workflow_conclusion": "failure (fail-closed)",
+        "gpu_preflight": "BLOCKED",
+        "live_inference": "NOT_RUN",
+        "qwen2_vl_qa": "NOT_RUN",
+        "hf_upload": "NOT_RUN",
+        "remote_read_after_write": "NOT_RUN",
+        "collateral_changes": "NONE_REPORTED"
+      },
+      "interpretation": "This is an infrastructure/ownership blocker, not a model or upload-protocol test. No CUDA owner was stopped and no shared queue/dataset was touched.",
+      "limitations": [
+        "Storage/HF preflight was not reached.",
+        "No live QA decision or remote upload occurred."
+      ]
     }
   ]
 }

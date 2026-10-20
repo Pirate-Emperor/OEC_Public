@@ -63,7 +63,7 @@ The added static suite checks notebook JSON, Python cell syntax, declared enviro
 
 Keep models in OEC core worker/service processes; do not import model packages into the Electron/UI or World Engine process.
 
-- LTX and TRELLIS expose GET /health, POST /v1/jobs, GET /v1/jobs/{job_id}, GET /v1/jobs/{job_id}/result on loopback ports 7869 and 7868. OEC-Deploy should submit, poll, then retrieve the validated artifact.
+- LTX and TRELLIS expose GET /health, POST /v1/jobs, GET /v1/jobs/{job_id}, GET /v1/jobs/{job_id}/result on loopback manager default ports 17869 and 17868 (a specific smoke can override them). OEC-Deploy should submit, poll, then retrieve the validated artifact.
 - Audio providers expose the same API on ports 7870–7873. Kokoro accepts prompt plus voice. Whisper/Qwen3-ASR accept task=transcribe and base64 audio with no data-URL prefix (maximum 12 MiB). ACE-Step accepts duration 10–180 seconds and inference steps 1–20. Bind loopback only; if UI and API are on separate nodes, use an authenticated internal proxy/tunnel.
 - AudioGen/MusicGen currently have guarded CLI workers, not persistent audio API sidecars. OEC-Deploy needs a supervised command/job wrapper with typed inputs, job IDs/status, artifact retrieval, licence metadata, output validation and StorageManager checks. Do not execute arbitrary user-supplied shell strings.
 - brain.py/brain_config.json currently handle prompt→LTX job generation, not a general multimodal scheduler. Define and test a typed worker job schema (provider, task, parameters, artifact path/hash, licence, QA status, storage admission, retry/error) before routing audio/3D through Brain.
@@ -97,3 +97,8 @@ A fail-closed workflow attempts to fast-forward the persistent $HOME/OEC checkou
 - Static workflow run 39379246551 on source c79401c00182e94f3bc3f4d38109174f0662c7f5 passed all steps, including the new notebook tests 3/3.
 - The live E2E attempt 39320471955 (attempt 2) is blocked by the external GPU process noted in docs/checklist.md; no inference/QA/upload was reached.
 - Safe sync run 39379246680 blocked because $HOME/OEC is on detached HEAD. The script refused to switch it; its working-tree cleanliness is unknown. Diagnose before taking a manual action.
+
+
+## Exact persistent checkout status (2026-10-20)
+
+Read-only preflight in run 39379628387/job 118485509739 confirmed: origin matches CalamityStriker/OEC; $HOME/OEC is detached at 081aaf34f6379873bdc925d1dcf6b9c3d50349d3; the expected local branch does not exist; the origin tracking ref does exist; 662 dirty/untracked entries are present. The sync helper correctly stopped. Do not run reset/clean/checkout over this state. Review the local status/diffs and back up user work first, or prepare a separate clean worktree once storage and path capacity are verified.
