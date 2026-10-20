@@ -12,7 +12,7 @@ permissions:
 # One bounded source-only job; full media/inference acceptance is a separate manual action.
 concurrency:
   group: oec-media-gpu-storage-serial
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   canonical-root-sync:
