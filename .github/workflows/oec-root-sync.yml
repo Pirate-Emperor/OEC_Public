@@ -37,6 +37,7 @@ jobs:
           import datetime
           import json
           import os
+          import time
           import urllib.parse
           import urllib.request
 
@@ -92,6 +93,21 @@ jobs:
               if status not in (200, 202):
                   raise SystemExit(f"Cancel request failed for run {run_id}: HTTP {status}")
               print(f"OEC_DEADLINE_CANCEL_REQUESTED run={run_id} age_seconds={int(age.total_seconds())} path={run.get('path')} status={run.get('status')}")
+              # A stuck runner may acknowledge cancellation without reaching a terminal state.
+              # Escalate only for this same-branch, allow-listed run after a short grace period.
+              run_url = f"https://api.github.com/repos/{repository}/actions/runs/{run_id}"
+              for _ in range(6):
+                  time.sleep(2)
+                  _, state = request_json(run_url)
+                  if state.get("status") not in {"in_progress", "queued", "pending", "waiting", "requested"}:
+                      print(f"OEC_DEADLINE_CANCEL_CONFIRMED run={run_id} status={state.get('status')} conclusion={state.get('conclusion')}")
+                      break
+              else:
+                  force_url = f"https://api.github.com/repos/{repository}/actions/runs/{run_id}/force-cancel"
+                  force_status, _ = request_json(force_url, method="POST")
+                  if force_status not in (200, 202):
+                      raise SystemExit(f"Force-cancel failed for run {run_id}: HTTP {force_status}")
+                  print(f"OEC_DEADLINE_FORCE_CANCEL_REQUESTED run={run_id} age_seconds={int(age.total_seconds())}")
           PY
 
   canonical-root-sync:
