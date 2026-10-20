@@ -3,7 +3,7 @@
 - [2026-10-20 — model-specific Gradio clients and guarded E2E retry](CHANGELOG-2026-10-20.md)
   - Added dedicated AudioGen, MusicGen, ACE-Step, Kokoro, Whisper and Qwen3-ASR notebooks with explicit UI/backend environments; the API-facing notebooks use isolated service workers rather than combining provider dependencies. Added a static notebook policy test and OEC-Deploy worker contract runbook.
   - E2E run [39320471955](https://github.com/CalamityStriker/OEC/actions/runs/39320471955), attempt 2, failed closed before inference because external PID 3347078 was still attached to all eight A100s. Artifact [12244625569](https://github.com/CalamityStriker/OEC/actions/runs/39320471955/artifacts/12244625569) records the block. No GPU process was stopped and no real QA/upload/read-after-write is claimed.
-  - The new notebook static check is pending this candidate commit's Actions result; live Gradio, ACE-Step, MusicGen, current-head FLUX→TRELLIS and the full Brain/LTX→QA→HF chunk/readback path remain open.
+  - The first notebook static check [run 39378972546](https://github.com/CalamityStriker/OEC/actions/runs/39378972546) failed on a minimum-cell assertion: AudioGen/MusicGen lacked separate environment markdown cells; their code cells were not syntax-checked by that attempt. Corrected notebooks are committed, and a fresh static result is pending. Live Gradio, ACE-Step, MusicGen, current-head FLUX→TRELLIS and full Brain/LTX→QA→HF remain open.
 
 
 - [2026-10-19 — model inference handoff and Actions quota update](CHANGELOG-2026-10-19.md)

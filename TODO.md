@@ -6,7 +6,7 @@
 
 - Repository inspected: CalamityStriker/OEC, branch fix/media-stack-supervision-20261019, parent source 2ca832a5e814d5f8bce43617ca04d2f7fdfee682.
 - Added dedicated model UI notebooks for AudioGen, MusicGen, ACE-Step, Kokoro, Whisper Turbo and Qwen3-ASR, plus a static notebook source-policy test. Each notebook declares its UI kernel and inference environment. Speech and ACE-Step UI clients call the existing loopback API and do not import their backend ML packages.
-- A new model/environment and OEC-Deploy integration runbook is being committed with the notebook set. CPU contract validation is pending until the Actions result/logs are retrieved.
+- A new model/environment and OEC-Deploy integration runbook is being committed with the notebook set. Initial CPU contract run 39378972546 FAILED at the new test's minimum-cell assertion (AudioGen and MusicGen had no separate environment markdown cell); because the assertion happened before the cell loop, it did not validate their Python syntax. Fix committed by adding environment/startup cells; rerun is required.
 - E2E run 39320471955, attempt 2, job 118480769324, ended FAILURE at the GPU-ownership gate. A100 PID 3347078 (external Biome server-components Python process) was attached to all eight visible A100s; usage ranged from about 974 MiB to 8,986 MiB per device, and the runner explicitly refused overlap. E2E artifact 12244625569 (1,758 bytes) confirms this is a pre-inference block: no LTX output, no Qwen2-VL decision, no actual HF upload and no read-after-write occurred.
 - Do not kill/signal PID 3347078 or launch another heavy GPU job against it. The user removed the Actions minutes restriction only; GPU ownership and StorageManager admission are still mandatory.
 - Remaining: inspect candidate Actions static result, safely sync branch into the persistent $HOME/OEC checkout after local status checks, live Gradio tests for every UI, current-head FLUX→TRELLIS, ACE-Step generation, MusicGen cache/egress, full LTX→QA→chunked HF upload/readback and deployment client integration.
@@ -336,3 +336,7 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - [ ] ACE-Step music generation remains skipped because acestep is absent from phase1, phase1_ltx and phase2_3d. Prepare and test it in an isolated runtime without modifying the shared Torch stack.
 - [ ] Visual acceptance [39209706982](https://github.com/Killer4K-N/OEC/actions/runs/39209706982) is running on the same serialized A100 lane; require a validated GLB from TRELLIS and decoded MP4 from LTX.
 - [ ] Continuous Brain-to-worker-to-QA-to-uploader acceptance and production OEC-Play health checks remain unverified.
+
+## Static validation follow-up — 2026-10-20
+
+- Preserved failure [run 39378972546](https://github.com/CalamityStriker/OEC/actions/runs/39378972546). The failure was the static validator asserting at least three cells in pipeline_audiogen_gradio.ipynb; both CLI notebooks used two cells. The Python AST loop did not run for those notebooks. Added a dedicated environment/safety cell to both; wait for the next Actions result before marking Python/notebook validation passed.

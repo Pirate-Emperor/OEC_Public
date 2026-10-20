@@ -4,7 +4,7 @@
 
 - Added six dedicated model notebooks: AudioGen and MusicGen in phase1; ACE-Step, Kokoro, Whisper Turbo and Qwen3-ASR Gradio clients using the phase2_3d kernel only for UI and existing isolated backend runtimes for inference.
 - The two AudioCraft notebooks use the existing worker CLIs with cache-only/offline flags and /tmp smoke outputs. The API notebooks require an already supervised service reporting ready=true and model_loaded=true; they do not install packages, fetch checkpoints, or bind a model API to a public interface.
-- Added tests/test_gradio_model_notebooks.py to validate notebook JSON, Python cells, the declared environment, loopback-only Gradio and no provider-stack imports into the frontend. Wired this test into the CPU/storage-admission regression workflow. Result is pending until the associated Actions run completes and its job logs are inspected.
+- Added tests/test_gradio_model_notebooks.py to validate notebook JSON, Python cells, the declared environment, loopback-only Gradio and no provider-stack imports into the frontend. Wired this test into the CPU/storage-admission regression workflow. Initial static run [39378972546](https://github.com/CalamityStriker/OEC/actions/runs/39378972546) failed at the minimum-cell assertion: AudioGen/MusicGen needed a separate environment markdown cell and their Python code was not reached by the AST loop. Corrected notebooks are committed; a fresh result is pending.
 - Added docs/MODEL_NOTEBOOKS_AND_WORKER_INTEGRATION.md containing the environment map, startup/run process, OEC-Deploy worker/API contract, correct filenames and remaining acceptance list.
 - Retry of guarded E2E run 39320471955 attempt 2 concluded failure at GPU preflight. Job 118480769324 observed external PID 3347078 from the Biome server-components Python runtime attached to all eight visible A100s (roughly 974–8,986 MiB used per card). The harness failed closed with exit code 3 and artifact 12244625569. No inference, QA decision or HF upload was attempted. No external process was killed/signalled.
 - Environment design remains intentionally separated: LTX phase1_ltx; FLUX/TRELLIS phase2_3d; AudioGen/MusicGen phase1; Kokoro/Whisper/Qwen3-ASR backend ~/.local/venvs/oec-audio-py311; ACE-Step backend ~/.local/venvs/oec-acestep-py311. The API-control notebooks use phase2_3d only as Gradio frontends, not as model runtimes.
@@ -18,3 +18,7 @@
 4. Start Kokoro, Whisper and Qwen3-ASR workers one at a time; test actual service readiness, job polling and non-empty outputs.
 5. Complete actual LTX→Qwen2-VL compliance→PENDING/upload→chunk manifest→remote read-after-write/reassembly/hash, then validate the OEC-Deploy clients against those accepted endpoints.
 6. Sync to the persistent A100 checkout only after a clean-tree and branch ownership check; verify commit SHA and current local state rather than overwriting local changes.
+
+## Validation correction
+
+- The first static run did not find a model/API error; it found that two otherwise intentionally concise CLI notebooks had only two cells. Added an explicit environment/startup cell to both. Preserve the failed run, and only report validation after the next static job finishes.

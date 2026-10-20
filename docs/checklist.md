@@ -50,8 +50,10 @@ The newest StorageManager snapshot from run 39271901007 showed 2.04/2.10 TB grou
 - [x] Added dedicated AudioGen and MusicGen Gradio notebooks, both using the existing phase1 CLI workers with offline/cache-only mode and run-scoped /tmp outputs.
 - [x] Added ACE-Step, Kokoro, Whisper Turbo and Qwen3-ASR Gradio control notebooks. They call the existing loopback job API; the frontend does not import provider ML packages, preserving oec-audio-py311 and oec-acestep-py311 isolation.
 - [x] Added a model/environment matrix and OEC-Deploy API/worker integration notes in docs/MODEL_NOTEBOOKS_AND_WORKER_INTEGRATION.md.
-- [ ] Static Python-cell/notebook validation is queued by this candidate commit; do not count it as passed until its Actions job and logs are inspected.
+- [ ] Static Action run 39378972546 FAILED because the new validator expected at least three notebook cells while AudioGen and MusicGen had only a title and code cell. The assertion stopped before parsing those code cells; this is not evidence of an inference failure. A separate environment/startup markdown cell is being added to each, then the suite must be rerun.
 - [ ] No new live model job was run by creating these notebook files. Gradio browser interaction, ACE-Step generation and MusicGen generation remain unverified by the current commit.
 - [ ] The guarded E2E run 39320471955 attempt 2 concluded failure before inference: runner oec-1 found external PID 3347078 attached to all eight A100s. Artifact 12244625569 records BLOCKED; do not kill or signal the process. Wait for normal release by its owner.
 - [ ] Follow-up: current-head FLUX→TRELLIS, live ACE-Step, cache/egress resolution for MusicGen, persistent audio service health/result tests, Qwen2-VL compliance decision, real HF manifest/chunk upload and independent read-after-write/reassembly/hash validation.
 - [ ] Safe-sync the committed branch to $HOME/OEC only after checking the existing local branch and dirty files. This commit does not claim the user-facing working tree or a permanent local A100 checkout has been synchronized.
+
+- [ ] Candidate validation follow-up: Action 39378972546 is a preserved historical failure; require a new passing static run on the corrected commit before describing notebook syntax as validated.
