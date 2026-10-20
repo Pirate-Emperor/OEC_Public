@@ -13,3 +13,4 @@ FLUX, AudioGen and MusicGen remain CLI/Gradio-only and are not represented as su
 
 Retry trigger after narrowing the workflow push filter: 2026-10-20T17:07:14.051Z
 Retry with approved detached-worktree updater; no model starts were attempted in previous sync-gate failures.
+Retry with detached-worktree HEAD verification and a bounded 7-minute job timeout. No service was started in prior attempts.
