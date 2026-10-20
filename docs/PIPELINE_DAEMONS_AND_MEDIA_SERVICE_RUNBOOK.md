@@ -1,3 +1,5 @@
+> **Status refresh (2026-10-20):** This runbook contains dated historical acceptance records; where they conflict with the source-SHA `0c53f6a...` evidence above, the later live run 39435100568 supersedes them. The current code head `72b71f8...` has an exact-head static pass and live run 39452849617 remains in progress. Tested sidecar ports are TRELLIS 17868 / LTX 17869. Test services were stopped at job exit, so persistent deployment readiness is not claimed.
+
 # OEC pipeline, daemons, and media-service runbook
 
 **Evidence checkpoint:** 2026-10-19T23:33+05:30, Asia/Kolkata  
@@ -15,15 +17,15 @@ This runbook separates confirmed live acceptance from commands that still requir
 | Whisper-Turbo ASR | [A100 bootstrap 39268082165](https://github.com/CalamityStriker/OEC/actions/runs/39268082165): live smoke PASS, startup+inference 18.47 s. | **PASS for a controlled input.** Broad WER not measured. |
 | Qwen3-ASR-0.6B | [A100 bootstrap 39268082165](https://github.com/CalamityStriker/OEC/actions/runs/39268082165): live smoke PASS, startup+inference 20.45 s. Prior controlled speech chain returned the same 56-character transcript as Whisper. | **PASS for a controlled input.** Broad WER not measured. |
 | ACE-Step 1.5 music | [Bootstrap run 39268082165](https://github.com/CalamityStriker/OEC/actions/runs/39268082165) prepared the full selected checkpoint set and isolated runtime; pinned source ca1e85fe9430179831e6bc6be790c332190a3866, isolated Python 3.12 / Torch 2.10.0+cu128 / CUDA 12.8; shared Torch unchanged. | **RUNTIME PREPARED; GENERATION BLOCKED.** Actual smoke failed closed because no eligible idle A100 was available; no music artifact was produced. |
-| TRELLIS.2 image-to-3D | **Loopback sidecar accepted:** [run 39278268411](https://github.com/CalamityStriker/OEC/actions/runs/39278268411), terminal GitHub conclusion **SUCCESS**, artifact [12198722285](https://github.com/CalamityStriker/OEC/actions/runs/39278268411/artifacts/12198722285), report 2/2 providers PASS; actual GLB 2,775,928 bytes, SHA-256 `e7a1a970edae002596a80fa47b19ad87e96ad82a8dfa3d4523ad65167435e875`, geometry report 1 mesh/1 primitive/48,806 position entries. Local trimesh reopen passed (48,806 vertices/95,566 faces) but mesh is **not watertight**. | **SIDECAR API PASS; combined FLUX→TRELLIS remains blocked** by its separate safe idle-A100 selector in [run 39271901007](https://github.com/CalamityStriker/OEC/actions/runs/39271901007). Final workflow status is SUCCESS; do not use the synthetic-input sidecar run as evidence of the combined FLUX→TRELLIS path. |
+**FLUX→TRELLIS is now live-accepted:** run 39435100568 generated a 512×512 PNG then consumed it with TRELLIS to create a GLB reopened by trimesh. Earlier blocked runs are historical; the combined CLI pipeline still has no standalone supervised FLUX `/v1/jobs` API.
 | LTX-2.3 text/image-to-video sidecar | **Loopback sidecar accepted:** same run [39278268411](https://github.com/CalamityStriker/OEC/actions/runs/39278268411), terminal workflow SUCCESS, artifact [12198722285](https://github.com/CalamityStriker/OEC/actions/runs/39278268411/artifacts/12198722285); real MP4 242,547 bytes, SHA-256 `5d7d54de4354936f66867fecd19d20c0ab6972b5d997ca00c145ab0c1e54ec51`, H.264 768×512, 2.083333 s; harness and local ffprobe PASS. | **SIDECAR API PASS.** The sustained Brain → queue worker → QA → uploader chain is still not live-accepted. |
 | MusicGen medium | [Run 39254306725](https://github.com/Killer4K-N/OEC/actions/runs/39254306725): 4/4 offline contracts passed; incomplete checkpoint and Hugging Face proxy failure (No route to host) prevented inference. | **BLOCKED BEFORE INFERENCE.** It is CC-BY-NC research-only unless separate commercial rights are established. Do not blindly repeat an expensive download. |
-| QA/compliance worker (Qwen2-VL) | Current static suite [39300850953](https://github.com/CalamityStriker/OEC/actions/runs/39300850953); earlier executable frame-path test [39278190899](https://github.com/CalamityStriker/OEC/actions/runs/39278190899). | **STATIC/FUNCTION PASS; LIVE QA UNVERIFIED.** `CUDA_VISIBLE_DEVICES` is set before Torch and qwen_vl_utils import; targeted `--once --asset-id ID --gpu N` is supported. Mocked-ffmpeg tests for .mp4/.webm/.avi preserved source bytes; fresh transcode quota guard passed. The live E2E job [39300850928](https://github.com/CalamityStriker/OEC/actions/runs/39300850928) stopped at GPU admission before model inference; no policy decision. |
+| QA/compliance worker (Qwen2-VL) | Run 39435100568, job `118691033786`: actual LTX MP4 passed Qwen2-VL QA (`qa_passed=true`, category 3, title + 10 keywords); output proceeded to chunk upload and remote hash read-back. | **LIVE SINGLE-ASSET QA PASS; sustained daemon/queue unverified.** Keep GPU visibility set before Torch imports; targeted `--once --asset-id ID --gpu N` remains the controlled invocation. Do not infer broad model quality from one item. |
 | QA → archive → Hugging Face upload | Offline SQLite contract tests cover QA success → canonical PENDING, uploader selection, ARCHIVING recovery and targeted rollback. | **NOT END-TO-END ACCEPTED.** No fresh live upload receipt and post-upload dataset verification from this session. |
-| Brain → LTX worker → QA → HF upload | Runbook documents intended commands; components and independent smoke results do not prove the sustained queue path. | **NOT YET LIVE-ACCEPTED AS ONE PIPELINE.** Run a single short controlled job and verify each status/artifact transition before scaling. |
+| Controlled LTX → Qwen2-VL QA → HF upload/read-back | Run 39435100568, job `118691033786`: real video → QA pass → `oec-asset-chunks-v1` manifest and 3 remote parts → remote reads and exact 228,845-byte reassembly/hash match. | **BOUNDED SINGLE-ASSET VERTICAL SLICE PASS.** Sustained Brain queue→worker→QA→upload, restart/failure injection and scale remain unverified. |
 | OEC-Play | OEC-Deploy feature validation runs are active/pending on their own branch; no server health request from this session. | **LIVE SERVER / CAPABILITY STATUS UNVERIFIED.** Keep adapters disabled unless their health and real artifact tests pass. |
 
-Latest completed static acceptance [39300850953](https://github.com/CalamityStriker/OEC/actions/runs/39300850953), job 118225345013, passed **96 tests**, source compilation and all four notebook JSON checks (16/15/10/6 cells) with no ResourceWarning. The six added E2E contract tests pass, along with QA frame safety and mocked resumable chunk upload/retry. This is CPU/static evidence, not live QA or remote upload. Live E2E run [39300850928](https://github.com/CalamityStriker/OEC/actions/runs/39300850928), job 118225345452 on `oec-1`, compiled the harness then deliberately stopped before inference: external PID 3347078 (`Biome/server-components/.venv/bin/python`) had CUDA contexts on all eight A100s. Report artifact [12211286861](https://github.com/CalamityStriker/OEC/actions/runs/39300850928/artifacts/12211286861) says BLOCKED and confirms no process kill, shared queue use, dataset creation or upload. Latest complete visual sidecar [39278268411](https://github.com/CalamityStriker/OEC/actions/runs/39278268411) concluded SUCCESS; actual TRELLIS GLB and LTX MP4 were inspected, with the mesh not watertight. Latest speech/ACE-Step bootstrap [39278145617](https://github.com/CalamityStriker/OEC/actions/runs/39278145617) failed at no-idle-A100 admission after Kokoro/Whisper/Qwen3-ASR passed; no ACE-Step music. The combined FLUX→TRELLIS run [39271901007](https://github.com/CalamityStriker/OEC/actions/runs/39271901007) remains blocked by its safe GPU gate. Historical StorageManager snapshots do not authorize future writes.
+Latest live suite [39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568), source SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`, supersedes the prior blocked runs: all 8 live jobs passed, including ACE-Step/speech, AudioGen/MusicGen, LTX/TRELLIS, FLUX→TRELLIS and a controlled LTX→Qwen2-VL QA→HF chunk upload/read-back. Current-head static run [39452849501](https://github.com/CalamityStriker/OEC/actions/runs/39452849501) passed; current-head A100 run [39452849617](https://github.com/CalamityStriker/OEC/actions/runs/39452849617) is still running on SHA `72b71f861bba72b78da1cec330e4273b00baaabb`.
 
 ## 2. What \`brain_config.json\` means for queue chunking
 
@@ -59,7 +61,7 @@ nvidia-smi
 
 # Inventory existing processes and listener ports. This is read-only.
 ps -u "$USER" -o pid,etime,args | grep -E '[s]torage_manager.py|[b]rain.py|[h]f_upload_daemon.py|[q]a_compliance_worker.py|[w]orker_ltx_video.py|[a]udio_api.py|[t]rellis_api.py|[l]tx_api.py' || true
-ss -ltnp | grep -E ':(7868|7869|7870|7871|7872|7873|7987)\\b' || true
+ss -ltnp | grep -E ':(17868|17869|7870|7871|7872|7873|7987)\\b' || true
 conda env list
 \`\`\`
 
@@ -155,20 +157,20 @@ The selected source asset + JSON and DB row are deleted after the upload API rep
 
 These sidecars are a separate interface from Brain's batch queue. They bind to loopback, use the configured OEC output/model targets, and should only be exposed to OEC-Play after their own live \`/health\` and artifact acceptance succeed.
 
-**TRELLIS** (phase2_3d, loopback port 7868; image-to-GLB):
+**TRELLIS** (phase2_3d, loopback port 17868; image-to-GLB):
 
 \`\`\`bash
 cd "$HOME/OEC"
 conda run --no-capture-output -n phase2_3d \\
-  python "$HOME/OEC/tools/media_services/trellis_api.py" --host 127.0.0.1 --port 7868
+  python "$HOME/OEC/tools/media_services/trellis_api.py" --host 127.0.0.1 --port 17868
 \`\`\`
 
-**LTX** (phase1_ltx, loopback port 7869; text/image-to-video). The StorageManager target mismatch has been fixed in OEC source, but a successful full live GLB/MP4 acceptance for the current adapter revision is still required before calling this ready.
+**LTX** (phase1_ltx, loopback port 17869; text/image-to-video). Run 39435100568 generated a real MP4 accepted by ffprobe. That proves test-scoped inference, not persistent deployment readiness; recheck `/health` after starting the service on the intended host.
 
 \`\`\`bash
 cd "$HOME/OEC"
 conda run --no-capture-output -n phase1_ltx \\
-  python "$HOME/OEC/tools/media_services/ltx_api.py" --host 127.0.0.1 --port 7869
+  python "$HOME/OEC/tools/media_services/ltx_api.py" --host 127.0.0.1 --port 17869
 \`\`\`
 
 **Speech/audio services** use the isolated runtime already tested on A100 at \`$HOME/.local/venvs/oec-audio-py311\`. For each model use a separate terminal/process:
@@ -180,15 +182,15 @@ export PYTHONPATH="$HOME/OEC:$HOME/OEC/tools/media_services\${PYTHONPATH:+:$PYTH
 "$HOME/.local/venvs/oec-audio-py311/bin/python" "$HOME/OEC/tools/media_services/audio_api.py" --model qwen3-asr --host 127.0.0.1 --port 7873
 \`\`\`
 
-ACE-Step's endpoint is port 7870, but it must remain **off/not configured** until its isolated \`acestep\` runtime is prepared and the music-generation model loads. The live speech test skipped it rather than upgrading shared Conda environments. AudioGen currently passes through \`pipeline_audiocraft.ipynb\` in phase1; it is not yet an \`audio_api.py\` provider.
+ACE-Step uses loopback port 7870 and the isolated `$HOME/.local/venvs/oec-acestep-py311` runtime. Real generation and Gradio callback passed in run 39435100568. The current-head run 39452849617 is retesting this provider after the Whisper metadata fix. Start only after fresh storage/GPU preflight and verify live health; do not combine its dependencies into shared Conda. AudioGen/MusicGen remain CLI/Gradio-only and are not exposed through the shared `/v1/jobs` API.
 
 ## 6. Validate an API and an actual job — not just a listening port
 
 Run these from the same server/compute-node network namespace where the service is meant to operate. The local commands below are diagnostics for the operator to run on that host; they were not executed against the user's live host by this chat.
 
 \`\`\`bash
-curl --noproxy '*' -fsS http://127.0.0.1:7868/health | python -m json.tool
-curl --noproxy '*' -fsS http://127.0.0.1:7869/health | python -m json.tool
+curl --noproxy '*' -fsS http://127.0.0.1:17868/health | python -m json.tool
+curl --noproxy '*' -fsS http://127.0.0.1:17869/health | python -m json.tool
 curl --noproxy '*' -fsS http://127.0.0.1:7871/health | python -m json.tool
 curl --noproxy '*' -fsS http://127.0.0.1:7872/health | python -m json.tool
 curl --noproxy '*' -fsS http://127.0.0.1:7873/health | python -m json.tool
