@@ -377,3 +377,9 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 ## Additional model catalogue finding — Wan 2.1
 
 - The repo contains `pipeline_wan_video.ipynb`, kernel metadata `phase1` / Python 3.9.25, and a legacy Wan 2.1 14B worker class embedded in a notebook. It contains stored historical outputs, no Gradio UI, selects GPU by free memory alone instead of verifying process ownership, and references bare `SYSTEM_DIRS` although it only imports `core_config`. This is not a verified worker. Do not run it against the shared GPU, or install Wan packages into shared `phase1`; first identify cached model/dependency state and provide a dedicated runtime/worker with safe GPU/storage admission.
+
+
+## Safe A100 test-worktree fallback — 2026-10-20
+
+- Added `tools/create_clean_a100_test_worktree.sh`. When the existing $HOME/OEC fails fast-forward gates, the workflow may create/update only a dedicated sibling test worktree after fresh StorageManager admission of 0.25 GB requested and at least 1.0 GB free. It refuses path collisions or dirty/unregistered existing targets and validates fetched/ref and actual SHA.
+- This does not claim success before the next sync workflow log confirms it. $HOME/OEC's detached HEAD and 662 dirty/untracked entries are preserved.

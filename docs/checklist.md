@@ -105,3 +105,6 @@ Review/backup those 662 entries first. Do not reset, clean or overwrite them. Af
 
 
 10. [ ] **Wan 2.1 (additional model found):** `pipeline_wan_video.ipynb` is an old `phase1`/Python 3.9 notebook with stored July outputs, no Gradio UI cell, GPU selection based only on free memory, and code that refers to `SYSTEM_DIRS` without importing/binding it. Treat it as unverified; refactor only after the available Wan dependencies/cache/environment are identified and a separate worker with GPU-ownership + StorageManager gates can be tested. Do not install Wan dependencies into `phase1` as a shortcut.
+
+
+- [ ] The sync workflow now has a safe fallback to a new dedicated `$HOME/OEC_feature_sync` git worktree after StorageManager space/quota admission. It has **not yet passed**; confirm `OEC_CLEAN_WORKTREE_SYNC=PASS` and matching A100 SHA before claiming local sync.

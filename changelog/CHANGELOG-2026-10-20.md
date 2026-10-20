@@ -34,3 +34,6 @@
 
 
 - Additional model audit: found the existing `pipeline_wan_video.ipynb` (Wan 2.1). The legacy notebook has no Gradio UI, uses historical saved cell outputs, references `SYSTEM_DIRS` without binding it, and picks GPU based only on free memory. Logged as an unaccepted model to refactor under an isolated environment; no Wan package install was attempted.
+
+
+- Added a safer clean-worktree fallback to the A100 sync flow. If the heavily dirty/detached primary checkout cannot be fast-forwarded, the script checks current StorageManager quota/capacity and creates/updates only `$HOME/OEC_feature_sync`, refuses to overwrite dirty paths, and verifies exact SHA. Outcome pending a new workflow run.

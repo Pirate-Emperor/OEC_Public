@@ -7,6 +7,7 @@ on:
     paths:
       - "pipeline_*_gradio.ipynb"
       - "tools/sync_feature_branch_a100.sh"
+      - "tools/create_clean_a100_test_worktree.sh"
       - ".github/workflows/oec-a100-local-sync.yml"
   workflow_dispatch:
 
@@ -67,23 +68,39 @@ jobs:
           printf 'OEC_EXPECTED_LOCAL_BRANCH_EXISTS=%s\n' "$expected_local_branch"
           printf 'OEC_EXPECTED_REMOTE_TRACKING_REF_EXISTS=%s\n' "$expected_remote_tracking_ref"
           # This step performs no fetch, checkout, merge, reset or file write.
-      - name: Fail-closed fast-forward of persistent checkout
+      - name: Try fast-forward sync without overwriting local content
+        id: inplace
         env:
           OEC_SYNC_BRANCH: fix/media-stack-supervision-20261019
         run: |
-          set -euo pipefail
+          set -uo pipefail
           test "$RUNNER_NAME" = "oec-1" || {
             echo "::error::Expected oec-1, got $RUNNER_NAME"
             exit 2
           }
-          bash tools/sync_feature_branch_a100.sh
+          if bash tools/sync_feature_branch_a100.sh; then
+            echo "OEC_SYNC_MODE=in_place" >> "$GITHUB_ENV"
+            echo "OEC_EXISTING_CHECKOUT_SYNC=PASS"
+          else
+            rc=$?
+            echo "OEC_EXISTING_CHECKOUT_SYNC=BLOCKED exit=$rc"
+            echo "Primary checkout was not altered; attempting a separate clean worktree after StorageManager admission."
+            bash tools/create_clean_a100_test_worktree.sh
+            echo "OEC_SYNC_MODE=clean_worktree" >> "$GITHUB_ENV"
+          fi
 
-      - name: Verify the synced persistent checkout equals this tested commit
+      - name: Verify exact SHA in the selected local test checkout
         run: |
           set -euo pipefail
           expected="$(git rev-parse HEAD)"
-          actual="$(git -C "$HOME/OEC" rev-parse HEAD)"
+          if [[ "${OEC_SYNC_MODE:-}" == "in_place" ]]; then
+            selected="$HOME/OEC"
+          else
+            selected="$HOME/OEC_feature_sync"
+          fi
+          actual="$(git -C "$selected" rev-parse HEAD)"
           printf 'A100_CHECKOUT_EXPECTED_SHA=%s\n' "$expected"
           printf 'A100_CHECKOUT_ACTUAL_SHA=%s\n' "$actual"
+          printf 'A100_CHECKOUT_PATH=%s\n' "$selected"
           test "$actual" = "$expected"
-          test -z "$(git -C "$HOME/OEC" status --porcelain --untracked-files=all)"
+          test -z "$(git -C "$selected" status --porcelain --untracked-files=all)"

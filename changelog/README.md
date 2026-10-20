@@ -102,3 +102,6 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 
 
 - Additional model audit: the repository also contains legacy `pipeline_wan_video.ipynb` (Wan 2.1), which is not currently accepted: it has no Gradio UI, an unbound `SYSTEM_DIRS` reference, and selects GPU based on free memory alone. A dedicated environment/worker audit remains open; shared `phase1` was not modified.
+
+
+- [2026-10-20 — clean A100 test worktree fallback](CHANGELOG-2026-10-20.md): updated the existing safe sync workflow to use a fresh-StorageManager-gated isolated `$HOME/OEC_feature_sync` worktree when the primary 662-entry detached checkout cannot be fast-forwarded. Pending workflow result.

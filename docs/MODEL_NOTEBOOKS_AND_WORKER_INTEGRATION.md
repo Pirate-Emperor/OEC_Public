@@ -107,3 +107,10 @@ Read-only preflight in run 39379628387/job 118485509739 confirmed: origin matche
 ## Additional repository model: Wan 2.1 (not yet accepted)
 
 The existing `pipeline_wan_video.ipynb` declares the `phase1` Python 3.9.25 kernel and embeds a Wan2.1-T2V-14B class in a notebook cell; it is not a separate worker or Gradio application. It references `SYSTEM_DIRS` without binding that name (it imports `core_config` only), selects GPU by free memory alone, and includes historical saved outputs. Therefore it is **not** counted as working or integrated. Do not install additional packages into shared `phase1` to make it run. First verify the cached Wan model, PyTorch/diffusers versions, and an isolated environment; then implement a dedicated, process-aware, StorageManager-gated worker plus a Gradio client and static/runtime checks.
+
+
+## Clean local A100 test checkout
+
+The existing `$HOME/OEC` checkout has 662 dirty/untracked entries and is detached. The sync workflow never resets or overwrites it. If the in-place fast-forward guard blocks, `tools/create_clean_a100_test_worktree.sh` checks StorageManager admission first and creates or updates only the dedicated, clean `$HOME/OEC_feature_sync` worktree. It refuses a pre-existing unregistered/dirty target, uses `--detach` and verifies actual SHA equals origin. Look for `OEC_CLEAN_WORKTREE_SYNC=PASS` and `A100_CHECKOUT_ACTUAL_SHA=<expected>` in [the sync workflow](../.github/workflows/oec-a100-local-sync.yml). If StorageManager denies the operation or the target is dirty, it does not force a write.
+
+Once the workflow passes, use `cd "$HOME/OEC_feature_sync"` for notebook/test commands below. This is a separate checkout; the old 662-entry `$HOME/OEC` tree remains untouched.
