@@ -1,0 +1,221 @@
+name: Release OEC media model APIs to persistent A100 workers
+
+on:
+  push:
+    branches:
+      - fix/media-stack-supervision-20261019
+    paths:
+      - .github/workflows/oec-model-service-release.yml
+      - tools/model_service_release.trigger
+
+permissions:
+  contents: read
+
+# Shares the same GPU/storage mutex as model inference and cache preparation.
+concurrency:
+  group: oec-media-gpu-storage-serial
+  cancel-in-progress: false
+
+jobs:
+  release-model-apis:
+    if: contains(github.event.head_commit.added, 'tools/model_service_release.trigger') || contains(github.event.head_commit.modified, 'tools/model_service_release.trigger')
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    timeout-minutes: 24
+    env:
+      # Existing OEC-Play contexts are permitted only by the existing trusted-owner,
+      # <2 GiB per-card shared-context admission guard. Unknown GPU owners still block.
+      OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout exact release trigger commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Safely fast-forward the existing clean A100 feature worktree
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-2" || { echo "::error::Expected oec-2; no service was started."; exit 2; }
+          test -x "$HOME/Conda/condabin/conda"
+          SYNC="$HOME/OEC_feature_sync"
+          [[ -d "$SYNC" && -e "$SYNC/.git" ]] || { echo "::error::Expected existing OEC_feature_sync worktree missing."; exit 3; }
+          # The checked-in guard accepts only the exact canonical OEC origin and a clean,
+          # expected branch. It never overwrites the original dirty/detached $HOME/OEC tree.
+          OEC_LOCAL_REPO="$SYNC" OEC_SYNC_BRANCH=fix/media-stack-supervision-20261019 \
+            bash "$GITHUB_WORKSPACE/tools/sync_feature_branch_a100.sh"
+          test "$(git -C "$SYNC" rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C "$SYNC" branch --show-current)" = "fix/media-stack-supervision-20261019"
+          test -z "$(git -C "$SYNC" status --porcelain --untracked-files=all)"
+          echo "MODEL_RELEASE_SOURCE_SHA=$(git -C "$SYNC" rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "MODEL_RELEASE_SOURCE_DIR=$SYNC" >> "$GITHUB_ENV"
+          echo "A100_NODE=$RUNNER_NAME"
+
+      - name: Fresh storage, cached-weight, and runtime admission
+        run: |
+          set -euo pipefail
+          R="$RUNNER_TEMP/oec-model-service-release-$GITHUB_RUN_ID"
+          mkdir -p "$R"
+          echo "MODEL_RELEASE_REPORT_DIR=$R" >> "$GITHUB_ENV"
+          SYNC="$MODEL_RELEASE_SOURCE_DIR"
+          C="$HOME/Conda/condabin/conda"
+          PY="$HOME/Conda/envs/oec_deploy/bin/python"
+          [[ -x "$PY" ]] || { echo "::error::Existing oec_deploy Python is missing."; exit 4; }
+          "$PY" -m py_compile \
+            "$SYNC/tools/oec_service_manager.py" \
+            "$SYNC/tools/media_services/common.py" \
+            "$SYNC/tools/media_services/audio_api.py" \
+            "$SYNC/tools/media_services/ltx_api.py" \
+            "$SYNC/tools/media_services/trellis_api.py" \
+            "$SYNC/tools/check_media_service_readiness.py"
+          "$C" run --no-capture-output -n oec_deploy python "$SYNC/storage_manager.py" --status \
+            2>&1 | tee "$R/storage-before.log"
+          # Require fresh authoritative quota and sufficient output capacity. No downloads,
+          # installs, reserve changes, model-cache purges, or output writes are allowed here.
+          cd "$SYNC"
+          "$PY" -c 'from storage_manager import storage_preflight; checks=(("models",0.1,0.5),("outputs",0.2,0.5)); failures=[]; [print("MODEL_RELEASE_STORAGE area=%s ok=%s reason=%s"%(a,*storage_preflight(a,required_gb=r,require_fresh_quota=True,minimum_free_gb=m))) for a,r,m in checks]; [failures.append(a) for a,r,m in checks if not storage_preflight(a,required_gb=r,require_fresh_quota=True,minimum_free_gb=m)[0]]; print("MODEL_RELEASE_STORAGE_DENIED="+",".join(failures) if failures else "MODEL_RELEASE_STORAGE_PASS"); raise SystemExit(5 if failures else 0)'
+          "$PY" "$SYNC/tools/prepare_media_models.py" status 2>&1 | tee "$R/model-cache-before.log"
+          "$PY" "$SYNC/tools/check_media_service_readiness.py" --json > "$R/readiness-before.json"
+          "$PY" - "$R/readiness-before.json" <<'PY'
+          import json, sys
+          required = ("kokoro", "whisper", "qwen3-asr", "ace-step", "ltx", "trellis")
+          report = json.load(open(sys.argv[1], encoding="utf-8"))
+          rows = {row["provider"]: row for row in report["services"]}
+          problems = []
+          for name in required:
+              row = rows.get(name)
+              if row is None:
+                  problems.append(f"{name}: no provider record")
+                  continue
+              cache_state = row.get("cache", {}).get("checkpoint_presence")
+              runtime = row.get("runtime_preflight")
+              print(f"MODEL_RELEASE_PREFLIGHT provider={name} runtime={runtime} cache={cache_state} api={row.get('api_status')}")
+              if runtime != "PASS":
+                  problems.append(f"{name}: runtime preflight {runtime}")
+              if cache_state not in {"PRESENT", "COMPLETE"}:
+                  problems.append(f"{name}: cached weights are {cache_state}")
+          if problems:
+              raise SystemExit("Release blocked before starting services: " + "; ".join(problems))
+          print("MODEL_RELEASE_PREFLIGHT=PASS; all six models are already cached; no model download requested.")
+          PY
+          nvidia-smi --query-gpu=index,name,memory.used,memory.free,utilization.gpu --format=csv \
+            | tee "$R/gpu-before.csv"
+
+      - name: Start or reuse persistent model APIs and require readiness
+        run: |
+          set -euo pipefail
+          SYNC="$MODEL_RELEASE_SOURCE_DIR"
+          R="$MODEL_RELEASE_REPORT_DIR"
+          C="$HOME/Conda/condabin/conda"
+          MANAGER="$SYNC/tools/oec_service_manager.py"
+          cd "$SYNC"
+          # Map each large model to its own physical A100; API servers bind only to 127.0.0.1.
+          # AudioGen/MusicGen and FLUX are intentionally excluded: no supervised job API exists.
+          SERVICES=(
+            "audio-api-kokoro|audio-api|kokoro|1"
+            "audio-api-whisper|audio-api|whisper|2"
+            "audio-api-qwen3-asr|audio-api|qwen3-asr|3"
+            "audio-api-ace-step|audio-api|ace-step|4"
+            "trellis-sidecar|trellis-sidecar||5"
+            "ltx-sidecar|ltx-sidecar||6"
+          )
+          STARTED=()
+          KEEP_SERVICES=0
+          cleanup_started_services() {
+            rc=$?
+            if [[ "$KEEP_SERVICES" != "1" ]]; then
+              echo "MODEL_RELEASE_ROLLBACK=stopping only services created in this release attempt"
+              for ((i=${#STARTED[@]}-1; i>=0; i--)); do
+                echo "ROLLBACK_SERVICE=${STARTED[$i]}"
+                "$C" run --no-capture-output -n oec_deploy python "$MANAGER" \
+                  --conda-root "$HOME/Conda" stop "${STARTED[$i]}" --grace-seconds 20 || true
+              done
+            fi
+            return "$rc"
+          }
+          trap cleanup_started_services EXIT
+          status_service() {
+            timeout 15s "$C" run --no-capture-output -n oec_deploy python "$MANAGER" \
+              --conda-root "$HOME/Conda" status "$1"
+          }
+          for spec in "${SERVICES[@]}"; do
+            IFS='|' read -r id kind provider gpu <<< "$spec"
+            current="$(status_service "$id" 2>&1 || true)"
+            printf '%s\n' "$current" > "$R/status-before-$id.txt"
+            if grep -q '"readiness": "READY"' <<< "$current" && grep -q '"status": "RUNNING"' <<< "$current"; then
+              echo "MODEL_API_REUSED_READY service=$id gpu=$gpu"
+              continue
+            fi
+            if grep -q '"status": "RUNNING"' <<< "$current"; then
+              echo "MODEL_API_EXISTING_UNREADY service=$id; not duplicating or terminating it"
+              continue
+            fi
+            if grep -q 'NO_MANAGED_INSTANCE\|"status": "EXITED/NOT RUNNING"' <<< "$current"; then
+              if [[ "$kind" == "audio-api" ]]; then
+                timeout 60s "$C" run --no-capture-output -n oec_deploy python "$MANAGER" \
+                  --conda-root "$HOME/Conda" start audio-api --provider "$provider" --gpu "$gpu" \
+                  2>&1 | tee "$R/start-$id.log"
+              else
+                timeout 60s "$C" run --no-capture-output -n oec_deploy python "$MANAGER" \
+                  --conda-root "$HOME/Conda" start "$kind" --gpu "$gpu" \
+                  2>&1 | tee "$R/start-$id.log"
+              fi
+              STARTED+=("$id")
+              echo "MODEL_API_START_ACCEPTED service=$id gpu=$gpu"
+              continue
+            fi
+            echo "::error::Unrecognized service-manager state for $id; no unmanaged process will be touched."
+            echo "$current" >&2
+            exit 6
+          done
+
+          # Poll all providers on the same runner; fail within 15 minutes so the 24-minute
+          # job has time to record evidence and roll back only newly started service groups.
+          deadline=$((SECONDS + 900))
+          while (( SECONDS < deadline )); do
+            all_ready=1
+            for spec in "${SERVICES[@]}"; do
+              IFS='|' read -r id kind provider gpu <<< "$spec"
+              current="$(status_service "$id" 2>&1 || true)"
+              printf '%s\n' "$current" > "$R/status-current-$id.txt"
+              if ! grep -q '"readiness": "READY"' <<< "$current" || ! grep -q '"status": "RUNNING"' <<< "$current"; then
+                all_ready=0
+                echo "MODEL_API_WAIT service=$id gpu=$gpu"
+              else
+                echo "MODEL_API_READY service=$id gpu=$gpu"
+              fi
+            done
+            if [[ "$all_ready" == "1" ]]; then
+              break
+            fi
+            sleep 10
+          done
+          if [[ "$all_ready" != "1" ]]; then
+            echo "::error::Not all six APIs reached HTTP 200, ready=true, model_loaded=true within 15 minutes."
+            exit 7
+          fi
+
+          for provider in kokoro whisper qwen3-asr ace-step ltx trellis; do
+            "$C" run --no-capture-output -n oec_deploy python "$SYNC/tools/check_media_service_readiness.py" \
+              --provider "$provider" --strict --json > "$R/readiness-after-$provider.json"
+            echo "MODEL_RELEASE_STRICT_READINESS_PASS provider=$provider"
+          done
+          for id in audio-api-kokoro audio-api-whisper audio-api-qwen3-asr audio-api-ace-step trellis-sidecar ltx-sidecar; do
+            status_service "$id" > "$R/final-status-$id.txt"
+          done
+          nvidia-smi --query-gpu=index,name,memory.used,memory.free,utilization.gpu --format=csv \
+            > "$R/gpu-after.csv"
+          echo "MODEL_API_RELEASE_STATUS=PASS"
+          echo "MODEL_API_ENDPOINTS=kokoro:7871,whisper:7872,qwen3-asr:7873,ace-step:7870,ltx:17869,trellis:17868"
+          echo "MODEL_API_NETWORK=loopback-only; use SSH forwarding; do not expose these ports publicly"
+          KEEP_SERVICES=1
+
+      - name: Upload model API release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-model-api-release-${{ github.run_id }}
+          path: ${{ runner.temp }}/oec-model-service-release-${{ github.run_id }}/
+          if-no-files-found: warn
+          retention-days: 14
