@@ -12,3 +12,4 @@ Release policy: no checkpoint downloads or package installs; require a clean fas
 FLUX, AudioGen and MusicGen remain CLI/Gradio-only and are not represented as supervised HTTP APIs.
 
 Retry trigger after narrowing the workflow push filter: 2026-10-20T17:07:14.051Z
+Retry with approved detached-worktree updater; no model starts were attempted in previous sync-gate failures.
