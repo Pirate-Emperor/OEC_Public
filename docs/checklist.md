@@ -153,3 +153,12 @@ Review/backup those 662 entries first. Do not reset, clean or overwrite them. Af
 
 
 - [x] Corrected the new static assertion to match loop-based `NO_PROXY`/`no_proxy` setup rather than requiring direct assignments. The failure in [run 39385994021](https://github.com/CalamityStriker/OEC/actions/runs/39385994021) was a test assertion mismatch, not evidence the helper failed Python syntax checks. Re-run static acceptance before calling the fix validated.
+
+## 2026-10-20 — Live acceptance findings and targeted fixes
+
+- [x] Confirmed actual AudioGen inference on `oec-2`: the existing `pipeline_audiocraft.ipynb` produced a non-silent 3-second mono 16 kHz WAV (96,078 bytes; run-specific SHA is recorded in the Actions artifact). This is a model-generation pass, not a dedicated Gradio UI pass.
+- [ ] Dedicated `pipeline_audiogen_gradio.ipynb` UI callback failed at Gradio startup. Runner logs identify a `gradio_client 1.3.0` JSON-schema bug: `get_type(False)` raises `TypeError: argument of type 'bool' is not iterable`. A process-local compatibility shim was added; it does not upgrade or mix Conda packages. Current candidate awaits rerun.
+- [ ] Speech runtime bootstrap stopped before model inference because `prepare_media_runtime.py` hard-coded a 40 GB model-reserve floor even though StorageManager reported an existing 29.83 GB `.storage_reserve.bin` reserve in the 280 GB model allocation. Corrected to use the configured minimum and preserve the reserve; the change neither shrinks nor rewrites the reserve file.
+- [ ] MusicGen generation did not start: the strict GPU selector found no eligible idle A100. The failure is retained; it will not bypass ownership checks or kill external processes. Added per-GPU admission diagnostics to identify why the next attempt is blocked.
+- [ ] FLUX/TRELLIS, LTX sidecar, the live Gradio callbacks for ACE-Step/Kokoro/Whisper/Qwen3-ASR, and the joined LTX→Qwen2-VL→chunked HF upload/read-back pipeline remain unaccepted until successful run artifacts show actual generated outputs and verified hashes.
+- [x] AudioGen live smoke now pins a verified idle physical A100 before importing Torch and records the physical index; no more implicit use of device zero in the smoke harness.

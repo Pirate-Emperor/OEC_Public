@@ -52,6 +52,15 @@ def main() -> int:
         "model_download_path": "notebook-managed StorageManager admission; no bypass in this harness",
     }
     try:
+        # The runner's idle status is not a GPU lease. Select a physical A100
+        # with no compute owner, low utilization and <=1 GiB already used, then
+        # expose only that card to the notebook before importing Torch.
+        from pipeline_flux_image import select_idle_a100_gpu
+        selected_gpu = select_idle_a100_gpu()
+        os.environ["CUDA_VISIBLE_DEVICES"] = selected_gpu["index"]
+        report["physical_gpu_selection"] = selected_gpu
+        report["physical_gpu_index"] = selected_gpu["index"]
+
         import torch
 
         report["torch"] = torch.__version__

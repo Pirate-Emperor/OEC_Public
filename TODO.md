@@ -425,3 +425,11 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - Existing AudioGen notebook live smoke on oec-2 passed, producing a non-silent 3.0s WAV of 96,078 bytes; SHA-256 `30b67f2c8f0dbfd017a319705091f607cada98f44f086bf5e545a0cff4893c92`. Artifact is linked in docs/checklist.md.
 - Dedicated AudioGen Gradio UI callback did not run because Gradio's loopback health check was intercepted by the runner's HTTP proxy. Updated the callback harness to append localhost/127.0.0.1/::1 to both NO_PROXY and no_proxy before importing Gradio and disabled Gradio analytics for the local test. Rerun must prove it works.
 - MusicGen generation failed closed at GPU selection (`no eligible idle A100; no process was killed or signalled`). We must inspect current physical GPU owners and retry only after a device is genuinely available; do not bypass the guard or terminate another process.
+
+ 
+## Current live test findings (2026-10-20)
+
+- AudioGen existing notebook generation passed on `oec-2` with a valid, non-silent 3-second WAV. The separate Gradio app/callback failed because of Gradio 4.44.1 / gradio_client 1.3.0 boolean-schema handling. An isolated runtime shim was added; next live run must prove the UI root plus callback pass.
+- Speech environment prep was blocked by an obsolete hard-coded 40 GB reserve floor. Current StorageManager status reported 29.83 GB existing reserve in the 280 GB model allocation; the environment prep does not need a larger reserve. Its gate now uses the configured model minimum and never resizes the reserve.
+- MusicGen did not load/generate: its GPU admission refused because no physical A100 met the idle/process/memory/utilization policy. A diagnostic audit was added; do not weaken the guard or stop other owners.
+- No all-model pass and no joined QA/upload pass yet. Verify the output for each provider and the Hugging Face remote manifest/part hashes before checking off the corresponding items.

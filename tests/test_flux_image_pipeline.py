@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import subprocess
+import contextlib
+import io
 from pathlib import Path
 from unittest import mock
 
@@ -21,6 +24,29 @@ class FluxImagePipelineTests(unittest.TestCase):
         self.assertEqual(a.mode, "generate")
         self.assertTrue(a.offline and a.scratch_output)
         self.assertEqual((a.gpu, a.seed), (0, 42))
+
+    def test_gpu_selector_chooses_an_unowned_idle_a100(self):
+        inventory = "0, GPU-0, NVIDIA A100-SXM4-40GB, 12000, 40\\n1, GPU-1, NVIDIA A100-SXM4-40GB, 300, 2\\n"
+        apps = "GPU-0, 1234\\n"
+        with mock.patch.object(flux.subprocess, "run", side_effect=[
+            subprocess.CompletedProcess([], 0, inventory, ""),
+            subprocess.CompletedProcess([], 0, apps, ""),
+        ]):
+            selected = flux.select_idle_a100_gpu()
+        self.assertEqual(selected["index"], "1")
+
+    def test_gpu_selector_logs_reasons_when_all_a100s_are_busy(self):
+        inventory = "0, GPU-0, NVIDIA A100-SXM4-40GB, 12000, 40\\n"
+        apps = "GPU-0, 1234\\n"
+        output = io.StringIO()
+        with mock.patch.object(flux.subprocess, "run", side_effect=[
+            subprocess.CompletedProcess([], 0, inventory, ""),
+            subprocess.CompletedProcess([], 0, apps, ""),
+        ]), contextlib.redirect_stdout(output):
+            with self.assertRaisesRegex(RuntimeError, "no eligible idle A100"):
+                flux.select_idle_a100_gpu()
+        self.assertIn("FLUX_GPU_ADMISSION_BLOCKED=", output.getvalue())
+        self.assertIn("compute process owns GPU", output.getvalue())
 
     def test_invalid_generation_options_fail_closed(self):
         flux._validate("amber sphere", 512, 512, 4, 1.0)

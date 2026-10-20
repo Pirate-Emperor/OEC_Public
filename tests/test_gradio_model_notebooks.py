@@ -47,6 +47,10 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn('loopback_hosts = ("localhost", "127.0.0.1", "::1")', source)
         self.assertIn('os.environ[key] = ",".join(dict.fromkeys([*existing, *loopback_hosts]))', source)
         self.assertIn('os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"', source)
+        self.assertIn("def patch_gradio_client_boolean_schema()", source)
+        self.assertIn("if isinstance(schema, bool):", source)
+        self.assertIn('return "boolean"', source)
+        self.assertIn("urllib.request.ProxyHandler({})", source)
 
     def test_service_ui_does_not_import_provider_ml_packages(self):
         for name in ("pipeline_acestep_gradio.ipynb","pipeline_kokoro_gradio.ipynb",

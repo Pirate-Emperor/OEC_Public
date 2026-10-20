@@ -124,3 +124,5 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 
 
 - [2026-10-20 — live AudioGen result and Gradio proxy fix](CHANGELOG-2026-10-20.md): existing notebook generated a validated 3s WAV; dedicated Gradio launch then exposed loopback/proxy settings and is being fixed. MusicGen was blocked by the idle-GPU gate.
+
+- [2026-10-20 — live acceptance gaps and fixes](CHANGELOG-2026-10-20.md): existing AudioGen notebook inference passed but its dedicated Gradio UI hit a Gradio schema bug; speech venv preparation was blocked by a hard-coded reserve floor; MusicGen was blocked by GPU admission. Targeted fixes are committed pending a rerun.

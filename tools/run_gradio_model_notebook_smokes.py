@@ -45,12 +45,37 @@ def free_port() -> int:
         return int(sock.getsockname()[1])
 
 
+def patch_gradio_client_boolean_schema() -> bool:
+    """Work around gradio_client 1.3.0 crashing on legal boolean JSON-schema nodes.
+
+    Gradio 4.44.x calls get_type(False) for schemas such as
+    additionalProperties=false while rendering /; older gradio_client versions
+    test string membership on a bool and raise TypeError. This process-local
+    compatibility shim leaves all Conda packages untouched.
+    """
+    try:
+        from gradio_client import utils as client_utils
+    except Exception:
+        return False
+    original = client_utils.get_type
+
+    def safe_get_type(schema):
+        if isinstance(schema, bool):
+            return "boolean"
+        return original(schema)
+
+    client_utils.get_type = safe_get_type
+    return True
+
+
 def wait_for_ui(url: str, timeout: float = 20.0) -> tuple[int, str]:
     deadline = time.monotonic() + timeout
     last_error = "not attempted"
     while time.monotonic() < deadline:
         try:
-            with urllib.request.urlopen(url, timeout=2) as response:
+            # Do not route loopback health checks through the runner's outbound proxy.
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            with opener.open(url, timeout=2) as response:
                 body = response.read(2048).decode("utf-8", errors="replace")
                 if response.status != 200 or "<html" not in body.lower():
                     raise RuntimeError(f"Gradio root returned HTTP {response.status} without HTML")
@@ -145,6 +170,9 @@ def main() -> int:
         result["gradio_version"] = importlib.metadata.version("gradio")
         result["callback_name"] = callback_name
 
+        # Patch this known Gradio/gradio_client JSON-schema compatibility issue in
+        # the smoke process only; do not install/upgrade packages in model envs.
+        result["gradio_client_boolean_schema_shim"] = patch_gradio_client_boolean_schema()
         # The real notebook Interface must bind locally and serve HTML. No share URL is allowed.
         port = free_port()
         ui_url = f"http://127.0.0.1:{port}/"

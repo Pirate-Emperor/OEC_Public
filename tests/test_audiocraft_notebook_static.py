@@ -70,6 +70,14 @@ class AudioCraftNotebookTests(unittest.TestCase):
         self.assertIn("outputs=[output_audio, output_file]", model_cell)
 
 
+    def test_live_harness_pins_an_idle_a100_before_torch_import(self):
+        source = (ROOT / "tools" / "run_audiogen_notebook_smoke.py").read_text(encoding="utf-8")
+        self.assertIn("select_idle_a100_gpu()", source)
+        self.assertIn('os.environ["CUDA_VISIBLE_DEVICES"] = selected_gpu["index"]', source)
+        self.assertLess(source.index('os.environ["CUDA_VISIBLE_DEVICES"] = selected_gpu["index"]'),
+                        source.index("import torch", source.index("selected_gpu = select_idle_a100_gpu()")))
+        self.assertIn('"physical_gpu_index": selected_gpu["index"]', source)
+
     def test_headless_smoke_is_explicit_and_default_output_stays_managed(self):
         setup = self.sources[1]
         model_cell = self.sources[4]

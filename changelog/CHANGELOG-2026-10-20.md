@@ -78,3 +78,19 @@
 - The existing AudioGen Jupyter smoke genuinely passed on oec-2 and produced a non-silent 3s WAV (96,078 bytes; SHA-256 `30b67f2c8f0dbfd017a319705091f607cada98f44f086bf5e545a0cff4893c92`), artifact 12247855010 in run 39384873799.
 - The new dedicated AudioGen Gradio smoke failed before invoking the callback: Gradio said localhost was not accessible because the runner HTTP proxy intercepted it. The new harness appends localhost/127.0.0.1/::1 to both `NO_PROXY` and `no_proxy` and disables Gradio analytics for the loopback test. A rerun must confirm the fix.
 - MusicGen generation stopped before inference because the idle-GPU selector returned `no eligible idle A100`; no GPU process was killed or signalled. Retest only when an A100 is truly free.
+
+## 2026-10-20 — Live acceptance findings and targeted fixes
+
+- [x] Confirmed actual AudioGen inference on `oec-2`: the existing `pipeline_audiocraft.ipynb` produced a non-silent 3-second mono 16 kHz WAV (96,078 bytes; run-specific SHA is recorded in the Actions artifact). This is a model-generation pass, not a dedicated Gradio UI pass.
+- [ ] Dedicated `pipeline_audiogen_gradio.ipynb` UI callback failed at Gradio startup. Runner logs identify a `gradio_client 1.3.0` JSON-schema bug: `get_type(False)` raises `TypeError: argument of type 'bool' is not iterable`. A process-local compatibility shim was added; it does not upgrade or mix Conda packages. Current candidate awaits rerun.
+- [ ] Speech runtime bootstrap stopped before model inference because `prepare_media_runtime.py` hard-coded a 40 GB model-reserve floor even though StorageManager reported an existing 29.83 GB `.storage_reserve.bin` reserve in the 280 GB model allocation. Corrected to use the configured minimum and preserve the reserve; the change neither shrinks nor rewrites the reserve file.
+- [ ] MusicGen generation did not start: the strict GPU selector found no eligible idle A100. The failure is retained; it will not bypass ownership checks or kill external processes. Added per-GPU admission diagnostics to identify why the next attempt is blocked.
+- [ ] FLUX/TRELLIS, LTX sidecar, the live Gradio callbacks for ACE-Step/Kokoro/Whisper/Qwen3-ASR, and the joined LTX→Qwen2-VL→chunked HF upload/read-back pipeline remain unaccepted until successful run artifacts show actual generated outputs and verified hashes.
+- [x] AudioGen live smoke now pins a verified idle physical A100 before importing Torch and records the physical index; no more implicit use of device zero in the smoke harness.
+
+ 
+### Runtime-only test fixes in current candidate
+
+- The Gradio callback harness now has a process-local compatibility shim for the boolean JSON-schema bug and sends localhost probes directly rather than through the runner proxy.
+- The isolated speech venv preparation gate now respects the configured minimum reserve rather than a hard-coded 40 GB floor. It still performs no reserve mutation.
+- AudioGen live smoke chooses and pins a truly idle A100 before importing Torch. The common idle-GPU selector logs per-GPU failure reasons if it blocks.

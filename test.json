@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-20T12:05:00+05:30",
+  "last_updated": "2026-10-20T13:05:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Current branch code SHA 132a8a5820a104ec27c14a87c9af3d4f84e83b98 passed static/storage workflow 39380928743/job 118489623553 (notebook tests 3/3 plus existing notebook JSON checks). Sync run 39380928762/job 118489623737 passed: $HOME/OEC_feature_sync actual/target SHA = 132a8a5820a104ec27c14a87c9af3d4f84e83b98 after StorageManager admission. Primary $HOME/OEC remains detached at 081aaf34f6379873bdc925d1dcf6b9c3d50349d3 with 662 dirty/untracked entries preserved. Live E2E remains blocked before inference by external PID 3347078 on all eight A100s.",
+  "latest_summary": "Current live suite 39386215687 on oec-2: safe source sync passed to SHA 128fdf6be1647e99d0b56ff28447d951126a2ba3. Existing AudioGen notebook inference passed with a non-silent 3s mono 16kHz WAV; dedicated Gradio UI failed because gradio_client 1.3.0 crashes on boolean JSON-schema in /; speech runtime prep failed on a hard-coded 40GB reserve floor despite StorageManager reporting 29.83GB existing reserve in a 280GB models target; MusicGen failed closed because no eligible idle A100. The visual-sidecar job was still in progress at the last query. Current candidate adds a process-local Gradio schema shim, configured-minimum reserve check, AudioGen GPU pinning, and detailed GPU-admission diagnostics. Full per-model and QA/HF chunk/readback acceptance remain pending.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -4919,6 +4919,111 @@
       "interpretation": "Dedicated clean sibling worktree matches the current branch head; primary detached/dirty checkout was preserved.",
       "limitations": [
         "Source synchronization is not live model inference."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-20-AUDIOGEN-LIVE-GENERATION-OEC2-39386215687",
+      "date": "2026-10-20",
+      "category": "Live AudioGen notebook inference",
+      "approach": "Execute pipeline_audiocraft.ipynb in the existing phase1 runtime on the oec-2 A100 runner; verify generated WAV bytes, sample rate, channels, duration and signal amplitude.",
+      "parameters": {
+        "workflow_run_id": 39386215687,
+        "job_id": 118508003618,
+        "runner": "oec-2",
+        "environment": "phase1",
+        "model": "facebook/audiogen-medium",
+        "duration_seconds": 3,
+        "sample_rate_hz": 16000,
+        "channels": 1,
+        "artifact_bytes": 96078,
+        "artifact_sha256": "51649eb62dc5dd58f84c1c7f17bf77e2cd2f2896c85d86c354d28239bdc4b3ca",
+        "peak_allocated_gib": 5.155,
+        "peak_reserved_gib": 5.387
+      },
+      "results": {
+        "status": "PASS_MODEL_GENERATION",
+        "wav_valid": true,
+        "non_silent": true,
+        "shared_outputs_written": false
+      },
+      "interpretation": "The existing AudioGen notebook generated a valid audio artifact. The separate dedicated Gradio notebook test failed at UI startup and is not included as a pass.",
+      "limitations": [
+        "This does not validate the dedicated pipeline_audiogen_gradio.ipynb UI/callback.",
+        "No Brain/QA/HF upload step in this run."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-20-GRADIO-SCHEMA-FAIL-39386215687",
+      "date": "2026-10-20",
+      "category": "Dedicated AudioGen Gradio UI",
+      "approach": "Execute the dedicated notebook code and launch the real Gradio app on loopback with share disabled.",
+      "parameters": {
+        "workflow_run_id": 39386215687,
+        "job_id": 118508003618,
+        "runner": "oec-2",
+        "environment": "phase1",
+        "notebook": "pipeline_audiogen_gradio.ipynb",
+        "gradio_version": "4.44.1",
+        "gradio_client_version": "1.3.0",
+        "failure": "gradio_client.utils.get_type received a boolean JSON-schema node"
+      },
+      "results": {
+        "status": "FAIL_UI_STARTUP",
+        "callback_invoked": false,
+        "model_generation_by_this_ui": false
+      },
+      "interpretation": "The UI failed while producing the API schema. This is a Gradio/gradio_client compatibility bug, not evidence that AudioGen inference is broken. A process-local shim is added for retest.",
+      "limitations": [
+        "The new shim is not yet live-verified."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-20-MUSICGEN-GPU-PREFLIGHT-BLOCKED-39386215687",
+      "date": "2026-10-20",
+      "category": "MusicGen live generation",
+      "approach": "Run one bounded MusicGen generation in phase1 with a cache-first model path and strict idle-A100 selection.",
+      "parameters": {
+        "workflow_run_id": 39386215687,
+        "job_id": 118509213731,
+        "runner": "oec-2",
+        "environment": "phase1",
+        "duration_seconds": 3,
+        "seed": 42
+      },
+      "results": {
+        "status": "BLOCKED_GPU_ADMISSION",
+        "generation_started": false,
+        "reason": "no eligible idle A100; no process was killed or signalled"
+      },
+      "interpretation": "The runner was available but no A100 passed the model's process/memory/utilization admission policy. Runner idle is not equivalent to GPU idle.",
+      "limitations": [
+        "No WAV was generated by this run.",
+        "Per-device GPU admission diagnostics were added; no override of ownership policy."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-20-AUDIO-RUNTIME-RESERVE-GATE-FAIL-39386215687",
+      "date": "2026-10-20",
+      "category": "Speech environment bootstrap",
+      "approach": "Verify cache completeness and prepare isolated audio dependency venv using the current StorageManager status.",
+      "parameters": {
+        "workflow_run_id": 39386215687,
+        "job_id": 118507423840,
+        "runner": "oec-2",
+        "models_target_gb": 280,
+        "models_content_gb": 250.3,
+        "existing_reserve_gb": 29.83,
+        "configured_minimum_reserve_gb": 1
+      },
+      "results": {
+        "status": "FAIL_OBSOLETE_HARD_CODED_RESERVE_FLOOR",
+        "weights_downloaded": false,
+        "reserve_mutated": false
+      },
+      "interpretation": "The environment prep did not need to grow the reserve. Its hard-coded 40 GB check was incompatible with the existing allocated reserve, so it has been replaced with a configured-minimum check that preserves the existing file.",
+      "limitations": [
+        "Speech services/Gradio callbacks have not yet run.",
+        "Next workflow must confirm runtime bootstrap succeeds on this exact reserve."
       ]
     }
   ]

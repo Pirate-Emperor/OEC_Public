@@ -68,8 +68,25 @@ def _prepare_output_reserve() -> dict[str, Any]:
     reserve_floor = max(minimum_reserve, float(output_policy.get("reserve_target_gb", minimum_reserve)))
     rows = _read_status()
     models, outputs = rows["models"], rows["outputs"]
-    if models["state"] not in {"NORMAL", "WARNING"} or float(models["reserve_gb"]) < 39.5:
-        raise RuntimeError(f"model-target gate failed; expected the existing 40 GB reserve floor: {models}")
+    models_policy = next((d for d in config.get("directories", []) if d.get("name") == "models"), None)
+    if not isinstance(models_policy, dict):
+        raise RuntimeError("models reserve policy is missing from the active storage_config.json")
+    model_minimum_reserve = max(
+        0.0,
+        float(models_policy.get("minimum_reserve_gb", config.get("minimum_reserve_gb", 0.25))),
+    )
+    # Use the actual StorageManager-reported .storage_reserve.bin allocation.
+    # The preparation of the isolated Python environment does not consume the
+    # models payload budget, so a hard-coded 40 GB floor incorrectly blocks
+    # this step when the configured target is 280 GB and the existing reserve
+    # has already been allocated (for example, 29.83 GB). Never resize it here.
+    if models["state"] not in {"NORMAL", "WARNING"}:
+        raise RuntimeError(f"model-target gate failed; StorageManager state is {models['state']}: {models}")
+    if float(models["reserve_gb"]) + 0.02 < model_minimum_reserve:
+        raise RuntimeError(
+            f"existing models reserve {float(models['reserve_gb']):.3f} GB is below the configured "
+            f"minimum {model_minimum_reserve:.3f} GB; refusing environment preparation: {models}"
+        )
     if outputs["state"] not in {"NORMAL", "WARNING"}:
         raise RuntimeError(f"outputs state is {outputs['state']}; refusing to start model inference")
 
@@ -93,6 +110,7 @@ def _prepare_output_reserve() -> dict[str, Any]:
 
     return {
         "models": models,
+        "models_reserve_minimum_gb": model_minimum_reserve,
         "outputs": outputs,
         "output_reserve_floor_gb": reserve_floor,
         "projected_output_usage_with_artifacts_gb": projected,
