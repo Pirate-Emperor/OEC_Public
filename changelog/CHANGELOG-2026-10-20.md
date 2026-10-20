@@ -1,5 +1,18 @@
 # Changelog — 20 October 2026
 
+## Persistent model API release attempt — 2026-10-20 22:45 IST
+
+**Clean-stop status: no persistent API model release completed.** The run-scoped generated-asset pipeline did publish and remotely verify one private artifact; all persistent API release attempts ended before any new service start. Do not describe provider weights as publicly released.
+
+- **Artifact published:** private Hugging Face dataset `strikerhell/Vault`, asset ID `1`, 228,845 bytes, SHA-256 `3d66b13693184eb7f76841f96836ded2f3407dc1e11b810f2e91c1db8b465392`. Manifest and three chunks were uploaded and read back; the final joined LTX → Qwen2-VL QA → HF chunk upload/read-back step passed in [live suite #39452849617](https://github.com/CalamityStriker/OEC/actions/runs/39452849617).
+- **Inference verified on that suite:** Kokoro, Whisper, Qwen3-ASR, ACE-Step, AudioGen, LTX and TRELLIS passed their live acceptance paths; FLUX → TRELLIS passed and reopened its GLB. MusicGen was cancelled before inference on the exact latest SHA, so the overall suite conclusion is failure even though the other jobs passed.
+- **Persistent API release attempts:** [#39463291348](https://github.com/CalamityStriker/OEC/actions/runs/39463291348) and [#39463516709](https://github.com/CalamityStriker/OEC/actions/runs/39463516709) failed at safe-worktree sync checks; [#39463702968](https://github.com/CalamityStriker/OEC/actions/runs/39463702968) was denied by model/output target capacity; [#39463952004](https://github.com/CalamityStriker/OEC/actions/runs/39463952004) correctly blocked on LTX runtime preflight; [#39464232552](https://github.com/CalamityStriker/OEC/actions/runs/39464232552) passed source sync, fresh output admission and four-provider runtime/cache preflight, then failed before any service start.
+- **Root cause in the latest release attempt:** the workflow called `oec_service_manager.py status audio-api-kokoro`, but the CLI only accepts service groups such as `audio-api`, `ltx-sidecar`, and `trellis-sidecar`; instance ID `audio-api-kokoro` is rejected by argparse. The rollback ran with an empty `STARTED` list; no model API was started by the failed attempt. Earlier attempts also show LTX's deployment readiness probe is incomplete despite a separate successful LTX inference test.
+- **Current capacity:** fresh StorageManager preflight passed for the tiny output footprint with soft-quota grace active and about 20.18 GiB of hard headroom. Model directory usage is over its configured target, so this attempt is cache-only; no model writes/downloads are authorized. The release workflow’s separate model-cache/runtime preflight is required before start.
+- **Next step:** fix the release workflow to inspect service groups and match individual providers/ports from returned JSON (or add/test exact-instance lookup in the CLI); resolve LTX’s runtime preflight mismatch; then rerun with the existing short timeout and only the cached, passing providers. Require every selected provider to return HTTP 200, `ready=true`, and `model_loaded=true`. Keep endpoints loopback-only and do not install/download weights or expose these ports publicly.
+
+No new persistent model API was accepted; no service was launched by the last attempt, no checkpoint was downloaded, and no public model-weight release was created.
+
 ## Model-specific Gradio clients and worker integration contract
 
 - Added six dedicated model notebooks: AudioGen and MusicGen in phase1; ACE-Step, Kokoro, Whisper Turbo and Qwen3-ASR Gradio clients using the phase2_3d kernel only for UI and existing isolated backend runtimes for inference.
