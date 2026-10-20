@@ -52,11 +52,12 @@ Before a real upload, verify the target dataset repository and licence/consent c
 Run these on the **approved cluster host/allocation that owns the OEC paths**, not in a new GitHub Actions shell:
 
 \`\`\`bash
-cd "$HOME/OEC"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+cd "$OEC_ROOT"
 source "$HOME/Conda/bin/activate"
 
 # Read-only storage/quota status; do not run --once for a status-only check.
-conda run --no-capture-output -n oec_deploy python "$HOME/OEC/storage_manager.py" --status
+conda run --no-capture-output -n oec_deploy python "$OEC_ROOT/storage_manager.py" --status
 nvidia-smi
 
 # Inventory existing processes and listener ports. This is read-only.
@@ -74,15 +75,17 @@ These are the OEC scripts used by the current design. Start each in the environm
 **Storage manager** — the no-argument invocation runs the continuous monitor. \`--status\` is read-only.
 
 \`\`\`bash
-cd "$HOME/OEC"
-conda run --no-capture-output -n oec_deploy python "$HOME/OEC/storage_manager.py"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+cd "$OEC_ROOT"
+conda run --no-capture-output -n oec_deploy python "$OEC_ROOT/storage_manager.py"
 \`\`\`
 
 **Brain prompt/queue orchestrator** — confirm that the configured DeepSeek-R1 model is complete in the model cache before launch. Missing weights require the script's fresh-quota StorageManager admission.
 
 \`\`\`bash
-cd "$HOME/OEC"
-conda run --no-capture-output -n "$OEC_BRAIN_ENV" python "$HOME/OEC/brain.py"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+cd "$OEC_ROOT"
+conda run --no-capture-output -n "$OEC_BRAIN_ENV" python "$OEC_ROOT/brain.py"
 \`\`\`
 
 Before using this command, set \`OEC_BRAIN_ENV\` to the **existing environment that passes** \`python -c "import torch, transformers; from huggingface_hub import snapshot_download"\` and has access to the configured OEC model cache. The live acceptance workflows did not confirm which persistent environment should own Brain, so this value must not be guessed.
@@ -90,9 +93,10 @@ Before using this command, set \`OEC_BRAIN_ENV\` to the **existing environment t
 **LTX multi-GPU queue worker** — the established worker arguments from the OEC/Deploy integration contract are shown below; execute them only in the assigned LTX allocation with the existing node-to-GPU mapping. \`--no-purge\` deliberately retains the model cache.
 
 \`\`\`bash
-cd "$HOME/OEC"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+cd "$OEC_ROOT"
 conda run --no-capture-output -n phase1_ltx \\
-  python "$HOME/OEC/worker_ltx_video.py" \\
+  python "$OEC_ROOT/worker_ltx_video.py" \\
   --gpus 1,2,3 --cluster-gpus 11 --no-purge
 \`\`\`
 
@@ -103,10 +107,11 @@ The above is the documented worker invocation; it is **not** proof that all 11 c
 Read-only preflight:
 
 ```bash
-cd "$HOME/OEC"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+cd "$OEC_ROOT"
 nvidia-smi
 conda run --no-capture-output -n "$OEC_QA_ENV" python -c 'import torch, transformers, qwen_vl_utils; print("torch", torch.__version__, "cuda", torch.cuda.is_available()); print("transformers", transformers.__version__)'
-conda run --no-capture-output -n "$OEC_QA_ENV" python "$HOME/OEC/storage_manager.py" --status
+conda run --no-capture-output -n "$OEC_QA_ENV" python "$OEC_ROOT/storage_manager.py" --status
 ```
 
 For an approved, run-scoped media item already present as one exact database row in `PENDING_QA`, use targeted mode:
@@ -116,7 +121,7 @@ test -n "${OEC_QA_ENV:-}" || { echo "Set OEC_QA_ENV to the verified existing QA 
 test "${OEC_QA_ASSET_ID:-}" -ge 1 2>/dev/null || { echo "Set OEC_QA_ASSET_ID to a verified PENDING_QA row"; exit 2; }
 test -n "${OEC_QA_GPU:-}" || { echo "Set OEC_QA_GPU to an actually allocated physical GPU"; exit 2; }
 conda run --no-capture-output -n "$OEC_QA_ENV" \
-  python "$HOME/OEC/qa_compliance_worker.py" --once --asset-id "$OEC_QA_ASSET_ID" \
+  python "$OEC_ROOT/qa_compliance_worker.py" --once --asset-id "$OEC_QA_ASSET_ID" \
   --no-purge --gpu "$OEC_QA_GPU"
 ```
 
@@ -129,7 +134,8 @@ Set `OEC_QA_ENV` only after the import preflight. `--no-purge` retains the model
 Verify the remote dataset destination and existing authentication without printing any token:
 
 ```bash
-cd "$HOME/OEC"
+OEC_ROOT="${OEC_ROOT:-$HOME/OEC_feature_sync}"
+cd "$OEC_ROOT"
 test -n "${AIEROS_HF_DATASET_REPO:-}" || { echo "Set AIEROS_HF_DATASET_REPO to the approved existing dataset repo"; exit 2; }
 conda run --no-capture-output -n oec_deploy python - <<'PY'
 import os
@@ -143,11 +149,11 @@ PY
 
 # Replace N with the one verified QA-passed PENDING row for the run-scoped test asset.
 conda run --no-capture-output -n oec_deploy \
-  python "$HOME/OEC/hf_upload_daemon.py" --once --asset-id N
+  python "$OEC_ROOT/hf_upload_daemon.py" --once --asset-id N
 
 # Only for a single asset+metadata pair exceeding the normal archive batch limit:
 conda run --no-capture-output -n oec_deploy \
-  python "$HOME/OEC/hf_upload_daemon.py" --once --asset-id N --chunk-oversize
+  python "$OEC_ROOT/hf_upload_daemon.py" --once --asset-id N --chunk-oversize
 ```
 
 After the command succeeds, confirm the printed asset ID matches the selected test row, obtain the archive name from logs/remote listing, verify the archive appears under `data/` using `HfApi().list_repo_files(repo_id=..., repo_type="dataset")`, and compare its contents/hash to a pre-upload local copy. CLI success means the Hub upload call returned successfully; read-after-write and remote-content hashing are separate acceptance checks and were **not** performed this session.
@@ -174,7 +180,7 @@ conda run --no-capture-output -n phase1_ltx \\
 **Speech/audio services** use the isolated runtime already tested on A100 at \`$HOME/.local/venvs/oec-audio-py311\`. For each model use a separate terminal/process:
 
 \`\`\`bash
-export PYTHONPATH="$HOME/OEC:$OEC_ROOT/tools/media_services\${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$OEC_ROOT:$OEC_ROOT/tools/media_services\${PYTHONPATH:+:$PYTHONPATH}"
 "$HOME/.local/venvs/oec-audio-py311/bin/python" "$OEC_ROOT/tools/media_services/audio_api.py" --model kokoro --host 127.0.0.1 --port 7871
 "$HOME/.local/venvs/oec-audio-py311/bin/python" "$OEC_ROOT/tools/media_services/audio_api.py" --model whisper --host 127.0.0.1 --port 7872
 "$HOME/.local/venvs/oec-audio-py311/bin/python" "$OEC_ROOT/tools/media_services/audio_api.py" --model qwen3-asr --host 127.0.0.1 --port 7873
