@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-20T19:17:00+05:30",
+  "last_updated": "2026-10-20T21:25:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Latest live run 39422087711 on source SHA cee722188fb4bd2b999b2b4fdfabc504bafc0087 passed Kokoro, Whisper, Qwen3-ASR, LTX-2.3, TRELLIS.2, AudioGen, MusicGen, FLUX.2 Klein-to-TRELLIS, and the joined LTX→QA→HF upload→remote hash read-back job. Combined workflow failed solely at ACE-Step install because fresh StorageManager admission found 10,888,517,632 bytes cache headroom vs 12,884,901,888 required; no writes were attempted. A new guarded ensure command reuses ACE only after exact pinned source/checkpoint/venv checks plus runtime CUDA/A100/import verification, otherwise invokes the same guarded installer. Post-smoke endpoints are UNREACHABLE because test services stop at job exit; persistent deployment readiness and safe sync to dirty ~/OEC remain open.",
+  "latest_summary": "Latest completed live acceptance is run 39435100568 on parent SHA 0c53f6a46328bc4ba6ce4d0942556e3077ea6d74, passing all eight jobs and the controlled LTX→Qwen2-VL QA→three-part HF chunk upload→remote hash reassembly. Static/storage run 39452849501 passed on current code SHA 72b71f861bba72b78da1cec330e4273b00baaabb. Current code adds validated Whisper per-segment timestamp metadata and unit tests. Live suite 39452849617 on the current SHA is in progress after a clean A100 isolated source sync passed; exact-head live inference is not yet confirmed. Persistent services remain unproven; FLUX, AudioGen, MusicGen not exposed via shared /v1/jobs.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -5407,6 +5407,206 @@
         "Start only required providers in the persistent OEC checkout after safe non-destructive sync, then verify live READY endpoints",
         "Keep AudioGen/MusicGen/standalone FLUX NOT_EXPOSED until supervised HTTP job APIs exist",
         "Do not merge to main until behind/ahead divergence (branch is diverged from main) is reconciled"
+      ]
+    },
+    {
+      "id": "TEST-2026-10-20-WHISPER-SEGMENT-TIMESTAMP-FIX",
+      "date": "2026-10-20",
+      "category": "Whisper API metadata regression and current-head A100 retest",
+      "source_sha": "72b71f861bba72b78da1cec330e4273b00baaabb",
+      "branch": "fix/media-stack-supervision-20261019",
+      "status": "CODE_PUSHED_STATIC_PASS_LIVE_IN_PROGRESS",
+      "changes": [
+        "Whisper job metadata adds validated segment_timestamps [{start,end,text}]",
+        "Existing transcript text artifact and segments count preserved",
+        "Added CPU mock tests for valid and missing timestamp data"
+      ],
+      "static_run_id": 39452849501,
+      "static_job_id": 118731941145,
+      "live_run_id": 39452849617,
+      "live_sync_job_id": 118731944200,
+      "live_speech_job_id": 118732881094,
+      "current_live_job_status": "in_progress",
+      "live_sync_status": "PASS",
+      "limitations": [
+        "Do not claim live Whisper timestamp result until the live run completes.",
+        "Persistent production service readiness not tested by temporary Action-scoped APIs."
+      ]
+    },
+    {
+      "id": "LIVE-2026-10-20-PARENT-SHA-MEDIA-E2E-ACCEPTANCE",
+      "date": "2026-10-20",
+      "category": "A100 multi-provider and QA/upload remote read-back",
+      "source_sha": "0c53f6a46328bc4ba6ce4d0942556e3077ea6d74",
+      "run_id": 39435100568,
+      "static_run_id": 39435100576,
+      "status": "PASS",
+      "workflow_jobs": [
+        {
+          "id": 118671362410,
+          "name": "Sync current source safely to oec-2",
+          "status": "success"
+        },
+        {
+          "id": 118671671625,
+          "name": "Authorized legacy storage-lock recovery (oec-1 only)",
+          "status": "success"
+        },
+        {
+          "id": 118671948949,
+          "name": "Kokoro/Whisper/Qwen3-ASR/ACE-Step actual inference + Gradio",
+          "status": "success"
+        },
+        {
+          "id": 118676749810,
+          "name": "AudioGen actual inference + Gradio",
+          "status": "success"
+        },
+        {
+          "id": 118678954975,
+          "name": "MusicGen actual inference + Gradio",
+          "status": "success"
+        },
+        {
+          "id": 118680265182,
+          "name": "LTX/TRELLIS sidecar inference",
+          "status": "success"
+        },
+        {
+          "id": 118687113833,
+          "name": "FLUX PNG→TRELLIS GLB",
+          "status": "success"
+        },
+        {
+          "id": 118691033786,
+          "name": "LTX→Qwen2-VL QA→HF chunk upload→remote read-back/reassembly",
+          "status": "success"
+        }
+      ],
+      "runner": "oec-2",
+      "hostname": "scn30-mn",
+      "end_to_end": {
+        "asset_bytes": 228845,
+        "asset_sha256": "3d66b13693184eb7f76841f96836ded2f3407dc1e11b810f2e91c1db8b465392",
+        "metadata_bytes": 818,
+        "metadata_sha256": "67c48f7483c3eccf836e9daef75e271c4c400026852f0e3da0ad4012d8b822de",
+        "parts": 3,
+        "protocol": "oec-asset-chunks-v1",
+        "qa_passed": true,
+        "remote_reassembly": "PASS",
+        "dataset_reused": "strikerhell/Vault",
+        "dataset_created": false
+      },
+      "providers": [
+        {
+          "name": "ACE-Step 1.5",
+          "status": "PASS",
+          "env": "~/.local/venvs/oec-acestep-py311",
+          "artifact": "FLAC",
+          "bytes": 1666899,
+          "sha256": "aa76c331a108970ea8d9f7f87165ac4f2867330d69da63326a3e161f3e7ddd5d",
+          "gpu": 4,
+          "generation_seconds": 32.513
+        },
+        {
+          "name": "Kokoro-82M",
+          "status": "PASS",
+          "env": "~/.local/venvs/oec-audio-py311",
+          "artifact": "WAV",
+          "bytes": 319244,
+          "sha256": "285d3904c3dc3d1362291e14195ac235122d7406899ac078b9db25be0c957be1",
+          "sample_rate": 24000,
+          "gpu": 4
+        },
+        {
+          "name": "Whisper Turbo",
+          "status": "PASS_PARENT_SHA",
+          "env": "~/.local/venvs/oec-audio-py311",
+          "artifact": "TXT",
+          "bytes": 82,
+          "sha256": "cef5bc6899fa64ba3a7f485f3e718f90227abe269cebc2862ce978390d0bc764",
+          "segments": 2,
+          "gpu": 2
+        },
+        {
+          "name": "Qwen3-ASR-0.6B",
+          "status": "PASS",
+          "env": "~/.local/venvs/oec-audio-py311",
+          "artifact": "TXT",
+          "bytes": 85,
+          "sha256": "9869b37e985b9d9678a508b7ee3b771d015e8b8473b6eddcf64997fa36f2dfe6",
+          "gpu": 4
+        },
+        {
+          "name": "AudioGen medium",
+          "status": "PASS_NOT_EXPOSED",
+          "env": "phase1",
+          "artifact": "WAV",
+          "bytes": 96044,
+          "sha256": "02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58",
+          "license": "CC-BY-NC-4.0"
+        },
+        {
+          "name": "MusicGen medium",
+          "status": "PASS_NOT_EXPOSED",
+          "env": "phase1",
+          "artifact": "WAV",
+          "bytes": 192044,
+          "sha256": "0b6ada01eed76ac2a8a325c2c4f688cdc51072d31773f62b793ffd7ddf75ab9d",
+          "model_revision": "d3bd7b00761b78ad7a8a05145ee31e7832e9916c",
+          "license": "CC-BY-NC-4.0"
+        },
+        {
+          "name": "LTX-2.3",
+          "status": "PASS_TEMPORARY_API",
+          "env": "phase1_ltx",
+          "artifact": "MP4",
+          "bytes": 242547,
+          "sha256": "5d7d54de4354936f66867fecd19d20c0ab6972b5d997ca00c145ab0c1e54ec51",
+          "port": 17869
+        },
+        {
+          "name": "TRELLIS.2",
+          "status": "PASS_TEMPORARY_API",
+          "env": "phase2_3d",
+          "artifact": "GLB",
+          "bytes": 2777432,
+          "sha256": "889d54ac9f7677615450b69190603c4f1a801b0dfc1a27aa5de2efc79a007f87",
+          "port": 17868,
+          "semantic_quality": "not measured"
+        },
+        {
+          "name": "FLUX.2 Klein→TRELLIS.2",
+          "status": "PASS_CLI_PIPELINE_NOT_EXPOSED",
+          "env": "phase2_3d",
+          "png_bytes": 211978,
+          "glb_bytes": 192384,
+          "glb_sha256": "26b5412d3a747ce539ff5b347ded708b64207bede57d7b048e82ee9dafd582ba",
+          "vertices": 2840,
+          "faces": 4696
+        }
+      ],
+      "deployment": {
+        "verified_isolated_path": "$HOME/OEC_feature_sync",
+        "verified_sha": "0c53f6a46328bc4ba6ce4d0942556e3077ea6d74",
+        "dirty_persistent_checkout": "$HOME/OEC",
+        "persistent_checkout": "preserved_not_synced",
+        "persistent_services": "not verified"
+      },
+      "quota_snapshot": {
+        "used_tb": 2.09,
+        "soft_tb": 2,
+        "hard_tb": 2.1,
+        "hard_headroom_gb": 6.7,
+        "grace_active": true,
+        "write_authorization": "sample only; refresh before any later write"
+      },
+      "limitations": [
+        "Action-scoped services stop at job exit.",
+        "No sustained Brain queue/production daemon load acceptance.",
+        "No TRELLIS semantic/watertightness quality result.",
+        "No standalone FLUX/AudioGen/MusicGen /v1/jobs API.",
+        "Original 15-day deadline not recovered; repository target 2026-10-21."
       ]
     }
   ]

@@ -1,6 +1,33 @@
 
 # OEC Active TODO
 
+## Current live-acceptance status — 2026-10-20
+
+**Code branch/head:** `fix/media-stack-supervision-20261019` at `72b71f861bba72b78da1cec330e4273b00baaabb` (Whisper timestamp metadata fix). The parent SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74` is the latest completed live-inference checkpoint. It passed [A100 live suite 39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568) (8/8 jobs) and [static/storage suite 39435100576](https://github.com/CalamityStriker/OEC/actions/runs/39435100576), job `118669928981` (144 tests, 18 unittest commands, four notebook JSON checks).
+
+**Exact-head validation:** static/storage run [39452849501](https://github.com/CalamityStriker/OEC/actions/runs/39452849501) passed on SHA `72b71f861bba72b78da1cec330e4273b00baaabb`. The new live run [39452849617](https://github.com/CalamityStriker/OEC/actions/runs/39452849617) is still in progress at speech-runtime preparation; its first source-sync job passed and verified isolated A100 worktree `$HOME/OEC_feature_sync` equals the new SHA with a clean working tree. Do not label exact-head live inference passed until run 39452849617 reaches a terminal conclusion.
+
+### Parent-SHA real inference and E2E evidence
+
+| Provider/path | Measured output and status | Limit |
+|---|---|---|
+| ACE-Step 1.5 | Real API/Gradio callback; FLAC 1,666,899 B, SHA-256 `aa76c331a108970ea8d9f7f87165ac4f2867330d69da63326a3e161f3e7ddd5d`; generation 32.513 s, isolated env `oec-acestep-py311`, GPU 4 | Temporary service, not persistent after Actions job. |
+| Kokoro-82M | WAV 319,244 B, SHA-256 `285d3904c3dc3d1362291e14195ac235122d7406899ac078b9db25be0c957be1`, 24 kHz; actual API/Gradio callback; `oec-audio-py311`, GPU 4 | Temporary service. |
+| Whisper Turbo | TXT 82 B, SHA-256 `cef5bc6899fa64ba3a7f485f3e718f90227abe269cebc2862ce978390d0bc764`; real transcript, 2 segments; `oec-audio-py311`, GPU 2 | New commit exposes validated `segment_timestamps` in job metadata while preserving text artifact/count; exact-head live check remains in progress. |
+| Qwen3-ASR-0.6B | Separate implementation; TXT 85 B, SHA-256 `9869b37e985b9d9678a508b7ee3b771d015e8b8473b6eddcf64997fa36f2dfe6`, 84 transcript chars; `oec-audio-py311`, GPU 4 | No per-segment timing claimed for Qwen. |
+| AudioGen medium | Real 3 s, 16 kHz WAV 96,044 B, SHA-256 `02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58`; Conda `phase1`, Torch 2.1.0+cu118 / AudioCraft 1.3.0 | CLI + Gradio pass; CC-BY-NC-4.0; no shared HTTP job API. |
+| MusicGen medium | Real 3 s, 32 kHz WAV 192,044 B, SHA-256 `0b6ada01eed76ac2a8a325c2c4f688cdc51072d31773f62b793ffd7ddf75ab9d`; Conda `phase1`, snapshot `d3bd7b00761b78ad7a8a05145ee31e7832e9916c` | CLI + Gradio pass; CC-BY-NC-4.0; no shared HTTP job API. |
+| LTX-2.3 | H.264 MP4 242,547 B, SHA-256 `5d7d54de4354936f66867fecd19d20c0ab6972b5d997ca00c145ab0c1e54ec51`; Conda `phase1_ltx`, temporary port 17869; ffprobe passed | Model revision absent in acceptance metadata. |
+| TRELLIS.2 | GLB 2,777,432 B, SHA-256 `889d54ac9f7677615450b69190603c4f1a801b0dfc1a27aa5de2efc79a007f87`; Conda `phase2_3d`, temp port 17868; 1 mesh/primitive, 48,867 positions, 287,076 indices | Structure valid; semantic geometry quality/watertightness not evaluated. |
+| FLUX.2 Klein → TRELLIS.2 | 512×512 PNG 211,978 B, SHA-256 `3571b033e4092ce42a51b132e1509930f79001132a58a5b3b5e73047efecacde`; resulting GLB 192,384 B, SHA-256 `26b5412d3a747ce539ff5b347ded708b64207bede57d7b048e82ee9dafd582ba`; trimesh reopen passed (2,840 vertices/4,696 faces) | Combined inference passed in 336.746 s; no standalone FLUX HTTP API. |
+| LTX → Qwen2-VL QA → HF chunks/read-back | QA passed; 228,845 B MP4 reassembled from 3 remote parts with SHA-256 `3d66b13693184eb7f76841f96836ded2f3407dc1e11b810f2e91c1db8b465392`; metadata 818 B SHA-256 `67c48f7483c3eccf836e9daef75e271c4c400026852f0e3da0ad4012d8b822de`; protocol `oec-asset-chunks-v1` | Job `118691033786` passed remote hash read-back; existing dataset reused; controlled single asset only. |
+
+**Deployment blockers remain:** all acceptance HTTP services shut down at job exit, so persistent readiness is unproven. FLUX, AudioGen and MusicGen remain `NOT_EXPOSED` through shared `/v1/jobs`. Safe sync verified only clean isolated `$HOME/OEC_feature_sync`; existing dirty/detached `$HOME/OEC` was intentionally not overwritten. Latest StorageManager live sample during the new run reports 2.09 TB / 2.00 TB soft / 2.10 TB hard, hard headroom 6.70 GB, grace active; this snapshot is not permanent permission for further writes. Repo target is 2026-10-21; original 15-day start/deadline remains unknown.
+
+
+## Prior chronological tasks and historical failures (retained)
+
+
 
 ## 2026-10-20 — New Gradio clients and live E2E retry
 

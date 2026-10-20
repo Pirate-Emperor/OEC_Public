@@ -1,9 +1,9 @@
 # OEC Work Changelog
 
-- [2026-10-20 — model-specific Gradio clients and guarded E2E retry](CHANGELOG-2026-10-20.md)
+- [2026-10-20 — live A100 media acceptance and Whisper timestamp follow-up](CHANGELOG-2026-10-20.md)
   - Added dedicated AudioGen, MusicGen, ACE-Step, Kokoro, Whisper and Qwen3-ASR notebooks with explicit UI/backend environments; the API-facing notebooks use isolated service workers rather than combining provider dependencies. Added a static notebook policy test and OEC-Deploy worker contract runbook.
-  - E2E run [39320471955](https://github.com/CalamityStriker/OEC/actions/runs/39320471955), attempt 2, failed closed before inference because external PID 3347078 was still attached to all eight A100s. Artifact [12244625569](https://github.com/CalamityStriker/OEC/actions/runs/39320471955/artifacts/12244625569) records the block. No GPU process was stopped and no real QA/upload/read-after-write is claimed.
-  - The first notebook static check [run 39378972546](https://github.com/CalamityStriker/OEC/actions/runs/39378972546) failed on a minimum-cell assertion: AudioGen/MusicGen lacked separate environment markdown cells; their code cells were not syntax-checked by that attempt. Corrected notebooks are committed, and a fresh static result is pending. Live Gradio, ACE-Step, MusicGen, current-head FLUX→TRELLIS and full Brain/LTX→QA→HF remain open.
+  - Later source SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74` passed all 8 live jobs in [run 39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568); the bounded LTX→Qwen2-VL QA→HF chunk upload→remote hash read-back also passed. Exact-head static run 39452849501 passed for `72b71f861bba72b78da1cec330e4273b00baaabb`; exact-head live run 39452849617 is still running.
+  - The older blocked attempts above are retained as history. The current source follow-up captures Whisper segment timestamps in job metadata; the actual A100 test against this change is pending run 39452849617.
 
 
 - [2026-10-19 — model inference handoff and Actions quota update](CHANGELOG-2026-10-19.md)
