@@ -390,3 +390,10 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - Current static/storage acceptance run 39380653548/job 118488776376 passed on source SHA `32e1a5f9203ed94214f4151c51e2504fe6589002`; 14 command groups/102 logged tests succeeded, including notebook tests 3/3.
 - Sync run 39380653563/job 118488776455 successfully created `$HOME/OEC_feature_sync` after the current StorageManager preflight passed. Output `OEC_CLEAN_WORKTREE_SYNC=PASS`, actual SHA equals target SHA `32e1a5f9203ed94214f4151c51e2504fe6589002`. Source path is the clean sibling worktree. Existing `$HOME/OEC` stayed at detached HEAD `081aaf34f6379873bdc925d1dcf6b9c3d50349d3` with 662 dirty/untracked entries; no files were overwritten.
 - The sync workflow is now configured to re-run for checklist/result/runbook/tracker changes as well as notebook/script changes, so the sibling test worktree can be advanced to the final documentation commit only while clean and after another StorageManager preflight.
+
+
+## Latest sync and regression result — 2026-10-20
+
+- Current branch SHA `132a8a5820a104ec27c14a87c9af3d4f84e83b98` passed static acceptance in run 39380928743/job 118489623553; new notebook tests 3/3 passed.
+- Sync run 39380928762/job 118489623737 passed after StorageManager admission and updated the isolated `$HOME/OEC_feature_sync` worktree to the current SHA. The primary `$HOME/OEC` checkout remains preserved at its detached HEAD with its 662 dirty/untracked entries.
+- Do not run model GPU tests until a fresh `nvidia-smi`/process-owner check and StorageManager check show the requested device/output admission is safe. Last E2E attempt found external PID 3347078 attached to all eight A100s; release must come from its owner.

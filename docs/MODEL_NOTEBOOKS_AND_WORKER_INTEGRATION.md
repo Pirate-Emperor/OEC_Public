@@ -118,4 +118,4 @@ Once the workflow passes, use `cd "$HOME/OEC_feature_sync"` for notebook/test co
 
 ## Sync result for this session
 
-Run [39380653563](https://github.com/CalamityStriker/OEC/actions/runs/39380653563), job 118488776455, passed by creating `$HOME/OEC_feature_sync` after fresh StorageManager admission. Exact target and actual source SHA: `32e1a5f9203ed94214f4151c51e2504fe6589002`. The existing `$HOME/OEC` detached/dirty checkout was preserved. The static workflow [39380653548](https://github.com/CalamityStriker/OEC/actions/runs/39380653548) passed on the same code source; this is not a live inference pass.
+Latest run [39380928762](https://github.com/CalamityStriker/OEC/actions/runs/39380928762), job 118489623737, passed by advancing `$HOME/OEC_feature_sync` after fresh StorageManager admission. Exact target and actual source SHA: `132a8a5820a104ec27c14a87c9af3d4f84e83b98`. The existing `$HOME/OEC` detached/dirty checkout was preserved. The static workflow [39380928743](https://github.com/CalamityStriker/OEC/actions/runs/39380928743) passed on that source candidate; this is not a live inference pass.

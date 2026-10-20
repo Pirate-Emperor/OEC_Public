@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-20T12:00:00+05:30",
+  "last_updated": "2026-10-20T12:05:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Latest static/storage acceptance PASS on source SHA 32e1a5f9203ed94214f4151c51e2504fe6589002, run 39380653548/job 118488776376: 14 unittest command groups, 102 test cases in logged summaries; new notebook test suite 3/3; existing notebook JSON checks passed. A100 sync run 39380653563/job 118488776455 passed: StorageManager preflight approved a clean sibling worktree $HOME/OEC_feature_sync; actual SHA matches target SHA 32e1a5f9203ed94214f4151c51e2504fe6589002. Original $HOME/OEC preserved detached at 081aaf34f6379873bdc925d1dcf6b9c3d50349d3 with 662 dirty/untracked entries. Live E2E still blocked before inference by external PID 3347078 occupying all eight A100s.",
+  "latest_summary": "Current branch code SHA 132a8a5820a104ec27c14a87c9af3d4f84e83b98 passed static/storage workflow 39380928743/job 118489623553 (notebook tests 3/3 plus existing notebook JSON checks). Sync run 39380928762/job 118489623737 passed: $HOME/OEC_feature_sync actual/target SHA = 132a8a5820a104ec27c14a87c9af3d4f84e83b98 after StorageManager admission. Primary $HOME/OEC remains detached at 081aaf34f6379873bdc925d1dcf6b9c3d50349d3 with 662 dirty/untracked entries preserved. Live E2E remains blocked before inference by external PID 3347078 on all eight A100s.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -4857,6 +4857,68 @@
       "limitations": [
         "No A100 model inference in this job.",
         "Live end-to-end pipeline remains blocked by GPU ownership."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-20-STATIC-CURRENT-HEAD-39380928743",
+      "date": "2026-10-20",
+      "category": "Static regression on current feature-branch head",
+      "approach": "Run OEC storage-admission and CLI/notebook contract tests on the candidate containing the model-specific Gradio notebooks and safe clean-worktree sync.",
+      "reason": "Ensure the final branch source remains valid without starting model inference on GPUs whose ownership is blocked.",
+      "parameters": {
+        "workflow_run_id": 39380928743,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39380928743",
+        "job_id": 118489623553,
+        "source_sha": "132a8a5820a104ec27c14a87c9af3d4f84e83b98",
+        "branch": "fix/media-stack-supervision-20261019",
+        "runner": "GitHub-hosted Ubuntu/Python 3.11",
+        "notebook_tests": 3
+      },
+      "environment": {
+        "purpose": "Static-only; no model weights"
+      },
+      "results": {
+        "status": "PASS",
+        "workflow_conclusion": "success",
+        "notebook_tests_passed": 3,
+        "existing_notebook_json": "PASS"
+      },
+      "interpretation": "Static source contracts pass on this candidate. Live Gradio interaction and model generation were not exercised.",
+      "limitations": [
+        "No live model inference or E2E QA/HF upload performed."
+      ]
+    },
+    {
+      "id": "EXP-2026-10-20-A100-WORKTREE-SYNC-CURRENT-HEAD-39380928762",
+      "date": "2026-10-20",
+      "category": "A100 source synchronization",
+      "approach": "Attempt guarded in-place fast-forward; when the primary checkout is detached/dirty, create or update a dedicated clean sibling worktree after StorageManager admission.",
+      "reason": "Expose current branch source locally while preserving existing local untracked/dirty data.",
+      "parameters": {
+        "workflow_run_id": 39380928762,
+        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39380928762",
+        "job_id": 118489623737,
+        "runner": "oec-1",
+        "branch": "fix/media-stack-supervision-20261019",
+        "target_path": "$HOME/OEC_feature_sync",
+        "actual_sha": "132a8a5820a104ec27c14a87c9af3d4f84e83b98",
+        "target_sha": "132a8a5820a104ec27c14a87c9af3d4f84e83b98",
+        "storage_manager_preflight": "PASS",
+        "primary_checkout_changed": false,
+        "primary_dirty_entries": 662
+      },
+      "environment": {
+        "operation": "Git worktree; no model execution"
+      },
+      "results": {
+        "status": "PASS",
+        "sha_match": true,
+        "clean_target": true,
+        "primary_preserved": true
+      },
+      "interpretation": "Dedicated clean sibling worktree matches the current branch head; primary detached/dirty checkout was preserved.",
+      "limitations": [
+        "Source synchronization is not live model inference."
       ]
     }
   ]

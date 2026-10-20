@@ -44,3 +44,10 @@
 - Static storage/regression workflow [39380653548](https://github.com/CalamityStriker/OEC/actions/runs/39380653548) passed at source `32e1a5f9203ed94214f4151c51e2504fe6589002`: 14 command groups/102 logged tests, new Gradio notebook tests 3/3.
 - A100 sync workflow [39380653563](https://github.com/CalamityStriker/OEC/actions/runs/39380653563) passed by creating `$HOME/OEC_feature_sync` after fresh StorageManager admission; actual SHA matched target SHA `32e1a5f9203ed94214f4151c51e2504fe6589002`. The older detached/dirty `$HOME/OEC` with 662 entries was preserved unchanged.
 - The live inference gate remains blocked by external process PID 3347078 using CUDA contexts across all eight A100s. No inference/QA/upload occurred.
+
+
+## Latest current-head verification — 2026-10-20
+
+- Static acceptance [39380928743](https://github.com/CalamityStriker/OEC/actions/runs/39380928743) passed on branch source `132a8a5820a104ec27c14a87c9af3d4f84e83b98`; notebook tests 3/3 and existing notebook JSON checks passed.
+- A100 sync [39380928762](https://github.com/CalamityStriker/OEC/actions/runs/39380928762) passed; `$HOME/OEC_feature_sync` was advanced after StorageManager preflight and the actual SHA matched the target at `132a8a5820a104ec27c14a87c9af3d4f84e83b98`. The 662-entry original checkout remained untouched.
+- This is source/static acceptance only. The live media E2E remains blocked by external process PID 3347078; no inference/QA/upload occurred.

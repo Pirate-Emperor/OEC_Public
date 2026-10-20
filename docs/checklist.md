@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-10-20 — model-specific Gradio rollout added; live acceptance status below  
 **Branch:** `fix/media-stack-supervision-20261019` (not merged to main)  
-**Latest tested code SHA:** `32e1a5f9203ed94214f4151c51e2504fe6589002` passed the complete static/storage workflow in [run 39380653548](https://github.com/CalamityStriker/OEC/actions/runs/39380653548), job `118488776376`; the new Gradio notebook suite passed 3/3. Current branch head may advance with the tracker update; branch `fix/media-stack-supervision-20261019`; not merged to main.  
+**Latest tested code SHA:** `132a8a5820a104ec27c14a87c9af3d4f84e83b98` passed the complete static/storage workflow in [run 39380928743](https://github.com/CalamityStriker/OEC/actions/runs/39380928743), job `118489623553`; the new Gradio notebook suite passed 3/3. Current branch head may advance with the tracker update; branch `fix/media-stack-supervision-20261019`; not merged to main.  
 **Target:** user requests completion by 2026-10-21. The original 15-day start/deadline has not been recovered; do not reset or guess it.
 
 Permanent instructions are in [Prompt.md](Prompt.md); current media pipeline detail is in [MODEL_PIPELINE_CONTINUATION_PROMPT.md](MODEL_PIPELINE_CONTINUATION_PROMPT.md); daily chronological record is in [the 2026-10-19 changelog](../changelog/CHANGELOG-2026-10-19.md); consolidated engineering backlog is [TODO.md](../TODO.md).
@@ -107,7 +107,7 @@ Review/backup those 662 entries first. Do not reset, clean or overwrite them. Af
 10. [ ] **Wan 2.1 (additional model found):** `pipeline_wan_video.ipynb` is an old `phase1`/Python 3.9 notebook with stored July outputs, no Gradio UI cell, GPU selection based only on free memory, and code that refers to `SYSTEM_DIRS` without importing/binding it. Treat it as unverified; refactor only after the available Wan dependencies/cache/environment are identified and a separate worker with GPU-ownership + StorageManager gates can be tested. Do not install Wan dependencies into `phase1` as a shortcut.
 
 
-- [ ] The sync workflow now has a safe fallback to a new dedicated `$HOME/OEC_feature_sync` git worktree after StorageManager space/quota admission. It has **not yet passed**; confirm `OEC_CLEAN_WORKTREE_SYNC=PASS` and matching A100 SHA before claiming local sync.
+- [x] Latest sync on current branch head passed in [run 39380928762](https://github.com/CalamityStriker/OEC/actions/runs/39380928762), job `118489623737`: the dedicated `$HOME/OEC_feature_sync` worktree was cleanly advanced after StorageManager admission; actual SHA equals target SHA `132a8a5820a104ec27c14a87c9af3d4f84e83b98`. The original `$HOME/OEC` detached/662-entry working tree was preserved.
 
 
 ## Latest checkpoint — 2026-10-20, sync + static acceptance
@@ -115,3 +115,10 @@ Review/backup those 662 entries first. Do not reset, clean or overwrite them. Af
 - [x] Static/storage workflow passed at candidate source SHA `32e1a5f9203ed94214f4151c51e2504fe6589002`: [run 39380653548](https://github.com/CalamityStriker/OEC/actions/runs/39380653548), job 118488776376. 14 unittest command groups succeeded (102 cases in emitted summaries); Gradio notebook suite 3/3; existing TRELLIS/FLUX/AudioCraft notebook JSON checks passed.
 - [x] Safe A100 sync workflow passed via the sibling worktree, not by changing the user-owned primary tree: [run 39380653563](https://github.com/CalamityStriker/OEC/actions/runs/39380653563), job 118488776455. Fresh StorageManager quota/capacity admission passed, actual/target SHA matched `32e1a5f9203ed94214f4151c51e2504fe6589002`, and local test checkout is `$HOME/OEC_feature_sync`.
 - [ ] Still not a live model pass: A100 E2E run 39320471955 attempt 2 was blocked at GPU preflight by external process PID 3347078 on all eight A100s. No inference, live QA, HF upload or read-after-write ran.
+
+
+## Latest verified current-branch checkpoint — 2026-10-20
+
+- [x] Static workflow passed on branch head `132a8a5820a104ec27c14a87c9af3d4f84e83b98`: [39380928743](https://github.com/CalamityStriker/OEC/actions/runs/39380928743), job 118489623553. All test groups passed, including notebook JSON/Python syntax, environment-contract, and frontend backend-stack-isolation tests.
+- [x] Local A100 feature-source sync passed to the same head: [39380928762](https://github.com/CalamityStriker/OEC/actions/runs/39380928762), job 118489623737. Actual/target SHA = `132a8a5820a104ec27c14a87c9af3d4f84e83b98`; worktree `$HOME/OEC_feature_sync`.
+- [ ] Live model pipeline remains unaccepted as a whole: the last guarded E2E run blocked before inference due the external CUDA owner. Do not infer a live pass from static tests or the source sync.
