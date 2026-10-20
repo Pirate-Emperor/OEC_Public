@@ -126,6 +126,14 @@ def main() -> int:
         "status": "FAIL",
     }
     os.environ["OEC_GRADIO_HEADLESS_SMOKE"] = "1"
+    # Hosted A100 runners inherit an outbound HTTP proxy. Explicitly bypass it for
+    # loopback so Gradio's internal localhost-health check and local API clients
+    # never try to reach 127.0.0.1 through that proxy.
+    loopback_hosts = ("localhost", "127.0.0.1", "::1")
+    for key in ("NO_PROXY", "no_proxy"):
+        existing = [value.strip() for value in os.environ.get(key, "").split(",") if value.strip()]
+        os.environ[key] = ",".join(dict.fromkeys([*existing, *loopback_hosts]))
+    os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
     demo = None
     try:
         if not notebook_path.is_file():

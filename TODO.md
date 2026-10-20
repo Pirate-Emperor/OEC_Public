@@ -418,3 +418,10 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - Current oec-2 model prep stopped with `legacy lock recovery is restricted to oec-1/scn30-mn; current identity=oec-2/scn30-mn`. This was a safety policy failure before checkpoint downloads, not model inference.
 - Added an ordered `recover-storage-locks` stage on oec-1; it uses only the conservative existing recovery helper, which checks lock age, owner PID, absence of a lease manifest, and invariant reserve size before calling StorageManager `--resume`.
 - Model jobs on oec-2 are now gated on the authorized recovery job succeeding and independently verify there are no remaining pause locks or lease manifests. Any unresolved lock/lease blocks inference; no reserve file is manually deleted or resized.
+
+
+## Actual live results and fixes — 2026-10-20
+
+- Existing AudioGen notebook live smoke on oec-2 passed, producing a non-silent 3.0s WAV of 96,078 bytes; SHA-256 `30b67f2c8f0dbfd017a319705091f607cada98f44f086bf5e545a0cff4893c92`. Artifact is linked in docs/checklist.md.
+- Dedicated AudioGen Gradio UI callback did not run because Gradio's loopback health check was intercepted by the runner's HTTP proxy. Updated the callback harness to append localhost/127.0.0.1/::1 to both NO_PROXY and no_proxy before importing Gradio and disabled Gradio analytics for the local test. Rerun must prove it works.
+- MusicGen generation failed closed at GPU selection (`no eligible idle A100; no process was killed or signalled`). We must inspect current physical GPU owners and retry only after a device is genuinely available; do not bypass the guard or terminate another process.

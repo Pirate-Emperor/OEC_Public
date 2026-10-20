@@ -121,3 +121,6 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 
 
 - [2026-10-20 — authorized storage recovery gate](CHANGELOG-2026-10-20.md): moved conservative legacy lock recovery to oec-1 and gated all oec-2 inference on successful recovery plus read-only no-lock/no-lease checks.
+
+
+- [2026-10-20 — live AudioGen result and Gradio proxy fix](CHANGELOG-2026-10-20.md): existing notebook generated a validated 3s WAV; dedicated Gradio launch then exposed loopback/proxy settings and is being fixed. MusicGen was blocked by the idle-GPU gate.

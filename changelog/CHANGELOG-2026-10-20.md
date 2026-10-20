@@ -71,3 +71,10 @@
 
 - Latest oec-2 live run was blocked at storage preparation by the existing helper's explicit `oec-1/scn30-mn` restriction, before downloads/inference. The helper must not be run on oec-2.
 - The ordered suite now recovers eligible legacy locks in a separate oec-1 job (dead PID, minimum lock age, no lease manifest, unchanged reserve). All oec-2 inference jobs require that recovery stage to pass and fail closed if any lock/lease remains.
+
+
+## Real AudioGen result / Gradio localhost fix / MusicGen GPU blocker
+
+- The existing AudioGen Jupyter smoke genuinely passed on oec-2 and produced a non-silent 3s WAV (96,078 bytes; SHA-256 `30b67f2c8f0dbfd017a319705091f607cada98f44f086bf5e545a0cff4893c92`), artifact 12247855010 in run 39384873799.
+- The new dedicated AudioGen Gradio smoke failed before invoking the callback: Gradio said localhost was not accessible because the runner HTTP proxy intercepted it. The new harness appends localhost/127.0.0.1/::1 to both `NO_PROXY` and `no_proxy` and disables Gradio analytics for the loopback test. A rerun must confirm the fix.
+- MusicGen generation stopped before inference because the idle-GPU selector returned `no eligible idle A100`; no GPU process was killed or signalled. Retest only when an A100 is truly free.

@@ -143,3 +143,10 @@ Review/backup those 662 entries first. Do not reset, clean or overwrite them. Af
 - [x] Ordered suite corrected: a separate non-inference `recover-storage-locks` job runs that helper only on oec-1, while all model-generation jobs remain on oec-2. Downstream GPU tests are gated on successful storage recovery.
 - [x] oec-2 now performs read-only checks for remaining `.storage_pause.lock` or `.storage_lease.json` and fails closed if either remains; it no longer tries unauthorized legacy-lock recovery.
 - [ ] Verify the new authorized recovery gate on the next ordered suite. No live speech model was tested in the failed preparation stage.
+
+
+## Live run evidence — 2026-10-20
+
+- [x] The existing `pipeline_audiocraft.ipynb` headless run on `oec-2` generated an actual non-silent 3.0-second AudioGen WAV (96,078 bytes, SHA-256 `30b67f2c8f0dbfd017a319705091f607cada98f44f086bf5e545a0cff4893c92`); see [live suite run 39384873799](https://github.com/CalamityStriker/OEC/actions/runs/39384873799), artifact [12247855010](https://github.com/CalamityStriker/OEC/actions/runs/39384873799/artifacts/12247855010).
+- [ ] The dedicated `pipeline_audiogen_gradio.ipynb` callback did not execute: Gradio failed its localhost check because inherited HTTP proxy settings intercepted loopback. Added NO_PROXY/no_proxy plus disabled Gradio analytics in the headless harness; next ordered run must confirm actual UI and callback.
+- [ ] MusicGen did not generate an asset: its fail-closed selector raised `no eligible idle A100; no process was killed or signalled` before inference. This is a live GPU-availability block, not a model-generation result.

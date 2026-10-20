@@ -43,6 +43,9 @@ class ModelNotebookTests(unittest.TestCase):
         ast.parse(runner, filename="tools/run_media_model_smokes.py")
         self.assertIn("--check-gradio-notebooks", runner)
         self.assertIn("_free_a100_gpu()", runner)
+        self.assertIn('os.environ["NO_PROXY"]', source)
+        self.assertIn('os.environ["no_proxy"]', source)
+        self.assertIn('os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"', source)
 
     def test_service_ui_does_not_import_provider_ml_packages(self):
         for name in ("pipeline_acestep_gradio.ipynb","pipeline_kokoro_gradio.ipynb",
