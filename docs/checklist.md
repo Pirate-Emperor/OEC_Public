@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-10-20 — latest live A100 acceptance state recorded below  
 **Branch:** `fix/media-stack-supervision-20261019` (not merged to main)  
-**Latest tested code SHA:** `132a8a5820a104ec27c14a87c9af3d4f84e83b98` passed the complete static/storage workflow in [run 39380928743](https://github.com/CalamityStriker/OEC/actions/runs/39380928743), job `118489623553`; the new Gradio notebook suite passed 3/3. Current branch head may advance with the tracker update; branch `fix/media-stack-supervision-20261019`; not merged to main.  
+**Latest fully live-tested parent SHA:** `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74` (8/8 jobs). **Current code SHA:** `72b71f861bba72b78da1cec330e4273b00baaabb`, static pass plus live suite in progress. Current branch HEAD is newer only because of documentation-only commits. No merge to `main`.  
 **Target:** user requests completion by 2026-10-21. The original 15-day start/deadline has not been recovered; do not reset or guess it.
 
 Permanent instructions are in [Prompt.md](Prompt.md); current media pipeline detail is in [MODEL_PIPELINE_CONTINUATION_PROMPT.md](MODEL_PIPELINE_CONTINUATION_PROMPT.md); daily chronological record is in [the 2026-10-19 changelog](../changelog/CHANGELOG-2026-10-19.md); consolidated engineering backlog is [TODO.md](../TODO.md).
@@ -11,7 +11,9 @@ Permanent instructions are in [Prompt.md](Prompt.md); current media pipeline det
 
 **Code branch/head:** `fix/media-stack-supervision-20261019` at `72b71f861bba72b78da1cec330e4273b00baaabb` (Whisper timestamp metadata fix). The parent SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74` is the latest completed live-inference checkpoint. It passed [A100 live suite 39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568) (8/8 jobs) and [static/storage suite 39435100576](https://github.com/CalamityStriker/OEC/actions/runs/39435100576), job `118669928981` (144 tests, 18 unittest commands, four notebook JSON checks).
 
-**Exact-head validation:** static/storage run [39452849501](https://github.com/CalamityStriker/OEC/actions/runs/39452849501) passed on SHA `72b71f861bba72b78da1cec330e4273b00baaabb`. The new live run [39452849617](https://github.com/CalamityStriker/OEC/actions/runs/39452849617) is still in progress at speech-runtime preparation; its first source-sync job passed and verified isolated A100 worktree `$HOME/OEC_feature_sync` equals the new SHA with a clean working tree. Do not label exact-head live inference passed until run 39452849617 reaches a terminal conclusion.
+**Exact-code SHA validation:** static/storage [run 39452849501](https://github.com/CalamityStriker/OEC/actions/runs/39452849501) passed on `72b71f861bba72b78da1cec330e4273b00baaabb`. Live A100 run [39452849617](https://github.com/CalamityStriker/OEC/actions/runs/39452849617) is **not terminal yet**: source sync (`118731944200`) and authorized lock recovery (`118732489356`) passed; speech/ACE-Step job (`118732881094`) passed and the real Whisper callback returned `segment_timestamps`:
+`[{start:0.0,end:3.0,text:"OEC notebook callback acceptance test"},{start:3.0,end:7.0,text:"The worker should return a valid speech WAV"}]`.
+Kokoro and Qwen3-ASR callbacks also passed; ACE-Step emitted a real FLAC with `ready=true`, `model_loaded=true`, `storage_ready=true` during the job. AudioGen inference+Gradio job `118738532097` also passed (3 s, mono 16 kHz, 96,078-byte notebook artifact; SHA-256 `81f71a003ac3975ca0074eb7ea402fc63c7102fd6da6500b7b3b92d398a590cf`; a separate Gradio callback artifact was 96,044 bytes and validated). MusicGen job `118741175823` is queued; do not call this full exact-head suite complete. The clean isolated A100 worktree `$HOME/OEC_feature_sync` is SHA-verified at `72b71f861bba72b78da1cec330e4273b00baaabb`. The later documentation-only feature commits do not change this tested code SHA and were not synced into that worktree.
 
 ### Parent-SHA real inference and E2E evidence
 

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-20T21:25:00+05:30",
+  "last_updated": "2026-10-20T21:35:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Latest completed live acceptance is run 39435100568 on parent SHA 0c53f6a46328bc4ba6ce4d0942556e3077ea6d74, passing all eight jobs and the controlled LTX→Qwen2-VL QA→three-part HF chunk upload→remote hash reassembly. Static/storage run 39452849501 passed on current code SHA 72b71f861bba72b78da1cec330e4273b00baaabb. Current code adds validated Whisper per-segment timestamp metadata and unit tests. Live suite 39452849617 on the current SHA is in progress after a clean A100 isolated source sync passed; exact-head live inference is not yet confirmed. Persistent services remain unproven; FLUX, AudioGen, MusicGen not exposed via shared /v1/jobs.",
+  "latest_summary": "Current live-tested code SHA 72b71f861bba72b78da1cec330e4273b00baaabb has an exact-head static pass (run 39452849501). Live A100 suite 39452849617 is not terminal: source sync and authorized lock recovery passed; the Kokoro/Whisper/Qwen3-ASR/ACE-Step job passed with Whisper's new segment_timestamps returned in its real callback and ACE-Step real FLAC; AudioGen real notebook and Gradio callback passed; MusicGen job 118741175823 remains queued. The prior parent SHA 0c53f6a... is the newest completed full live run (39435100568, 8/8 jobs, including LTX→Qwen2-VL QA→HF chunk upload/read-back). Do not mark the complete exact-head suite finished while 39452849617 remains non-terminal. Persistent service readiness remains unproven, and FLUX/AudioGen/MusicGen not exposed through shared /v1/jobs.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -5431,7 +5431,42 @@
       "limitations": [
         "Do not claim live Whisper timestamp result until the live run completes.",
         "Persistent production service readiness not tested by temporary Action-scoped APIs."
-      ]
+      ],
+      "current_live_status": "IN_PROGRESS_WAITING_FOR_MUSICGEN_AND_REMAINING_PIPELINE",
+      "whisper_real_gradio_callback": "PASS",
+      "whisper_segment_timestamps": [
+        {
+          "start": 0,
+          "end": 3,
+          "text": "OEC notebook callback acceptance test"
+        },
+        {
+          "start": 3,
+          "end": 7,
+          "text": "The worker should return a valid speech WAV"
+        }
+      ],
+      "kokoro_real_gradio_callback": "PASS",
+      "qwen3_asr_real_gradio_callback": "PASS",
+      "ace_step_real_gradio_callback": "PASS",
+      "audiogen_real_inference_and_gradio": "PASS",
+      "audiogen_notebook_artifact": {
+        "bytes": 96078,
+        "sha256": "81f71a003ac3975ca0074eb7ea402fc63c7102fd6da6500b7b3b92d398a590cf",
+        "duration_seconds": 3,
+        "sample_rate_hz": 16000,
+        "channels": 1
+      },
+      "audiogen_callback_artifact": {
+        "bytes": 96044,
+        "sha256": "02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58",
+        "duration_seconds": 3,
+        "sample_rate_hz": 16000,
+        "channels": 1
+      },
+      "audiogen_job_id": 118738532097,
+      "musicgen_job_id": 118741175823,
+      "musicgen_job_status": "queued"
     },
     {
       "id": "LIVE-2026-10-20-PARENT-SHA-MEDIA-E2E-ACCEPTANCE",
