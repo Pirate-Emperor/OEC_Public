@@ -3,7 +3,6 @@ name: OEC MusicGen A100 inference acceptance (CC-BY-NC research)
 on:
   push:
     branches:
-      - fix/media-stack-supervision-20261019
       - feat/media-service-sidecars-20261018
     paths:
       - ".github/workflows/oec-musicgen-smoke.yml"

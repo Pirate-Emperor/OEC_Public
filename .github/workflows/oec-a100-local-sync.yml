@@ -3,7 +3,7 @@ name: OEC safe A100 checkout sync
 on:
   push:
     branches:
-      - fix/media-stack-supervision-20261019
+      - feat/media-service-sidecars-20261018
     paths:
       - "pipeline_*_gradio.ipynb"
       - "tools/sync_feature_branch_a100.sh"

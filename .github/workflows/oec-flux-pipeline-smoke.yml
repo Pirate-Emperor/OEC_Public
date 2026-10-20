@@ -3,7 +3,6 @@ name: OEC FLUX to TRELLIS A100 inference acceptance
 on:
   push:
     branches:
-      - fix/media-stack-supervision-20261019
       - feat/media-service-sidecars-20261018
     paths:
       - ".github/workflows/oec-flux-pipeline-smoke.yml"
@@ -14,6 +13,8 @@ on:
       - "tools/oec_service_manager.py"
       - "tests/test_flux_image_pipeline.py"
       - "tests/test_flux_trellis_pipeline.py"
+
+  workflow_dispatch:
 
 permissions:
   contents: read

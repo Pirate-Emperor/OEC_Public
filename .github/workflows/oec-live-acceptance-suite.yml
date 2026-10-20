@@ -1,0 +1,424 @@
+name: OEC ordered live acceptance suite
+run-name: "OEC live acceptance suite - ${{ github.ref_name }}"
+
+on:
+  push:
+    branches:
+      - fix/media-stack-supervision-20261019
+    paths:
+      - ".github/workflows/oec-live-acceptance-suite.yml"
+      - ".github/workflows/oec-a100-local-sync.yml"
+      - ".github/workflows/oec-a100-media-model-bootstrap.yml"
+      - ".github/workflows/oec-audiogen-notebook-smoke.yml"
+      - ".github/workflows/oec-musicgen-smoke.yml"
+      - ".github/workflows/oec-visual-media-sidecar-smoke.yml"
+      - ".github/workflows/oec-flux-pipeline-smoke.yml"
+      - ".github/workflows/oec-e2e-acceptance.yml"
+      - "pipeline_*_gradio.ipynb"
+      - "pipeline_audiogen.py"
+      - "pipeline_musicgen.py"
+      - "pipeline_flux_image.py"
+      - "pipeline_flux_trellis.py"
+      - "pipeline_trellis_3d.py"
+      - "worker_ltx_video.py"
+      - "brain.py"
+      - "brain_config.json"
+      - "qa_compliance_worker.py"
+      - "hf_upload_daemon.py"
+      - "asset_status.py"
+      - "tools/run_gradio_model_notebook_smokes.py"
+      - "tools/run_media_model_smokes.py"
+      - "tools/run_audiogen_notebook_smoke.py"
+      - "tools/run_visual_media_sidecar_smokes.py"
+      - "tools/run_flux_pipeline_smoke.py"
+      - "tools/run_oec_e2e_acceptance.py"
+      - "tools/prepare_media_models.py"
+      - "tools/prepare_media_runtime.py"
+      - "tools/prepare_ace_step_runtime.py"
+      - "tools/oec_service_manager.py"
+      - "tools/media_services/**"
+      - "tools/storage_reserve_probe.py"
+      - "tools/recover_dead_storage_locks.py"
+      - "storage_manager.py"
+      - "storage_policy.py"
+      - "storage_config.json"
+      - "core_config.py"
+      - "tests/**"
+      - "docs/checklist.md"
+      - "docs/MODEL_NOTEBOOKS_AND_WORKER_INTEGRATION.md"
+      - "TODO.md"
+      - "result.md"
+      - "test.json"
+      - "changelog/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One workflow owns the GPU/storage lane; ordered jobs cannot cancel each other as pending workflows.
+concurrency:
+  group: oec-media-gpu-storage-serial
+  cancel-in-progress: false
+
+jobs:
+  sync-source:
+    name: Sync current source safely to oec-2
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout candidate source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require oec-2 and non-destructive source synchronization
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-2"
+          test -x "$HOME/Conda/condabin/conda"
+          test -f "$HOME/OEC/storage_config.json"
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          if bash tools/sync_feature_branch_a100.sh; then
+            selected="$HOME/OEC"
+          else
+            bash tools/create_clean_a100_test_worktree.sh
+            selected="$HOME/OEC_feature_sync"
+          fi
+          expected="$(git rev-parse HEAD)"
+          actual="$(git -C "$selected" rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test -z "$(git -C "$selected" status --porcelain --untracked-files=all)"
+          printf 'OEC_LIVE_SOURCE_SYNC=PASS\n'
+          printf 'OEC_LIVE_SOURCE_PATH=%s\n' "$selected"
+          printf 'OEC_LIVE_EXPECTED_SHA=%s\n' "$expected"
+          printf 'OEC_LIVE_ACTUAL_SHA=%s\n' "$actual"
+
+  prepare-media-services:
+    name: Real Kokoro, Whisper, Qwen3-ASR and ACE-Step inference + Gradio callbacks
+    needs: sync-source
+    if: ${{ always() && needs.sync-source.result == 'success' }}
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout candidate source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate runner and live StorageManager config
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-2"
+          test -x "$HOME/Conda/condabin/conda"
+          test -f "$HOME/OEC/storage_config.json"
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          echo "$HOME/Conda/condabin:$PATH" >> "$GITHUB_PATH"
+          nvidia-smi
+      - name: Select an existing Python for StorageManager
+        run: |
+          set -euo pipefail
+          selected=""
+          for name in oec_deploy phase1 phase1_ltx phase2_3d; do
+            py="$("$HOME/Conda/condabin/conda" run --no-capture-output -n "$name" python -c 'import sys; print(sys.executable)' 2>/dev/null | tail -n 1 || true)"
+            if [[ -n "$py" && -x "$py" ]] && "$py" -c 'import huggingface_hub, core_config; from storage_manager import storage_preflight, managed_storage_operation' >/dev/null 2>&1; then
+              selected="$py"; echo "OEC_STORAGE_ENV=$name"; break
+            fi
+          done
+          test -n "$selected" || { echo "::error::No existing StorageManager Python"; exit 2; }
+          echo "OEC_PYTHON=$selected" >> "$GITHUB_ENV"
+          "$selected" -m py_compile tools/prepare_media_models.py tools/prepare_media_runtime.py tools/prepare_ace_step_runtime.py tools/run_media_model_smokes.py tools/run_gradio_model_notebook_smokes.py tools/media_services/common.py tools/media_services/audio_api.py tools/media_services/smoke_client.py tools/oec_service_manager.py
+          "$selected" -m unittest discover -s tests -p 'test_media_service_api.py' -v
+          "$selected" -m unittest discover -s tests -p 'test_audio_service_validation.py' -v
+          "$selected" -m unittest discover -s tests -p 'test_oec_service_manager_media.py' -v
+          "$selected" -m unittest discover -s tests -p 'test_ace_step_runtime.py' -v
+      - name: Capture storage/cache state and recover only authorized expired locks
+        run: |
+          set -euo pipefail
+          R="$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/media-services"
+          mkdir -p "$R"
+          "$OEC_PYTHON" tools/prepare_media_models.py status 2>&1 | tee "$R/cache-before.log"
+          "$OEC_PYTHON" storage_manager.py --status 2>&1 | tee "$R/storage-before.log"
+          "$OEC_PYTHON" storage_manager.py --clean
+          "$OEC_PYTHON" tools/recover_dead_storage_locks.py outputs
+          "$OEC_PYTHON" storage_manager.py --status 2>&1 | tee "$R/storage-after-lock-recovery.log"
+      - name: Download only missing speech checkpoints through StorageManager admission
+        run: |
+          set -euo pipefail
+          for model in kokoro whisper-turbo qwen3-asr-0.6b; do
+            echo "MODEL_PREP_START=$model"
+            "$OEC_PYTHON" tools/prepare_media_models.py download --model "$model"
+            echo "MODEL_PREP_COMPLETE=$model"
+          done
+      - name: Prepare the isolated speech runtime
+        run: |
+          set -euo pipefail
+          "$OEC_PYTHON" -c 'from storage_manager import storage_preflight; ok, reason = storage_preflight("models", required_gb=1.5, require_fresh_quota=True, minimum_free_gb=2.0); print("AUDIO_RUNTIME_STORAGE_ADMISSION=" + str(bool(ok)) + " reason=" + str(reason)); raise SystemExit(0 if ok else 2)'
+          "$OEC_PYTHON" tools/prepare_media_runtime.py
+      - name: Live service and real Kokoro/Whisper/Qwen3-ASR Gradio callbacks
+        run: |
+          set -euo pipefail
+          "$OEC_PYTHON" tools/run_media_model_smokes.py --providers kokoro,whisper,qwen3-asr --check-gradio-notebooks --require-pass 2>&1 | tee "$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/media-services/speech-gradio-smoke.log"
+      - name: Download missing ACE-Step checkpoint groups through StorageManager
+        run: |
+          set -euo pipefail
+          "$OEC_PYTHON" tools/prepare_media_models.py download --model ace-step-main
+          "$OEC_PYTHON" tools/prepare_media_models.py download --model ace-step-lm-0.6b
+      - name: Install pinned ACE-Step into its isolated Python environment
+        run: |
+          set -euo pipefail
+          ACE_BASE_PYTHON=""
+          for candidate in "$HOME/Conda/envs/oec_deploy/bin/python" "$HOME/Conda/envs/phase1_ltx/bin/python" "$HOME/Conda/envs/phase2_3d/bin/python" "$HOME/Conda/envs/phase1/bin/python"; do
+            [[ -x "$candidate" ]] || continue
+            version="$("$candidate" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || true)"
+            case "$version" in 3.11|3.12) ACE_BASE_PYTHON="$candidate"; break;; esac
+          done
+          test -n "$ACE_BASE_PYTHON" || { echo "::error::No existing Python 3.11/3.12 runtime for isolated ACE-Step"; exit 2; }
+          "$ACE_BASE_PYTHON" tools/prepare_ace_step_runtime.py install
+      - name: Live ACE-Step generation and Gradio notebook callback
+        run: |
+          set -euo pipefail
+          "$OEC_PYTHON" tools/run_media_model_smokes.py --providers ace-step --check-gradio-notebooks --require-pass 2>&1 | tee "$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/media-services/ace-step-gradio-smoke.log"
+      - name: Final StorageManager status
+        if: always()
+        run: |
+          set +e
+          if [[ -n "$OEC_PYTHON" ]]; then "$OEC_PYTHON" storage_manager.py --status 2>&1 | tee "$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/media-services/storage-final.log"; fi
+      - name: Upload API/UI live evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-live-media-services-${{ github.run_id }}
+          path: ${{ runner.temp }}/oec-live-acceptance-${{ github.run_id }}/media-services/
+          if-no-files-found: warn
+          retention-days: 7
+
+  audiogen-notebook:
+    name: AudioGen actual inference and Gradio callback
+    needs: prepare-media-services
+    if: ${{ always() && needs.sync-source.result == 'success' }}
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout candidate source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate runner/config and AudioCraft environment
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-2"
+          test -x "$HOME/Conda/condabin/conda"
+          test -f "$HOME/OEC/storage_config.json"
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -c 'import torch, audiocraft; print("TORCH="+torch.__version__); print("CUDA="+str(torch.version.cuda)); assert torch.cuda.is_available()'
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -m unittest discover -s tests -p 'test_audiocraft_notebook_static.py' -v
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python storage_manager.py --status
+      - name: Execute existing AudioGen notebook smoke
+        run: |
+          set -euo pipefail
+          R="$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/audiogen"
+          mkdir -p "$R"
+          export OEC_AUDIOGEN_SMOKE_DIR="$R"
+          export OEC_AUDIOGEN_HEADLESS_SMOKE=1
+          timeout 1200s "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python tools/run_audiogen_notebook_smoke.py 2>&1 | tee "$R/existing-notebook.log"
+      - name: Launch dedicated AudioGen Gradio and invoke real generation callback
+        run: |
+          set -euo pipefail
+          export OEC_GRADIO_HEADLESS_SMOKE=1
+          timeout 1200s "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python tools/run_gradio_model_notebook_smokes.py --provider audiogen --report-dir "$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/audiogen" 2>&1 | tee "$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/audiogen/gradio-callback.log"
+      - name: Upload AudioGen evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-live-audiogen-${{ github.run_id }}
+          path: ${{ runner.temp }}/oec-live-acceptance-${{ github.run_id }}/audiogen/
+          if-no-files-found: warn
+          retention-days: 7
+
+  musicgen-notebook:
+    name: MusicGen actual inference and Gradio callback
+    needs: audiogen-notebook
+    if: ${{ always() && needs.sync-source.result == 'success' }}
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout candidate source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate runner/config and MusicGen environment
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-2"
+          test -x "$HOME/Conda/condabin/conda"
+          test -f "$HOME/OEC/storage_config.json"
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -c 'import torch, torchaudio, audiocraft, soundfile; assert torch.cuda.is_available(); print("TORCH="+torch.__version__); print("AUDIOCRAFT="+__import__("importlib.metadata",fromlist=["version"]).version("audiocraft"))'
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -m unittest discover -s tests -p 'test_musicgen_pipeline.py' -v
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python storage_manager.py --status
+      - name: Generate real MusicGen WAV with quota-admitted cache fill if needed
+        run: |
+          set -euo pipefail
+          R="$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/musicgen"
+          mkdir -p "$R"
+          OUT="/tmp/oec-musicgen-suite-$GITHUB_RUN_ID.wav"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python pipeline_musicgen.py --mode generate --allow-download --scratch-output --output "$OUT" --duration 3 --seed 42 --prompt "A short gentle instrumental cue with warm piano and mellow strings" 2>&1 | tee "$R/model-generation.log"
+          cp "$OUT" "$R/"
+          cp "$OUT.info.json" "$R/"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -c 'import soundfile,sys; info=soundfile.info(sys.argv[1]); print("MUSICGEN_WAV_VALIDATION=PASS", info); assert info.frames>0 and info.samplerate>0' "$R/$(basename "$OUT")"
+      - name: Launch MusicGen Gradio and invoke real generation callback
+        run: |
+          set -euo pipefail
+          export OEC_GRADIO_HEADLESS_SMOKE=1
+          timeout 1200s "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python tools/run_gradio_model_notebook_smokes.py --provider musicgen --report-dir "$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/musicgen" 2>&1 | tee "$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/musicgen/gradio-callback.log"
+      - name: Final MusicGen storage status
+        if: always()
+        run: |
+          set +e
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python storage_manager.py --status 2>&1 | tee "$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/musicgen/storage-final.log"
+      - name: Upload MusicGen evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-live-musicgen-${{ github.run_id }}
+          path: ${{ runner.temp }}/oec-live-acceptance-${{ github.run_id }}/musicgen/
+          if-no-files-found: warn
+          retention-days: 7
+
+  visual-sidecars:
+    name: LTX and TRELLIS real sidecar inference
+    needs: musicgen-notebook
+    if: ${{ always() && needs.sync-source.result == 'success' }}
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout candidate source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate runner/config and compile visual adapters
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-2"
+          test -x "$HOME/Conda/condabin/conda"
+          test -f "$HOME/OEC/storage_config.json"
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python -m py_compile tools/run_visual_media_sidecar_smokes.py tools/media_services/common.py tools/media_services/ltx_api.py tools/media_services/trellis_api.py brain.py worker_ltx_video.py qa_compliance_worker.py hf_upload_daemon.py
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python -m unittest discover -s tests -p 'test_brain_ltx_queue_storage.py' -v
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python -m unittest discover -s tests -p 'test_visual_storage_cleanup.py' -v
+      - name: Storage preflight and cache-only LTX/TRELLIS acceptance
+        run: |
+          set -euo pipefail
+          R="$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/visual"
+          mkdir -p "$R"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python storage_manager.py --status 2>&1 | tee "$R/storage-before.log"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python storage_manager.py --clean
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python tools/recover_dead_storage_locks.py outputs
+          export OEC_VISUAL_SMOKE_DIR="$R"
+          export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+          timeout 6900s "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python tools/run_visual_media_sidecar_smokes.py 2>&1 | tee "$R/sidecar-run.log"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python storage_manager.py --status 2>&1 | tee "$R/storage-after.log"
+      - name: Upload visual outputs and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-live-visual-${{ github.run_id }}
+          path: ${{ runner.temp }}/oec-live-acceptance-${{ github.run_id }}/visual/
+          if-no-files-found: warn
+          retention-days: 7
+
+  flux-trellis:
+    name: FLUX PNG to TRELLIS GLB actual inference
+    needs: visual-sidecars
+    if: ${{ always() && needs.sync-source.result == 'success' }}
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout candidate source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate phase2_3d and run component contracts
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-2"
+          test -x "$HOME/Conda/condabin/conda"
+          test -f "$HOME/OEC/storage_config.json"
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python -c 'import torch,diffusers,huggingface_hub,transformers; assert torch.cuda.is_available(); print("TORCH="+torch.__version__); print("CUDA="+str(torch.version.cuda))'
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_flux_image_pipeline.py' -v
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_flux_trellis_pipeline.py' -v
+      - name: Generate and validate PNG then GLB on the same image
+        run: |
+          set -euo pipefail
+          R="$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/flux-trellis"
+          W="/tmp/oec-flux-live-suite-$GITHUB_RUN_ID"
+          mkdir -p "$R"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-before.log"
+          timeout 6600s "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python tools/run_flux_pipeline_smoke.py --work-dir "$W" --report-dir "$R" --width 512 --height 512 --steps 4 2>&1 | tee "$R/flux-trellis.log"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-after.log"
+      - name: Upload PNG/GLB and model report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-live-flux-trellis-${{ github.run_id }}
+          path: ${{ runner.temp }}/oec-live-acceptance-${{ github.run_id }}/flux-trellis/
+          if-no-files-found: warn
+          retention-days: 7
+
+  qa-hf-e2e:
+    name: LTX -> Qwen2-VL QA -> HF resumable upload -> remote hash read-back
+    needs: flux-trellis
+    if: ${{ always() && needs.sync-source.result == 'success' }}
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout candidate source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate runner/config and compile end-to-end harness
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-2"
+          test -x "$HOME/Conda/condabin/conda"
+          test -f "$HOME/OEC/storage_config.json"
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python -m py_compile tools/run_oec_e2e_acceptance.py qa_compliance_worker.py hf_upload_daemon.py tools/run_visual_media_sidecar_smokes.py
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python -m unittest discover -s tests -p 'test_oec_e2e_acceptance_contract.py' -v
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python storage_manager.py --status
+      - name: Run the joined Brain/LTX/Qwen2-VL/HF chunk/read-back acceptance
+        run: |
+          set -euo pipefail
+          R="$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/e2e"
+          mkdir -p "$R"
+          export OEC_E2E_REPORT_DIR="$R"
+          timeout 10200s "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python tools/run_oec_e2e_acceptance.py 2>&1 | tee "$R/e2e-run.log"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python storage_manager.py --status 2>&1 | tee "$R/storage-after.log"
+      - name: Upload QA decision, HF manifest/parts, read-back, and hashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-live-qa-hf-e2e-${{ github.run_id }}
+          path: ${{ runner.temp }}/oec-live-acceptance-${{ github.run_id }}/e2e/
+          if-no-files-found: warn
+          retention-days: 7

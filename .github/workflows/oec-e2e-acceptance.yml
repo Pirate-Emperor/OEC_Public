@@ -4,7 +4,7 @@ run-name: "OEC E2E acceptance - ${{ github.ref_name }}"
 on:
   push:
     branches:
-      - fix/media-stack-supervision-20261019
+      - feat/media-service-sidecars-20261018
     paths:
       - ".github/workflows/oec-e2e-acceptance.yml"
       - "tools/run_oec_e2e_acceptance.py"
