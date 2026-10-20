@@ -11,6 +11,20 @@ CONDA="${OEC_CONDA_BIN:-$HOME/Conda/condabin/conda}"
 WORKSPACE_ROOT="${GITHUB_WORKSPACE:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)}"
 STORAGE_ENV="${OEC_STORAGE_PYTHON_ENV:-oec_deploy}"
 RUN_ID="${GITHUB_RUN_ID:-manual}-$(date +%Y%m%d%H%M%S)"
+BACKUP_ROOT=""
+
+finish_recovery_record() {
+  local rc=$?
+  if [[ -n "${BACKUP_ROOT:-}" && -d "$BACKUP_ROOT" && ! -f "$BACKUP_ROOT/README.txt" ]]; then
+    {
+      printf "OEC sync recovery record\nRun: %s\nCanonical root: %s\nBranch: %s\nPrevious HEAD: %s\nTarget SHA: %s\nExit code: %s\n" \
+        "${RUN_ID:-unknown}" "${ROOT:-unknown}" "${EXPECTED_BRANCH:-unknown}" "${BEFORE_SHA:-unknown}" "${TARGET_SHA:-unknown}" "$rc"
+      echo "Preserved files are identified by the NUL-delimited manifests under this directory."
+      echo "Tracked changes are held under refs/oec-sync-recovery/<run-id>/*-stash; prior HEAD is under *-head."
+    } > "$BACKUP_ROOT/README.txt" 2>/dev/null || true
+  fi
+}
+trap finish_recovery_record EXIT
 
 fail() {
   printf 'OEC_CANONICAL_SYNC=BLOCKED reason=%s\n' "$1" >&2
@@ -160,8 +174,69 @@ move_captured_paths "$ROOT" root nonignored
 git -C "$ROOT" checkout -B "$EXPECTED_BRANCH" "$TARGET_SHA"
 ACTUAL_SHA="$(git -C "$ROOT" rev-parse HEAD)"
 [[ "$ACTUAL_SHA" == "$TARGET_SHA" ]] || fail "canonical checkout SHA differs from remote target" 28
+
+# Make initialized submodule worktrees match the exact gitlink revisions pinned by this OEC commit.
+# Never switch a submodule with local edits/untracked files; preserve its state and fail closed instead.
+while IFS=
+
+cat > "$BACKUP_ROOT/README.txt" <<EOF
+OEC canonical A100 checkout reconciliation
+Run: $RUN_ID
+Canonical path: $ROOT
+Remote branch: $EXPECTED_BRANCH
+Previous HEAD: $BEFORE_SHA
+Synchronized SHA: $TARGET_SHA
+Tracked root changes: refs/oec-sync-recovery/$RUN_ID/root-stash (if created)
+Previous root HEAD: refs/oec-sync-recovery/$RUN_ID/root-head
+Previous sibling worktree HEAD: refs/oec-sync-recovery/$RUN_ID/feature-sync-head (if present)
+Untracked files from each checkout are preserved under this directory with NUL-delimited path manifests.
+No model cache or storage reserve file was intentionally deleted.
+EOF
+
+{
+  printf 'OEC_CANONICAL_SYNC=PASS\n'
+  printf 'OEC_CANONICAL_ROOT=%s\n' "$ROOT"
+  printf 'OEC_CANONICAL_BRANCH=%s\n' "$EXPECTED_BRANCH"
+  printf 'OEC_CANONICAL_SHA=%s\n' "$ACTUAL_SHA"
+  printf 'OEC_RECOVERY_METADATA=%s\n' "$BACKUP_ROOT"
+} | tee "$BACKUP_ROOT/report.txt"
+
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+  {
+    echo "## OEC canonical A100 source reconciliation"
+    echo
+    printf -- '- Canonical path: %s\n' "$ROOT"
+    printf -- '- Branch: %s\n' "$EXPECTED_BRANCH"
+    printf -- '- Exact remote SHA: %s\n' "$ACTUAL_SHA"
+    printf -- '- Previous local HEAD and recovery payloads: %s\n' "$BACKUP_ROOT"
+    printf -- '- OEC_feature_sync removed only after registered-worktree verification.\n'
+  } >> "$GITHUB_STEP_SUMMARY"
+fi
+\t' read -r meta subpath; do
+  [[ -n "$subpath" ]] || continue
+  read -r mode type expected_sub_sha <<< "$meta"
+  [[ "$mode" == "160000" && "$type" == "commit" ]] || continue
+  subroot="$ROOT/$subpath"
+  [[ -e "$subroot/.git" ]] || fail "submodule $subpath is not initialized; no clone was attempted" 30
+  current_sub_sha="$(git -C "$subroot" rev-parse HEAD)"
+  sub_dirty="$(git -C "$subroot" status --porcelain --untracked-files=all)"
+  if [[ -n "$sub_dirty" ]]; then
+    printf 'OEC_SUBMODULE_SYNC_BLOCKED path=%s expected=%s actual=%s reason=local_changes_preserved\n' "$subpath" "$expected_sub_sha" "$current_sub_sha" >&2
+    fail "submodule $subpath has local edits/untracked files; refusing to change its checkout" 31
+  fi
+  if [[ "$current_sub_sha" != "$expected_sub_sha" ]]; then
+    git -C "$subroot" update-ref "refs/oec-sync-recovery/$RUN_ID/pre-sync-head" "$current_sub_sha"
+    printf 'OEC_SUBMODULE_SYNC_START path=%s current=%s expected=%s\n' "$subpath" "$current_sub_sha" "$expected_sub_sha"
+    git -C "$ROOT" submodule update --checkout -- "$subpath"
+    current_sub_sha="$(git -C "$subroot" rev-parse HEAD)"
+  fi
+  [[ "$current_sub_sha" == "$expected_sub_sha" ]] || fail "submodule $subpath SHA does not match the OEC branch gitlink" 32
+  [[ -z "$(git -C "$subroot" status --porcelain --untracked-files=all)" ]] || fail "submodule $subpath changed during alignment" 33
+  printf 'OEC_SUBMODULE_SYNC_PASS path=%s sha=%s\n' "$subpath" "$current_sub_sha"
+done < <(git -C "$ROOT" ls-tree -r HEAD)
+
 [[ -z "$(git -C "$ROOT" status --porcelain --untracked-files=all)" ]] ||
-  fail "canonical checkout not clean after synchronization; recovery data remains in place" 29
+  fail "canonical checkout not clean after source and safe submodule synchronization; recovery data remains in place" 34
 
 cat > "$BACKUP_ROOT/README.txt" <<EOF
 OEC canonical A100 checkout reconciliation
