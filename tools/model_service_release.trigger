@@ -10,3 +10,5 @@ Start or reuse the verified, already-cached API runtimes on oec-2:
 
 Release policy: no checkpoint downloads or package installs; require a clean fast-forwarded feature worktree, fresh StorageManager admission, cached-weight/runtime preflight, per-model GPU admission, and HTTP 200 with ready=true and model_loaded=true. If the whole six-provider release fails, stop only instances created by this attempt. Do not expose ports publicly.
 FLUX, AudioGen and MusicGen remain CLI/Gradio-only and are not represented as supervised HTTP APIs.
+
+Retry trigger after narrowing the workflow push filter: 2026-10-20T17:07:14.051Z
