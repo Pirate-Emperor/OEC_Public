@@ -15,20 +15,19 @@ class OecE2EAcceptanceContractTests(unittest.TestCase):
     def setUpClass(cls):
         cls.source = (ROOT / "tools" / "run_oec_e2e_acceptance.py").read_text(encoding="utf-8")
 
-    def test_gpu_gate_refuses_unowned_compute_processes(self):
+    def test_gpu_admission_is_explicit_and_fail_closed(self):
         self.assertIn('expected_runner = os.environ.get("OEC_EXPECTED_RUNNER", "oec-1")', self.source)
-        self.assertIn("if runner != expected_runner:", self.source)
-        self.assertIn("nvidia-smi", self.source)
-        self.assertIn("active_compute", self.source)
-        self.assertIn("refusing overlap", self.source)
-        self.assertIn("free_mib", self.source)
-
-    def test_runner_override_does_not_disable_gpu_process_ownership_gate(self):
-        self.assertIn('expected_runner = os.environ.get("OEC_EXPECTED_RUNNER", "oec-1")', self.source)
-        self.assertIn("if runner != expected_runner:", self.source)
-        self.assertIn("active_compute = [line.strip() for line in process_check.stdout.splitlines() if line.strip()]", self.source)
-        self.assertIn("if active_compute:", self.source)
+        self.assertIn("from oec_gpu_admission import inspect_a100_devices", self.source)
+        admission = (ROOT / "oec_gpu_admission.py").read_text(encoding="utf-8")
+        self.assertIn("OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING", admission)
+        self.assertIn("unknown_compute_processes_always_block", admission)
+        self.assertIn("processes_are_never_killed", admission)
         self.assertIn("no A100 has at least 30 GiB free VRAM", self.source)
+
+    def test_runner_override_does_not_disable_gpu_admission(self):
+        self.assertIn("if runner != expected_runner:", self.source)
+        self.assertIn("min_free_mib=30000", self.source)
+        self.assertIn('eligible = admission["eligible_devices"]', self.source)
 
     def test_upload_target_requires_auth_and_existing_dataset(self):
         self.assertIn("api.whoami()", self.source)

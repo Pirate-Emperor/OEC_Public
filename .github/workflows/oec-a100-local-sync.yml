@@ -9,6 +9,7 @@ on:
       - "tools/sync_feature_branch_a100.sh"
       - "tools/run_gradio_model_notebook_smokes.py"
       - "tools/create_clean_a100_test_worktree.sh"
+      - "oec_gpu_admission.py"
       - "docs/checklist.md"
       - "docs/MODEL_NOTEBOOKS_AND_WORKER_INTEGRATION.md"
       - "TODO.md"

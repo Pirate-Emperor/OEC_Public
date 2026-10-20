@@ -64,50 +64,29 @@ def gpu_preflight() -> dict[str, Any]:
     expected_runner = os.environ.get("OEC_EXPECTED_RUNNER", "oec-1")
     if runner != expected_runner:
         raise GateBlocked(f"expected assigned runner {expected_runner}, got {runner or 'unknown'}")
-    smi = subprocess.run(
-        ["nvidia-smi", "--query-gpu=index,name,memory.total,memory.used",
-         "--format=csv,noheader,nounits"],
-        text=True, capture_output=True, timeout=15, check=False,
-    )
-    if smi.returncode != 0:
-        raise GateBlocked("nvidia-smi GPU inventory failed: " + smi.stderr[-500:])
-    gpu_rows = []
-    for line in smi.stdout.splitlines():
-        columns = [item.strip() for item in line.split(",")]
-        if len(columns) != 4:
-            continue
-        try:
-            index, name, total, used = int(columns[0]), columns[1], int(columns[2]), int(columns[3])
-        except ValueError:
-            continue
-        if "A100" in name:
-            gpu_rows.append({"index": index, "name": name, "total_mib": total,
-                             "used_mib": used, "free_mib": total - used})
-    if not gpu_rows:
-        raise GateBlocked("assigned runner exposes no NVIDIA A100 device")
-
-    process_check = subprocess.run(
-        ["nvidia-smi", "--query-compute-apps=gpu_uuid,pid,process_name,used_gpu_memory",
-         "--format=csv,noheader,nounits"],
-        text=True, capture_output=True, timeout=15, check=False,
-    )
-    if process_check.returncode != 0:
-        raise GateBlocked("could not verify GPU process ownership; refusing overlapping inference")
-    active_compute = [line.strip() for line in process_check.stdout.splitlines() if line.strip()]
-    # The policy is fail-closed: an unowned compute process is not treated as idle
-    # solely because the GPU reports low utilization or has spare VRAM.
-    if active_compute:
-        raise GateBlocked(
-            "A100 compute processes are already present; refusing overlap. "
-            "Inspect current owner and rerun after normal release. Process summary: "
-            + " | ".join(active_compute[:8])
-        )
-    eligible = [row for row in gpu_rows if row["free_mib"] >= 30000]
+    # Read-only nvidia-smi admission. Shared OEC-Play context is only tolerated when
+    # explicitly enabled, same-user, recognized by executable path, low-memory and <=5% util.
+    from oec_gpu_admission import inspect_a100_devices
+    try:
+        admission = inspect_a100_devices(min_free_mib=30000)
+    except Exception as exc:
+        raise GateBlocked(f"nvidia-smi GPU process admission failed: {type(exc).__name__}: {exc}") from exc
+    eligible = admission["eligible_devices"]
     if not eligible:
-        raise GateBlocked("no A100 has at least 30 GiB free VRAM after the process-ownership check")
-    return {"runner": runner, "host": __import__("socket").gethostname(),
-            "gpus": gpu_rows, "selected_qa_gpu": eligible[0]["index"],
-            "compute_processes": active_compute}
+        raise GateBlocked("no A100 has at least 30 GiB free VRAM and satisfies the GPU/process ownership policy: "
+                          + json.dumps({"policy": admission["policy"], "devices": admission["devices"]}, sort_keys=True))
+    selected = eligible[0]
+    print("OEC_E2E_GPU_ADMISSION=" + json.dumps({
+        "selected": selected, "policy": admission["policy"], "devices": admission["devices"]
+    }, sort_keys=True), flush=True)
+    return {
+        "runner": runner,
+        "host": __import__("socket").gethostname(),
+        "gpus": admission["devices"],
+        "selected_qa_gpu": int(selected["index"]),
+        "compute_processes": [p for d in admission["devices"] for p in d["processes"]],
+        "gpu_admission_policy": admission["policy"],
+    }
 
 
 def verify_hf_target() -> tuple[str, Any]:

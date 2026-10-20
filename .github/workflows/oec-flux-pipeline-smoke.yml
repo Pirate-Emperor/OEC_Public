@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/oec-flux-pipeline-smoke.yml"
       - "pipeline_flux_image.py"
+      - "oec_gpu_admission.py"
       - "pipeline_flux_trellis.py"
       - "pipeline_trellis_3d.py"
       - "tools/run_flux_pipeline_smoke.py"

@@ -24,6 +24,7 @@ on:
       - "worker_ltx_video.py"
       - "tests/test_oec_service_manager_media.py"
       - "tools/run_media_model_smokes.py"
+      - "oec_gpu_admission.py"
       - "tools/run_gradio_model_notebook_smokes.py"
       - "tests/test_ace_step_runtime.py"
       - "tools/media_services/**"

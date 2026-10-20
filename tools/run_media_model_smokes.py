@@ -74,37 +74,10 @@ def _ace_roots() -> tuple[Path, Path]:
 
 
 def _free_a100_gpu() -> str:
-    inventory = subprocess.run(
-        ["nvidia-smi", "--query-gpu=index,name,uuid,memory.used,utilization.gpu", "--format=csv,noheader,nounits"],
-        capture_output=True, text=True, timeout=12, check=False,
-    )
-    apps = subprocess.run(
-        ["nvidia-smi", "--query-compute-apps=gpu_uuid,pid", "--format=csv,noheader,nounits"],
-        capture_output=True, text=True, timeout=12, check=False,
-    )
-    if inventory.returncode or apps.returncode:
-        raise RuntimeError("GPU/process telemetry unavailable; refusing ACE-Step launch")
-    busy_uuids = set()
-    for line in apps.stdout.splitlines():
-        fields = [part.strip() for part in line.split(",")]
-        if len(fields) >= 2 and fields[0] and fields[1].isdigit():
-            busy_uuids.add(fields[0])
-    candidates = []
-    for line in inventory.stdout.splitlines():
-        fields = [part.strip() for part in line.split(",")]
-        if len(fields) < 5 or not fields[0].isdigit() or "A100" not in fields[1].upper():
-            continue
-        try:
-            memory_used, utilization = float(fields[3]), float(fields[4])
-        except ValueError:
-            continue
-        if fields[2] not in busy_uuids and memory_used <= 1024 and utilization <= 5:
-            candidates.append((int(fields[0]), memory_used, utilization))
-    if not candidates:
-        raise RuntimeError("no idle A100 available; no ACE-Step process was started")
-    selected = str(min(candidates)[0])
-    print(f"ACE_STEP_PHYSICAL_GPU={selected}", flush=True)
-    return selected
+    from oec_gpu_admission import select_idle_a100_gpu
+    selected = select_idle_a100_gpu(caller="MEDIA")
+    print(f"MEDIA_PHYSICAL_GPU={selected['index']}", flush=True)
+    return selected["index"]
 
 
 def _ace_env() -> dict[str, str]:

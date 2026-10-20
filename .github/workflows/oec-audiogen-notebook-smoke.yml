@@ -1,105 +1,113 @@
-name: OEC AudioGen A100 notebook live smoke
-
-run-name: "OEC AudioGen phase1 live smoke - ${{ github.ref_name }}"
+name: OEC safe A100 checkout sync
 
 on:
   push:
     branches:
       - feat/media-service-sidecars-20261018
     paths:
-      - ".github/workflows/oec-audiogen-notebook-smoke.yml"
-      - "pipeline_audiocraft.ipynb"
-      - "pipeline_audiogen_gradio.ipynb"
+      - "pipeline_*_gradio.ipynb"
+      - "tools/sync_feature_branch_a100.sh"
       - "tools/run_gradio_model_notebook_smokes.py"
-      - "tools/run_audiogen_notebook_smoke.py"
-      - "tests/test_audiocraft_notebook_static.py"
-      - "storage_manager.py"
-      - "storage_policy.py"
-      - "storage_config.json"
+      - "tools/create_clean_a100_test_worktree.sh"
+      - "docs/checklist.md"
+      - "docs/MODEL_NOTEBOOKS_AND_WORKER_INTEGRATION.md"
+      - "TODO.md"
+      - "result.md"
+      - "test.json"
+      - "changelog/**"
+      - ".github/workflows/oec-a100-local-sync.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  # Shared oec-2 GPU and StorageManager state: serialize all media jobs.
   group: oec-media-gpu-storage-serial
   cancel-in-progress: false
 
 jobs:
-  audiogen-live-smoke:
+  safe-fast-forward:
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
-    timeout-minutes: 60
+    timeout-minutes: 5
     defaults:
       run:
         shell: bash
     steps:
-      - name: Checkout OEC feature branch
+      - name: Checkout the exact candidate revision in an isolated Actions workspace
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Verify designated runner, phase1 CUDA environment, and current storage configuration
+      - name: Read-only diagnose persistent checkout before sync
         run: |
           set -euo pipefail
-          test "${RUNNER_NAME:-unknown}" = "oec-2" || {
-            echo "::error::Expected the dedicated oec-2 A100 runner; got ${RUNNER_NAME:-unknown}."
+          repo="$HOME/OEC"
+          if [[ ! -e "$repo/.git" ]]; then
+            echo "OEC_LOCAL_CHECKOUT=ABSENT"
+            exit 0
+          fi
+          branch="$(git -C "$repo" branch --show-current 2>/dev/null || true)"
+          head_sha="$(git -C "$repo" rev-parse HEAD 2>/dev/null || echo UNKNOWN)"
+          dirty_count="$(git -C "$repo" status --porcelain --untracked-files=all 2>/dev/null | wc -l | tr -d '[:space:]')"
+          origin="$(git -C "$repo" remote get-url origin 2>/dev/null || true)"
+          case "$origin" in
+            *github.com/CalamityStriker/OEC.git|*github.com/CalamityStriker/OEC|*github.com:CalamityStriker/OEC.git|*github.com:CalamityStriker/OEC)
+              origin_state=EXPECTED
+              ;;
+            *)
+              origin_state=OTHER_OR_UNKNOWN
+              ;;
+          esac
+          if git -C "$repo" show-ref --verify --quiet refs/heads/fix/media-stack-supervision-20261019; then
+            expected_local_branch=YES
+          else
+            expected_local_branch=NO
+          fi
+          if git -C "$repo" show-ref --verify --quiet refs/remotes/origin/fix/media-stack-supervision-20261019; then
+            expected_remote_tracking_ref=YES
+          else
+            expected_remote_tracking_ref=NO
+          fi
+          printf 'OEC_LOCAL_ORIGIN=%s\n' "$origin_state"
+          printf 'OEC_LOCAL_BRANCH=%s\n' "$branch"
+          printf 'OEC_LOCAL_HEAD_SHA=%s\n' "$head_sha"
+          printf 'OEC_LOCAL_DIRTY_ENTRY_COUNT=%s\n' "$dirty_count"
+          printf 'OEC_EXPECTED_LOCAL_BRANCH_EXISTS=%s\n' "$expected_local_branch"
+          printf 'OEC_EXPECTED_REMOTE_TRACKING_REF_EXISTS=%s\n' "$expected_remote_tracking_ref"
+          # This step performs no fetch, checkout, merge, reset or file write.
+      - name: Try fast-forward sync without overwriting local content
+        id: inplace
+        env:
+          OEC_SYNC_BRANCH: fix/media-stack-supervision-20261019
+        run: |
+          set -uo pipefail
+          test "$RUNNER_NAME" = "oec-2" || {
+            echo "::error::Expected oec-2, got $RUNNER_NAME"
             exit 2
           }
-          test -f "$HOME/Conda/condabin/conda" || {
-            echo "::error::Conda executable not found; no packages or model files were changed."
-            exit 2
-          }
-          test -f "$HOME/OEC/storage_config.json" || {
-            echo "::error::Current live OEC storage_config.json is unavailable; no model write is allowed."
-            exit 2
-          }
-          # Use the host's live reserve/target policy, not a stale repository default.
-          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
-          timeout 180s "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -c 'import sys, torch, importlib.metadata as m; print("ENV=phase1"); print("PYTHON="+sys.version.split()[0]); print("TORCH="+torch.__version__); print("CUDA="+str(torch.version.cuda)); print("CUDA_AVAILABLE="+str(torch.cuda.is_available())); print("AUDIOCRAFT="+m.version("audiocraft")); print("TORCHVISION="+m.version("torchvision")); print("TORCHAUDIO="+m.version("torchaudio")); assert torch.cuda.is_available(), "CUDA is not available in phase1"'
-          nvidia-smi
+          if bash tools/sync_feature_branch_a100.sh; then
+            echo "OEC_SYNC_MODE=in_place" >> "$GITHUB_ENV"
+            echo "OEC_EXISTING_CHECKOUT_SYNC=PASS"
+          else
+            rc=$?
+            echo "OEC_EXISTING_CHECKOUT_SYNC=BLOCKED exit=$rc"
+            echo "Primary checkout was not altered; attempting a separate clean worktree after StorageManager admission."
+            bash tools/create_clean_a100_test_worktree.sh
+            echo "OEC_SYNC_MODE=clean_worktree" >> "$GITHUB_ENV"
+          fi
 
-      - name: Compile notebook harness and run offline notebook regressions
+      - name: Verify exact SHA in the selected local test checkout
         run: |
           set -euo pipefail
-          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -m py_compile tools/run_audiogen_notebook_smoke.py storage_manager.py storage_policy.py
-          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -m unittest discover -s tests -p 'test_audiocraft_notebook_static.py' -v
-
-      - name: Capture live StorageManager status
-        run: |
-          set -euo pipefail
-          export OEC_AUDIOGEN_SMOKE_DIR="$RUNNER_TEMP/oec-audiogen-smoke"
-          mkdir -p "$OEC_AUDIOGEN_SMOKE_DIR"
-          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python storage_manager.py --status 2>&1 | tee "$OEC_AUDIOGEN_SMOKE_DIR/storage-status.log"
-
-      - name: Execute AudioGen notebook cells and generate one acceptance WAV
-        run: |
-          set -euo pipefail
-          export OEC_AUDIOGEN_SMOKE_DIR="$RUNNER_TEMP/oec-audiogen-smoke"
-          export OEC_AUDIOGEN_HEADLESS_SMOKE=1
-          timeout 1200s "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python tools/run_audiogen_notebook_smoke.py 2>&1 | tee "$OEC_AUDIOGEN_SMOKE_DIR/notebook-execution.log"
-
-      - name: Generate and validate through the dedicated AudioGen Gradio callback
-        run: |
-          set -euo pipefail
-          export OEC_GRADIO_HEADLESS_SMOKE=1
-          mkdir -p "$RUNNER_TEMP/oec-audiogen-smoke"
-          timeout 1200s "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 \
-            python tools/run_gradio_model_notebook_smokes.py --provider audiogen \
-            --report-dir "$RUNNER_TEMP/oec-audiogen-smoke" 2>&1 | tee "$RUNNER_TEMP/oec-audiogen-smoke/gradio-callback.log"
-
-      - name: Final read-only StorageManager status
-        if: always()
-        run: |
-          set +e
-          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python storage_manager.py --status 2>&1 | tee "$RUNNER_TEMP/oec-audiogen-smoke/final-storage-status.log"
-          exit 0
-
-      - name: Upload smoke report, logs, and generated WAV if available
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: oec-audiogen-a100-smoke-${{ github.run_id }}
-          path: ${{ runner.temp }}/oec-audiogen-smoke/
-          if-no-files-found: warn
-          retention-days: 3
+          expected="$(git rev-parse HEAD)"
+          if [[ "${OEC_SYNC_MODE:-}" == "in_place" ]]; then
+            selected="$HOME/OEC"
+          else
+            selected="$HOME/OEC_feature_sync"
+          fi
+          actual="$(git -C "$selected" rev-parse HEAD)"
+          printf 'A100_CHECKOUT_EXPECTED_SHA=%s\n' "$expected"
+          printf 'A100_CHECKOUT_ACTUAL_SHA=%s\n' "$actual"
+          printf 'A100_CHECKOUT_PATH=%s\n' "$selected"
+          test "$actual" = "$expected"
+          test -z "$(git -C "$selected" status --porcelain --untracked-files=all)"

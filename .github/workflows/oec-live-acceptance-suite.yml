@@ -15,6 +15,7 @@ on:
       - ".github/workflows/oec-flux-pipeline-smoke.yml"
       - ".github/workflows/oec-e2e-acceptance.yml"
       - "pipeline_*_gradio.ipynb"
+      - "oec_gpu_admission.py"
       - "pipeline_audiogen.py"
       - "pipeline_musicgen.py"
       - "pipeline_flux_image.py"
@@ -131,6 +132,8 @@ jobs:
     needs: [sync-source, recover-storage-locks]
     if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    env:
+      OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
     timeout-minutes: 180
     defaults:
       run:
@@ -231,6 +234,8 @@ jobs:
     needs: [prepare-media-services, sync-source, recover-storage-locks]
     if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    env:
+      OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
     timeout-minutes: 60
     defaults:
       run:
@@ -277,6 +282,8 @@ jobs:
     needs: [audiogen-notebook, sync-source, recover-storage-locks]
     if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    env:
+      OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
     timeout-minutes: 60
     defaults:
       run:
@@ -330,6 +337,8 @@ jobs:
     needs: [musicgen-notebook, sync-source, recover-storage-locks]
     if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    env:
+      OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
     timeout-minutes: 150
     defaults:
       run:
@@ -374,6 +383,8 @@ jobs:
     needs: [visual-sidecars, sync-source, recover-storage-locks]
     if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    env:
+      OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
     timeout-minutes: 150
     defaults:
       run:
@@ -416,6 +427,8 @@ jobs:
     needs: [flux-trellis, sync-source, recover-storage-locks]
     if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    env:
+      OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
     timeout-minutes: 180
     defaults:
       run:

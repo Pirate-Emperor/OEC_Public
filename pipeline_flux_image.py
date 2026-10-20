@@ -46,53 +46,10 @@ def _validate(prompt: str, width: int, height: int, steps: int, guidance: float)
 
 
 def select_idle_a100_gpu(requested: int | None = None) -> dict[str, str]:
-    try:
-        inv = subprocess.run(["nvidia-smi", "--query-gpu=index,uuid,name,memory.used,utilization.gpu",
-                              "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=10)
-        apps = subprocess.run(["nvidia-smi", "--query-compute-apps=gpu_uuid,pid",
-                               "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=10)
-    except (OSError, subprocess.TimeoutExpired) as e:
-        raise RuntimeError("GPU/process telemetry unavailable; refusing inference") from e
-    if inv.returncode or apps.returncode:
-        raise RuntimeError("nvidia-smi GPU/process telemetry failed; refusing inference")
-    busy = {row[0].strip() for row in csv.reader(apps.stdout.splitlines())
-            if len(row) >= 2 and row[0].strip() and row[1].strip().isdigit()}
-    audit: list[dict[str, Any]] = []
-    for row in csv.reader(inv.stdout.splitlines()):
-        if len(row) != 5:
-            continue
-        idx, uid, name, memory, util = (v.strip() for v in row)
-        if not idx.isdigit() or "A100" not in name.upper():
-            continue
-        if requested is not None and int(idx) != requested:
-            audit.append({"index": idx, "name": name, "eligible": False, "reason": "not requested"})
-            continue
-        try:
-            used_mib, utilization = float(memory), float(util)
-        except ValueError:
-            used_mib, utilization = float("inf"), float("inf")
-        reasons = []
-        if uid in busy:
-            reasons.append("compute process owns GPU")
-        if used_mib > 1024:
-            reasons.append("memory used exceeds 1024 MiB")
-        if utilization > 5:
-            reasons.append("GPU utilization exceeds 5 percent")
-        item = {
-            "index": idx, "name": name, "memory_used_mib": memory,
-            "utilization_percent": util, "compute_process_active": uid in busy,
-            "eligible": not reasons, "reasons": reasons,
-        }
-        audit.append(item)
-        if not reasons:
-            result = {"index": idx, "uuid": uid, "name": name,
-                      "memory_used_mib": memory, "utilization_percent": util}
-            print("FLUX_GPU_ADMITTED=" + json.dumps(result, sort_keys=True), flush=True)
-            return result
-    blocked = {"requested_index": requested, "a100_devices": audit,
-               "policy": "no active compute process, <=1024 MiB already used, <=5% utilization"}
-    print("FLUX_GPU_ADMISSION_BLOCKED=" + json.dumps(blocked, sort_keys=True), flush=True)
-    raise RuntimeError("no eligible idle A100; detailed per-GPU admission reasons are logged; no process was killed or signalled")
+    """Use shared host admission; OEC-Play context sharing remains explicit opt-in."""
+    from oec_gpu_admission import select_idle_a100_gpu as _select_gpu
+    return _select_gpu(requested, caller="FLUX")
+
 
 def _check_versions() -> None:
     bad = {}

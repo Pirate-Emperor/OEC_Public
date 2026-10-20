@@ -62,7 +62,7 @@ jobs:
         id: e2e
         env:
           OEC_EXPECTED_RUNNER: oec-2
-        env:
+          OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
           OEC_E2E_REPORT_DIR: ${{ runner.temp }}/oec-e2e-acceptance-${{ github.run_id }}
         run: |
           set -uo pipefail
