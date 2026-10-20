@@ -19,6 +19,7 @@ The readiness command is read-only: it does not start services, install packages
 |---|---|---:|---|
 | LTX-2.3 video | `phase1_ltx` | `17869` | validated MP4 |
 | TRELLIS.2 image-to-3D | `phase2_3d` | `17868` | validated GLB; requires `o_voxel` |
+| FLUX.2 Klein text-to-image | `phase2_3d` | — | PNG; combined CLI/Gradio pipeline only, not HTTP exposed |
 | ACE-Step 1.5 music | `~/.local/venvs/oec-acestep-py311` | `7870` | validated FLAC |
 | Kokoro-82M TTS | `~/.local/venvs/oec-audio-py311` | `7871` | validated WAV |
 | Whisper Turbo ASR | `~/.local/venvs/oec-audio-py311` | `7872` | text/segments as implemented |

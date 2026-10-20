@@ -166,3 +166,6 @@ The AudioGen dedicated Gradio app now passed an actual gradio_client event on lo
 ## AudioCraft event acceptance results
 
 On run 39404646877 (source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844), both AudioGen and MusicGen Gradio UIs reached HTTP 200 and their actual gradio_client event calls generated validated WAVs. AudioGen result: 96,044 bytes, SHA-256 02341fb8a7c71886fd8b837cf1f6558c0d26b6a8f5cce45949cdade5e5ceda58. MusicGen result: 192,044 bytes, SHA-256 0b6ada01eed76ac2a8a325c2c4f688cdc51072d31773f62b793ffd7ddf75ab9d. Both used physical GPU 4 in phase1. Their availability is still CLI/Gradio rather than supervised /v1/jobs for deployment integration.
+### FLUX status
+
+FLUX.2 Klein uses model identifier black-forest-labs/FLUX.2-klein-4B and the phase2_3d runtime in pipeline_flux_image.py. It is included in the readiness inventory, but is marked NOT_EXPOSED until a supervised standalone HTTP job API exists. The combined FLUX-to-TRELLIS CLI pipeline must not be represented as an independent remote FLUX service.

@@ -120,3 +120,6 @@
 
 - Run 39404646877 on source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844 passed actual Gradio event requests for AudioGen and MusicGen, with validated 3-second WAV artifacts and SHA-256 values recorded in docs/checklist.md.
 - Both remain NOT_EXPOSED to OEC_Deploy through the supervised HTTP job contract until their CLI flows are wrapped in managed typed APIs. Speech UI endpoint indexing and ACE-Step inference are still pending.
+## 2026-10-20 — FLUX included in readiness inventory
+
+- Added FLUX.2 Klein (black-forest-labs/FLUX.2-klein-4B, phase2_3d) to the read-only readiness report. It is accurately marked NOT_EXPOSED because current code has CLI/Gradio and a combined FLUX-to-TRELLIS pipeline but no standalone supervised HTTP API.

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-20T16:05:00+05:30",
+  "last_updated": "2026-10-20T16:12:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Static readiness/service-manager regression suite passed on SHA 3476407add55d5fcb52f70f570f93cba35992a8b, and the follow-up function-index harness change is committed at the latest candidate. Run 39404646877 on SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844 passed real AudioGen and MusicGen Gradio event callbacks (artifacts and SHA-256s recorded). Speech UI failed only because the older harness hard-coded /predict under Gradio 6.0.1; next candidate uses fn_index=0. ACE-Step and remaining ordered pipeline outcomes are pending.",
+  "latest_summary": "Read-only readiness inventory includes LTX, TRELLIS, FLUX, ACE-Step, Kokoro, Whisper, Qwen3-ASR, AudioGen and MusicGen. FLUX and AudioGen/MusicGen are marked NOT_EXPOSED until standalone supervised HTTP job APIs exist. Static suite passed on prior candidate 807bf322ad5afb94e4bde2b67b70b67c8a34ab59; latest A100 live suite is pending behind an older serialized run.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -5107,6 +5107,13 @@
           "limitation": "action-scoped sidecar; must recheck persistent readiness"
         },
         {
+          "provider": "FLUX.2 Klein",
+          "status": "NOT_EXPOSED",
+          "model": "black-forest-labs/FLUX.2-klein-4B",
+          "environment": "phase2_3d",
+          "reason": "Current implementation supports CLI/Gradio and a combined FLUX-to-TRELLIS CLI pipeline but no standalone supervised HTTP job API."
+        },
+        {
           "provider": "TRELLIS.2",
           "status": "PASS_RUN_SPECIFIC",
           "run_id": 39401991943,
@@ -5173,7 +5180,8 @@
         "Rerun FLUX-to-TRELLIS and verify PNG/GLB artifacts",
         "Rerun QA->HF upload->remote hash read-back",
         "Keep AudioGen/MusicGen NOT_EXPOSED until supervised HTTP job APIs are implemented",
-        "Do not merge to main until current candidate validates and branch divergence is reconciled"
+        "Do not merge to main until current candidate validates and branch divergence is reconciled",
+        "Keep FLUX NOT_EXPOSED until a standalone supervised API is implemented"
       ]
     },
     {
@@ -5239,6 +5247,28 @@
         "Run ACE-Step through real API/UI generation",
         "Complete FLUX-to-TRELLIS and QA/HF read-after-write",
         "Keep AudioGen/MusicGen labeled NOT_EXPOSED until supervised HTTP APIs exist"
+      ]
+    },
+    {
+      "id": "TEST-2026-10-20-FLUX-READINESS-MATRIX",
+      "date": "2026-10-20",
+      "category": "Readiness inventory coverage",
+      "source_sha": "pending-current-commit",
+      "runner": "source review",
+      "results": [
+        {
+          "provider": "FLUX.2 Klein",
+          "status": "INVENTORY_ONLY_NOT_API_READY",
+          "model": "black-forest-labs/FLUX.2-klein-4B",
+          "environment": "phase2_3d",
+          "evidence": "pipeline_flux_image.py",
+          "limitation": "No standalone supervised HTTP API; do not use a service URL."
+        }
+      ],
+      "next_actions": [
+        "Run updated static suite on exact commit",
+        "Confirm FLUX is NOT_EXPOSED in readiness JSON",
+        "Only build a standalone service if direct FLUX-to-Deploy requests are required"
       ]
     }
   ]

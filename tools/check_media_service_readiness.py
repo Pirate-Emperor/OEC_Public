@@ -25,6 +25,10 @@ SPECS: dict[str, dict[str, Any]] = {
     "trellis": {"display_name":"TRELLIS.2 image-to-3D","port":17868,"env":"phase2_3d",
             "python_kind":"conda","modules":["torch","o_voxel","trimesh","PIL"],
             "repo":"microsoft/TRELLIS.2-4B","artifact":"model/gltf-binary (GLB)","operation":"image_to_3d"},
+    "flux": {"display_name":"FLUX.2 Klein text-to-image","port":None,"env":"phase2_3d",
+            "python_kind":"conda","modules":["torch","diffusers","huggingface_hub","transformers"],
+            "repo":"black-forest-labs/FLUX.2-klein-4B","artifact":"image/png",
+            "operation":"CLI/Gradio and combined FLUX-to-TRELLIS pipeline only; no supervised OEC HTTP job API is implemented"},
     "ace-step": {"display_name":"ACE-Step 1.5 music generation","port":7870,"env":"oec-acestep-py311",
             "python_kind":"venv","modules":["torch","acestep"],"artifact":"audio/flac","operation":"text_to_music"},
     "kokoro": {"display_name":"Kokoro-82M text-to-speech","port":7871,"env":"oec-audio-py311",
@@ -184,7 +188,7 @@ def build_report() -> dict[str,Any]:
             "deployment_contract":{"ready_condition":"api_status == READY; /health must be HTTP 200 with ready=true and model_loaded=true",
             "job_contract":"POST /v1/jobs -> 202/job_id; GET /v1/jobs/{job_id} until succeeded/failed; GET /v1/jobs/{job_id}/result to retrieve the validated artifact",
             "network":"Services bind to loopback. For OEC-Deploy on another host, forward each required port over SSH and configure its provider URL to the forwarded endpoint.",
-            "not_yet_exposed":["audiogen","musicgen"]}}
+            "not_yet_exposed":["flux","audiogen","musicgen"]}}
 
 def main() -> int:
     parser=argparse.ArgumentParser(description=__doc__)

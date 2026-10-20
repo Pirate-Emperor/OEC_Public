@@ -40,3 +40,6 @@ Run [39404646877](https://github.com/CalamityStriker/OEC/actions/runs/3940464687
 - MusicGen: 3-second mono 32 kHz WAV, 192,044 bytes, SHA-256 0b6ada01eed76ac2a8a325c2c4f688cdc51072d31773f62b793ffd7ddf75ab9d; physical A100 4; peak allocated VRAM 4.352 GiB.
 
 The test launches the actual loopback Gradio UI and sends a gradio_client event request. These successes establish working CLI/Gradio paths on that source SHA; they do not create the supervised HTTP job API needed for direct OEC_Deploy access. Speech Gradio 6.0.1 endpoint selection is fixed in the newer candidate by using function index 0 and remains to be live-verified.
+## FLUX readiness representation
+
+FLUX.2 Klein is included in the read-only readiness inventory (black-forest-labs/FLUX.2-klein-4B, phase2_3d) as a real CLI/Gradio provider, but is explicitly NOT_EXPOSED through the shared HTTP job contract. The combined FLUX-to-TRELLIS pipeline is real but is not a standalone remote FLUX API.

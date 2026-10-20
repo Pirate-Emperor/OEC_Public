@@ -466,3 +466,5 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - AudioGen and MusicGen both passed their actual Gradio HTTP event callbacks on run 39404646877 (source SHA a558d2d52a5f6f93afabd5c0aaa14f6e721cf844). The artifacts and SHA-256 values are recorded in docs/checklist.md and test.json.
 - This does not make either provider HTTP-ready for OEC_Deploy; neither has a supervised OEC /v1/jobs API. Use the readiness report status NOT_EXPOSED.
 - Speech/ASR requires the Gradio 6.0.1 fn_index=0 fix validation; ACE-Step remains pending independent model/API acceptance.
+- [x] Included FLUX.2 Klein (black-forest-labs/FLUX.2-klein-4B, phase2_3d) in the readiness matrix and marked it NOT_EXPOSED because no standalone supervised HTTP job API exists.
+- [ ] Add a standalone FLUX API only if direct image requests from OEC_Deploy are required; the combined FLUX-to-TRELLIS pipeline remains a CLI path.
