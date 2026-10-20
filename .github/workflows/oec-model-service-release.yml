@@ -39,10 +39,13 @@ jobs:
           test -x "$HOME/Conda/condabin/conda"
           SYNC="$HOME/OEC_feature_sync"
           [[ -d "$SYNC" && -e "$SYNC/.git" ]] || { echo "::error::Expected existing OEC_feature_sync worktree missing."; exit 3; }
-          # The checked-in guard accepts only the exact canonical OEC origin and a clean,
-          # expected branch. It never overwrites the original dirty/detached $HOME/OEC tree.
-          OEC_LOCAL_REPO="$SYNC" OEC_SYNC_BRANCH=fix/media-stack-supervision-20261019 \
-            bash "$GITHUB_WORKSPACE/tools/sync_feature_branch_a100.sh"
+          # Use the approved detached clean-worktree updater: $HOME/OEC may be dirty/detached.
+          # It preserves that primary checkout and fast-forwards only the registered clean test worktree
+          # after fresh StorageManager admission.
+          OEC_SOURCE_REPO="$HOME/OEC" OEC_TEST_WORKTREE="$SYNC" \
+            OEC_SYNC_BRANCH=fix/media-stack-supervision-20261019 \
+            OEC_STORAGE_PYTHON_ENV=oec_deploy OEC_CONDA_BIN="$HOME/Conda/condabin/conda" \
+            bash "$GITHUB_WORKSPACE/tools/create_clean_a100_test_worktree.sh"
           test "$(git -C "$SYNC" rev-parse HEAD)" = "$GITHUB_SHA"
           test "$(git -C "$SYNC" branch --show-current)" = "fix/media-stack-supervision-20261019"
           test -z "$(git -C "$SYNC" status --porcelain --untracked-files=all)"
