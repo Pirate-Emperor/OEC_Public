@@ -29,13 +29,13 @@ permissions:
   contents: read
 
 concurrency:
-  # Shared oec-1 GPU and StorageManager state: serialize all media jobs.
+  # Shared oec-2 GPU and StorageManager state: serialize all media jobs.
   group: oec-media-gpu-storage-serial
   cancel-in-progress: false
 
 jobs:
   sequential-visual-model-acceptance:
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 120
     defaults:
       run:
@@ -49,8 +49,8 @@ jobs:
       - name: Validate runner and configured environments without installing dependencies
         run: |
           set -euo pipefail
-          test "${RUNNER_NAME:-unknown}" = "oec-1" || {
-            echo "::error::Expected the oec-1 A100 runner; got ${RUNNER_NAME:-unknown}"
+          test "${RUNNER_NAME:-unknown}" = "oec-2" || {
+            echo "::error::Expected the oec-2 A100 runner; got ${RUNNER_NAME:-unknown}"
             exit 2
           }
           test -x "$HOME/Conda/condabin/conda"

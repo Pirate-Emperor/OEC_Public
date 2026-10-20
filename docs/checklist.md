@@ -122,3 +122,12 @@ Review/backup those 662 entries first. Do not reset, clean or overwrite them. Af
 - [x] Static workflow passed on branch head `132a8a5820a104ec27c14a87c9af3d4f84e83b98`: [39380928743](https://github.com/CalamityStriker/OEC/actions/runs/39380928743), job 118489623553. All test groups passed, including notebook JSON/Python syntax, environment-contract, and frontend backend-stack-isolation tests.
 - [x] Local A100 feature-source sync passed to the same head: [39380928762](https://github.com/CalamityStriker/OEC/actions/runs/39380928762), job 118489623737. Actual/target SHA = `132a8a5820a104ec27c14a87c9af3d4f84e83b98`; worktree `$HOME/OEC_feature_sync`.
 - [ ] Live model pipeline remains unaccepted as a whole: the last guarded E2E run blocked before inference due the external CUDA owner. Do not infer a live pass from static tests or the source sync.
+
+
+## 2026-10-20 — Live acceptance retarget and actual Gradio callback testing
+
+- [x] Retargeted live GPU workflows to the reported idle runner `oec-2`; they remain serialized through the common media/storage concurrency group. The former `oec-1` GPU preflight failure is preserved in history.
+- [x] Added headless launch gating to the six model Gradio notebooks so their actual Gradio Interfaces can be launched by a smoke harness without public sharing.
+- [x] Added `tools/run_gradio_model_notebook_smokes.py`: executes notebook code, launches the actual Gradio UI on loopback, checks HTTP 200 HTML, calls the real generation/transcription callback, validates WAV/FLAC headers or non-empty transcript, records artifact SHA-256 and closes the UI.
+- [x] Hardened `tools/run_media_model_smokes.py` to select/pin an actually idle A100 for all four speech/music API providers based on process owner, memory use and GPU utilization; previously only ACE-Step was explicitly pinned.
+- [ ] The new oec-2 Actions runs are triggered by this commit. Do not mark any model/UI/full-pipeline task passed until the run-specific artifacts show generated assets and the E2E report confirms QA→HF upload→remote read-back/reassembly/hash.

@@ -51,3 +51,11 @@
 - Static acceptance [39380928743](https://github.com/CalamityStriker/OEC/actions/runs/39380928743) passed on branch source `132a8a5820a104ec27c14a87c9af3d4f84e83b98`; notebook tests 3/3 and existing notebook JSON checks passed.
 - A100 sync [39380928762](https://github.com/CalamityStriker/OEC/actions/runs/39380928762) passed; `$HOME/OEC_feature_sync` was advanced after StorageManager preflight and the actual SHA matched the target at `132a8a5820a104ec27c14a87c9af3d4f84e83b98`. The 662-entry original checkout remained untouched.
 - This is source/static acceptance only. The live media E2E remains blocked by external process PID 3347078; no inference/QA/upload occurred.
+
+
+## Live runner reroute and real Gradio callback acceptance
+
+- Rerouted the live A100 workflows to `oec-2`, based on the idle runner state supplied by the user. Kept media/storage operations serialized.
+- Added headless launch gating to the six model notebooks and a smoke helper that executes notebook cells, launches the real Gradio Interface on loopback, checks its HTML response, invokes the actual callback, validates generated audio/transcripts, preserves report artifacts plus SHA-256 and closes the UI without a public share.
+- Hardened the live audio provider smoke to choose and pin a physically idle A100 for Kokoro, Whisper, Qwen3-ASR and ACE-Step. It now refuses if GPU/process telemetry is unavailable or no device is available.
+- Current live Actions results are pending; no model/QA/upload pass is implied by these source changes.

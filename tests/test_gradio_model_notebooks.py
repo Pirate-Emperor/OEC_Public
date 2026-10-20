@@ -36,6 +36,14 @@ class ModelNotebookTests(unittest.TestCase):
             self.assertIn('server_name="127.0.0.1"', text, name)
             self.assertIn("share=False", text, name)
             self.assertNotIn("pip install", text.lower(), name)
+    def test_live_gradio_smoke_harness_is_valid_python(self):
+        source = (ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
+        ast.parse(source, filename="tools/run_gradio_model_notebook_smokes.py")
+        runner = (ROOT / "tools" / "run_media_model_smokes.py").read_text(encoding="utf-8")
+        ast.parse(runner, filename="tools/run_media_model_smokes.py")
+        self.assertIn("--check-gradio-notebooks", runner)
+        self.assertIn("_free_a100_gpu()", runner)
+
     def test_service_ui_does_not_import_provider_ml_packages(self):
         for name in ("pipeline_acestep_gradio.ipynb","pipeline_kokoro_gradio.ipynb",
                      "pipeline_whisper_gradio.ipynb","pipeline_qwen3_asr_gradio.ipynb"):

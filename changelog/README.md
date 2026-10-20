@@ -112,3 +112,6 @@ Update the daily changelog, `TODO.md`, `test.json`, and `result.md` at the end o
 
 
 - [2026-10-20 — current-head test and sync pass](CHANGELOG-2026-10-20.md): static run [39380928743](https://github.com/CalamityStriker/OEC/actions/runs/39380928743) and A100 sync [39380928762](https://github.com/CalamityStriker/OEC/actions/runs/39380928762) passed at source SHA `132a8a5820a104ec27c14a87c9af3d4f84e83b98`; clean sibling worktree synced after StorageManager admission.
+
+
+- [2026-10-20 — oec-2 live acceptance and real Gradio callbacks](CHANGELOG-2026-10-20.md): live model workflows now target `oec-2`. The API smoke can launch each notebook UI on loopback, call the wired callback against the live backend, validate outputs and capture SHA-256 evidence. Pending Actions artifacts.

@@ -119,3 +119,17 @@ Once the workflow passes, use `cd "$HOME/OEC_feature_sync"` for notebook/test co
 ## Sync result for this session
 
 Latest run [39380928762](https://github.com/CalamityStriker/OEC/actions/runs/39380928762), job 118489623737, passed by advancing `$HOME/OEC_feature_sync` after fresh StorageManager admission. Exact target and actual source SHA: `132a8a5820a104ec27c14a87c9af3d4f84e83b98`. The existing `$HOME/OEC` detached/dirty checkout was preserved. The static workflow [39380928743](https://github.com/CalamityStriker/OEC/actions/runs/39380928743) passed on that source candidate; this is not a live inference pass.
+
+
+## Live Gradio callback acceptance
+
+`tools/run_gradio_model_notebook_smokes.py` now tests the notebooks' real callback path. For AudioGen/MusicGen it runs in the `phase1` kernel, launches the notebook's Gradio Interface locally, checks the HTML root, invokes the callback, validates the resulting WAV, records SHA-256, and retains a run-scoped report artifact. For ACE-Step/Kokoro/Whisper/Qwen3-ASR it runs in `phase2_3d` while the matching isolated backend is live and posts through the notebook's actual HTTP job client. No public Gradio share URL is created.
+
+The provider workflow can run both backend/API and UI callback acceptance using:
+
+    python tools/run_media_model_smokes.py --providers kokoro,whisper,qwen3-asr --check-gradio-notebooks --require-pass
+    python tools/run_media_model_smokes.py --providers ace-step --check-gradio-notebooks --require-pass
+
+The live worker harness now selects a currently idle A100 using process ownership, memory and utilization telemetry for **all** providers, then sets `CUDA_VISIBLE_DEVICES` to that physical card. If the status query fails or no device is idle, it fails closed. This prevents accidental defaulting to GPU 0 while it is owned by another process.
+
+The live workflows are routed to the runner label `oec-2` because the previous `oec-1` attempt failed the GPU ownership guard. Routing is not a test pass; inspect the current run's job and artifact evidence before marking any model accepted.

@@ -8,6 +8,7 @@ on:
       - feat/media-service-sidecars-20261018
       - fix/media-stack-supervision-20261019
     paths:
+      - ".github/workflows/oec-a100-media-model-bootstrap.yml"
       # Model bootstrap is expensive and shares the A100/storage lane. Keep QA,
       # upload/status and workflow-file-only edits on CPU contract CI; trigger this
       # only for model/runtime/cache/storage changes that need real model acceptance.
@@ -24,6 +25,7 @@ on:
       - "worker_ltx_video.py"
       - "tests/test_oec_service_manager_media.py"
       - "tools/run_media_model_smokes.py"
+      - "tools/run_gradio_model_notebook_smokes.py"
       - "tests/test_ace_step_runtime.py"
       - "tools/media_services/**"
       - "tools/model_cache_manager.py"
@@ -39,13 +41,13 @@ permissions:
   contents: read
 
 concurrency:
-  # Shared oec-1 GPU and StorageManager state: serialize all media jobs.
+  # Shared oec-2 GPU and StorageManager state: serialize all media jobs.
   group: oec-media-gpu-storage-serial
   cancel-in-progress: false
 
 jobs:
   inspect-download-smoke:
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 90
     defaults:
       run:
@@ -89,7 +91,7 @@ jobs:
           fi
           echo "OEC_PYTHON=$selected" >> "$GITHUB_ENV"
           "$selected" --version
-          test "${RUNNER_NAME:-unknown}" = "oec-1" || { echo "::error::Expected oec-1 A100 runner, got ${RUNNER_NAME:-unknown}"; exit 52; }
+          test "${RUNNER_NAME:-unknown}" = "oec-2" || { echo "::error::Expected oec-2 A100 runner, got ${RUNNER_NAME:-unknown}"; exit 52; }
           echo "Runner host: $(hostname)"
           echo "Runner name: $RUNNER_NAME"
           echo "Python: $selected"

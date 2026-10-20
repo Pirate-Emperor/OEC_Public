@@ -397,3 +397,11 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - Current branch SHA `132a8a5820a104ec27c14a87c9af3d4f84e83b98` passed static acceptance in run 39380928743/job 118489623553; new notebook tests 3/3 passed.
 - Sync run 39380928762/job 118489623737 passed after StorageManager admission and updated the isolated `$HOME/OEC_feature_sync` worktree to the current SHA. The primary `$HOME/OEC` checkout remains preserved at its detached HEAD with its 662 dirty/untracked entries.
 - Do not run model GPU tests until a fresh `nvidia-smi`/process-owner check and StorageManager check show the requested device/output admission is safe. Last E2E attempt found external PID 3347078 attached to all eight A100s; release must come from its owner.
+
+
+## 2026-10-20 — User-requested live UI and worker acceptance
+
+- Route live A100 acceptance to the reported idle `oec-2` runner, not the `oec-1` runner that saw an external CUDA owner. Keep GPU/storage tests serialized.
+- For each model-specific notebook, start its actual Gradio interface on loopback, verify the UI responds HTTP 200, invoke the wired callback against the live isolated backend, validate generated WAV/FLAC or ASR transcript, and record the SHA-256 of generated audio.
+- Select/pin a process-checked, low-use A100 for every live speech/music provider. If no device is admitted, fail closed rather than letting the provider default to GPU 0.
+- Static checks and source sync are not live acceptance. Require current Actions artifacts for AudioGen, MusicGen, ACE-Step, Kokoro, Whisper, Qwen3-ASR, FLUX→TRELLIS, LTX/TRELLIS, and full QA/upload/read-back.

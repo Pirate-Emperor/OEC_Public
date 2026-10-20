@@ -7,6 +7,7 @@ on:
     paths:
       - "pipeline_*_gradio.ipynb"
       - "tools/sync_feature_branch_a100.sh"
+      - "tools/run_gradio_model_notebook_smokes.py"
       - "tools/create_clean_a100_test_worktree.sh"
       - "docs/checklist.md"
       - "docs/MODEL_NOTEBOOKS_AND_WORKER_INTEGRATION.md"
@@ -21,12 +22,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: oec-a100-local-repo-sync
+  group: oec-media-gpu-storage-serial
   cancel-in-progress: false
 
 jobs:
   safe-fast-forward:
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 5
     defaults:
       run:
@@ -80,8 +81,8 @@ jobs:
           OEC_SYNC_BRANCH: fix/media-stack-supervision-20261019
         run: |
           set -uo pipefail
-          test "$RUNNER_NAME" = "oec-1" || {
-            echo "::error::Expected oec-1, got $RUNNER_NAME"
+          test "$RUNNER_NAME" = "oec-2" || {
+            echo "::error::Expected oec-2, got $RUNNER_NAME"
             exit 2
           }
           if bash tools/sync_feature_branch_a100.sh; then
