@@ -7,16 +7,97 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: read
 
-# One bounded source-only job; full media/inference acceptance is a separate manual action.
+# Keep the watchdog independent from the GPU-lane lock so it can stop stale runs.
 concurrency:
-  group: oec-media-gpu-storage-serial
+  group: oec-canonical-source-reconcile
   cancel-in-progress: true
 
 jobs:
+  enforce-30-minute-cutoff:
+    name: Stop stale OEC A100 media runs
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-3]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout workflow source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Cancel allow-listed same-branch media runs older than 30 minutes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+
+          repository = os.environ["GITHUB_REPOSITORY"]
+          branch = os.environ["GITHUB_REF_NAME"]
+          this_run = int(os.environ["GITHUB_RUN_ID"])
+          token = os.environ["GITHUB_TOKEN"]
+          cutoff = datetime.timedelta(minutes=30)
+          allowed_paths = {
+              ".github/workflows/oec-live-acceptance-suite.yml",
+              ".github/workflows/oec-model-service-release.yml",
+              ".github/workflows/oec-a100-media-model-bootstrap.yml",
+              ".github/workflows/oec-flux-pipeline-smoke.yml",
+              ".github/workflows/oec-visual-media-sidecar-smoke.yml",
+              ".github/workflows/oec-audiogen-notebook-smoke.yml",
+              ".github/workflows/oec-musicgen-smoke.yml",
+              ".github/workflows/oec-e2e-acceptance.yml",
+          }
+          api = f"https://api.github.com/repos/{repository}/actions/runs"
+          query = urllib.parse.urlencode({"branch": branch, "per_page": 100})
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+          }
+
+          def request_json(url, method="GET"):
+              request = urllib.request.Request(url, headers=headers, data=b"" if method == "POST" else None, method=method)
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  body = response.read()
+                  return response.status, (json.loads(body) if body else {})
+
+          _, payload = request_json(f"{api}?{query}")
+          now = datetime.datetime.now(datetime.timezone.utc)
+          for run in payload.get("workflow_runs", []):
+              run_id = int(run.get("id", 0))
+              if run_id == this_run or run.get("head_branch") != branch:
+                  continue
+              if run.get("path") not in allowed_paths:
+                  continue
+              if run.get("status") not in {"in_progress", "queued", "pending", "waiting", "requested"}:
+                  continue
+              started = run.get("run_started_at") or run.get("created_at")
+              if not started:
+                  continue
+              start = datetime.datetime.fromisoformat(started.replace("Z", "+00:00"))
+              age = now - start
+              if age <= cutoff:
+                  print(f"OEC_DEADLINE_OK run={run_id} age_seconds={int(age.total_seconds())} status={run['status']}")
+                  continue
+              url = f"https://api.github.com/repos/{repository}/actions/runs/{run_id}/cancel"
+              status, _ = request_json(url, method="POST")
+              if status not in (200, 202):
+                  raise SystemExit(f"Cancel request failed for run {run_id}: HTTP {status}")
+              print(f"OEC_DEADLINE_CANCEL_REQUESTED run={run_id} age_seconds={int(age.total_seconds())} path={run.get('path')} status={run.get('status')}")
+          PY
+
   canonical-root-sync:
     name: Sync A100's canonical OEC checkout to GitHub
+    needs: enforce-30-minute-cutoff
+    if: ${{ needs.enforce-30-minute-cutoff.result == 'success' }}
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 12
     defaults:
