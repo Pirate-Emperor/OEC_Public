@@ -1,0 +1,55 @@
+name: OEC safe A100 checkout sync
+
+on:
+  push:
+    branches:
+      - fix/media-stack-supervision-20261019
+    paths:
+      - "pipeline_*_gradio.ipynb"
+      - "docs/checklist.md"
+      - "docs/MODEL_NOTEBOOKS_AND_WORKER_INTEGRATION.md"
+      - "TODO.md"
+      - "tools/sync_feature_branch_a100.sh"
+      - ".github/workflows/oec-a100-local-sync.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-a100-local-repo-sync
+  cancel-in-progress: false
+
+jobs:
+  safe-fast-forward:
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout the exact candidate revision in an isolated Actions workspace
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Fail-closed fast-forward of persistent checkout
+        env:
+          OEC_SYNC_BRANCH: fix/media-stack-supervision-20261019
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-1" || {
+            echo "::error::Expected oec-1, got $RUNNER_NAME"
+            exit 2
+          }
+          bash tools/sync_feature_branch_a100.sh
+
+      - name: Verify the synced persistent checkout equals this tested commit
+        run: |
+          set -euo pipefail
+          expected="$(git rev-parse HEAD)"
+          actual="$(git -C "$HOME/OEC" rev-parse HEAD)"
+          printf 'A100_CHECKOUT_EXPECTED_SHA=%s\n' "$expected"
+          printf 'A100_CHECKOUT_ACTUAL_SHA=%s\n' "$actual"
+          test "$actual" = "$expected"
+          test -z "$(git -C "$HOME/OEC" status --porcelain --untracked-files=all)"

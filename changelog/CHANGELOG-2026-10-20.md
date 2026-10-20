@@ -22,3 +22,5 @@
 ## Validation correction
 
 - The first static run did not find a model/API error; it found that two otherwise intentionally concise CLI notebooks had only two cells. Added an explicit environment/startup cell to both. Preserve the failed run, and only report validation after the next static job finishes.
+
+- Added a fail-closed persistent checkout sync workflow for $HOME/OEC on oec-1. It fast-forwards only when origin/branch/history/working-tree checks pass; otherwise no local files are changed. Actual sync remains pending until logs show PASS and SHA equality.

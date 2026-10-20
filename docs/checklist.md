@@ -57,3 +57,5 @@ The newest StorageManager snapshot from run 39271901007 showed 2.04/2.10 TB grou
 - [ ] Safe-sync the committed branch to $HOME/OEC only after checking the existing local branch and dirty files. This commit does not claim the user-facing working tree or a permanent local A100 checkout has been synchronized.
 
 - [ ] Candidate validation follow-up: Action 39378972546 is a preserved historical failure; require a new passing static run on the corrected commit before describing notebook syntax as validated.
+
+- [ ] A fail-closed A100 sync workflow/script has been added; it must run and prove OEC_A100_SYNC=PASS plus expected==actual SHA before claiming the long-lived $HOME/OEC checkout was updated. The workflow intentionally blocks on dirty checkout, wrong origin/branch, or divergent history.

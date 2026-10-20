@@ -340,3 +340,8 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 ## Static validation follow-up — 2026-10-20
 
 - Preserved failure [run 39378972546](https://github.com/CalamityStriker/OEC/actions/runs/39378972546). The failure was the static validator asserting at least three cells in pipeline_audiogen_gradio.ipynb; both CLI notebooks used two cells. The Python AST loop did not run for those notebooks. Added a dedicated environment/safety cell to both; wait for the next Actions result before marking Python/notebook validation passed.
+
+## 2026-10-20 — Safe persistent-checkout sync gate
+
+- Added tools/sync_feature_branch_a100.sh and .github/workflows/oec-a100-local-sync.yml. The designated oec-1 runner attempts only a clean same-branch fast-forward from origin; it does not clone, branch-switch, reset, delete files or touch GPU/storage state.
+- The live A100 checkout is not yet claimed synced: await this workflow's log and require OEC_A100_SYNC=PASS and matching target/after SHA. If the tree is dirty or origin/branch differs, resolve that state without overwriting it.

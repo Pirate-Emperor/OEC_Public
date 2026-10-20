@@ -85,3 +85,8 @@ Keep models in OEC core worker/service processes; do not import model packages i
 10. [ ] Run static notebook tests and actual Gradio/provider tests separately; mark statuses independently.
 11. [ ] Audit the existing Wan notebook and complete model catalogue for environment/licensing/cache/UI gaps.
 12. [ ] Recheck environment pins without bulk-upgrading shared Conda stacks.
+
+
+## Persistent A100 checkout synchronization
+
+A fail-closed workflow attempts to fast-forward the persistent $HOME/OEC checkout after branch updates. It will not clone, switch branches, reset files, overwrite local changes or replace a divergent history. It proceeds only when the checkout exists, origin identifies CalamityStriker/OEC, the local branch is fix/media-stack-supervision-20261019, the working tree is clean and origin is a fast-forward descendant. The workflow must show OEC_A100_SYNC=PASS and matching before/after/target SHAs before we claim that the long-lived checkout is synced. If it blocks, preserve the local tree and resolve its branch/dirty/origin issue manually.
