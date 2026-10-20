@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-20T21:35:00+05:30",
+  "last_updated": "2026-10-20T21:45:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Current live-tested code SHA 72b71f861bba72b78da1cec330e4273b00baaabb has an exact-head static pass (run 39452849501). Live A100 suite 39452849617 is not terminal: source sync and authorized lock recovery passed; the Kokoro/Whisper/Qwen3-ASR/ACE-Step job passed with Whisper's new segment_timestamps returned in its real callback and ACE-Step real FLAC; AudioGen real notebook and Gradio callback passed; MusicGen job 118741175823 remains queued. The prior parent SHA 0c53f6a... is the newest completed full live run (39435100568, 8/8 jobs, including LTX→Qwen2-VL QA→HF chunk upload/read-back). Do not mark the complete exact-head suite finished while 39452849617 remains non-terminal. Persistent service readiness remains unproven, and FLUX/AudioGen/MusicGen not exposed through shared /v1/jobs.",
+  "latest_summary": "Current code SHA 72b71f861bba72b78da1cec330e4273b00baaabb has exact-head static pass (run 39452849501). Live A100 suite 39452849617 remains non-terminal: source sync and authorized lock recovery passed; the actual Whisper callback returned new segment_timestamps; Kokoro/Qwen3-ASR passed; ACE-Step generated a real FLAC; AudioGen actual inference and Gradio callback passed. MusicGen job 118741175823 was cancelled before starting with no inference output and no reported reason; LTX/TRELLIS job 118743897523 remains at storage/cache preflight. Latest completed full suite is parent SHA 0c53f6a... run 39435100568 (8/8 jobs, including LTX→QA→HF chunk upload/read-back). Persistent services remain unproven; FLUX, AudioGen, MusicGen not exposed via shared /v1/jobs.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -5432,7 +5432,7 @@
         "Do not claim live Whisper timestamp result until the live run completes.",
         "Persistent production service readiness not tested by temporary Action-scoped APIs."
       ],
-      "current_live_status": "IN_PROGRESS_WAITING_FOR_MUSICGEN_AND_REMAINING_PIPELINE",
+      "current_live_status": "IN_PROGRESS_LTX_TRELLIS_AFTER_MUSICGEN_CANCELLED_BEFORE_START",
       "whisper_real_gradio_callback": "PASS",
       "whisper_segment_timestamps": [
         {
@@ -5466,7 +5466,10 @@
       },
       "audiogen_job_id": 118738532097,
       "musicgen_job_id": 118741175823,
-      "musicgen_job_status": "queued"
+      "musicgen_job_status": "cancelled_before_start_no_result_reason_unreported",
+      "ltx_trellis_job_id": 118743897523,
+      "ltx_trellis_job_status": "in_progress_storage_cache_preflight",
+      "musicgen_cancel_reason": "Not reported in job record; unknown."
     },
     {
       "id": "LIVE-2026-10-20-PARENT-SHA-MEDIA-E2E-ACCEPTANCE",
