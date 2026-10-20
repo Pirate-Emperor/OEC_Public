@@ -175,33 +175,92 @@ git -C "$ROOT" checkout -B "$EXPECTED_BRANCH" "$TARGET_SHA"
 ACTUAL_SHA="$(git -C "$ROOT" rev-parse HEAD)"
 [[ "$ACTUAL_SHA" == "$TARGET_SHA" ]] || fail "canonical checkout SHA differs from remote target" 28
 
-# Match initialized submodule worktrees to the gitlink revisions pinned by this OEC commit.
-# Never switch a submodule with local edits or non-ignored untracked files; fail closed instead.
-while IFS=$'\t' read -r meta subpath; do
-  [[ -n "$subpath" ]] || continue
-  read -r mode type expected_sub_sha <<< "$meta"
-  [[ "$mode" == "160000" && "$type" == "commit" ]] || continue
-  subroot="$ROOT/$subpath"
-  [[ -e "$subroot/.git" ]] || fail "submodule $subpath is not initialized; no clone was attempted" 30
-  current_sub_sha="$(git -C "$subroot" rev-parse HEAD)"
-  sub_dirty="$(git -C "$subroot" status --porcelain --untracked-files=all)"
-  if [[ -n "$sub_dirty" ]]; then
-    printf 'OEC_SUBMODULE_SYNC_BLOCKED path=%s expected=%s actual=%s reason=local_changes_preserved\n' "$subpath" "$expected_sub_sha" "$current_sub_sha" >&2
-    fail "submodule $subpath has local edits/untracked files; refusing to change its checkout" 31
+# Recursively align initialized submodules to the exact gitlink pins.
+# Before each checkout, protect tracked source and loose files; ignored model caches remain in place.
+archive_submodule_residual() {
+  local wt="$1" label="$2"
+  local list="$BACKUP_ROOT/$label-nonignored-paths.nul"
+  local status changed stash_sha rel src dst
+  status="$(git -C "$wt" status --porcelain --untracked-files=all)"
+  [[ -n "$status" ]] || return 0
+
+  printf 'OEC_SUBMODULE_POST_CHECKOUT_STATUS_BEGIN path=%s\n' "$label"
+  git -C "$wt" status --short --untracked-files=all
+  printf 'OEC_SUBMODULE_POST_CHECKOUT_STATUS_END path=%s\n' "$label"
+
+  changed="$(git -C "$wt" diff --name-only HEAD; git -C "$wt" diff --cached --name-only)"
+  if [[ -n "$changed" ]]; then
+    git -C "$wt" stash push -m "OEC post-checkout recovery $RUN_ID ($label)"
+    stash_sha="$(git -C "$wt" rev-parse refs/stash)"
+    git -C "$wt" update-ref "refs/oec-sync-recovery/$RUN_ID/post-checkout-stash" "$stash_sha"
+    printf 'OEC_SUBMODULE_POST_CHECKOUT_TRACKED_STASH path=%s sha=%s\n' "$label" "$stash_sha"
+    printf '%s\t%s\n' "$label" "$stash_sha" >> "$BACKUP_ROOT/submodule-stashes.tsv"
   fi
-  if [[ "$current_sub_sha" != "$expected_sub_sha" ]]; then
-    git -C "$subroot" update-ref "refs/oec-sync-recovery/$RUN_ID/pre-sync-head" "$current_sub_sha"
-    printf 'OEC_SUBMODULE_SYNC_START path=%s current=%s expected=%s\n' "$subpath" "$current_sub_sha" "$expected_sub_sha"
-    git -C "$ROOT" submodule update --checkout -- "$subpath"
-    current_sub_sha="$(git -C "$subroot" rev-parse HEAD)"
-  fi
-  [[ "$current_sub_sha" == "$expected_sub_sha" ]] || fail "submodule $subpath SHA does not match the OEC branch gitlink" 32
-  [[ -z "$(git -C "$subroot" status --porcelain --untracked-files=all)" ]] || fail "submodule $subpath changed during alignment" 33
-  printf 'OEC_SUBMODULE_SYNC_PASS path=%s sha=%s\n' "$subpath" "$current_sub_sha"
-done < <(git -C "$ROOT" ls-tree -r HEAD)
+
+  git -C "$wt" ls-files --others --exclude-standard -z > "$list"
+  while IFS= read -r -d '' rel; do
+    [[ -n "$rel" && "$rel" != /* && "$rel" != .. && "$rel" != ../* && "$rel" != */../* ]] ||
+      fail "unsafe untracked path appeared in submodule recovery manifest" 40
+    src="$wt/$rel"
+    [[ -e "$src" || -L "$src" ]] || continue
+    dst="$BACKUP_ROOT/submodule-loose/$label/$rel"
+    mkdir -p "$(dirname -- "$dst")"
+    mv -- "$src" "$dst"
+  done < "$list"
+
+  [[ -z "$(git -C "$wt" status --porcelain --untracked-files=all)" ]] ||
+    fail "submodule residual content remains after tracked stash and loose-file backup: $label" 41
+  printf 'OEC_SUBMODULE_POST_CHECKOUT_PRESERVED_AND_CLEAN path=%s\n' "$label"
+}
+
+sync_pinned_submodules() {
+  local parent="$1" parent_label="$2"
+  local meta rel mode type expected child current safe_label nonignored
+  while IFS=$'\t' read -r meta rel; do
+    [[ -n "$rel" ]] || continue
+    read -r mode type expected <<< "$meta"
+    [[ "$mode" == "160000" && "$type" == "commit" ]] || continue
+    child="$parent/$rel"
+    safe_label="\${parent_label//\//__}__\${rel//\//__}"
+
+    [[ -e "$child/.git" ]] ||
+      fail "submodule $parent_label/$rel is not initialized; refusing an unbounded clone" 42
+
+    # Changes outside nested gitlinks indicate real local source; keep and block on those.
+    if ! git -C "$child" diff --quiet --ignore-submodules=all HEAD -- . ||
+       ! git -C "$child" diff --cached --quiet --ignore-submodules=all HEAD -- .; then
+      printf 'OEC_SUBMODULE_LOCAL_SOURCE_CHANGES path=%s/%s\n' "$parent_label" "$rel" >&2
+      git -C "$child" status --short --untracked-files=all >&2 || true
+      fail "submodule has local tracked edits; preserving them and refusing checkout: $parent_label/$rel" 43
+    fi
+    nonignored="$(git -C "$child" ls-files --others --exclude-standard | wc -l | tr -d '[:space:]')"
+    [[ "$nonignored" == "0" ]] || {
+      printf 'OEC_SUBMODULE_LOCAL_LOOSE_FILES path=%s/%s count=%s\n' "$parent_label" "$rel" "$nonignored" >&2
+      git -C "$child" status --short --untracked-files=all >&2 || true
+      fail "submodule has non-ignored loose files; preserving them and refusing checkout: $parent_label/$rel" 44
+    }
+
+    current="$(git -C "$child" rev-parse HEAD)"
+    if [[ "$current" != "$expected" ]]; then
+      git -C "$child" update-ref "refs/oec-sync-recovery/$RUN_ID/pre-sync-head" "$current"
+      printf 'OEC_SUBMODULE_SYNC_START path=%s/%s current=%s expected=%s\n' "$parent_label" "$rel" "$current" "$expected"
+      git -C "$parent" submodule update --checkout -- "$rel"
+      current="$(git -C "$child" rev-parse HEAD)"
+    fi
+    [[ "$current" == "$expected" ]] ||
+      fail "submodule SHA does not match the OEC gitlink: $parent_label/$rel" 45
+
+    # Match nested submodules before judging whether the containing checkout is clean.
+    sync_pinned_submodules "$child" "$safe_label"
+    archive_submodule_residual "$child" "$safe_label"
+    printf 'OEC_SUBMODULE_SYNC_PASS path=%s/%s sha=%s\n' "$parent_label" "$rel" "$current"
+  done < <(git -C "$parent" ls-tree -r HEAD)
+}
+
+sync_pinned_submodules "$ROOT" "root"
 
 [[ -z "$(git -C "$ROOT" status --porcelain --untracked-files=all)" ]] ||
-  fail "canonical checkout not clean after source and safe submodule synchronization; recovery data remains in place" 34
+  fail "canonical checkout not clean after source and recursive submodule synchronization; recovery data remains in place" 46
 
 cat > "$BACKUP_ROOT/README.txt" <<EOF
 OEC canonical A100 checkout reconciliation
@@ -214,7 +273,8 @@ Tracked root changes: refs/oec-sync-recovery/$RUN_ID/root-stash (if created)
 Previous root HEAD: refs/oec-sync-recovery/$RUN_ID/root-head
 Previous sibling worktree HEAD: refs/oec-sync-recovery/$RUN_ID/feature-sync-head (if present)
 Untracked files from each checkout are preserved under this directory with NUL-delimited path manifests.
-No model cache or storage reserve file was intentionally deleted.
+Post-checkout submodule residual tracked edits are held in per-submodule Git recovery refs/stashes; non-ignored loose files are moved into this recovery directory.
+Ignored model caches remain in place; no storage reserve file was intentionally deleted.
 EOF
 
 {
