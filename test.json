@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-20T15:00:00+05:30",
+  "last_updated": "2026-10-20T15:45:14.924+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Latest verified evidence: static/storage suite passed at d037bfff24f7ffef7bc2ac640071f6eb6d3dea71 (run 39402803588). Ordered A100 suite for that SHA is pending behind the serialized GPU run. At source 9db29e82c8346ee245dfe7db6a527feb0dde2d99, AudioGen inference passed (3s/16kHz mono WAV, 96078 bytes; SHA c543c2e6a45a44a89f45d22a135ac5000b154f0025d2e93592a31c672589e7ba; 5.155 GiB peak allocated) and MusicGen inference passed (3s/32kHz mono WAV, 192044 bytes; SHA 0cbb209e90f823ef309457410d72ac53899d378b5df6d19db476189d30e61d7b; 4.352 GiB peak allocated). AudioGen Gradio root reached HTTP 200 but its callback failed due to a scratch path outside /tmp; MusicGen job failed after successful generation due to wrong .info.json shell path. Kokoro/Whisper/Qwen3-ASR environment prep passed, but their smoke failed before inference due to a missing root import path. ACE-Step steps were skipped and have not passed. Prior run 39388844316 passed LTX and TRELLIS output generation; current candidate still needs repeat acceptance, FLUX→TRELLIS, end-to-end QA/HF upload/read-back.",
+  "latest_summary": "OEC media-readiness candidate: added read-only provider readiness semantics and an OEC_Deploy integration contract; aligned supervised service GPU admission with the shared process-aware selector and provider VRAM floors; fixed known FLUX fixture, QA DB status comparison and AudioCraft Gradio/workflow output bugs. Prior live run 39401991943 passed LTX/TRELLIS actual asset generation and AudioGen/MusicGen CLI inference. Speech and ACE-Step are not yet accepted; OEC-Deploy remains unmodified; exact-head acceptance of candidate changes is pending.",
   "experiments": [
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
@@ -5080,6 +5080,90 @@
         "Run ACE-Step only if fresh StorageManager admission permits it",
         "Complete FLUX->TRELLIS and QA/HF upload/read-after-write E2E",
         "Do not purge any model cache before second-inference and restart/reload evidence"
+      ]
+    },
+    {
+      "id": "EXP-2026-10-20-OEC-MEDIA-READINESS-INTEGRATION",
+      "date": "2026-10-20",
+      "category": "Media-service readiness and downstream deployment contract",
+      "source_sha": "pending-candidate-commit",
+      "runner": "oec-2",
+      "environments": {
+        "ltx": "phase1_ltx",
+        "trellis": "phase2_3d",
+        "audiogen": "phase1",
+        "musicgen": "phase1",
+        "ace_step": "oec-acestep-py311",
+        "speech": "oec-audio-py311"
+      },
+      "results": [
+        {
+          "provider": "LTX-2.3",
+          "status": "PASS_RUN_SPECIFIC",
+          "run_id": 39401991943,
+          "artifact": "validated MP4",
+          "bytes": 242547,
+          "sha256": "5d7d54de4354936f66867fecd19d20c0ab6972b5d997ca00c145ab0c1e54ec51",
+          "limitation": "action-scoped sidecar; must recheck persistent readiness"
+        },
+        {
+          "provider": "TRELLIS.2",
+          "status": "PASS_RUN_SPECIFIC",
+          "run_id": 39401991943,
+          "artifact": "validated GLB",
+          "bytes": 2879276,
+          "sha256": "42ffde231b855564414222306eeabb3913c9e2b9d3fab10e05f21b9240cf533d",
+          "limitation": "action-scoped sidecar; must recheck persistent readiness"
+        },
+        {
+          "provider": "AudioGen",
+          "status": "CLI_INFERENCE_PASS_UI_ACCEPTANCE_PENDING",
+          "run_id": 39401991943,
+          "artifact": "3s mono 16kHz WAV",
+          "bytes": 96078,
+          "sha256": "c543c2e6a45a44a89f45d22a135ac5000b154f0025d2e93592a31c672589e7ba",
+          "peak_allocated_vram_gib": 5.155,
+          "limitation": "prior Gradio callback failed due output outside /tmp; fix awaits rerun"
+        },
+        {
+          "provider": "MusicGen",
+          "status": "CLI_INFERENCE_PASS_WORKFLOW_POSTCHECK_FAILED",
+          "run_id": 39401991943,
+          "artifact": "3s mono 32kHz WAV",
+          "bytes": 192044,
+          "sha256": "0cbb209e90f823ef309457410d72ac53899d378b5df6d19db476189d30e61d7b",
+          "peak_allocated_vram_gib": 4.352,
+          "limitation": "generation succeeded; .info.json copy path was wrong; fixed in candidate"
+        },
+        {
+          "provider": "ACE-Step",
+          "status": "NOT_ACCEPTED",
+          "limitation": "prior speech failure skipped stage; new workflow runs stage independently"
+        },
+        {
+          "provider": "Kokoro/Whisper/Qwen3-ASR",
+          "status": "BLOCKED_BEFORE_INFERENCE",
+          "limitation": "prior smoke failed importing shared GPU selector; import path fix awaits exact-head rerun"
+        },
+        {
+          "provider": "FLUX-to-TRELLIS",
+          "status": "BLOCKED_IN_FIXTURE",
+          "limitation": "old test fixture omitted memory.total; fixture corrected"
+        },
+        {
+          "provider": "QA-to-HF upload",
+          "status": "QA_PASS_HANDOFF_CHECK_FAILED",
+          "limitation": "QA outcome was PENDING_UPLOAD while DB upload status correctly used PENDING; canonical constant comparison fixed; remote upload/readback not accepted"
+        }
+      ],
+      "next_actions": [
+        "Commit candidate and run static tests on exact SHA",
+        "Verify current health endpoints using tools/check_media_service_readiness.py on persistent host",
+        "Run independent speech and ACE-Step inference and Gradio event acceptance",
+        "Rerun FLUX-to-TRELLIS and verify PNG/GLB artifacts",
+        "Rerun QA->HF upload->remote hash read-back",
+        "Keep AudioGen/MusicGen NOT_EXPOSED until supervised HTTP job APIs are implemented",
+        "Do not merge to main until current candidate validates and branch divergence is reconciled"
       ]
     }
   ]

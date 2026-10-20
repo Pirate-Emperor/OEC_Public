@@ -39,7 +39,8 @@ class OecE2EAcceptanceContractTests(unittest.TestCase):
         self.assertIn("create_run_scoped_queue(run_db, asset_path, metadata_path)", self.source)
         self.assertIn('"--db-path", str(run_db)', self.source)
         self.assertIn('"--once", "--asset-id", str(asset_id)', self.source)
-        self.assertIn('row[0] != "PENDING_UPLOAD"', self.source)
+        self.assertIn("from asset_status import UPLOAD_PENDING", self.source)
+        self.assertIn("row[0] != UPLOAD_PENDING", self.source)
         self.assertIn('passed_metadata.get("qa_passed") is not True', self.source)
 
     def test_upload_is_chunked_opt_in_and_not_continuous_daemon(self):

@@ -20,6 +20,7 @@ import time
 import traceback
 import uuid
 from pathlib import Path
+from asset_status import UPLOAD_PENDING
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -358,8 +359,8 @@ def main() -> int:
             report["note"] = "A complete QA rejection is recorded; upload was correctly not attempted."
             write_json(report_root / "pipeline-report.json", report)
             return 2
-        if qa_outcome != "PENDING_UPLOAD" or row is None or row[0] != "PENDING_UPLOAD":
-            raise RuntimeError(f"QA did not hand off the selected asset to PENDING_UPLOAD (outcome={qa_outcome}, row={row})")
+        if qa_outcome != "PENDING_UPLOAD" or row is None or row[0] != UPLOAD_PENDING:
+            raise RuntimeError(f"QA did not hand off the selected asset to the canonical uploader status {UPLOAD_PENDING!r} (QA outcome={qa_outcome}, row={row})")
         if not asset_path.is_file() or not metadata_path.is_file():
             raise RuntimeError("QA hand-off row is pending upload but one or both files are missing")
         passed_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))

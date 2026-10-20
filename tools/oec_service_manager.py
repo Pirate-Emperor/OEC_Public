@@ -25,6 +25,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 HOST = socket.gethostname()
 DEFAULT_CONDA_ROOT = Path(os.environ.get("CONDA_ROOT", str(Path.home() / "Conda"))).expanduser()
 STATE_ROOT = Path(os.environ.get(
@@ -82,39 +84,46 @@ def _available_physical_gpus() -> list[str]:
     return ids
 
 
-def _assert_gpu_idle(gpu: str) -> None:
-    """Refuse a new service when an untracked compute process occupies its physical GPU."""
+def _assert_gpu_idle(gpu: str, min_free_mib: int = 0) -> None:
+    """Use the shared fail-closed A100 admission policy for a requested physical card.
+
+    A CUDA context is not treated as an idle GPU by default. The only optional
+    exception is the explicitly enabled, same-user OEC-Play context validated by
+    oec_gpu_admission; unknown owners and insufficient free VRAM always block.
+    """
     if not gpu.isdigit():
         raise ValueError("--gpu must be a non-negative physical GPU index.")
-    inventory = subprocess.run(
-        ["nvidia-smi", "--query-gpu=index,uuid", "--format=csv,noheader,nounits"],
-        capture_output=True, text=True, timeout=10, check=False,
-    )
-    if inventory.returncode:
-        raise RuntimeError("Could not verify GPU inventory; refusing model-service launch.")
-    targets = set()
-    for line in inventory.stdout.splitlines():
-        fields = [part.strip() for part in line.split(",")]
-        if len(fields) >= 2 and fields[0].isdigit() and str(int(fields[0])) == str(int(gpu)):
-            targets.add(fields[1])
-    if not targets:
-        raise RuntimeError(f"Physical GPU {gpu} was not present in the fresh nvidia-smi inventory.")
-    processes = subprocess.run(
-        ["nvidia-smi", "--query-compute-apps=gpu_uuid,pid", "--format=csv,noheader,nounits"],
-        capture_output=True, text=True, timeout=10, check=False,
-    )
-    if processes.returncode:
-        raise RuntimeError("Could not verify GPU process occupancy; refusing model-service launch.")
-    pids = []
-    for line in processes.stdout.splitlines():
-        fields = [part.strip() for part in line.split(",")]
-        if len(fields) >= 2 and fields[0] in targets:
-            pids.append(fields[1])
-    if pids:
-        raise RuntimeError(
-            f"Physical GPU {gpu} already has compute PID(s) {','.join(pids)}; "
-            "inspect ownership and memory before starting another model service."
+    from oec_gpu_admission import select_idle_a100_gpu
+    try:
+        selected = select_idle_a100_gpu(
+            requested=int(gpu), min_free_mib=int(min_free_mib), caller="SERVICE_MANAGER"
         )
+    except Exception as exc:
+        raise RuntimeError(
+            f"Physical GPU {gpu} failed OEC A100 admission; service launch refused: "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+    _emit(
+        f"GPU_ADMISSION_PASS physical_gpu={gpu} free_mib={selected['free_mib']} "
+        f"shared_oec_play_context={selected['shared_oec_play_context']}"
+    )
+
+
+def _minimum_free_vram_mib(service: str, provider: str) -> int:
+    """Conservative per-provider launch floor; final runtime may need more memory."""
+    if service == "ltx-sidecar":
+        return 24 * 1024
+    if service == "trellis-sidecar":
+        return 20 * 1024
+    if provider == "ace-step":
+        return 16 * 1024
+    if provider == "qwen3-asr":
+        return 6 * 1024
+    if provider == "whisper":
+        return 4 * 1024
+    if provider == "kokoro":
+        return 2 * 1024
+    return 0
 
 
 def _assert_port_available(port: int) -> None:
@@ -514,7 +523,7 @@ def _start_media_service(args: argparse.Namespace, service: str, conda_root: Pat
         port=args.media_port, python_override=args.python,
     )
     _assert_gpu_available(spec["gpus"])
-    _assert_gpu_idle(next(iter(spec["gpus"])))
+    _assert_gpu_idle(next(iter(spec["gpus"])), min_free_mib=_minimum_free_vram_mib(service, spec["provider"]))
     _assert_port_available(spec["port"])
     if service == "audio-api" and spec["environment"] in {"oec-audio-py311", "oec-acestep-py311"}:
         if not spec["python_override"] or not Path(spec["python_override"]).is_file():

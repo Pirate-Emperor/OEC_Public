@@ -28,6 +28,7 @@ on:
       - "hf_upload_daemon.py"
       - "asset_status.py"
       - "tools/run_gradio_model_notebook_smokes.py"
+      - "tools/check_media_service_readiness.py"
       - "tools/run_media_model_smokes.py"
       - "tools/run_audiogen_notebook_smoke.py"
       - "tools/run_visual_media_sidecar_smokes.py"
@@ -164,11 +165,12 @@ jobs:
           done
           test -n "$selected" || { echo "::error::No existing StorageManager Python"; exit 2; }
           echo "OEC_PYTHON=$selected" >> "$GITHUB_ENV"
-          "$selected" -m py_compile tools/prepare_media_models.py tools/prepare_media_runtime.py tools/prepare_ace_step_runtime.py tools/run_media_model_smokes.py tools/run_gradio_model_notebook_smokes.py tools/media_services/common.py tools/media_services/audio_api.py tools/media_services/smoke_client.py tools/oec_service_manager.py
+          "$selected" -m py_compile tools/prepare_media_models.py tools/prepare_media_runtime.py tools/prepare_ace_step_runtime.py tools/run_media_model_smokes.py tools/run_gradio_model_notebook_smokes.py tools/check_media_service_readiness.py tools/media_services/common.py tools/media_services/audio_api.py tools/media_services/smoke_client.py tools/oec_service_manager.py
           "$selected" -m unittest discover -s tests -p 'test_media_service_api.py' -v
           "$selected" -m unittest discover -s tests -p 'test_audio_service_validation.py' -v
           "$selected" -m unittest discover -s tests -p 'test_oec_service_manager_media.py' -v
           "$selected" -m unittest discover -s tests -p 'test_ace_step_runtime.py' -v
+          "$selected" -m unittest discover -s tests -p 'test_media_service_readiness.py' -v
       - name: Capture storage/cache state and recover only authorized expired locks
         run: |
           set -euo pipefail
@@ -178,6 +180,7 @@ jobs:
           "$OEC_PYTHON" storage_manager.py --status 2>&1 | tee "$R/storage-before.log"
           "$OEC_PYTHON" -c 'from pathlib import Path; from core_config import SYSTEM_DIRS; blocked=[str(Path(SYSTEM_DIRS[a])/n) for a in ("models","outputs") for n in (".storage_pause.lock",".storage_lease.json") if (Path(SYSTEM_DIRS[a])/n).exists() or (Path(SYSTEM_DIRS[a])/n).is_symlink()]; print("STORAGE_LOCK_GUARD=" + ("BLOCKED " + ",".join(blocked) if blocked else "PASS no lock/lease files")); raise SystemExit(3 if blocked else 0)'
           "$OEC_PYTHON" storage_manager.py --status 2>&1 | tee "$R/storage-after-authorized-recovery.log"
+          "$OEC_PYTHON" tools/check_media_service_readiness.py --json 2>&1 | tee "$R/readiness-before.json"
       - name: Download only missing speech checkpoints through StorageManager admission
         run: |
           set -euo pipefail
@@ -192,15 +195,19 @@ jobs:
           "$OEC_PYTHON" -c 'from storage_manager import storage_preflight; ok, reason = storage_preflight("models", required_gb=1.5, require_fresh_quota=True, minimum_free_gb=2.0); print("AUDIO_RUNTIME_STORAGE_ADMISSION=" + str(bool(ok)) + " reason=" + str(reason)); raise SystemExit(0 if ok else 2)'
           "$OEC_PYTHON" tools/prepare_media_runtime.py
       - name: Live service and real Kokoro/Whisper/Qwen3-ASR Gradio callbacks
+        id: speech_gradio
+        continue-on-error: true
         run: |
           set -euo pipefail
           "$OEC_PYTHON" tools/run_media_model_smokes.py --providers kokoro,whisper,qwen3-asr --check-gradio-notebooks --require-pass 2>&1 | tee "$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/media-services/speech-gradio-smoke.log"
       - name: Download missing ACE-Step checkpoint groups through StorageManager
+        id: ace_step_download
         run: |
           set -euo pipefail
           "$OEC_PYTHON" tools/prepare_media_models.py download --model ace-step-main
           "$OEC_PYTHON" tools/prepare_media_models.py download --model ace-step-lm-0.6b
       - name: Install pinned ACE-Step into its isolated Python environment
+        id: ace_step_install
         run: |
           set -euo pipefail
           ACE_BASE_PYTHON=""
@@ -212,14 +219,34 @@ jobs:
           test -n "$ACE_BASE_PYTHON" || { echo "::error::No existing Python 3.11/3.12 runtime for isolated ACE-Step"; exit 2; }
           "$ACE_BASE_PYTHON" tools/prepare_ace_step_runtime.py install
       - name: Live ACE-Step generation and Gradio notebook callback
+        id: ace_step_live
         run: |
           set -euo pipefail
           "$OEC_PYTHON" tools/run_media_model_smokes.py --providers ace-step --check-gradio-notebooks --require-pass 2>&1 | tee "$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/media-services/ace-step-gradio-smoke.log"
+      - name: Enforce independent speech and ACE-Step acceptance
+        if: always()
+        env:
+          SPEECH_OUTCOME: ${{ steps.speech_gradio.outcome }}
+          ACE_DOWNLOAD_OUTCOME: ${{ steps.ace_step_download.outcome }}
+          ACE_INSTALL_OUTCOME: ${{ steps.ace_step_install.outcome }}
+          ACE_LIVE_OUTCOME: ${{ steps.ace_step_live.outcome }}
+        run: |
+          set -u
+          echo "SPEECH_ACCEPTANCE_OUTCOME=$SPEECH_OUTCOME"
+          echo "ACE_STEP_DOWNLOAD_OUTCOME=$ACE_DOWNLOAD_OUTCOME"
+          echo "ACE_STEP_INSTALL_OUTCOME=$ACE_INSTALL_OUTCOME"
+          echo "ACE_STEP_LIVE_OUTCOME=$ACE_LIVE_OUTCOME"
+          if [[ "$SPEECH_OUTCOME" != "success" || "$ACE_DOWNLOAD_OUTCOME" != "success" || "$ACE_INSTALL_OUTCOME" != "success" || "$ACE_LIVE_OUTCOME" != "success" ]]; then
+            echo "::error::At least one speech or ACE-Step acceptance stage did not pass; see per-stage evidence above."
+            exit 1
+          fi
+
       - name: Final StorageManager status
         if: always()
         run: |
           set +e
           if [[ -n "$OEC_PYTHON" ]]; then "$OEC_PYTHON" storage_manager.py --status 2>&1 | tee "$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/media-services/storage-final.log"; fi
+          if [[ -n "$OEC_PYTHON" ]]; then "$OEC_PYTHON" tools/check_media_service_readiness.py --json 2>&1 | tee "$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/media-services/readiness-after.json"; fi
       - name: Upload API/UI live evidence
         if: always()
         uses: actions/upload-artifact@v4

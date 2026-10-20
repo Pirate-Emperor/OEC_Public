@@ -58,6 +58,16 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn('return "boolean"', source)
         self.assertIn("urllib.request.ProxyHandler({})", source)
 
+    def test_speech_failure_does_not_skip_ace_step_acceptance(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-live-acceptance-suite.yml").read_text(encoding="utf-8")
+        self.assertIn("id: speech_gradio", workflow)
+        self.assertIn("continue-on-error: true", workflow)
+        self.assertIn("id: ace_step_download", workflow)
+        self.assertIn("id: ace_step_install", workflow)
+        self.assertIn("id: ace_step_live", workflow)
+        self.assertIn("Enforce independent speech and ACE-Step acceptance", workflow)
+        self.assertIn('ACE_LIVE_OUTCOME: ${{ steps.ace_step_live.outcome }}', workflow)
+
     def test_service_ui_does_not_import_provider_ml_packages(self):
         for name in ("pipeline_acestep_gradio.ipynb","pipeline_kokoro_gradio.ipynb",
                      "pipeline_whisper_gradio.ipynb","pipeline_qwen3_asr_gradio.ipynb"):

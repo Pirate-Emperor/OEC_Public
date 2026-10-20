@@ -104,3 +104,11 @@
 - MusicGen live inference passed (3s/32kHz/mono WAV, 192,044 bytes; SHA-256 `0cbb209e90f823ef309457410d72ac53899d378b5df6d19db476189d30e61d7b`). The workflow's metadata-copy path was wrong after a successful generation; corrected.
 - Kokoro/Whisper/Qwen3-ASR prepared their runtime but the inference step stopped at a missing repo-root import; corrected in the candidate. ACE-Step was skipped because the previous required job failed and remains unverified.
 - Next live run must prove actual Gradio event requests, speech generation/transcription, ACE-Step FLAC, current-source FLUX→TRELLIS artifact chain, and QA → chunked HF upload → remote hash read-back. Do not purge shared caches until model-specific second-inference and restart/reload tests pass; never modify `.storage_reserve.bin`.
+
+## 2026-10-20 — Readiness contract and candidate integration fixes
+
+- Added a read-only per-provider readiness CLI and detailed OEC_Deploy integration guide. It uses actual loopback HTTP health and model-loaded state for READY and keeps runtime/checkpoint preflight separate.
+- Aligned media service manager GPU selection with the shared process-aware admission helper and conservative provider VRAM floors.
+- Fixed a missing nvidia-smi memory.total field in FLUX test fixtures and corrected the E2E QA handoff assertion to use asset_status.UPLOAD_PENDING rather than the QA outcome marker.
+- Fixed AudioGen/MusicGen scratch output under /tmp and the MusicGen .info.json copy path.
+- The ordered workflow now runs ACE-Step stages independently of speech-stage failure and retains a final overall gate. Exact-head run results remain pending.

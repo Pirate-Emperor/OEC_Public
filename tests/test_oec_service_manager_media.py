@@ -90,6 +90,24 @@ class MediaServiceSpecTests(unittest.TestCase):
         args = parser.parse_args(["start", "ltx-sidecar", "--gpu", "3"])
         self.assertEqual(args.service, "ltx-sidecar")
 
+    def test_service_gpu_guard_uses_explicit_shared_admission_and_vram_floor(self):
+        with mock.patch("oec_gpu_admission.select_idle_a100_gpu", return_value={
+            "index": "4", "free_mib": "39900", "shared_oec_play_context": "true",
+        }) as select:
+            manager._assert_gpu_idle("4", min_free_mib=16 * 1024)
+        select.assert_called_once_with(requested=4, min_free_mib=16 * 1024, caller="SERVICE_MANAGER")
+
+    def test_service_gpu_guard_fails_closed_when_admission_rejects_gpu(self):
+        with mock.patch("oec_gpu_admission.select_idle_a100_gpu", side_effect=RuntimeError("unknown compute owner")):
+            with self.assertRaisesRegex(RuntimeError, "service launch refused"):
+                manager._assert_gpu_idle("4", min_free_mib=16 * 1024)
+
+    def test_provider_vram_floors_are_distinct_and_conservative(self):
+        self.assertEqual(manager._minimum_free_vram_mib("ltx-sidecar", "ltx-2.3"), 24 * 1024)
+        self.assertEqual(manager._minimum_free_vram_mib("trellis-sidecar", "trellis-2"), 20 * 1024)
+        self.assertEqual(manager._minimum_free_vram_mib("audio-api", "ace-step"), 16 * 1024)
+        self.assertEqual(manager._minimum_free_vram_mib("audio-api", "kokoro"), 2 * 1024)
+
     def test_status_health_probe_never_uses_configured_remote_hosts(self):
         with mock.patch.object(manager.urllib.request, "build_opener") as opener:
             opener.return_value.open.side_effect = OSError("offline")

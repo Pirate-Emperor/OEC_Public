@@ -444,3 +444,15 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - ACE-Step was skipped due to the speech job's fail-fast dependency. It has not been verified. Do not check it off without a real generated FLAC, validated metadata, and a passing Gradio event request.
 - Prior live run [39388844316](https://github.com/CalamityStriker/OEC/actions/runs/39388844316) generated/validated an LTX MP4 and TRELLIS GLB in `phase1_ltx` and `phase2_3d`; repeat on current candidate.
 - Remaining: real Gradio event callbacks for both AudioCraft models; live Kokoro/Whisper/Qwen3-ASR; ACE-Step; FLUX PNG → TRELLIS GLB; joined Brain/LTX/Qwen2-VL QA, chunked HF upload, remote manifest/part hash read-after-write; model-specific purge-safety and restart tests. Keep cache purge off and preserve `.storage_reserve.bin`.
+
+## Media readiness and OEC_Deploy integration — 2026-10-20
+
+- [x] Implemented a read-only provider readiness report separating actual HTTP health/model-loaded state from environment and checkpoint/cache preflight.
+- [x] Added a downstream integration guide for OEC_Deploy; the downstream repository is intentionally unchanged.
+- [x] Updated the media service supervisor to use shared process-aware fail-closed GPU admission plus model-specific free-VRAM floors.
+- [x] Fixed live-test defects found in FLUX's mocked GPU inventory, QA status handoff, AudioGen/MusicGen scratch output locations and MusicGen metadata filename.
+- [x] Independent ACE-Step acceptance now runs even when the speech acceptance step fails; the job still reports overall failure unless both groups pass.
+- [ ] Exact-head validation for this candidate is pending.
+- [ ] Verify ACE-Step real music generation and Gradio event acceptance; separately validate Kokoro synthesis, Whisper transcription and Qwen3-ASR transcription.
+- [ ] Complete current-source FLUX-to-TRELLIS and the HF upload/remote hash read-back path.
+- [ ] Add supervised HTTP job APIs for AudioGen and MusicGen before they are marked available to OEC_Deploy.

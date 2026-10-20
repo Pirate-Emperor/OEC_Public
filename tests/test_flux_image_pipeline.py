@@ -26,7 +26,7 @@ class FluxImagePipelineTests(unittest.TestCase):
         self.assertEqual((a.gpu, a.seed), (0, 42))
 
     def test_gpu_selector_chooses_an_unowned_idle_a100(self):
-        inventory = "0, GPU-0, NVIDIA A100-SXM4-40GB, 12000, 40\n1, GPU-1, NVIDIA A100-SXM4-40GB, 300, 2\n"
+        inventory = "0, GPU-0, NVIDIA A100-SXM4-40GB, 12000, 40, 40960\n1, GPU-1, NVIDIA A100-SXM4-40GB, 300, 2, 40960\n"
         apps = "GPU-0, 1234\n"
         with mock.patch.object(flux.subprocess, "run", side_effect=[
             subprocess.CompletedProcess([], 0, inventory, ""),
@@ -36,7 +36,7 @@ class FluxImagePipelineTests(unittest.TestCase):
         self.assertEqual(selected["index"], "1")
 
     def test_gpu_selector_logs_reasons_when_all_a100s_are_busy(self):
-        inventory = "0, GPU-0, NVIDIA A100-SXM4-40GB, 12000, 40\n"
+        inventory = "0, GPU-0, NVIDIA A100-SXM4-40GB, 12000, 40, 40960\n"
         apps = "GPU-0, 1234\n"
         output = io.StringIO()
         with mock.patch.object(flux.subprocess, "run", side_effect=[

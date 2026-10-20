@@ -189,3 +189,14 @@ This section distinguishes model inference from UI acceptance. All results below
 3. Re-run LTX/TRELLIS, then FLUX PNG → TRELLIS GLB on the current source and validate/reopen each file.
 4. Run the joined QA → uploader → manifest/part upload → remote reassembly/hash read-after-write test against the already-configured Hugging Face dataset; no repository creation and no purge until remote verification succeeds.
 5. Update this checklist with each run ID, source SHA, conda runtime, GPU, artifact dimensions/bytes, SHA-256, VRAM, runtime and exact failure reason. Merge to `main` only after the integrated acceptance is green and the branch/main divergence has been reconciled; do not blindly merge the current heavily diverged branch.
+
+## Media readiness and deployment integration — 2026-10-20
+
+- [x] Added a read-only readiness CLI at tools/check_media_service_readiness.py to report API health, model-loaded state, runtime modules and cached checkpoint presence separately. It explicitly marks AudioGen and MusicGen NOT_EXPOSED because they lack a supervised HTTP job API.
+- [x] Added OEC_Deploy integration documentation at docs/OEC_DEPLOY_MEDIA_SERVICE_READINESS.md: provider ports/environments, live readiness semantics, HTTP job lifecycle, and SSH-tunnel access while keeping sidecars loopback-only.
+- [x] Aligned oec_service_manager.py to the shared fail-closed GPU admission policy and added provider-specific minimum-free-VRAM floors.
+- [x] Fixed the FLUX test fixture (memory.total omitted), QA E2E handoff comparison (canonical DB status is PENDING; PENDING_UPLOAD is the QA result marker), AudioGen/MusicGen explicit /tmp paths, and MusicGen metadata-copy path.
+- [x] Changed the ordered live workflow so speech failure no longer silently skips the independent ACE-Step steps. A final gating step still fails the job if speech or ACE-Step fails.
+- [ ] These current candidate changes need exact-head static and A100 Actions validation. Do not report ACE-Step, speech or persistent endpoints ready before the next results prove them.
+- [ ] AudioGen/MusicGen remain unavailable to OEC_Deploy via HTTP until supervised job APIs are added, even though prior real CLI inference generated WAV files.
+- [ ] Run the new readiness command on the persistent OEC host after starting each service. Smoke sidecars launched inside Actions stop at the end of their job.
