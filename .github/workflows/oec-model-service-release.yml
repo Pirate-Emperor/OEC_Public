@@ -74,7 +74,23 @@ jobs:
           # Require fresh authoritative quota and sufficient output capacity. No downloads,
           # installs, reserve changes, model-cache purges, or output writes are allowed here.
           cd "$SYNC"
-          "$PY" -c 'from storage_manager import storage_preflight; checks=(("models",0.1,0.5),("outputs",0.2,0.5)); failures=[]; [print("MODEL_RELEASE_STORAGE area=%s ok=%s reason=%s"%(a,*storage_preflight(a,required_gb=r,require_fresh_quota=True,minimum_free_gb=m))) for a,r,m in checks]; [failures.append(a) for a,r,m in checks if not storage_preflight(a,required_gb=r,require_fresh_quota=True,minimum_free_gb=m)[0]]; print("MODEL_RELEASE_STORAGE_DENIED="+",".join(failures) if failures else "MODEL_RELEASE_STORAGE_PASS"); raise SystemExit(5 if failures else 0)'
+          "$PY" - <<'PY'
+          from storage_manager import storage_preflight
+          checks = (("models", 0.1, 0.5), ("outputs", 0.2, 0.5))
+          failures = []
+          for area, required_gb, minimum_free_gb in checks:
+              ok, reason = storage_preflight(
+                  area, required_gb=required_gb, require_fresh_quota=True,
+                  minimum_free_gb=minimum_free_gb,
+              )
+              print(f"MODEL_RELEASE_STORAGE area={area} ok={ok} reason={reason}")
+              if not ok:
+                  failures.append(area)
+          if failures:
+              print("MODEL_RELEASE_STORAGE_DENIED=" + ",".join(failures))
+              raise SystemExit(5)
+          print("MODEL_RELEASE_STORAGE_PASS")
+          PY
           "$PY" "$SYNC/tools/prepare_media_models.py" status 2>&1 | tee "$R/model-cache-before.log"
           "$PY" "$SYNC/tools/check_media_service_readiness.py" --json > "$R/readiness-before.json"
           "$PY" - "$R/readiness-before.json" <<'PY'
