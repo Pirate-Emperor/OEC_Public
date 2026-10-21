@@ -221,7 +221,7 @@ sync_pinned_submodules() {
     read -r mode type expected <<< "$meta"
     [[ "$mode" == "160000" && "$type" == "commit" ]] || continue
     child="$parent/$rel"
-    safe_label="\${parent_label//\//__}__\${rel//\//__}"
+    safe_label="${parent_label//\//__}__${rel//\//__}"
 
     [[ -e "$child/.git" ]] ||
       fail "submodule $parent_label/$rel is not initialized; refusing an unbounded clone" 42
@@ -260,6 +260,7 @@ PYLOOSE
 
     current="$(git -C "$child" rev-parse HEAD)"
     if [[ "$current" != "$expected" ]]; then
+      git -C "$parent" submodule sync -- "$rel"
       git -C "$child" update-ref "refs/oec-sync-recovery/$RUN_ID/pre-sync-head" "$current"
       printf 'OEC_SUBMODULE_SYNC_START path=%s/%s current=%s expected=%s\n' "$parent_label" "$rel" "$current" "$expected"
       git -C "$parent" submodule update --checkout -- "$rel"
