@@ -1,11 +1,54 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-21T10:30:00+05:30",
+  "last_updated": "2026-10-21T10:45:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "2026-10-21: Added reproducible demo runbook and fixed the exact-head FLUX live workflow's fixed work-directory collision. Fix commit 59689f57 is not yet re-tested. Run 39452849617: MusicGen/AudioGen/speech+ACE-Step/LTX+TRELLIS jobs passed; FLUX→TRELLIS failed with FileExistsError because the work directory already existed; joined QA/HF job was cancelled during remote listing and its artifact upload failed after cancellation. Main/feature divergence requires reconciliation before merge.",
+  "latest_summary": "Full OEC demo runbook authored in docs/DEMO_EXECUTION_PLAN.md, with per-model CLI/Gradio/Jupyter paths and final known-failure ledger. Current branch adds a strict FLUX/TRELLIS work-path correction (unique parent plus non-existent child) and a regression test; neither test nor live correction has been verified yet. Historical complete run 39435100568 is 8/8 on its older SHA. Retrieved logs for 39452849617 show FLUX failure and joined QA/HF cancellation, while older tracker notes conflict regarding artifact publication in that run. Root sync 39549368673 preserved 37 loose oec_deploy files and failed closed; model runtime audit 39549368702 failed Qwen2-VL import/cache preflight; storage admission tests 39549368681 passed. A100 local sync and current-source end-to-end acceptance remain unverified.",
   "experiments": [
+    {
+      "id": "EXP-2026-10-21-OEC-DEMO-RUNBOOK-WORKDIR-GUARD",
+      "date": "2026-10-21",
+      "category": "demo runbook, workflow guard correction, regression coverage",
+      "approach": "Reviewed the existing OEC notebooks, CLI entrypoints, service wrappers and live workflow evidence. Added a detailed model-by-model presenter runbook; corrected the ordered live workflow and command guide to pass a not-yet-created work child under a unique parent; added a test for path creation/reuse rejection.",
+      "reason": "The FLUX/TRELLIS orchestrator deliberately throws FileExistsError for an existing work path. The previous mktemp -d path was already created, so it failed before inference.",
+      "parameters": {
+        "branch": "fix/media-stack-supervision-20261019",
+        "model_config_baseline_sha": "2a4223b9a720362365101f94d6378c17eb970f71",
+        "runbook_commit": "63f9c0d8d65d39a947124125b1912930c6f7644f",
+        "historical_full_suite": 39435100568,
+        "partial_live_suite": 39452849617,
+        "root_sync_failure": 39549368673,
+        "model_runtime_audit_failure": 39549368702,
+        "storage_admission_pass": 39549368681,
+        "commands": [
+          "python -m unittest discover -s tests -p 'test_flux_trellis_pipeline.py' -v",
+          "python tools/run_flux_pipeline_smoke.py --work-dir <non-existent-child-path> --report-dir <run-scoped-report> --width 512 --height 512 --steps 4",
+          "gh run view 39452849617 --repo CalamityStriker/OEC --log-failed",
+          "gh run view 39549368673 --repo CalamityStriker/OEC",
+          "gh run view 39549368702 --repo CalamityStriker/OEC"
+        ],
+        "environment": "GitHub repository/workflow editing and source inspection; no direct A100 shell, new model downloads or GPU inference were used.",
+        "model_downloads": false,
+        "gpu_inference": false
+      },
+      "results": {
+        "runbook": "docs/DEMO_EXECUTION_PLAN.md added and linked from the short demo outline.",
+        "workflow_fix": "Unique parent + non-existent child for FLUX/TRELLIS work directory.",
+        "regression_test": "Added to tests/test_flux_trellis_pipeline.py; not executed yet.",
+        "historical_live": "39435100568 passed 8/8 on its old source SHA; retrieved 39452849617 job logs show FLUX failure and joined QA/HF cancellation, conflicting with older summary prose about a published artifact.",
+        "root_sync": "Blocked safely; 37 loose files preserved.",
+        "runtime_audit": "Qwen2-VL import/cache preflight failed or timed out.",
+        "storage_admission": "Run 39549368681 passed."
+      },
+      "interpretation": "Documentation and the work-directory correction were committed, but current-source live acceptance remains unverified.",
+      "limitations": [
+        "No direct shell access to verify the canonical A100 checkout.",
+        "Main and feature branches remain diverged.",
+        "The regression test and new workflow need execution evidence.",
+        "The retrieved job log for run 39452849617 conflicts with older cumulative tracker prose; reconcile artifacts before stronger claims."
+      ]
+    },
     {
       "id": "EXP-2026-10-21-FLUX-WORKDIR-COLLISION-FIX",
       "date": "2026-10-21",
