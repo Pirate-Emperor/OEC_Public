@@ -1,0 +1,46 @@
+name: OEC Asset Factory contract tests
+
+on:
+  push:
+    branches:
+      - fix/media-stack-supervision-20261019
+    paths:
+      - "asset_factory/**"
+      - "brain_config.json"
+      - "brain.py"
+      - "tests/test_asset_factory_upload_queue.py"
+      - ".github/workflows/oec-asset-factory-contracts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  asset-factory-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout the tested branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile Asset Factory, Brain and storage gates
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            brain.py core_config.py storage_policy.py storage_manager.py \
+            asset_factory/__init__.py asset_factory/registry.py \
+            asset_factory/client.py asset_factory/worker.py \
+            tests/test_asset_factory_upload_queue.py
+          python -m json.tool brain_config.json > /dev/null
+
+      - name: Test provider routing, Brain prompts, input-conditioned ASR and HF enqueue
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_asset_factory_upload_queue.py' -v
