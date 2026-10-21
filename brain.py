@@ -294,7 +294,11 @@ class TheBrain:
                                 job_data["asset_factory"] = True
                                 job_data["asset_type"] = use_case["asset_type"]
                                 job_data["model"] = use_case["model"]
-                                job_data["parameters"] = dict(use_case.get("parameters", {}))
+                                job_data["parameters"] = dict(
+                                    use_case.get("parameters", job_data.get("parameters", {}))
+                                )
+                                if use_case.get("input_path"):
+                                    job_data["input_path"] = use_case["input_path"]
                                 job_queue_dir = self.asset_factory_jobs_dir
                             else:
                                 job_queue_dir = self.jobs_dir

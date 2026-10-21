@@ -52,6 +52,15 @@ def _json(url:str,method:str="GET",payload:dict[str,Any]|None=None,timeout:float
 def _encode_input(value:str|Path,kind:str)->tuple[str,str]:
     path=Path(value).expanduser()
     if path.is_symlink() or not path.is_file(): raise ValueError(f"input {kind} must be a regular non-symlink file")
+    from core_config import SYSTEM_DIRS
+    allowed_roots = [
+        Path(SYSTEM_DIRS["inputs"]).expanduser().resolve(),
+        (Path(SYSTEM_DIRS["outputs"]).expanduser().resolve() / "asset_factory"),
+    ]
+    resolved = path.resolve()
+    if not any(root != resolved and root in resolved.parents for root in allowed_roots):
+        raise ValueError("input file must be under the OEC-managed inputs root or Asset Factory output root")
+    path = resolved
     raw=path.read_bytes()
     if not raw or len(raw)>MAX_INPUT_BYTES: raise ValueError("input must be between 1 byte and 12 MiB")
     if kind=="image":
