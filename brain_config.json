@@ -235,6 +235,22 @@
                     "voice": "af_heart"
                 }
             }
+        },
+        {
+            "id": "asset_kokoro_speech",
+            "enabled": false,
+            "queue": "asset_factory",
+            "asset_type": "speech",
+            "model": "kokoro",
+            "target_queue_count": 1,
+            "randomness_percentage": 0,
+            "system_prompt": "You write natural, original spoken dialogue and voice lines for a text-to-speech model. Use concise conversational language, clear punctuation, no sound cues or stage directions, and no impersonation of a real person. Output only numbered scripts.",
+            "template_instruction": "Write {0} distinct natural spoken lines for Kokoro speech generation. Tailor the wording, pacing, emotional tone and sentence length to {2}. Keep each item speakable and self-contained; do not use stage directions, markup, named-voice imitation, or references to existing copyrighted dialogue.",
+            "worker_parameters": {
+                "parameters": {
+                    "voice": "af_heart"
+                }
+            }
         }
     ],
     "input_asset_use_cases": [
