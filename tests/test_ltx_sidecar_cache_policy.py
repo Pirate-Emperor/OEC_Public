@@ -5,6 +5,7 @@ import contextlib
 import sys
 import types
 import unittest
+from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -64,10 +65,10 @@ class LtxCachePolicyTests(unittest.TestCase):
         fake_ltx.LTX_COMMIT_SHA = "test-revision"
         fake_ltx.torch = fake_torch
         with (
-            mock.patch("tools.media_services.ltx_api.storage_check", return_value=(True, "ok")),
-            mock.patch("tools.media_services.ltx_api.managed_write", return_value=contextlib.nullcontext()),
+            mock.patch("ltx_api.storage_check", return_value=(True, "ok")),
+            mock.patch("ltx_api.managed_write", return_value=contextlib.nullcontext()),
             mock.patch.dict(sys.modules, {"worker_ltx_video": fake_ltx}),
-            mock.patch("tools.media_services.ltx_api.purge_loaded_ltx_caches") as purge,
+            mock.patch("ltx_api.purge_loaded_ltx_caches") as purge,
         ):
             with self.assertRaisesRegex(RuntimeError, "load failed"):
                 LtxProvider(allow_download=True, purge_after_load=True).load_runtime()
