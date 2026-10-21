@@ -234,11 +234,29 @@ sync_pinned_submodules() {
       fail "submodule has local tracked edits; preserving them and refusing checkout: $parent_label/$rel" 43
     fi
     nonignored="$(git -C "$child" ls-files --others --exclude-standard | wc -l | tr -d '[:space:]')"
-    [[ "$nonignored" == "0" ]] || {
+    if [[ "$nonignored" != "0" ]]; then
+      local loose_list="$BACKUP_ROOT/$safe_label-nonignored-paths.nul"
+      git -C "$child" ls-files --others --exclude-standard -z > "$loose_list"
+      # OEC-Deploy's packaged server-components tree is user/runtime work until
+      # it is committed and the parent gitlink is deliberately advanced. Preserve
+      # it in place and allow the parent OEC checkout to sync independently.
+      if [[ "$parent_label" == "root" && "$rel" == "oec_deploy" ]] &&
+         python3 - "$loose_list" <<'PYLOOSE'
+import pathlib, sys
+paths = pathlib.Path(sys.argv[1]).read_bytes().split(b"\0")
+paths = [p for p in paths if p]
+sys.exit(0 if paths and all(p.startswith(b"v1/Biome/build/packaging/server-components/") for p in paths) else 1)
+PYLOOSE
+      then
+        printf 'OEC_DEPLOY_SUBMODULE_SYNC=DEFERRED_LOCAL_WORK_PRESERVED count=%s path=v1/Biome/build/packaging/server-components/\n' "$nonignored"
+        printf 'OEC_SUBMODULE_LOCAL_LOOSE_FILES_PRESERVED path=%s/%s count=%s\n' "$parent_label" "$rel" "$nonignored"
+        git -C "$child" status --short --untracked-files=all >&2 || true
+        continue
+      fi
       printf 'OEC_SUBMODULE_LOCAL_LOOSE_FILES path=%s/%s count=%s\n' "$parent_label" "$rel" "$nonignored" >&2
       git -C "$child" status --short --untracked-files=all >&2 || true
-      fail "submodule has non-ignored loose files; preserving them and refusing checkout: $parent_label/$rel" 44
-    }
+      fail "submodule has non-ignored loose files outside the approved preserved OEC-Deploy packaging directory; preserving and refusing checkout: $parent_label/$rel" 44
+    fi
 
     current="$(git -C "$child" rev-parse HEAD)"
     if [[ "$current" != "$expected" ]]; then
@@ -259,8 +277,23 @@ sync_pinned_submodules() {
 
 sync_pinned_submodules "$ROOT" "root"
 
-[[ -z "$(git -C "$ROOT" status --porcelain --untracked-files=all)" ]] ||
-  fail "canonical checkout not clean after source and recursive submodule synchronization; recovery data remains in place" 46
+[[ -z "$(git -C "$ROOT" status --porcelain --untracked-files=all --ignore-submodules=all)" ]] ||
+  fail "canonical OEC parent checkout not clean after source synchronization; recovery data remains in place" 46
+
+if [[ -d "$ROOT/oec_deploy/.git" || -f "$ROOT/oec_deploy/.git" ]]; then
+  child_head="$(git -C "$ROOT/oec_deploy" rev-parse HEAD 2>/dev/null || true)"
+  parent_pin="$(git -C "$ROOT" ls-tree HEAD -- oec_deploy | awk '{print $3}')"
+  if [[ -n "$child_head" && "$child_head" != "$parent_pin" ]]; then
+    printf 'OEC_DEPLOY_GITLINK_MISMATCH=WARNING parent_pin=%s child_head=%s\n' "$parent_pin" "$child_head"
+  else
+    printf 'OEC_DEPLOY_GITLINK=%s\n' "$parent_pin"
+  fi
+  if [[ "$(git -C "$ROOT/oec_deploy" ls-files --others --exclude-standard | wc -l | tr -d '[:space:]')" != "0" ]]; then
+    printf 'OEC_DEPLOY_LOOSE_FILES=WARNING preserved=yes\n'
+  else
+    printf 'OEC_DEPLOY_LOOSE_FILES=NONE\n'
+  fi
+fi
 
 cat > "$BACKUP_ROOT/README.txt" <<EOF
 OEC canonical A100 checkout reconciliation

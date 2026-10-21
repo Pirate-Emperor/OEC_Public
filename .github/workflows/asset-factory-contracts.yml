@@ -1,0 +1,38 @@
+name: OEC Asset Factory contracts
+
+on:
+  push:
+    branches:
+      - fix/media-stack-supervision-20261019
+    paths:
+      - "asset_factory/**"
+      - "tools/media_services/flux_api.py"
+      - "tools/media_services/audiocraft_api.py"
+      - "tools/media_services/common.py"
+      - "pipeline_flux_image.py"
+      - "pipeline_audiogen.py"
+      - "pipeline_musicgen.py"
+      - "tests/test_asset_factory_contract.py"
+      - ".github/workflows/asset-factory-contracts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  asset-factory-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile the asset factory and sidecar entry points
+        run: python -m py_compile asset_factory/*.py tools/media_services/flux_api.py tools/media_services/audiocraft_api.py brain.py
+      - name: Run dependency-light contracts
+        run: python -m unittest discover -s tests -p "test_asset_factory_contract.py" -v
+      - name: Check expanded Brain configuration
+        run: python -c "import json; c=json.load(open('brain_config.json')); assert len(c['asset_factory_use_cases']) >= 6; assert {'asset_whisper_transcription','asset_qwen_transcription'} <= {x['id'] for x in c['input_asset_use_cases']}; print('BRAIN_MULTIMODAL_CONFIG=PASS')"

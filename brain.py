@@ -47,16 +47,22 @@ class TheBrain:
         # New prompt jobs live under the configured outputs target; the old inputs/jobs
         # directory is still counted and consumed for backward compatibility only.
         self.jobs_dir = os.path.join(SYSTEM_DIRS["outputs"], "ltx_pipeline", "jobs")
+        self.asset_factory_jobs_dir = os.path.join(SYSTEM_DIRS["outputs"], "asset_factory", "jobs")
         self.legacy_jobs_dir = os.path.join(SYSTEM_DIRS["inputs"], "jobs")
         with managed_storage_operation(
             "outputs", required_gb=0.001, require_fresh_quota=True, minimum_free_gb=0.05
         ):
             os.makedirs(self.jobs_dir, exist_ok=True)
+            os.makedirs(self.asset_factory_jobs_dir, exist_ok=True)
         
         self.load_config()
+        configured_use_cases = [
+            *self.config.get("use_cases", []),
+            *self.config.get("asset_factory_use_cases", []),
+            *self.config.get("input_asset_use_cases", []),
+        ]
         if self.use_case_filter and not any(
-            item.get("id") == self.use_case_filter
-            for item in self.config.get("use_cases", [])
+            item.get("id") == self.use_case_filter for item in configured_use_cases
         ):
             print(f"[CRITICAL] Unknown use-case ID: {self.use_case_filter}")
             sys.exit(2)
@@ -153,13 +159,11 @@ class TheBrain:
             print(f"[CRITICAL] LLM Initialization Failed: {type(e).__name__}: {e}")
             sys.exit(1)
 
-    def get_current_job_count(self, use_case_id):
-        """Counts how many pending jobs exist for a specific use case."""
-        pattern = f"job_{use_case_id}_*.json"
-        return sum(
-            len(glob.glob(os.path.join(folder, pattern)))
-            for folder in (self.jobs_dir, self.legacy_jobs_dir)
-        )
+    def get_current_job_count(self, use_case_id, *, asset_factory=False):
+        """Count queued and in-progress jobs without confusing separate queues."""
+        pattern = f"job_{use_case_id}_*.json*"
+        folders = (self.asset_factory_jobs_dir,) if asset_factory else (self.jobs_dir, self.legacy_jobs_dir)
+        return sum(len(glob.glob(os.path.join(folder, pattern))) for folder in folders)
 
     def adjust_polling_interval(self, total_deficit):
         if total_deficit == 0:
@@ -192,63 +196,48 @@ class TheBrain:
         niche = random.choice(self.config.get("profitable_niches", ["everyday human life"]))
         theme = random.choice(self.config.get("creative_themes", ["quiet realism"]))
         min_dur, max_dur = use_case.get("duration_range", [5.0, 10.0])
-        
+        is_asset_factory = use_case.get("queue") == "asset_factory"
         base_instruction = use_case["template_instruction"].format(amount, niche, theme, min_dur, max_dur)
-        instruction = self.inject_randomness(base_instruction, use_case["randomness_percentage"])
-        system_prompt = self.config["system_settings"]["global_system_prompt"]
-        
+        visual_types = {"image", "3d_asset", "video"}
+        if is_asset_factory and use_case.get("asset_type") not in visual_types:
+            instruction = base_instruction
+        else:
+            instruction = self.inject_randomness(base_instruction, use_case.get("randomness_percentage", 0))
+        system_prompt = use_case.get("system_prompt", self.config["system_settings"]["global_system_prompt"])
         user_prompt = (
             f"{instruction}\n\n"
-            f"Provide EXACTLY {amount} distinct prompts. "
+            f"Provide EXACTLY {amount} distinct prompts, one per numbered line. "
             "Do not include any introductory or concluding text outside of the numbered list."
         )
-
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
-
         try:
             outputs = self.llm(messages, max_new_tokens=2000, temperature=0.8, top_p=0.9, return_full_text=False)
-            response_text = outputs[0]['generated_text']
-            
-            # Strip out DeepSeek-R1 internal "thinking" blocks completely
-            response_text = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
-            
+            response_text = re.sub(r'<think>.*?</think>', '', outputs[0]["generated_text"], flags=re.DOTALL)
             prompts = []
-            for line in response_text.split('\n'):
-                line = line.strip()
-                # Matches "1. " or "1) "
-                match = re.search(r'^\W*\d+[\.\)]\s*(.*)', line)
-                
-                if match:
-                    raw_prompt_text = match.group(1).strip()
-                    
-                    # Extract the [DURATION: X] tag predicted by the LLM
-                    dur_match = re.search(r'\[DURATION:\s*(\d+(?:\.\d+)?)\]', raw_prompt_text, re.IGNORECASE)
-                    
-                    if dur_match:
-                        predicted_duration = float(dur_match.group(1))
-                        # Clamp the duration to ensure it doesn't hallucinate 90 seconds and crash the A100
-                        predicted_duration = max(min_dur, min(max_dur, predicted_duration))
-                        # Remove the tag so it doesn't get sent to the video generator
-                        clean_prompt = re.sub(r'\[DURATION:\s*(\d+(?:\.\d+)?)\]', '', raw_prompt_text, flags=re.IGNORECASE).strip()
+            for line in response_text.split("\n"):
+                match = re.search(r'^\W*\d+[\.\)]\s*(.*)', line.strip())
+                if not match:
+                    continue
+                raw = match.group(1).strip()
+                duration = None
+                if not is_asset_factory:
+                    tag = re.search(r'\[DURATION:\s*(\d+(?:\.\d+)?)\]', raw, re.IGNORECASE)
+                    if tag:
+                        duration = max(min_dur, min(max_dur, float(tag.group(1))))
+                        raw = re.sub(r'\[DURATION:\s*(\d+(?:\.\d+)?)\]', '', raw, flags=re.IGNORECASE).strip()
                     else:
-                        # Fallback: Assign a random duration if the LLM forgot the tag
-                        predicted_duration = round(random.uniform(min_dur, max_dur), 1)
-                        clean_prompt = raw_prompt_text
-                        
-                    clean_prompt = clean_prompt.strip('"').strip("'")
-                    if len(clean_prompt) > 15: 
-                        prompts.append({
-                            "text": clean_prompt,
-                            "duration": predicted_duration
-                        })
-            
+                        duration = round(random.uniform(min_dur, max_dur), 1)
+                else:
+                    raw = re.sub(r'\[DURATION:\s*(\d+(?:\.\d+)?)\]', '', raw, flags=re.IGNORECASE).strip()
+                clean = raw.strip('"').strip("'")
+                if len(clean) > 15:
+                    prompts.append({"text": clean, "duration": duration})
             return prompts[:amount]
-            
-        except Exception as e:
-            print(f"[THE BRAIN] Error during LLM generation: {e}")
+        except Exception as exc:
+            print(f"[THE BRAIN] Error during LLM generation: {type(exc).__name__}: {exc}")
             return []
 
     def run(self):
@@ -259,12 +248,23 @@ class TheBrain:
             total_deficit = 0
             queue_write_failed = False
 
-            for use_case in self.config["use_cases"]:
+            configured_use_cases = [
+                *self.config.get("use_cases", []),
+                *self.config.get("asset_factory_use_cases", []),
+                *self.config.get("input_asset_use_cases", []),
+            ]
+            for use_case in configured_use_cases:
                 if queue_write_failed or not self.is_running:
                     break
                 if self.use_case_filter and use_case["id"] != self.use_case_filter:
                     continue
-                current_count = self.get_current_job_count(use_case["id"])
+                if not use_case.get("enabled", True) and self.use_case_filter != use_case["id"]:
+                    continue
+                if use_case.get("requires_input") and not use_case.get("input_path"):
+                    print(f"[THE BRAIN] {use_case['id']} needs a real input file; not generating a fake prompt job.")
+                    continue
+                asset_queue = use_case.get("queue") == "asset_factory"
+                current_count = self.get_current_job_count(use_case["id"], asset_factory=asset_queue)
                 target_count = use_case["target_queue_count"]
                 deficit = target_count - current_count
                 
@@ -284,16 +284,23 @@ class TheBrain:
                         for prompt_data in new_prompts:
                             job_data = {
                                 "prompt": prompt_data["text"],
-                                "duration": prompt_data["duration"],
                                 "use_case": use_case["id"],
                                 "created_at": datetime.now().isoformat()
                             }
-                            # Injects output_type, model_type, resolution, fps, etc.
-                            job_data.update(use_case["worker_parameters"])
-                            
+                            if prompt_data.get("duration") is not None:
+                                job_data["duration"] = prompt_data["duration"]
+                            job_data.update(use_case.get("worker_parameters", {}))
+                            if asset_queue:
+                                job_data["asset_factory"] = True
+                                job_data["asset_type"] = use_case["asset_type"]
+                                job_data["model"] = use_case["model"]
+                                job_data["parameters"] = dict(use_case.get("parameters", {}))
+                                job_queue_dir = self.asset_factory_jobs_dir
+                            else:
+                                job_queue_dir = self.jobs_dir
                             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
                             job_id = f"job_{use_case['id']}_{timestamp}_{uuid.uuid4().hex[:6]}.json"
-                            job_path = os.path.join(self.jobs_dir, job_id)
+                            job_path = os.path.join(job_queue_dir, job_id)
                             
                             temp_job_path = job_path + f".{uuid.uuid4().hex}.tmp"
                             try:
@@ -319,9 +326,10 @@ class TheBrain:
                                 queue_write_failed = True
                                 break
 
-                            out_type = job_data.get("output_type", "video")
-                            dur = job_data.get("duration", 5.0)
-                            print(f"     + Queued [{out_type} | {dur}s]: {prompt_data['text'][:55]}...")
+                            out_type = job_data.get("asset_type", job_data.get("output_type", "video"))
+                            dur = job_data.get("duration")
+                            suffix = f" | {dur}s" if dur is not None else ""
+                            print(f"     + Queued [{out_type}{suffix}]: {prompt_data['text'][:55]}...")
                             total_deficit += 1
                             deficit -= 1
                             self.jobs_created += 1

@@ -50,18 +50,22 @@
             "smudged foreground glass catching cinematic light leaks"
         ]
     },
-    "use_cases": [{
+    "use_cases": [
+        {
             "id": "ltx_2_3_commercial_broll",
             "target_queue_count": 50,
             "randomness_percentage": 85,
-            "duration_range": [5.0, 10.0],
+            "duration_range": [
+                5,
+                10
+            ],
             "template_instruction": "Generate {0} distinct prompts describing a premium cinematic video clip. The niche is '{1}' and the underlying emotional theme is '{2}'. The prompt MUST describe a multi-stage action where the scene and camera evolve over time. First, predict the ideal duration required to capture this complex motion (between {3} and {4} seconds). Format each item STRICTLY like this: 1. [DURATION: 8.5] Your prompt text here...",
             "worker_parameters": {
                 "output_type": "video",
                 "model_type": "ltx-2.3-22b",
                 "width": 1024,
                 "height": 576,
-                "fps": 24.0,
+                "fps": 24,
                 "enhance_prompt": false,
                 "num_takes": 1
             }
@@ -70,14 +74,17 @@
             "id": "ltx_2_3_vfx_elements",
             "target_queue_count": 30,
             "randomness_percentage": 95,
-            "duration_range": [4.0, 8.0],
+            "duration_range": [
+                4,
+                8
+            ],
             "template_instruction": "Generate {0} distinct prompts for high-speed VFX elements and macro textures. Focus on complex, multi-stage physics simulations (e.g., fluid dynamics morphing into shattering glass) shot on a pure black background for easy compositing. The niche is '{1}' and theme is '{2}'. Predict the ideal duration (between {3} and {4} seconds) for this slow-motion sequence. Format each item STRICTLY like this: 1. [DURATION: 6.0] Your prompt text here...",
             "worker_parameters": {
                 "output_type": "vfx_video",
                 "model_type": "ltx-2.3-22b",
                 "width": 1024,
                 "height": 576,
-                "fps": 60.0,
+                "fps": 60,
                 "enhance_prompt": false,
                 "num_takes": 1
             }
@@ -86,16 +93,184 @@
             "id": "ltx_2_3_motion_backgrounds",
             "target_queue_count": 20,
             "randomness_percentage": 60,
-            "duration_range": [8.0, 15.0],
+            "duration_range": [
+                8,
+                15
+            ],
             "template_instruction": "Generate {0} distinct prompts for abstract, luxury motion backgrounds suitable for corporate presentations or website headers. The niche is '{1}' and theme is '{2}'. Focus on slow, mesmerizing movements of textures like glass, metallic waves, or soft glowing geometry. NO HUMANS allowed. Predict the ideal duration (between {3} and {4} seconds) needed for this slow, evolving loop. Format each item STRICTLY like this: 1. [DURATION: 12.0] Your prompt text here...",
             "worker_parameters": {
                 "output_type": "abstract_video",
                 "model_type": "ltx-2.3-22b",
                 "width": 1536,
                 "height": 864,
-                "fps": 24.0,
+                "fps": 24,
                 "enhance_prompt": false,
                 "num_takes": 1
+            }
+        }
+    ],
+    "asset_factory_use_cases": [
+        {
+            "id": "asset_flux_image",
+            "enabled": false,
+            "queue": "asset_factory",
+            "asset_type": "image",
+            "model": "flux",
+            "target_queue_count": 1,
+            "randomness_percentage": 0,
+            "system_prompt": "You write precise, original image-generation prompts. No copyrighted characters, logos, artists, living public figures or brand names. Output only the requested numbered prompts.",
+            "template_instruction": "Write {0} distinct standalone image prompts for FLUX text-to-image. Focus on a clear subject, composition, lighting, materials, color palette, background and visual finish. Creative niche: {1}. Emotional or aesthetic theme: {2}. Keep each prompt self-contained.",
+            "worker_parameters": {
+                "parameters": {
+                    "width": 512,
+                    "height": 512,
+                    "steps": 4,
+                    "guidance_scale": 1,
+                    "seed": 42
+                }
+            }
+        },
+        {
+            "id": "asset_trellis_3d",
+            "enabled": false,
+            "queue": "asset_factory",
+            "asset_type": "3d_asset",
+            "model": "trellis",
+            "target_queue_count": 1,
+            "randomness_percentage": 0,
+            "system_prompt": "You are a 3D asset design brief writer. Describe one feasible, coherent object for image-to-3D reconstruction, with distinct silhouette, readable geometry and materials. Avoid copyrighted designs and text/logos. Output only numbered prompts.",
+            "template_instruction": "Write {0} distinct design prompts for original 3D assets. State the object silhouette, proportions, major geometric features, surface materials, and color treatment; keep shapes feasible for one clean 3D object. Theme: {2}.",
+            "worker_parameters": {
+                "parameters": {
+                    "max_image_size": 1024,
+                    "texture_size": 2048,
+                    "decimation_target": 100000
+                }
+            }
+        },
+        {
+            "id": "asset_ltx_video",
+            "enabled": false,
+            "queue": "asset_factory",
+            "asset_type": "video",
+            "model": "ltx",
+            "target_queue_count": 1,
+            "randomness_percentage": 0,
+            "system_prompt": "You write safe, original text-to-video prompts with clear camera movement and temporal progression. Output only numbered prompts.",
+            "template_instruction": "Write {0} distinct LTX video prompts for a {1} concept with {2} tone. Describe subject, setting, camera motion, temporal action, lighting and a coherent visual evolution. Keep prompts executable and self-contained.",
+            "worker_parameters": {
+                "parameters": {
+                    "duration_seconds": 4,
+                    "fps": 24
+                }
+            }
+        },
+        {
+            "id": "asset_ace_step_song",
+            "enabled": false,
+            "queue": "asset_factory",
+            "asset_type": "song",
+            "model": "ace-step",
+            "target_queue_count": 1,
+            "randomness_percentage": 0,
+            "system_prompt": "You are a songwriter and music-director. Generate original music briefs and optional lyrics only; never imitate a named artist or existing song. Output only numbered prompts.",
+            "template_instruction": "Write {0} original ACE-Step song briefs. Describe genre, energy, tempo feel, instruments, vocal character if any, emotional arc, structure, and production. Avoid references to specific artists or existing works. Theme: {2}.",
+            "worker_parameters": {
+                "parameters": {
+                    "duration_seconds": 30,
+                    "seed": -1,
+                    "steps": 8,
+                    "lyrics": "",
+                    "instrumental": true,
+                    "language": "unknown"
+                }
+            }
+        },
+        {
+            "id": "asset_musicgen_music",
+            "enabled": false,
+            "queue": "asset_factory",
+            "asset_type": "music",
+            "model": "musicgen",
+            "target_queue_count": 1,
+            "randomness_percentage": 0,
+            "system_prompt": "You create original instrumental music prompts with distinct timbre, rhythm and emotional arc. No artist imitation. Output only numbered prompts.",
+            "template_instruction": "Write {0} MusicGen prompts for original instrumental music. Specify genre, instrumentation, rhythmic motion, texture, dynamics and mood progression. Theme: {2}.",
+            "worker_parameters": {
+                "parameters": {
+                    "duration_seconds": 8,
+                    "seed": 42
+                }
+            }
+        },
+        {
+            "id": "asset_audiogen_sfx",
+            "enabled": false,
+            "queue": "asset_factory",
+            "asset_type": "sound_effect",
+            "model": "audiogen",
+            "target_queue_count": 1,
+            "randomness_percentage": 0,
+            "system_prompt": "You write concise environmental sound-effect briefs, emphasizing sonic sources, rhythm, distance, acoustic texture and ambience. Output only numbered prompts.",
+            "template_instruction": "Write {0} AudioGen prompts for standalone sound effects. Describe the physical sound source, transient/continuous behavior, distance, room or outdoor acoustics, background ambience and ending. Theme: {2}.",
+            "worker_parameters": {
+                "parameters": {
+                    "duration_seconds": 3,
+                    "seed": 42
+                }
+            }
+        },
+        {
+            "id": "asset_kokoro_tts",
+            "enabled": false,
+            "queue": "asset_factory",
+            "asset_type": "tts",
+            "model": "kokoro",
+            "target_queue_count": 1,
+            "randomness_percentage": 0,
+            "system_prompt": "You write concise original narration scripts suited to natural text-to-speech. Use only the narration text, with clear punctuation and no stage directions. Output only numbered scripts.",
+            "template_instruction": "Write {0} short spoken scripts for Kokoro TTS. Use natural speech, clear punctuation, no markup, no sound cues and no names of real public figures. Theme: {2}. Each item should be one coherent utterance of around 1–3 sentences.",
+            "worker_parameters": {
+                "parameters": {
+                    "voice": "af_heart"
+                }
+            }
+        }
+    ],
+    "input_asset_use_cases": [
+        {
+            "id": "asset_whisper_transcription",
+            "enabled": false,
+            "queue": "asset_factory",
+            "asset_type": "transcript",
+            "model": "whisper",
+            "requires_input": true,
+            "input_kind": "audio",
+            "input_path": null,
+            "target_queue_count": 1,
+            "randomness_percentage": 0,
+            "template_instruction": "Transcription jobs are input-conditioned and are not prompt-generated. Supply an explicit audio file path in input_path before enabling.",
+            "worker_parameters": {
+                "parameters": {
+                    "temperature": 0,
+                    "condition_on_previous_text": true
+                }
+            }
+        },
+        {
+            "id": "asset_qwen_transcription",
+            "enabled": false,
+            "queue": "asset_factory",
+            "asset_type": "transcript",
+            "model": "qwen3-asr",
+            "requires_input": true,
+            "input_kind": "audio",
+            "input_path": null,
+            "target_queue_count": 1,
+            "randomness_percentage": 0,
+            "template_instruction": "Transcription jobs are input-conditioned and are not prompt-generated. Supply an explicit audio file path in input_path before enabling.",
+            "worker_parameters": {
+                "parameters": {}
             }
         }
     ]

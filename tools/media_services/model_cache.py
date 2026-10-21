@@ -18,6 +18,10 @@ WHISPER_SIZES = ("tiny", "base", "small", "medium", "large-v3", "turbo")
 def model_targets() -> dict[str, list[Path]]:
     targets = {
         "ace-step": [MODELS_ROOT / "ace-step-1.5"],
+        "flux-klein-4b": [MODELS_ROOT / "hub" / "models--black-forest-labs--FLUX.2-klein-4B"],
+        "trellis-2-4b": [MODELS_ROOT / "hub" / "models--microsoft--TRELLIS.2-4B"],
+        "audiogen-medium": [MODELS_ROOT / "hub" / "models--facebook--audiogen-medium"],
+        "musicgen-medium": [MODELS_ROOT / "hub" / "models--facebook--musicgen-medium"],
         "kokoro": [MODELS_ROOT / "hub" / "models--hexgrad--Kokoro-82M"],
         "qwen3-asr-0.6b": [MODELS_ROOT / "hub" / "models--Qwen--Qwen3-ASR-0.6B"],
     }
