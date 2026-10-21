@@ -9,6 +9,7 @@ import uuid
 import re
 import argparse
 from datetime import datetime
+from pathlib import Path
 
 from core_config import SYSTEM_DIRS
 from storage_manager import managed_storage_operation
@@ -31,11 +32,13 @@ class DualLogger:
         self.log_file.flush()
         
 class TheBrain:
-    def __init__(self, config_path="brain_config.json", *, once=False, use_case=None):
+    def __init__(self, config_path="brain_config.json", *, once=False, use_case=None, input_path=None):
         if once and not use_case:
             raise ValueError("bounded Brain mode requires an explicit use-case ID")
         self.once = once
         self.use_case_filter = use_case
+        self.input_path = input_path
+        self.input_only_once = False
         self.jobs_created = 0
         log_path = os.path.join(SYSTEM_DIRS['logs'], "brain.log")
         sys.stdout = DualLogger(log_path)
@@ -66,10 +69,38 @@ class TheBrain:
         ):
             print(f"[CRITICAL] Unknown use-case ID: {self.use_case_filter}")
             sys.exit(2)
+        selected_use_case = next(
+            (item for item in configured_use_cases if item.get("id") == self.use_case_filter),
+            None,
+        )
+        if self.input_path and not (once and selected_use_case and selected_use_case.get("requires_input")):
+            raise ValueError("--input-path is only valid with --once and an input-conditioned use-case such as Whisper or Qwen3-ASR")
+        self.input_only_once = bool(once and selected_use_case and selected_use_case.get("requires_input"))
+        if self.input_only_once:
+            configured_path = self.input_path or selected_use_case.get("input_path")
+            if not configured_path:
+                raise ValueError("input-conditioned use-case requires --input-path or input_path in brain_config.json")
+            self.input_path = self._validate_managed_input_path(configured_path)
         self.is_running = True
 
         self._setup_signals()
-        self._initialize_llm()
+        if self.input_only_once:
+            self.llm = None
+            print("[THE BRAIN] Input-conditioned ASR selected; skipping prompt LLM load.")
+        else:
+            self._initialize_llm()
+
+    def _validate_managed_input_path(self, value):
+        """Validate a regular input file under OEC-managed inputs or Asset Factory outputs."""
+        path = Path(value).expanduser()
+        if path.is_symlink() or not path.is_file():
+            raise ValueError("input path must name an existing regular, non-symlink file")
+        resolved = path.resolve()
+        input_root = Path(SYSTEM_DIRS["inputs"]).expanduser().resolve()
+        asset_root = Path(SYSTEM_DIRS["outputs"]).expanduser().resolve() / "asset_factory"
+        if not any(root != resolved and root in resolved.parents for root in (input_root, asset_root)):
+            raise ValueError("input path must be under the OEC-managed inputs root or Asset Factory output root")
+        return str(resolved)
 
     def _setup_signals(self):
         def handle_sig(sig, frame):
@@ -256,6 +287,8 @@ class TheBrain:
             for use_case in configured_use_cases:
                 if queue_write_failed or not self.is_running:
                     break
+                if use_case.get("requires_input") and self.input_path and use_case["id"] == self.use_case_filter:
+                    use_case["input_path"] = self.input_path
                 if self.use_case_filter and use_case["id"] != self.use_case_filter:
                     continue
                 if not use_case.get("enabled", True) and self.use_case_filter != use_case["id"]:
@@ -275,7 +308,11 @@ class TheBrain:
                         batch_amount = min(deficit, self.max_batch)
                         print(f"  -> Generating chunk of {batch_amount} prompts using DeepSeek-R1...")
                         
-                        new_prompts = self.generate_prompts(use_case, batch_amount)
+                        if use_case.get("requires_input"):
+                            # ASR operates on the supplied audio; do not ask the LLM to fabricate a prompt.
+                            new_prompts = [{"text": "", "duration": None} for _ in range(batch_amount)]
+                        else:
+                            new_prompts = self.generate_prompts(use_case, batch_amount)
                         
                         if not new_prompts:
                             print(f"[THE BRAIN] Warning: LLM failed to return valid prompts. Retrying next loop.")
@@ -333,7 +370,8 @@ class TheBrain:
                             out_type = job_data.get("asset_type", job_data.get("output_type", "video"))
                             dur = job_data.get("duration")
                             suffix = f" | {dur}s" if dur is not None else ""
-                            print(f"     + Queued [{out_type}{suffix}]: {prompt_data['text'][:55]}...")
+                            display_text = prompt_data["text"][:55] or os.path.basename(job_data.get("input_path", "input audio"))
+                            print(f"     + Queued [{out_type}{suffix}]: {display_text}...")
                             total_deficit += 1
                             deficit -= 1
                             self.jobs_created += 1
@@ -386,11 +424,17 @@ if __name__ == "__main__":
         "--use-case",
         help="Restrict --once to this exact configured use-case ID.",
     )
+    parser.add_argument(
+        "--input-path",
+        help="Existing audio file for an input-conditioned use-case such as Whisper or Qwen3-ASR.",
+    )
     args = parser.parse_args()
     if args.once and not args.use_case:
         parser.error("--once requires --use-case")
     if not args.once and args.use_case:
         parser.error("--use-case can only be used with --once")
+    if args.input_path and (not args.once or not args.use_case):
+        parser.error("--input-path requires --once --use-case <input-conditioned-use-case>")
 
     if args.no_proxy:
         print("[SYSTEM] '--no-proxy' flag detected. Entering Offline/Local-Only Mode.")
@@ -399,7 +443,7 @@ if __name__ == "__main__":
         for p in proxies_to_remove:
             os.environ.pop(p, None)
 
-    brain = TheBrain(config_path=args.config, once=args.once, use_case=args.use_case)
+    brain = TheBrain(config_path=args.config, once=args.once, use_case=args.use_case, input_path=args.input_path)
     jobs_created = brain.run()
     if args.once:
         if jobs_created != 1:
