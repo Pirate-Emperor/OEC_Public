@@ -119,10 +119,29 @@ move_captured_paths() {
 
 stash_tracked_changes() {
   local worktree="$1" label="$2"
-  local changed stash_sha
-  changed="$(git -C "$worktree" diff --name-only; git -C "$worktree" diff --cached --name-only)"
+  local changed stash_sha entry mode type sha path
+  local -a stash_pathspec=(-- .)
+
+  # A changed child HEAD is not an OEC-root source edit. In particular, a dirty
+  # OEC-Deploy submodule must not make the parent stash try to capture its gitlink;
+  # the parent synchronizes its own files while sync_pinned_submodules preserves
+  # the child-local server-components sources under the explicit exception below.
+  if [[ "$label" == "root" ]]; then
+    changed="$(git -C "$worktree" diff --ignore-submodules=all --name-only; git -C "$worktree" diff --cached --ignore-submodules=all --name-only)"
+    while read -r mode type sha path; do
+      [[ "$mode" == "160000" && -n "$path" ]] || continue
+      stash_pathspec+=(":(exclude)$path")
+    done < <(git -C "$worktree" ls-tree HEAD)
+  else
+    changed="$(git -C "$worktree" diff --name-only; git -C "$worktree" diff --cached --name-only)"
+  fi
+
   if [[ -n "$changed" ]]; then
-    git -C "$worktree" stash push -m "OEC pre-sync recovery $RUN_ID ($label)"
+    if [[ "$label" == "root" ]]; then
+      git -C "$worktree" stash push -m "OEC pre-sync recovery $RUN_ID ($label)" -- "${stash_pathspec[@]}"
+    else
+      git -C "$worktree" stash push -m "OEC pre-sync recovery $RUN_ID ($label)"
+    fi
     stash_sha="$(git -C "$worktree" rev-parse refs/stash)"
     git -C "$ROOT" update-ref "refs/oec-sync-recovery/$RUN_ID/$label-stash" "$stash_sha"
     printf 'OEC_SYNC_TRACKED_CHANGES_STASHED_%s=%s\n' "$label" "$stash_sha"
