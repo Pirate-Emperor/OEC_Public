@@ -1,6 +1,6 @@
 # OEC Asset Factory
 
-The shared Asset Factory routes each output kind to a loopback model sidecar. It stores validated assets and SHA-256 manifests under the OEC-managed outputs/asset_factory tree. Brain can generate model-appropriate prompts for images, 3D concepts, video, songs, music, sound effects, and TTS/speech. Automatic speech recognition (ASR) is input-driven and never invents an audio file.
+The shared Asset Factory routes each output kind to a loopback model sidecar. It stores validated assets and SHA-256 manifests under the OEC-managed outputs/asset_factory tree, then inserts each completed artifact/manifest pair into the existing HF upload queue (`QUEUE_DB_PATH`, default `outputs/upload_queue.db`) under the StorageManager gate. A `PENDING` queue row means the local pair is queued, not that a remote Hugging Face upload has completed; the upload daemon and remote read-back must be verified separately. Brain can generate model-appropriate prompts for images, 3D concepts, video, songs, music, sound effects, and TTS/speech. Automatic speech recognition (ASR) is input-driven and never invents an audio file.
 
 | Asset type | Default model | Output | Sidecar / port |
 |---|---|---|---|
@@ -20,6 +20,12 @@ Asset Factory Brain use cases are present but disabled by default. This prevents
 ```bash
 python brain.py --once --use-case asset_flux_image
 python -m asset_factory.worker --once
+
+# Input-conditioned speech recognition (no prompt-LLM load; input must be a real audio file):
+python brain.py --once --use-case asset_whisper_transcription --input-path "$HOME/aireos_input/recording.wav"
+python -m asset_factory.worker --once
+python brain.py --once --use-case asset_qwen_transcription --input-path "$HOME/aireos_input/recording.wav"
+python -m asset_factory.worker --once
 ```
 
 Or call the client directly after starting the relevant sidecar:
@@ -32,6 +38,7 @@ python -m asset_factory.client --asset-type song --prompt "Atmospheric instrumen
 python -m asset_factory.client --asset-type music --prompt "Warm piano and soft strings"
 python -m asset_factory.client --asset-type sound_effect --prompt "Rain pattering on a metal roof"
 python -m asset_factory.client --asset-type tts --prompt "Welcome to the coast."
+python -m asset_factory.client --asset-type speech --prompt "The expedition starts at dawn."
 python -m asset_factory.client --asset-type transcript --model whisper --input "$HOME/aireos_input/recording.wav"
 ```
 
