@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Typed client for OEC's isolated multimodal model sidecars."""
 from __future__ import annotations
-import argparse,base64,hashlib,ipaddress,json,os,re,sys,time,urllib.error,urllib.parse,urllib.request
+import argparse,base64,hashlib,ipaddress,json,os,re,sys,time,urllib.error,urllib.parse,urllib.request,sqlite3
 from dataclasses import asdict,dataclass
 from pathlib import Path
 from typing import Any
@@ -12,7 +12,7 @@ JOB_ID_RE=re.compile(r"job_[A-Za-z0-9_-]{12,40}\Z")
 MAX_INPUT_BYTES=12*1024*1024
 @dataclass(frozen=True)
 class AssetResult:
-    asset_type:str; provider:str; model:str; job_id:str; artifact_path:str; sha256:str; size_bytes:int; content_type:str; metadata_path:str
+    asset_type:str; provider:str; model:str; job_id:str; artifact_path:str; sha256:str; size_bytes:int; content_type:str; metadata_path:str; upload_queue_id:int=0
 
 def _loopback(host:str)->bool:
     if host.lower()=="localhost": return True
@@ -80,6 +80,43 @@ def _hash(path:Path)->str:
         for block in iter(lambda:f.read(1024*1024),b""): h.update(block)
     return h.hexdigest()
 
+def _enqueue_hf_upload(asset_path:Path,metadata_path:Path)->int:
+    """Put a completed artifact/manifest pair into OEC's existing HF upload queue."""
+    from core_config import QUEUE_DB_PATH
+    from storage_manager import managed_storage_operation
+    if asset_path.is_symlink() or metadata_path.is_symlink() or not asset_path.is_file() or not metadata_path.is_file():
+        raise FileNotFoundError("asset and metadata must be regular files before enqueue")
+    asset_size=asset_path.stat().st_size
+    metadata_size=metadata_path.stat().st_size
+    if asset_size<1 or metadata_size<1:
+        raise ValueError("empty asset or metadata cannot be queued")
+    total_size=asset_size+metadata_size
+    db_path=Path(QUEUE_DB_PATH).expanduser()
+    with managed_storage_operation("outputs",required_gb=0.001,require_fresh_quota=True,minimum_free_gb=0.02):
+        db_path.parent.mkdir(parents=True,exist_ok=True)
+        with sqlite3.connect(str(db_path),timeout=30) as conn:
+            conn.execute("PRAGMA busy_timeout=30000")
+            # Match the extension-agnostic table contract used by hf_upload_daemon.AssetQueue.
+            conn.execute("""CREATE TABLE IF NOT EXISTS assets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                asset_path TEXT NOT NULL,
+                json_path TEXT NOT NULL,
+                total_size_bytes INTEGER NOT NULL,
+                status TEXT DEFAULT 'PENDING',
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""")
+            cursor=conn.execute(
+                "INSERT INTO assets (asset_path,json_path,total_size_bytes,status) VALUES (?,?,?,'PENDING')",
+                (str(asset_path.resolve()),str(metadata_path.resolve()),total_size),
+            )
+            queue_id=cursor.lastrowid
+            conn.commit()
+            if not isinstance(queue_id,int) or queue_id<1:
+                raise RuntimeError("upload queue did not return a valid row ID")
+    return queue_id
+
+
+
 class AssetFactoryClient:
     def __init__(self,*,timeout_seconds:int=1800,poll_seconds:float=2,output_root:str|Path|None=None):
         from core_config import SYSTEM_DIRS
@@ -143,10 +180,29 @@ class AssetFactoryClient:
                 sha=digest.hexdigest()
                 models={"flux":"black-forest-labs/FLUX.2-klein-4B","trellis":"microsoft/TRELLIS.2-4B","ltx":"Lightricks/LTX-2.3","ace-step":"ACE-Step-1.5","kokoro":"hexgrad/Kokoro-82M","whisper":"openai/whisper","qwen3-asr":"Qwen/Qwen3-ASR-0.6B","audiogen":"facebook/audiogen-medium","musicgen":"facebook/musicgen-medium"}
                 manifest={"schema_version":1,"asset_type":kind,"provider":spec.name,"model":models[spec.name],"job_id":job_id,"artifact_path":str(target),"artifact_bytes":length,"artifact_sha256":sha,"content_type":content,"sidecar_metadata":state.get("metadata") if isinstance(state.get("metadata"),dict) else {},"created_at":state.get("created_at"),"completed_at":state.get("updated_at")}
-                with metadata_path.open("x",encoding="utf-8") as output: json.dump(manifest,output,indent=2,sort_keys=True); output.write("\n")
-                return [AssetResult(kind,spec.name,models[spec.name],job_id,str(target),sha,length,content,str(metadata_path))]
+                manifest["upload_queue"]={"status":"pending","queue_database":"outputs/upload_queue.db"}
+                serialized=json.dumps(manifest,indent=2,sort_keys=True)+"\n"
+                with _managed_write(len(serialized)+1024),metadata_path.open("x",encoding="utf-8") as output:
+                    output.write(serialized); output.flush(); os.fsync(output.fileno())
+                try:
+                    upload_queue_id=_enqueue_hf_upload(target,metadata_path)
+                except Exception as exc:
+                    manifest["upload_queue"]={"status":"failed","error_type":type(exc).__name__}
+                    failed_data=json.dumps(manifest,indent=2,sort_keys=True)+"\n"
+                    temp_manifest=metadata_path.with_name(metadata_path.name+f".{os.getpid()}.tmp")
+                    try:
+                        with _managed_write(len(failed_data)+1024),temp_manifest.open("x",encoding="utf-8") as output:
+                            output.write(failed_data); output.flush(); os.fsync(output.fileno())
+                        os.replace(temp_manifest,metadata_path)
+                    finally:
+                        temp_manifest.unlink(missing_ok=True)
+                    raise RuntimeError(f"asset was saved at {target} but HF upload enqueue failed; manifest={metadata_path}; cause={type(exc).__name__}") from exc
+                return [AssetResult(kind,spec.name,models[spec.name],job_id,str(target),sha,length,content,str(metadata_path),upload_queue_id)]
             except BaseException:
-                target.unlink(missing_ok=True); raise
+                # Keep completed assets and manifests when queue admission fails; they are recovery evidence.
+                if not metadata_path.exists():
+                    target.unlink(missing_ok=True)
+                raise
 
 def main()->int:
     p=argparse.ArgumentParser(description=__doc__); p.add_argument("--asset-type",choices=("image","3d_asset","video","song","music","sound_effect","speech","tts","transcript"),required=True)
