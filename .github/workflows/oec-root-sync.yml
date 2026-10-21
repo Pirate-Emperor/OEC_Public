@@ -13,7 +13,9 @@ permissions:
 # Keep the watchdog independent from the GPU-lane lock so it can stop stale runs.
 concurrency:
   group: oec-canonical-source-reconcile
-  cancel-in-progress: true
+  # This job mutates one persistent shared checkout. Queue newer syncs instead of
+  # cancelling an active Git operation and leaving an index.lock behind.
+  cancel-in-progress: false
 
 jobs:
   enforce-30-minute-cutoff:
