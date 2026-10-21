@@ -89,6 +89,13 @@ class MediaServiceSpecTests(unittest.TestCase):
         self.assertEqual(args.gpu, "2")
         args = parser.parse_args(["start", "ltx-sidecar", "--gpu", "3"])
         self.assertEqual(args.service, "ltx-sidecar")
+        args = parser.parse_args(["start", "audiocraft-api", "--provider", "musicgen", "--gpu", "2", "--accept-noncommercial-license"])
+        self.assertEqual(args.service, "audiocraft-api")
+        self.assertEqual(args.provider, "musicgen")
+        self.assertTrue(args.accept_noncommercial_license)
+        args = parser.parse_args(["start", "asset-factory-worker", "--asset-factory-timeout-seconds", "600"])
+        self.assertEqual(args.service, "asset-factory-worker")
+        self.assertEqual(args.asset_factory_timeout_seconds, 600)
 
     def test_service_gpu_guard_uses_explicit_shared_admission_and_vram_floor(self):
         with mock.patch("oec_gpu_admission.select_idle_a100_gpu", return_value={
@@ -104,9 +111,70 @@ class MediaServiceSpecTests(unittest.TestCase):
 
     def test_provider_vram_floors_are_distinct_and_conservative(self):
         self.assertEqual(manager._minimum_free_vram_mib("ltx-sidecar", "ltx-2.3"), 24 * 1024)
+        self.assertEqual(manager._minimum_free_vram_mib("ltx-api", "ltx"), 24 * 1024)
         self.assertEqual(manager._minimum_free_vram_mib("trellis-sidecar", "trellis-2"), 20 * 1024)
+        self.assertEqual(manager._minimum_free_vram_mib("trellis-api", "trellis"), 20 * 1024)
+        self.assertEqual(manager._minimum_free_vram_mib("flux-api", "flux"), 16 * 1024)
+        self.assertEqual(manager._minimum_free_vram_mib("audiocraft-api", "musicgen"), 8 * 1024)
         self.assertEqual(manager._minimum_free_vram_mib("audio-api", "ace-step"), 16 * 1024)
         self.assertEqual(manager._minimum_free_vram_mib("audio-api", "kokoro"), 2 * 1024)
+
+    def test_deploy_aligned_api_services_use_registry_ports_and_isolated_model_scripts(self):
+        with mock.patch.object(manager, "_assert_port_range"):
+            flux = manager._build_media_service_spec("flux-api", gpu="1")
+            trellis = manager._build_media_service_spec("trellis-api", gpu="2")
+            ltx = manager._build_media_service_spec("ltx-api", gpu="3")
+        self.assertEqual((flux["port"], trellis["port"], ltx["port"]), (7867, 7868, 7869))
+        self.assertIn("tools/media_services/flux_api.py", str(flux["script"]))
+        self.assertIn("tools/media_services/trellis_api.py", str(trellis["script"]))
+        self.assertIn("tools/media_services/ltx_api.py", str(ltx["script"]))
+        self.assertEqual(flux["runtime_import"], "diffusers")
+        self.assertEqual(trellis["runtime_import"], "pipeline_trellis_3d")
+        self.assertEqual(ltx["runtime_import"], "worker_ltx_video")
+        self.assertIsNone(flux["env_updates"]["CUDA_VISIBLE_DEVICES"])
+        self.assertEqual(trellis["env_updates"]["CUDA_VISIBLE_DEVICES"], "2")
+        self.assertEqual(ltx["env_updates"]["CUDA_VISIBLE_DEVICES"], "3")
+        self.assertNotIn("--allow-download", ltx["script_args"])
+
+    def test_ltx_disk_cache_purge_is_explicit_opt_in(self):
+        with mock.patch.object(manager, "_assert_port_range"):
+            normal = manager._build_media_service_spec("ltx-api", gpu="0")
+            purge = manager._build_media_service_spec("ltx-api", gpu="0", purge_ltx_cache_after_load=True)
+        self.assertNotIn("--allow-download", normal["script_args"])
+        self.assertIn("--allow-download", purge["script_args"])
+
+    def test_audiocraft_api_requires_license_acknowledgement_and_uses_deploy_ports(self):
+        with mock.patch.object(manager, "_assert_port_range"):
+            with self.assertRaisesRegex(ValueError, "CC-BY-NC-4.0"):
+                manager._build_media_service_spec("audiocraft-api", "audiogen", "2")
+            audio = manager._build_media_service_spec(
+                "audiocraft-api", "audiogen", "2", accept_noncommercial_license=True
+            )
+            music = manager._build_media_service_spec(
+                "audiocraft-api", "musicgen", "3", accept_noncommercial_license=True
+            )
+        self.assertEqual((audio["port"], music["port"]), (7874, 7875))
+        self.assertIn("tools/media_services/audiocraft_api.py", str(audio["script"]))
+        self.assertEqual(audio["environment"], "phase1")
+        self.assertEqual(audio["runtime_import"], "audiocraft")
+        self.assertIsNone(audio["env_updates"]["CUDA_VISIBLE_DEVICES"])
+        self.assertIn("--accept-noncommercial-license", audio["script_args"])
+        self.assertIn("--gpu", audio["script_args"])
+        self.assertEqual(audio["provider"], "audiogen")
+        self.assertEqual(music["provider"], "musicgen")
+
+    def test_asset_factory_worker_is_cpu_only_and_has_bounded_arguments(self):
+        spec = manager._build_media_service_spec(
+            "asset-factory-worker", asset_factory_poll_seconds=3, asset_factory_timeout_seconds=240
+        )
+        self.assertEqual(spec["environment"], "oec_deploy")
+        self.assertIn("asset_factory/worker.py", str(spec["script"]))
+        self.assertEqual(spec["gpus"], set())
+        self.assertIsNone(spec["port"])
+        self.assertIsNone(spec["env_updates"]["CUDA_VISIBLE_DEVICES"])
+        self.assertEqual(spec["script_args"], ["--poll-seconds", "3.0", "--timeout-seconds", "240"])
+        with self.assertRaises(ValueError):
+            manager._build_media_service_spec("asset-factory-worker", asset_factory_poll_seconds=0.1)
 
     def test_status_health_probe_never_uses_configured_remote_hosts(self):
         with mock.patch.object(manager.urllib.request, "build_opener") as opener:

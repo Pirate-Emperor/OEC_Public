@@ -13,8 +13,15 @@ on:
       - "pipeline_trellis_3d.py"
       - "tools/run_flux_pipeline_smoke.py"
       - "tools/oec_service_manager.py"
+      - "tools/media_services/*.py"
+      - "asset_factory/**"
+      - "brain_config.json"
+      - "brain.py"
       - "tests/test_flux_image_pipeline.py"
       - "tests/test_flux_trellis_pipeline.py"
+      - "tests/test_oec_service_manager_media.py"
+      - "tests/test_asset_factory_upload_queue.py"
+      - "tests/test_ltx_sidecar_cache_policy.py"
 
   workflow_dispatch:
 
@@ -70,9 +77,19 @@ jobs:
           CONDA="$HOME/Conda/condabin/conda"
           "$CONDA" run --no-capture-output -n phase2_3d python -m py_compile \
             pipeline_flux_image.py pipeline_flux_trellis.py pipeline_trellis_3d.py \
-            tools/run_flux_pipeline_smoke.py tests/test_flux_image_pipeline.py tests/test_flux_trellis_pipeline.py
+            brain.py core_config.py storage_policy.py storage_manager.py tools/oec_service_manager.py \
+            asset_factory/__init__.py asset_factory/registry.py asset_factory/client.py asset_factory/worker.py \
+            tools/media_services/common.py tools/media_services/model_cache.py \
+            tools/media_services/audio_api.py tools/media_services/audiocraft_api.py \
+            tools/media_services/flux_api.py tools/media_services/trellis_api.py tools/media_services/ltx_api.py \
+            tools/run_flux_pipeline_smoke.py tests/test_flux_image_pipeline.py tests/test_flux_trellis_pipeline.py \
+            tests/test_asset_factory_upload_queue.py tests/test_ltx_sidecar_cache_policy.py \
+            tests/test_oec_service_manager_media.py
           "$CONDA" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_flux_image_pipeline.py' -v
           "$CONDA" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_flux_trellis_pipeline.py' -v
+          "$CONDA" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_asset_factory_upload_queue.py' -v
+          "$CONDA" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_ltx_sidecar_cache_policy.py' -v
+          "$CONDA" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_oec_service_manager_media.py' -v
 
       - name: Capture live StorageManager state before inference
         run: |

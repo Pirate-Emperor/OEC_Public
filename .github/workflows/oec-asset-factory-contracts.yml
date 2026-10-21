@@ -6,11 +6,13 @@ on:
       - fix/media-stack-supervision-20261019
     paths:
       - "asset_factory/**"
-      - "tools/media_services/ltx_api.py"
+      - "tools/oec_service_manager.py"
+      - "tools/media_services/*.py"
       - "brain_config.json"
       - "brain.py"
       - "tests/test_asset_factory_upload_queue.py"
       - "tests/test_ltx_sidecar_cache_policy.py"
+      - "tests/test_oec_service_manager_media.py"
       - ".github/workflows/oec-asset-factory-contracts.yml"
   workflow_dispatch:
 
@@ -39,8 +41,13 @@ jobs:
             brain.py core_config.py storage_policy.py storage_manager.py \
             asset_factory/__init__.py asset_factory/registry.py \
             asset_factory/client.py asset_factory/worker.py \
-            tools/media_services/ltx_api.py tests/test_asset_factory_upload_queue.py \
-            tests/test_ltx_sidecar_cache_policy.py
+            tools/oec_service_manager.py \
+            tools/media_services/common.py tools/media_services/model_cache.py \
+            tools/media_services/audio_api.py tools/media_services/audiocraft_api.py \
+            tools/media_services/flux_api.py tools/media_services/trellis_api.py \
+            tools/media_services/ltx_api.py \
+            tests/test_asset_factory_upload_queue.py tests/test_ltx_sidecar_cache_policy.py \
+            tests/test_oec_service_manager_media.py
           python -m json.tool brain_config.json > /dev/null
 
       - name: Test provider routing, Brain prompts, input-conditioned ASR and HF enqueue
@@ -48,3 +55,4 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s tests -p 'test_asset_factory_upload_queue.py' -v
           python -m unittest discover -s tests -p 'test_ltx_sidecar_cache_policy.py' -v
+          python -m unittest discover -s tests -p 'test_oec_service_manager_media.py' -v
