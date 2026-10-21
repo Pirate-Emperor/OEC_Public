@@ -37,6 +37,7 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s tests -p 'test_trellis_notebook_static.py' -v
           python -m unittest discover -s tests -p 'test_trellis_easy_run.py' -v
+          python -m unittest discover -s tests -p 'test_flux_trellis_pipeline.py' -v
           python -m unittest discover -s tests -p 'test_audiocraft_notebook_static.py' -v
           python -m unittest discover -s tests -p 'test_storage_write_admission.py' -v
           python -m unittest discover -s tests -p 'test_inference_storage_integration.py' -v
@@ -49,7 +50,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_ace_step_runtime.py' -v
           python -m unittest discover -s tests -p 'test_oec_service_manager_media.py' -v
           python -m unittest discover -s tests -p 'test_gpu_admission.py' -v
-          python -m py_compile oec_gpu_admission.py pipeline_flux_image.py tools/run_media_model_smokes.py tools/run_oec_e2e_acceptance.py qa_compliance_worker.py tests/test_gpu_admission.py tests/test_inference_storage_integration.py
+          python -m py_compile oec_gpu_admission.py pipeline_flux_image.py pipeline_flux_trellis.py tests/test_flux_trellis_pipeline.py tools/run_media_model_smokes.py tools/run_oec_e2e_acceptance.py qa_compliance_worker.py tests/test_gpu_admission.py tests/test_inference_storage_integration.py
           python -m py_compile tools/check_media_service_readiness.py tools/oec_service_manager.py tools/prepare_ace_step_runtime.py tests/test_media_service_readiness.py tests/test_oec_service_manager_media.py tests/test_ace_step_runtime.py
           python -m py_compile hf_upload_daemon.py tests/test_upload_daemon_storage.py
           python -m py_compile tools/run_oec_e2e_acceptance.py tests/test_oec_e2e_acceptance_contract.py
