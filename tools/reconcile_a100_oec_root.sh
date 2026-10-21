@@ -38,6 +38,17 @@ root_top="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null || true)"
 root_top="$(cd -- "$root_top" && pwd -P)"
 [[ "$root_top" == "$ROOT" ]] || fail "canonical checkout top-level differs from $ROOT" 12
 
+# Serialize every entry point that reconciles this persistent shared checkout.
+EARLY_COMMON_DIR="$(git -C "$ROOT" rev-parse --git-common-dir)"
+if [[ "$EARLY_COMMON_DIR" != /* ]]; then EARLY_COMMON_DIR="$ROOT/$EARLY_COMMON_DIR"; fi
+EARLY_COMMON_DIR="$(cd -- "$EARLY_COMMON_DIR" && pwd -P)"
+SYNC_LOCK="$EARLY_COMMON_DIR/oec-sync-reconcile.lock"
+[[ ! -L "$SYNC_LOCK" ]] || fail "sync lock path is a symlink; refusing to follow it" 29
+exec 9>"$SYNC_LOCK"
+command -v flock >/dev/null 2>&1 || fail "flock is required to serialize persistent checkout reconciliation" 29
+flock -n 9 || fail "another reconciliation process currently owns the persistent OEC sync lock" 29
+printf 'OEC_SYNC_MUTEX=ACQUIRED path=%s\\n' "$SYNC_LOCK"
+
 origin="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
 case "$origin" in
   *github.com/CalamityStriker/OEC.git|*github.com/CalamityStriker/OEC|*github.com:CalamityStriker/OEC.git|*github.com:CalamityStriker/OEC) ;;
@@ -85,6 +96,30 @@ COMMON_DIR="$(cd -- "$COMMON_DIR" && pwd -P)"
 
 BACKUP_ROOT="$COMMON_DIR/oec-sync-recovery/$RUN_ID"
 mkdir -p -m 700 "$BACKUP_ROOT"
+
+# Recover a demonstrably stale Git index lock only by moving it into the
+# timestamped recovery area. Never unlink it and never move one held by a live PID.
+INDEX_LOCK="$COMMON_DIR/index.lock"
+if [[ -L "$INDEX_LOCK" ]]; then
+  fail "Git index.lock is a symlink; preserved for manual inspection" 29
+fi
+if [[ -e "$INDEX_LOCK" ]]; then
+  LOCK_OWNERS=""
+  if command -v fuser >/dev/null 2>&1; then
+    LOCK_OWNERS="$(fuser "$INDEX_LOCK" 2>/dev/null | tr -s '[:space:]' ' ' | sed 's/^ *//;s/ *$//' || true)"
+  elif command -v lsof >/dev/null 2>&1; then
+    LOCK_OWNERS="$(lsof -t -- "$INDEX_LOCK" 2>/dev/null | tr -s '[:space:]' ' ' | sed 's/^ *//;s/ *$//' || true)"
+  else
+    fail "Git index.lock exists but neither fuser nor lsof is available to identify an owner" 29
+  fi
+  [[ -z "$LOCK_OWNERS" ]] || fail "Git index.lock is still open by PID(s) $LOCK_OWNERS; preserved without mutation" 29
+  LOCK_AGE_SECONDS=$(( $(date +%s) - $(stat -c '%Y' "$INDEX_LOCK") ))
+  (( LOCK_AGE_SECONDS >= 600 )) || fail "Git index.lock is only $LOCK_AGE_SECONDS seconds old; preserved for safety" 29
+  mv -- "$INDEX_LOCK" "$BACKUP_ROOT/stale-index.lock"
+  chmod 600 "$BACKUP_ROOT/stale-index.lock"
+  printf 'OEC_STALE_INDEX_LOCK_PRESERVED path=%s age_seconds=%s recovery=%s\\n' "$INDEX_LOCK" "$LOCK_AGE_SECONDS" "$BACKUP_ROOT/stale-index.lock"
+fi
+
 git -C "$ROOT" update-ref "refs/oec-sync-recovery/$RUN_ID/root-head" "$BEFORE_SHA"
 git -C "$ROOT" update-ref "refs/oec-sync-recovery/$RUN_ID/target" "$TARGET_SHA"
 
