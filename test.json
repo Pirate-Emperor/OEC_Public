@@ -1,11 +1,49 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-20T21:45:00+05:30",
+  "last_updated": "2026-10-21T10:30:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Private generated asset in strikerhell/Vault verified with remote hash read-back (asset 1, 228845 bytes, SHA-256 3d66b13693184eb7f76841f96836ded2f3407dc1e11b810f2e91c1db8b465392). Live run #39452849617 passed the LTX→Qwen2-VL QA→HF upload/read-back path and most live model inference jobs; MusicGen was cancelled, so overall suite is failed. Persistent API release attempts did not start services; latest #39464232552 passed sync, output storage and four audio runtime/cache preflight checks, then failed because service manager CLI rejects instance ID audio-api-kokoro (only group choices such as audio-api are accepted). No model weights were downloaded, no public model-weight release was made, and no persistent API start succeeded. Next: fix group status parsing/instance lookup and LTX runtime preflight, then rerun the short guarded release.",
+  "latest_summary": "2026-10-21: Added reproducible demo runbook and fixed the exact-head FLUX live workflow's fixed work-directory collision. Fix commit 59689f57 is not yet re-tested. Run 39452849617: MusicGen/AudioGen/speech+ACE-Step/LTX+TRELLIS jobs passed; FLUX→TRELLIS failed with FileExistsError because the work directory already existed; joined QA/HF job was cancelled during remote listing and its artifact upload failed after cancellation. Main/feature divergence requires reconciliation before merge.",
   "experiments": [
+    {
+      "id": "EXP-2026-10-21-FLUX-WORKDIR-COLLISION-FIX",
+      "date": "2026-10-21",
+      "category": "workflow failure diagnosis and demo documentation",
+      "approach": "Inspected terminal GitHub Actions job logs, identified fixed work-directory reuse in the FLUX→TRELLIS acceptance step, changed workflow to allocate a unique temporary directory per run attempt, and added a reproducible demo runbook.",
+      "reason": "The exact-head A100 run failed before inference because the smoke entrypoint intentionally refuses to reuse an existing work directory. The runbook also needs to distinguish accepted standalone inference from failed/cancelled joined paths.",
+      "parameters": {
+        "source_branch": "fix/media-stack-supervision-20261019",
+        "failing_run_id": 39452849617,
+        "failing_job_id": 118794989470,
+        "joined_job_id": 118795638536,
+        "fix_commit": "59689f57b172719cd9f3cd518fe6eb11f3f27973",
+        "commands": [
+          "gh run view 39452849617 --repo CalamityStriker/OEC",
+          "gh run view 39452849617 --repo CalamityStriker/OEC --log-failed",
+          "python -m unittest discover -s tests -p 'test_flux_image_pipeline.py' -v",
+          "python -m unittest discover -s tests -p 'test_flux_trellis_pipeline.py' -v"
+        ],
+        "environment": "GitHub Actions logs; FLUX offline tests ran on assigned oec-2 A100 runner in phase2_3d",
+        "model_downloads": false,
+        "gpu_inference_in_fix_commit": false,
+        "github_actions_triggered": false
+      },
+      "results": {
+        "flux_image_contract_tests": "PASS 9/9 on preceding code SHA 72b71f861bba72b78da1cec330e4273b00baaabb",
+        "flux_trellis_contract_tests": "PASS 5/5 on preceding code SHA 72b71f861bba72b78da1cec330e4273b00baaabb",
+        "failing_live_run": "FAIL before FLUX inference: FileExistsError for /tmp/oec-flux-live-suite-39452849617",
+        "joined_e2e": "CANCELLED while listing remote dataset tree; artifact upload afterward failed 403 because job was already completed",
+        "workflow_fix": "Committed unique mktemp -d directory with run ID/attempt; not yet tested"
+      },
+      "interpretation": "The workflow orchestration defect is addressed in source, but the fix is unverified until static and live reruns succeed. This is not an accepted FLUX inference or joined end-to-end pass.",
+      "limitations": [
+        "No A100 local directory was directly inspected by this session.",
+        "The feature branch compares as 345 commits ahead and 11 behind main; do not merge blindly.",
+        "No fresh GPU run was started for this change.",
+        "Joined QA/HF remote read-back remains unverified on this exact head."
+      ]
+    },
     {
       "id": "EXP-2026-10-18-MEDIA-SIDECAR-API-CPU",
       "date": "2026-10-18",
