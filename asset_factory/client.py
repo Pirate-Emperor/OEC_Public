@@ -180,22 +180,13 @@ class AssetFactoryClient:
                 sha=digest.hexdigest()
                 models={"flux":"black-forest-labs/FLUX.2-klein-4B","trellis":"microsoft/TRELLIS.2-4B","ltx":"Lightricks/LTX-2.3","ace-step":"ACE-Step-1.5","kokoro":"hexgrad/Kokoro-82M","whisper":"openai/whisper","qwen3-asr":"Qwen/Qwen3-ASR-0.6B","audiogen":"facebook/audiogen-medium","musicgen":"facebook/musicgen-medium"}
                 manifest={"schema_version":1,"asset_type":kind,"provider":spec.name,"model":models[spec.name],"job_id":job_id,"artifact_path":str(target),"artifact_bytes":length,"artifact_sha256":sha,"content_type":content,"sidecar_metadata":state.get("metadata") if isinstance(state.get("metadata"),dict) else {},"created_at":state.get("created_at"),"completed_at":state.get("updated_at")}
-                manifest["upload_queue"]={"status":"pending","queue_database":"outputs/upload_queue.db"}
                 serialized=json.dumps(manifest,indent=2,sort_keys=True)+"\n"
                 with _managed_write(len(serialized)+1024),metadata_path.open("x",encoding="utf-8") as output:
                     output.write(serialized); output.flush(); os.fsync(output.fileno())
                 try:
                     upload_queue_id=_enqueue_hf_upload(target,metadata_path)
                 except Exception as exc:
-                    manifest["upload_queue"]={"status":"failed","error_type":type(exc).__name__}
-                    failed_data=json.dumps(manifest,indent=2,sort_keys=True)+"\n"
-                    temp_manifest=metadata_path.with_name(metadata_path.name+f".{os.getpid()}.tmp")
-                    try:
-                        with _managed_write(len(failed_data)+1024),temp_manifest.open("x",encoding="utf-8") as output:
-                            output.write(failed_data); output.flush(); os.fsync(output.fileno())
-                        os.replace(temp_manifest,metadata_path)
-                    finally:
-                        temp_manifest.unlink(missing_ok=True)
+                    # Keep the valid artifact manifest immutable for recovery; queue state belongs in SQLite/status logs.
                     raise RuntimeError(f"asset was saved at {target} but HF upload enqueue failed; manifest={metadata_path}; cause={type(exc).__name__}") from exc
                 return [AssetResult(kind,spec.name,models[spec.name],job_id,str(target),sha,length,content,str(metadata_path),upload_queue_id)]
             except BaseException:
