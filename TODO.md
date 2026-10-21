@@ -519,3 +519,13 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - [ ] Run the current-head static suite and A100 suite. Only mark ACE-Step ready after actual generation, live health and Gradio event pass.
 - [ ] Do not edit/reset the dirty persistent `~/OEC` checkout. The current sync helper reported it preserved that checkout; a safe per-file/worktree sync is still needed before claiming the tested commit is installed at the deployment path.
 - [ ] Add supervised typed HTTP job APIs for AudioGen/MusicGen (and standalone FLUX only if requested) before marking those providers `READY` to OEC_Deploy. Existing CLI/Gradio passes do not make them HTTP-exposed.
+
+## Demo runbook and exact-head follow-up — 2026-10-21
+
+- [x] Added [docs/DEMO_SUITE.md](docs/DEMO_SUITE.md) with reproducible commands, artifact checks and presentation narration.
+- [x] Inspected terminal job logs for [run 39452849617](https://github.com/CalamityStriker/OEC/actions/runs/39452849617). Static/storage validation passed at SHA `72b71f861bba72b78da1cec330e4273b00baaabb`; the exact-head FLUX→TRELLIS job failed because the fixed work directory already existed, while joined LTX/Qwen2-VL/HF read-back was cancelled during remote dataset listing.
+- [x] Fixed the workflow to use a unique per-run/per-attempt temporary work directory; commit [59689f57](https://github.com/CalamityStriker/OEC/commit/59689f57b172719cd9f3cd518fe6eb11f3f27973).
+- [ ] Re-run static checks and a bounded live acceptance on the new workflow commit; verify generated PNG and GLB independently.
+- [ ] Re-run joined QA/HF remote hash read-back and retain full successful artifact evidence.
+- [ ] Reconcile feature branch (345 ahead / 11 behind at last compare) with current main before merging; preserve main-only changes and review the full diff.
+- [ ] Do not claim A100 local directory synchronization from GitHub Actions logs alone; verify actual local checkout SHA/status through the designated runner workflow.
