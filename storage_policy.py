@@ -319,9 +319,19 @@ def _live_lustre_quota(
         fields = line.split()
         if fields and fields[0].startswith("/"):
             fields = fields[1:]
-        if len(fields) < 3 or not all(re.fullmatch(r"\d+", value) for value in fields[:3]):
+        # Lustre appends '*' to the kbytes usage field when the soft quota
+        # is exceeded. Strip that status marker before numeric conversion; the
+        # separate grace column remains authoritative for whether writes may
+        # continue below the hard limit.
+        used_match = re.fullmatch(r"(\d+)\*?", fields[0]) if fields else None
+        if (
+            len(fields) < 3
+            or used_match is None
+            or not all(re.fullmatch(r"\d+", value) for value in fields[1:3])
+        ):
             continue
-        used_kib, soft_kib, hard_kib = map(int, fields[:3])
+        used_kib = int(used_match.group(1))
+        soft_kib, hard_kib = map(int, fields[1:3])
         soft_bytes = soft_kib * 1024 if soft_kib > 0 else None
         hard_bytes = hard_kib * 1024 if hard_kib > 0 else None
         effective_limit = soft_bytes if soft_bytes is not None else hard_bytes
