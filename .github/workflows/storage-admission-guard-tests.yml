@@ -12,6 +12,7 @@ on:
       - main
       - 'fix/storage-admission-write-guards-20261014'
       - 'feat/quota-aware-reserve-management-20261017'
+      - 'fix/lfs-quota-asterisk-parser-20261021'
 
 permissions:
   contents: read
