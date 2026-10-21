@@ -105,8 +105,8 @@ class AssetFactoryUploadQueueTests(unittest.TestCase):
         self.assertEqual(artifact.read_bytes(), payload)
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(manifest["artifact_sha256"], hashlib.sha256(payload).hexdigest())
-        self.assertEqual(manifest["upload_queue"]["status"], "pending")
-        self.assertEqual(item.upload_queue_id, result[0].upload_queue_id)
+        self.assertNotIn("upload_queue", manifest)
+        self.assertGreater(item.upload_queue_id, 0)
         with sqlite3.connect(self.db) as conn:
             queued = conn.execute(
                 "SELECT asset_path, json_path, total_size_bytes, status FROM assets WHERE id = ?",
@@ -117,6 +117,38 @@ class AssetFactoryUploadQueueTests(unittest.TestCase):
         self.assertEqual(queued[1], str(manifest_path.resolve()))
         self.assertEqual(queued[2], artifact.stat().st_size + manifest_path.stat().st_size)
         self.assertEqual(queued[3], "PENDING")
+
+    def test_enqueue_failure_retains_artifact_and_generation_manifest_for_recovery(self):
+        from asset_factory.registry import resolve_provider
+
+        asset_root = self.outputs / "asset_factory"
+        client = AssetFactoryClient(output_root=asset_root)
+        payload = b"RIFF" + b"\\x00\\x00\\x00\\x00" + b"WAVE" + b"recovery-audio"
+        response = _FakeResponse(payload, "audio/wav")
+        opener = mock.Mock()
+        opener.open.return_value = response
+        spec = resolve_provider("music")
+        job_id = "job_mnopqrstuvwxyz"
+        with mock.patch("asset_factory.client._opener", return_value=opener), mock.patch(
+            "asset_factory.client._enqueue_hf_upload", side_effect=OSError("queue database unavailable")
+        ):
+            with self.assertRaisesRegex(RuntimeError, "HF upload enqueue failed"):
+                client._download(
+                    spec,
+                    "http://127.0.0.1:7875",
+                    job_id,
+                    "music",
+                    {"job_id": job_id, "status": "succeeded", "metadata": {}},
+                )
+        artifact = asset_root / "music" / f"{job_id}.wav"
+        manifest_path = artifact.with_suffix(artifact.suffix + ".json")
+        self.assertTrue(artifact.is_file())
+        self.assertTrue(manifest_path.is_file())
+        self.assertEqual(artifact.read_bytes(), payload)
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["artifact_sha256"], hashlib.sha256(payload).hexdigest())
+        self.assertNotIn("upload_queue", manifest)
+        self.assertFalse(self.db.exists())
 
     def test_empty_or_missing_artifacts_are_not_queued(self):
         with self.assertRaises(FileNotFoundError):
