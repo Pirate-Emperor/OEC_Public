@@ -160,3 +160,12 @@ No new persistent model API was accepted; no service was launched by the last at
 ## Exact-code live retest status at 21:45 IST — 2026-10-20
 
 **Live run update (2026-10-20 21:45 IST):** [Run 39452849617](https://github.com/CalamityStriker/OEC/actions/runs/39452849617), code SHA `72b71f861bba72b78da1cec330e4273b00baaabb`, remains non-terminal. Source sync and approved lock recovery passed; the actual Whisper callback returned the new timestamped segments, Kokoro and Qwen3-ASR callbacks passed, ACE-Step generated a real FLAC, and AudioGen inference/Gradio passed. MusicGen job `118741175823` was cancelled before starting; there is no inference output and no cancellation reason was reported by the job record. LTX/TRELLIS job `118743897523` is still running at storage/cache preflight. The earlier full suite on SHA `0c53f6a...` remains the latest fully completed 8/8 run.
+
+
+## 2026-10-21 — Demo suite and FLUX work-directory failure fix
+
+- Added `docs/DEMO_SUITE.md` as a presentation-ready runbook covering non-destructive Git inspection, offline contract tests, Actions/artifact review and honest narration of model limitations.
+- Inspected terminal jobs for [live run 39452849617](https://github.com/CalamityStriker/OEC/actions/runs/39452849617). MusicGen, AudioGen, speech/ACE-Step and LTX/TRELLIS jobs passed; FLUX→TRELLIS failed and the joined QA/HF job was cancelled. Offline FLUX tests passed 9/9 and 5/5 respectively.
+- The FLUX failure was a work-directory collision: the script rejected the already-existing `/tmp/oec-flux-live-suite-39452849617` with `FileExistsError`. Updated `.github/workflows/oec-live-acceptance-suite.yml` to create a unique `mktemp -d` work directory using run ID and attempt, recording it in evidence. Workflow fix commit: [59689f57](https://github.com/CalamityStriker/OEC/commit/59689f57b172719cd9f3cd518fe6eb11f3f27973).
+- The joined job was cancelled while listing the remote dataset tree; artifact upload then returned 403 because the job was already completed. It is not an accepted E2E pass. The new workflow fix has not yet been tested.
+- Branch comparison showed feature branch divergence from main (345 ahead, 11 behind). No merge performed: reconcile main-only commits and validate before integration. No direct shell access to the A100 local directory was available in this session; do not claim it is synced from branch/Actions evidence alone.
