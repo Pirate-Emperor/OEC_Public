@@ -161,8 +161,10 @@ class AssetFactoryClient:
         try: response=_opener(url).open(req,timeout=120)
         except urllib.error.HTTPError as exc: raise RuntimeError(f"{spec.name} result HTTP {exc.code}: {exc.read(2048).decode('utf-8','replace')}") from exc
         with response:
-            content=response.headers.get_content_type()
-            if content!=spec.content_type: raise RuntimeError(f"{spec.name} result MIME mismatch: {content}")
+            mime_type=response.headers.get_content_type().lower()
+            expected_mime_type=spec.content_type.split(";",1)[0].strip().lower()
+            if mime_type!=expected_mime_type: raise RuntimeError(f"{spec.name} result MIME mismatch: {mime_type}")
+            content_type=response.headers.get("Content-Type",mime_type)
             try: length=int(response.headers.get("Content-Length",""))
             except ValueError as exc: raise RuntimeError("result Content-Length missing/invalid") from exc
             if length<1 or length>spec.max_result_bytes: raise RuntimeError("result is outside configured byte cap")
@@ -179,7 +181,7 @@ class AssetFactoryClient:
                     output.flush(); os.fsync(output.fileno())
                 sha=digest.hexdigest()
                 models={"flux":"black-forest-labs/FLUX.2-klein-4B","trellis":"microsoft/TRELLIS.2-4B","ltx":"Lightricks/LTX-2.3","ace-step":"ACE-Step-1.5","kokoro":"hexgrad/Kokoro-82M","whisper":"openai/whisper","qwen3-asr":"Qwen/Qwen3-ASR-0.6B","audiogen":"facebook/audiogen-medium","musicgen":"facebook/musicgen-medium"}
-                manifest={"schema_version":1,"asset_type":kind,"provider":spec.name,"model":models[spec.name],"job_id":job_id,"artifact_path":str(target),"artifact_bytes":length,"artifact_sha256":sha,"content_type":content,"sidecar_metadata":state.get("metadata") if isinstance(state.get("metadata"),dict) else {},"created_at":state.get("created_at"),"completed_at":state.get("updated_at")}
+                manifest={"schema_version":1,"asset_type":kind,"provider":spec.name,"model":models[spec.name],"job_id":job_id,"artifact_path":str(target),"artifact_bytes":length,"artifact_sha256":sha,"content_type":content_type,"sidecar_metadata":state.get("metadata") if isinstance(state.get("metadata"),dict) else {},"created_at":state.get("created_at"),"completed_at":state.get("updated_at")}
                 serialized=json.dumps(manifest,indent=2,sort_keys=True)+"\n"
                 with _managed_write(len(serialized)+1024),metadata_path.open("x",encoding="utf-8") as output:
                     output.write(serialized); output.flush(); os.fsync(output.fileno())
@@ -188,7 +190,7 @@ class AssetFactoryClient:
                 except Exception as exc:
                     # Keep the valid artifact manifest immutable for recovery; queue state belongs in SQLite/status logs.
                     raise RuntimeError(f"asset was saved at {target} but HF upload enqueue failed; manifest={metadata_path}; cause={type(exc).__name__}") from exc
-                return [AssetResult(kind,spec.name,models[spec.name],job_id,str(target),sha,length,content,str(metadata_path),upload_queue_id)]
+                return [AssetResult(kind,spec.name,models[spec.name],job_id,str(target),sha,length,content_type,str(metadata_path),upload_queue_id)]
             except BaseException:
                 # Keep completed assets and manifests when queue admission fails; they are recovery evidence.
                 if not metadata_path.exists():
