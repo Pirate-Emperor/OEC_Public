@@ -61,7 +61,7 @@ esac
 [[ -f "$ROOT/storage_config.json" ]] || fail "canonical checkout storage_config.json is missing" 16
 
 # Source checkout changes are forbidden while a known OEC consumer/inference process is active.
-if pgrep -f '[b]rain.py|[h]f_upload_daemon.py|[q]a_compliance_worker.py|[w]orker_ltx_video.py|[a]udio_api.py|[t]rellis_api.py|[l]tx_api.py|[p]ipeline_audiogen.py|[p]ipeline_musicgen.py' >/dev/null 2>&1; then
+if pgrep -f '[b]rain.py|[h]f_upload_daemon.py|[q]a_compliance_worker.py|[w]orker_ltx_video.py|[a]udio_api.py|[t]rellis_api.py|[l]tx_api.py|[f]lux_api.py|[a]udiocraft_api.py|[p]ipeline_audiogen.py|[p]ipeline_musicgen.py|[p]ipeline_flux_image.py|[p]ipeline_flux_trellis.py|[p]ipeline_trellis_3d.py|[p]ipeline_flux_only.py|asset_factory[.]worker' >/dev/null 2>&1; then
   fail "active OEC inference/queue process detected; stop it normally and retry" 17
 fi
 
