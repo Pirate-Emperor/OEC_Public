@@ -118,6 +118,33 @@ class AssetFactoryUploadQueueTests(unittest.TestCase):
         self.assertEqual(queued[2], artifact.stat().st_size + manifest_path.stat().st_size)
         self.assertEqual(queued[3], "PENDING")
 
+    def test_whisper_and_qwen_transcript_mime_with_charset_is_accepted_and_preserved(self):
+        from asset_factory.registry import resolve_provider
+
+        for provider in ("whisper", "qwen3-asr"):
+            with self.subTest(provider=provider):
+                client = AssetFactoryClient(output_root=self.outputs / "asset_factory")
+                payload = b"example transcript from test audio"
+                response = _FakeResponse(payload, "text/plain; charset=utf-8")
+                opener = mock.Mock()
+                opener.open.return_value = response
+                spec = resolve_provider("transcript", provider)
+                job_id = "job_asr_" + ("w" if provider == "whisper" else "q") + "123456789"
+                with mock.patch("asset_factory.client._opener", return_value=opener):
+                    result = client._download(
+                        spec,
+                        "http://127.0.0.1:" + str(spec.default_port),
+                        job_id,
+                        "transcript",
+                        {"job_id": job_id, "status": "succeeded", "metadata": {"language": "en"}},
+                    )
+                item = result[0]
+                manifest = json.loads(Path(item.metadata_path).read_text(encoding="utf-8"))
+                self.assertEqual(item.content_type, "text/plain; charset=utf-8")
+                self.assertEqual(manifest["content_type"], "text/plain; charset=utf-8")
+                self.assertEqual(Path(item.artifact_path).read_bytes(), payload)
+                self.assertGreater(item.upload_queue_id, 0)
+
     def test_enqueue_failure_retains_artifact_and_generation_manifest_for_recovery(self):
         from asset_factory.registry import resolve_provider
 
