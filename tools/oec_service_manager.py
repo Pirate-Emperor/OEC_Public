@@ -36,7 +36,10 @@ STATE_ROOT = Path(os.environ.get(
 LOG_ROOT = STATE_ROOT / "logs"
 SUPPORTED_IMAGES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
 AUDIO_API_DEFAULT_PORTS = {"ace-step": 7870, "kokoro": 7871, "whisper": 7872, "qwen3-asr": 7873}
+AUDIOCRAFT_API_DEFAULT_PORTS = {"audiogen": 7874, "musicgen": 7875}
+MEDIA_API_PROVIDERS = tuple(AUDIO_API_DEFAULT_PORTS) + tuple(AUDIOCRAFT_API_DEFAULT_PORTS)
 MEDIA_SIDECAR_DEFAULT_PORTS = {"trellis-sidecar": 17868, "ltx-sidecar": 17869}
+ASSET_FACTORY_API_PORTS = {"flux-api": 7867, "trellis-api": 7868, "ltx-api": 7869}
 AUDIO_API_IMPORTS = {"ace-step": "acestep", "kokoro": "kokoro", "whisper": "whisper", "qwen3-asr": "qwen_asr"}
 
 
@@ -111,10 +114,14 @@ def _assert_gpu_idle(gpu: str, min_free_mib: int = 0) -> None:
 
 def _minimum_free_vram_mib(service: str, provider: str) -> int:
     """Conservative per-provider launch floor; final runtime may need more memory."""
-    if service == "ltx-sidecar":
+    if service in {"ltx-sidecar", "ltx-api"}:
         return 24 * 1024
-    if service == "trellis-sidecar":
+    if service in {"trellis-sidecar", "trellis-api"}:
         return 20 * 1024
+    if service == "flux-api":
+        return 16 * 1024
+    if service == "audiocraft-api":
+        return 8 * 1024
     if provider == "ace-step":
         return 16 * 1024
     if provider == "qwen3-asr":
@@ -444,11 +451,52 @@ def _build_media_service_spec(
     gpu: str = "0",
     port: int | None = None,
     python_override: str | None = None,
+    *,
+    accept_noncommercial_license: bool = False,
+    purge_ltx_cache_after_load: bool = False,
+    asset_factory_poll_seconds: float = 5.0,
+    asset_factory_timeout_seconds: int = 1800,
 ) -> dict[str, Any]:
-    """Pure cache-only launch specification for speech/audio/music and video/3D APIs."""
+    """Build an offline-by-default launch specification for one managed media service."""
+    current_pythonpath = os.environ.get("PYTHONPATH", "")
+    additional_paths = [str(REPO_ROOT), str(REPO_ROOT / "tools" / "media_services")]
+    base_env: dict[str, str | None] = {
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "OEC_USE_MANAGER_DIRECTORY_ONLY": "0",
+    }
+
+    # The Asset Factory consumer is CPU-only and must not claim a GPU or port.
+    if service == "asset-factory-worker":
+        if isinstance(asset_factory_poll_seconds, bool) or not isinstance(asset_factory_poll_seconds, (int, float)) or not 0.5 <= float(asset_factory_poll_seconds) <= 300:
+            raise ValueError("--asset-factory-poll-seconds must be between 0.5 and 300.")
+        if isinstance(asset_factory_timeout_seconds, bool) or not isinstance(asset_factory_timeout_seconds, int) or not 30 <= asset_factory_timeout_seconds <= 86400:
+            raise ValueError("--asset-factory-timeout-seconds must be between 30 and 86400.")
+        return {
+            "instance_id": "asset-factory-worker",
+            "group": "asset-factory-worker",
+            "script": REPO_ROOT / "asset_factory" / "worker.py",
+            "environment": "oec_deploy",
+            "python_override": python_override,
+            "script_args": [
+                "--poll-seconds", str(float(asset_factory_poll_seconds)),
+                "--timeout-seconds", str(asset_factory_timeout_seconds),
+            ],
+            "env_updates": {
+                **base_env,
+                "CUDA_VISIBLE_DEVICES": None,
+                "PYTHONPATH": os.pathsep.join(value for value in (*additional_paths, current_pythonpath) if value),
+            },
+            "gpus": set(),
+            "port": None,
+            "provider": "asset-factory",
+            "runtime_import": "asset_factory.worker",
+        }
+
     if not isinstance(gpu, str) or not gpu.isdigit():
         raise ValueError("--gpu must be a non-negative physical GPU index.")
     gpu_id = str(int(gpu))
+    gpu_mask: str | None = gpu_id
     if service == "audio-api":
         if provider not in AUDIO_API_DEFAULT_PORTS:
             raise ValueError(f"Unsupported audio provider {provider!r}.")
@@ -463,27 +511,65 @@ def _build_media_service_spec(
             selected_python = python_override or str(Path.home() / ".local" / "venvs" / "oec-audio-py311" / "bin" / "python")
         instance_id = f"audio-api-{provider}"
         script_args = ["--model", provider, "--host", "127.0.0.1", "--port", str(selected_port)]
-    elif service in MEDIA_SIDECAR_DEFAULT_PORTS:
-        selected_port = port if port is not None else MEDIA_SIDECAR_DEFAULT_PORTS[service]
-        if service == "ltx-sidecar":
-            module_name, script, env_name = "worker_ltx_video", REPO_ROOT / "tools" / "media_services" / "ltx_api.py", "phase1_ltx"
-            provider = "ltx-2.3"
-        else:
-            module_name, script, env_name = "pipeline_trellis_3d", REPO_ROOT / "tools" / "media_services" / "trellis_api.py", "phase2_3d"
-            provider = "trellis-2"
+    elif service == "audiocraft-api":
+        if provider not in AUDIOCRAFT_API_DEFAULT_PORTS:
+            raise ValueError("audiocraft-api supports only audiogen or musicgen.")
+        if not accept_noncommercial_license:
+            raise ValueError(
+                "AudioGen/MusicGen weights are CC-BY-NC-4.0; pass --accept-noncommercial-license "
+                "only when the intended use is permitted."
+            )
+        selected_port = port if port is not None else AUDIOCRAFT_API_DEFAULT_PORTS[provider]
+        module_name, script, env_name = "audiocraft", REPO_ROOT / "tools" / "media_services" / "audiocraft_api.py", "phase1"
         selected_python = python_override
-        instance_id = service
-        script_args = ["--host", "127.0.0.1", "--port", str(selected_port)]
+        instance_id = f"audiocraft-api-{provider}"
+        # AudioCraft's selector must inspect physical IDs before applying the device mask.
+        gpu_mask = None
+        script_args = [
+            "--model", provider, "--host", "127.0.0.1", "--port", str(selected_port),
+            "--gpu", gpu_id, "--accept-noncommercial-license",
+        ]
+    elif service in {"flux-api", "trellis-api", "ltx-api", *MEDIA_SIDECAR_DEFAULT_PORTS}:
+        if service == "flux-api":
+            selected_port = port if port is not None else ASSET_FACTORY_API_PORTS[service]
+            module_name, script, env_name = "diffusers", REPO_ROOT / "tools" / "media_services" / "flux_api.py", "phase2_3d"
+            provider = "flux"
+            selected_python = python_override
+            instance_id = service
+            # FLUX's selector applies CUDA_VISIBLE_DEVICES only after physical-GPU selection.
+            gpu_mask = None
+            script_args = ["--host", "127.0.0.1", "--port", str(selected_port), "--gpu", gpu_id]
+        elif service in {"ltx-api", "ltx-sidecar"}:
+            selected_port = port if port is not None else (
+                ASSET_FACTORY_API_PORTS["ltx-api"] if service == "ltx-api" else MEDIA_SIDECAR_DEFAULT_PORTS[service]
+            )
+            module_name, script, env_name = "worker_ltx_video", REPO_ROOT / "tools" / "media_services" / "ltx_api.py", "phase1_ltx"
+            provider = "ltx" if service == "ltx-api" else "ltx-2.3"
+            selected_python = python_override
+            instance_id = service
+            script_args = ["--host", "127.0.0.1", "--port", str(selected_port)]
+            if service == "ltx-api" and purge_ltx_cache_after_load:
+                # Explicit opt-in uses the adapter's tested load-then-purge path.
+                # LTX/Gemma cache removal happens only after model load succeeds.
+                script_args.append("--allow-download")
+        else:
+            selected_port = port if port is not None else (
+                ASSET_FACTORY_API_PORTS["trellis-api"] if service == "trellis-api" else MEDIA_SIDECAR_DEFAULT_PORTS[service]
+            )
+            module_name, script, env_name = "pipeline_trellis_3d", REPO_ROOT / "tools" / "media_services" / "trellis_api.py", "phase2_3d"
+            provider = "trellis" if service == "trellis-api" else "trellis-2"
+            selected_python = python_override
+            instance_id = service
+            script_args = ["--host", "127.0.0.1", "--port", str(selected_port)]
     else:
         raise ValueError(f"Unsupported media service {service!r}.")
     _assert_port_range(selected_port)
     current_pythonpath = os.environ.get("PYTHONPATH", "")
     additional_paths = [str(REPO_ROOT), str(REPO_ROOT / "tools" / "media_services")]
     env_updates = {
-        "CUDA_VISIBLE_DEVICES": gpu_id,
-        "HF_HUB_OFFLINE": "1",
-        "TRANSFORMERS_OFFLINE": "1",
-        "OEC_USE_MANAGER_DIRECTORY_ONLY": "0",
+        **base_env,
+        "CUDA_VISIBLE_DEVICES": gpu_mask,
+        "PYTHONPATH": os.pathsep.join(value for value in (*additional_paths, current_pythonpath) if value),
     }
     if service == "audio-api" and provider == "ace-step":
         cache_root = _configured_storage_path("AIEROS_CACHE_DIR", Path.home() / "aireos_cache")
@@ -521,6 +607,10 @@ def _start_media_service(args: argparse.Namespace, service: str, conda_root: Pat
     spec = _build_media_service_spec(
         service=service, provider=args.provider, gpu=args.gpu,
         port=args.media_port, python_override=args.python,
+        accept_noncommercial_license=args.accept_noncommercial_license,
+        purge_ltx_cache_after_load=args.purge_ltx_cache_after_load,
+        asset_factory_poll_seconds=args.asset_factory_poll_seconds,
+        asset_factory_timeout_seconds=args.asset_factory_timeout_seconds,
     )
     _assert_gpu_available(spec["gpus"])
     _assert_gpu_idle(next(iter(spec["gpus"])), min_free_mib=_minimum_free_vram_mib(service, spec["provider"]))
@@ -534,7 +624,11 @@ def _start_media_service(args: argparse.Namespace, service: str, conda_root: Pat
             )
     py_prefix = _python_prefix(spec["environment"], conda_root, spec["python_override"])
     preflight_env = _base_env()
-    preflight_env.update(spec["env_updates"])
+    for key, value in spec["env_updates"].items():
+        if value is None:
+            preflight_env.pop(key, None)
+        else:
+            preflight_env[key] = value
     code = "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec(" + repr(spec["runtime_import"]) + ") else 41)"
     checked = subprocess.run(
         py_prefix + ["-c", code], cwd=REPO_ROOT, env=preflight_env,
@@ -559,6 +653,53 @@ def _start_media_service(args: argparse.Namespace, service: str, conda_root: Pat
     _emit(
         f"MEDIA_SERVICE_STARTED provider={spec['provider']} port={spec['port']} gpu={next(iter(spec['gpus']))}; "
         "run status to observe model readiness before submitting jobs"
+    )
+
+
+def _start_asset_factory_worker(args: argparse.Namespace, conda_root: Path) -> None:
+    spec = _build_media_service_spec(
+        "asset-factory-worker",
+        python_override=args.python,
+        asset_factory_poll_seconds=args.asset_factory_poll_seconds,
+        asset_factory_timeout_seconds=args.asset_factory_timeout_seconds,
+    )
+    script = Path(spec["script"])
+    if not script.is_file():
+        raise FileNotFoundError(f"Asset Factory worker script is missing: {script}")
+    py_prefix = _python_prefix(spec["environment"], conda_root, spec["python_override"])
+    preflight_env = _base_env()
+    for key, value in spec["env_updates"].items():
+        if value is None:
+            preflight_env.pop(key, None)
+        else:
+            preflight_env[key] = value
+    code = "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('asset_factory.worker') else 41)"
+    checked = subprocess.run(
+        py_prefix + ["-c", code], cwd=REPO_ROOT, env=preflight_env,
+        capture_output=True, text=True, timeout=20, check=False,
+    )
+    if checked.returncode:
+        detail = (checked.stdout + "\\n" + checked.stderr).strip()[-1200:]
+        raise RuntimeError(f"Asset Factory worker import preflight failed in {spec['environment']}: {detail}")
+    output_root = _configured_storage_path("AIEROS_OUTPUTS_DIR", Path.home() / "aireos_output")
+    quota = subprocess.run(
+        py_prefix + [
+            str(REPO_ROOT / "storage_manager.py"), "--preflight-path", str(output_root),
+            "--required-gb", "0.01", "--minimum-free-gb", "0.05", "--require-fresh-quota",
+        ],
+        cwd=REPO_ROOT, env=preflight_env, capture_output=True, text=True, timeout=40, check=False,
+    )
+    if quota.returncode:
+        detail = (quota.stdout + "\\n" + quota.stderr).strip()[-2000:]
+        raise RuntimeError(f"Fresh StorageManager admission denied Asset Factory worker start: {detail}")
+    state = _launch(
+        spec["instance_id"], spec["group"], spec["script"], spec["environment"],
+        spec["script_args"], conda_root, spec["python_override"],
+        spec["env_updates"], set(), port=None, provider=spec["provider"],
+    )
+    _emit(
+        f"ASSET_FACTORY_WORKER_STARTED pid={state['pid']} poll_seconds={args.asset_factory_poll_seconds} "
+        f"timeout_seconds={args.asset_factory_timeout_seconds}; worker handles the Asset Factory queue only"
     )
 
 
@@ -745,7 +886,13 @@ def start_service(args: argparse.Namespace) -> None:
             )
             created.append(state)
             return
-        if service in {"audio-api", "trellis-sidecar", "ltx-sidecar"}:
+        if service == "asset-factory-worker":
+            _start_asset_factory_worker(args, conda_root)
+            return
+        if service in {
+            "audio-api", "audiocraft-api", "flux-api", "trellis-api", "ltx-api",
+            "trellis-sidecar", "ltx-sidecar",
+        }:
             _start_media_service(args, service, conda_root)
             return
         raise ValueError(f"Unknown service {service!r}.")
@@ -815,7 +962,7 @@ def show_logs(service: str, tail: int) -> None:
 
 
 CLUSTER_CONFIG_DEFAULT = REPO_ROOT / "tools" / "oec_cluster_services.local.json"
-CLUSTER_SERVICES = {"ltx-control", "ltx-worker", "qa", "flux-image", "flux-ui", "trellis-batch", "trellis-ui", "flux-trellis", "audio-api", "trellis-sidecar", "ltx-sidecar"}
+CLUSTER_SERVICES = {"ltx-control", "ltx-worker", "qa", "flux-image", "flux-ui", "trellis-batch", "trellis-ui", "flux-trellis", "audio-api", "audiocraft-api", "flux-api", "trellis-api", "ltx-api", "asset-factory-worker", "trellis-sidecar", "ltx-sidecar"}
 
 
 def _cluster_config(path: Path) -> dict[str, Any]:
@@ -1109,7 +1256,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Conda root (default: CONDA_ROOT or ~/Conda). Must precede the action.")
     parser.add_argument("--python", help="Optional explicit Python executable override for local smoke tests or custom environments.")
     sub = parser.add_subparsers(dest="action", required=True)
-    services = ("ltx-control", "ltx-worker", "qa", "flux-image", "flux-ui", "trellis-batch", "trellis-ui", "flux-trellis", "audio-api", "trellis-sidecar", "ltx-sidecar")
+    services = ("ltx-control", "ltx-worker", "qa", "flux-image", "flux-ui", "trellis-batch", "trellis-ui", "flux-trellis", "audio-api", "audiocraft-api", "flux-api", "trellis-api", "ltx-api", "asset-factory-worker", "trellis-sidecar", "ltx-sidecar")
 
     def service_parser(action: str, help_text: str, description: str):
         child = sub.add_parser(action, help=help_text, description=description)
@@ -1135,8 +1282,20 @@ def build_parser() -> argparse.ArgumentParser:
     child.add_argument("--height", type=int, default=512)
     child.add_argument("--steps", type=int, default=4)
     child.add_argument("--guidance-scale", type=float, default=1.0)
-    child.add_argument("--provider", choices=tuple(AUDIO_API_DEFAULT_PORTS), default="kokoro", help="Audio API provider when service=audio-api.")
+    child.add_argument("--provider", choices=MEDIA_API_PROVIDERS, default="kokoro", help="Provider for audio-api or audiocraft-api; each service validates its own provider set.")
     child.add_argument("--media-port", type=int, help="Optional loopback port override for media APIs.")
+    child.add_argument(
+        "--accept-noncommercial-license", action="store_true",
+        help="Acknowledge AudioGen/MusicGen CC-BY-NC-4.0 boundary; required for audiocraft-api.",
+    )
+    child.add_argument(
+        "--purge-ltx-cache-after-load", action="store_true",
+        help="Explicitly opt into storage-gated LTX load and cache purge only after successful model load.",
+    )
+    child.add_argument("--asset-factory-poll-seconds", type=float, default=5.0,
+                       help="Asset Factory worker poll interval (0.5..300 seconds).")
+    child.add_argument("--asset-factory-timeout-seconds", type=int, default=1800,
+                       help="Asset Factory worker per-job timeout (30..86400 seconds).")
     child.add_argument("--output", type=Path, help="FLUX-only PNG output; must be under /tmp.")
     child.add_argument("--output-dir", type=Path, help="TRELLIS batch GLB directory; must be under /tmp and not already exist.")
     child.add_argument("--max-image-size", type=int, default=1024)
