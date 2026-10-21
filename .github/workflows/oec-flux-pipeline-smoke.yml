@@ -34,7 +34,7 @@ concurrency:
 
 jobs:
   flux-trellis-inference:
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
     timeout-minutes: 30
     defaults:
       run:
@@ -48,8 +48,8 @@ jobs:
       - name: Validate assigned A100 runner, existing environment and storage configuration
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-2" || {
-            echo "::error::Expected oec-2 A100 runner, got $RUNNER_NAME"
+          test "$RUNNER_NAME" = "oec-1" || {
+            echo "::error::Expected oec-1 A100 runner, got $RUNNER_NAME"
             exit 2
           }
           test -x "$HOME/Conda/condabin/conda"
