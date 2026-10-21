@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import io
 import json
+from email.message import Message
 import sqlite3
 import tempfile
 import unittest
@@ -15,8 +18,25 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import core_config
-from asset_factory.client import _enqueue_hf_upload
+from asset_factory.client import AssetFactoryClient, _enqueue_hf_upload
 from asset_factory.registry import DEFAULT_PROVIDER_BY_ASSET, resolve_provider
+
+
+class _FakeResponse:
+    def __init__(self, payload: bytes, content_type: str):
+        self.headers = Message()
+        self.headers["Content-Type"] = content_type
+        self.headers["Content-Length"] = str(len(payload))
+        self._stream = io.BytesIO(payload)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self, size: int = -1) -> bytes:
+        return self._stream.read(size)
 
 
 class AssetFactoryUploadQueueTests(unittest.TestCase):
@@ -57,6 +77,46 @@ class AssetFactoryUploadQueueTests(unittest.TestCase):
         self.assertEqual(row[1], str(self.manifest.resolve()))
         self.assertEqual(row[2], self.asset.stat().st_size + self.manifest.stat().st_size)
         self.assertEqual(row[3], "PENDING")
+
+    def test_client_download_persists_manifest_and_enqueues_actual_artifact_pair(self):
+        from asset_factory.registry import resolve_provider
+
+        asset_root = self.outputs / "asset_factory"
+        client = AssetFactoryClient(output_root=asset_root)
+        payload = b"RIFF" + b"\x00\x00\x00\x00" + b"WAVE" + b"test-audio-payload"
+        response = _FakeResponse(payload, "audio/wav")
+        opener = mock.Mock()
+        opener.open.return_value = response
+        spec = resolve_provider("music")
+        job_id = "job_abcdefghijkl"
+        with mock.patch("asset_factory.client._opener", return_value=opener):
+            result = client._download(
+                spec,
+                "http://127.0.0.1:7875",
+                job_id,
+                "music",
+                {"job_id": job_id, "status": "succeeded", "metadata": {"seed": 42}},
+            )
+        self.assertEqual(len(result), 1)
+        item = result[0]
+        artifact = Path(item.artifact_path)
+        manifest_path = Path(item.metadata_path)
+        self.assertTrue(artifact.is_file())
+        self.assertEqual(artifact.read_bytes(), payload)
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["artifact_sha256"], hashlib.sha256(payload).hexdigest())
+        self.assertEqual(manifest["upload_queue"]["status"], "pending")
+        self.assertEqual(item.upload_queue_id, result[0].upload_queue_id)
+        with sqlite3.connect(self.db) as conn:
+            queued = conn.execute(
+                "SELECT asset_path, json_path, total_size_bytes, status FROM assets WHERE id = ?",
+                (item.upload_queue_id,),
+            ).fetchone()
+        self.assertIsNotNone(queued)
+        self.assertEqual(queued[0], str(artifact.resolve()))
+        self.assertEqual(queued[1], str(manifest_path.resolve()))
+        self.assertEqual(queued[2], artifact.stat().st_size + manifest_path.stat().st_size)
+        self.assertEqual(queued[3], "PENDING")
 
     def test_empty_or_missing_artifacts_are_not_queued(self):
         with self.assertRaises(FileNotFoundError):
