@@ -385,8 +385,9 @@ jobs:
         run: |
           set -euo pipefail
           R="$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/flux-trellis"
-          W="/tmp/oec-flux-live-suite-$GITHUB_RUN_ID"
           mkdir -p "$R"
+          W="$(mktemp -d "/tmp/oec-flux-live-suite-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-XXXXXX")"
+          printf 'FLUX_TRELLIS_WORK_DIR=%s\n' "$W" | tee "$R/work-dir.txt"
           "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-before.log"
           timeout 6600s "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python tools/run_flux_pipeline_smoke.py --work-dir "$W" --report-dir "$R" --width 512 --height 512 --steps 4 2>&1 | tee "$R/flux-trellis.log"
           "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-after.log"
