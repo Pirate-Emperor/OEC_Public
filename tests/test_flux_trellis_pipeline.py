@@ -55,5 +55,15 @@ class FluxTrellisPipelineTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,"declared length"):
                 combined._inspect_glb_header(path)
 
+    def test_safe_work_dir_creates_nonexistent_requested_path_and_rejects_reuse(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            requested = Path(tmp) / "work"
+            self.assertFalse(requested.exists())
+            result = combined._safe_work_dir(requested)
+            self.assertEqual(result, requested.resolve())
+            self.assertTrue(result.is_dir())
+            with self.assertRaisesRegex(FileExistsError, "refusing to reuse existing work directory"):
+                combined._safe_work_dir(requested)
+
 if __name__ == "__main__":
     unittest.main()

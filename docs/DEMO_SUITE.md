@@ -2,6 +2,8 @@
 
 **Purpose:** A short, evidence-led demonstration of the current OEC multimodal inference work. This guide is not a claim that every path is production-ready. Run commands from the OEC repository root and record the exact branch and commit used.
 
+> **Complete runbook:** [DEMO_EXECUTION_PLAN.md](DEMO_EXECUTION_PLAN.md) contains the model-by-model CLI/Gradio/Jupyter paths, kernels, expected outputs, service/API lifecycle, FLUX → TRELLIS, Brain → LTX → QA → HF read-back, workflow commands and final error/incomplete ledger. This short guide is retained.
+
 ## 1. What to show
 
 Recommended 8–12 minute sequence:

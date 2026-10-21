@@ -110,8 +110,11 @@ OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"
 cd "$OEC_ROOT"
 export RUNNER_TEMP="${RUNNER_TEMP:-/tmp}"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
+WORK_PARENT="$(mktemp -d "$RUNNER_TEMP/oec-flux-parent-$RUN_ID-XXXXXX")"
+WORK_DIR="$WORK_PARENT/work"  # Must not exist yet; orchestrator creates it.
+test ! -e "$WORK_DIR"
 "$CONDA" run --no-capture-output -n phase2_3d python tools/run_flux_pipeline_smoke.py \
-  --work-dir "$RUNNER_TEMP/oec-flux-work-$RUN_ID" \
+  --work-dir "$WORK_DIR" \
   --report-dir "$RUNNER_TEMP/oec-flux-report-$RUN_ID" \
   --width 512 --height 512 --steps 4
 ```

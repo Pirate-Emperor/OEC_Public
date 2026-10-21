@@ -177,6 +177,22 @@ jupyter lab --no-browser --ip=127.0.0.1 --port=8888
 
 Use the host's approved Jupyter installation and access path. If jupyter is unavailable in the shell, use the already-configured host entrypoint; do not install a new Jupyter stack for the presentation. Keep it private; no unauthenticated network bind.
 
+For workstation access, use the approved SSH tunnel rather than exposing Jupyter/Gradio to the network:
+
+```bash
+ssh -N \
+  -L 8888:127.0.0.1:8888 \
+  -L 7862:127.0.0.1:7862 \
+  -L 7864:127.0.0.1:7864 \
+  -L 17868:127.0.0.1:17868 \
+  -L 17869:127.0.0.1:17869 \
+  -L 7870:127.0.0.1:7870 \
+  -L 7871:127.0.0.1:7871 \
+  -L 7872:127.0.0.1:7872 \
+  -L 7873:127.0.0.1:7873 \
+  <ssh-user>@<oec-host>
+```
+
 Open the existing notebook, select the correct kernel below and run setup/check cells from the beginning. Do not use stale saved outputs as proof of live inference.
 
 ### A. AudioGen sound effects
@@ -314,7 +330,7 @@ For Gradio, open pipeline_trellis_3d_only.ipynb, choose phase2_3d and run top-to
 
 ### I. Combined FLUX + TRELLIS notebook
 
-pipeline_trellis_3d.ipynb retains separate FLUX prompt-to-image and TRELLIS image-to-3D studios in one notebook. Use phase2_3d; run setup cells top-to-bottom and let the storage/cache checks finish before loading either pipeline. For auditable proof that the exact PNG was passed to TRELLIS, use `5 composite smoke, which retains both outputs and hashes.
+pipeline_trellis_3d.ipynb retains separate FLUX prompt-to-image and TRELLIS image-to-3D studios in one notebook. Use phase2_3d; run setup cells top-to-bottom and let the storage/cache checks finish before loading either pipeline. For auditable proof that the exact PNG was passed to TRELLIS, use section 5 composite smoke, which retains both outputs and hashes.
 
 ### J. LTX-2.3 video generation
 
@@ -336,7 +352,9 @@ This is the most visual model-to-model demonstration. The smoke harness records 
 
 ```bash
 export OEC_FLUX_REPORT_DIR="$RUNNER_TEMP/oec-flux-report-$RUN_ID"
-export OEC_FLUX_WORK_DIR="$(mktemp -d "$RUNNER_TEMP/oec-flux-work-$RUN_ID-XXXXXX")"
+export OEC_FLUX_WORK_PARENT="$(mktemp -d "$RUNNER_TEMP/oec-flux-parent-$RUN_ID-XXXXXX")"
+export OEC_FLUX_WORK_DIR="$OEC_FLUX_WORK_PARENT/work"
+test ! -e "$OEC_FLUX_WORK_DIR" || { echo "Work path must not exist before the orchestrator creates it." >&2; exit 2; }
 "$CONDA" run --no-capture-output -n phase2_3d \
   python tools/run_flux_pipeline_smoke.py \
   --work-dir "$OEC_FLUX_WORK_DIR" \
@@ -344,7 +362,7 @@ export OEC_FLUX_WORK_DIR="$(mktemp -d "$RUNNER_TEMP/oec-flux-work-$RUN_ID-XXXXXX
   --width 512 --height 512 --steps 4
 ```
 
-Expected: pipeline.log, pipeline-report.json, artifacts/ with the source PNG and GLB, artifact-manifest.json with output bytes/SHA and mesh-reopen fields, and a final FLUX_PIPELINE_SMOKE=PASS line. A previous failure was FileExistsError from reusing a work directory. The workflow was changed to use mktemp with the run attempt; rerun evidence from that fix is still required. Do not delete an unknown path or retry using an existing work directory.
+Expected: pipeline.log, pipeline-report.json, artifacts/ with the source PNG and GLB, artifact-manifest.json with output bytes/SHA and mesh-reopen fields, and a final FLUX_PIPELINE_SMOKE=PASS line. A previous failure was FileExistsError because the orchestrator rejects any already-existing work directory. Passing the directory created by mktemp -d would still fail. The corrected command and ordered workflow must create a unique parent and pass a child path that does not yet exist; this fix and its regression test still need execution evidence.
 
 ## 6. Media service API and lifecycle
 
@@ -662,7 +680,7 @@ Replace the placeholder with the actual ID. The ordered workflow uses GPUs and t
 
 ## 10. Prior accepted evidence and current integration limits
 
-The strongest completed ordered live run is **39435100568**, source SHA 0c53f6a46328bc4ba6ce4d0942556e3077ea6d74, with 8/8 jobs passed. Static/storage run **39452849501** passed on SHA 72b71f861bba72b78da1cec330e4273b00baaabb. The current feature tip is **2a4223b9a720362365101f94d6378c17eb970f71**. These are not a full live pass of the current tip.
+The strongest completed ordered live run is **39435100568**, source SHA 0c53f6a46328bc4ba6ce4d0942556e3077ea6d74, with 8/8 jobs passed. Static/storage run **39452849501** passed on SHA 72b71f861bba72b78da1cec330e4273b00baaabb. The model/config baseline is **2a4223b9a720362365101f94d6378c17eb970f71**; the current documentation/workflow/test edits are later and are not a fresh live pass. These are not a full live pass of the current tip.
 
 | Model/path | Historic output evidence | What it proves | Caveat |
 |---|---|---|---|
