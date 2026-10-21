@@ -24,6 +24,24 @@ from common import MediaProvider, RequestError, managed_write, safe_child, serve
 LOG = logging.getLogger("oec.media_service.ltx")
 MODEL_ID = "Lightricks/LTX-2.3"
 
+def purge_loaded_ltx_caches() -> dict[str, bool]:
+    """Use the existing LTX load-then-purge policy after model weights are resident.
+
+    This is only called when the operator has opted into the guarded-download mode;
+    cache-only deployments retain their on-disk weights for restartability.
+    """
+    from purge_manager import DiskPurgeManager
+
+    results = {
+        "ltx": bool(DiskPurgeManager.purge_hf_model("Lightricks/LTX-2.3")),
+        "gemma": bool(DiskPurgeManager.purge_hf_model("google/gemma-3-12b-it-qat-q4_0-unquantized")),
+    }
+    for model_key, purged in results.items():
+        LOG.info("LTX_MODEL_CACHE_PURGE model=%s status=%s", model_key, "PASS" if purged else "FAILED")
+    return results
+
+
+
 
 class LtxProvider(MediaProvider):
     name = "ltx"
@@ -31,8 +49,11 @@ class LtxProvider(MediaProvider):
     artifact_extension = "mp4"
     max_prompt_chars = 800
 
-    def __init__(self, allow_download: bool = False):
+    def __init__(self, allow_download: bool = False, purge_after_load: bool = False):
         super().__init__(allow_download=allow_download)
+        self.purge_after_load = bool(purge_after_load)
+        if self.purge_after_load and not allow_download:
+            raise ValueError("purge-after-load requires --allow-download so a later restart can restore purged weights under StorageManager")
         self.module = None
         self.pipeline = None
         self.gpu_id = "0"  # logical device index inside the scheduler-provided visibility mask
@@ -112,6 +133,11 @@ class LtxProvider(MediaProvider):
         except Exception:
             self.device_name = "cuda:0"
         self.model_loaded = True
+        if self.purge_after_load:
+            # Match worker_ltx_video.py's established load-then-purge behavior.
+            # With --allow-download, a future service restart may restore these
+            # weights only after the existing fresh StorageManager admission.
+            purge_loaded_ltx_caches()
 
     def run_job(self, job_id: str, request: dict[str, Any], input_file: Path | None) -> tuple[Path, dict[str, Any]]:
         if not self.model_loaded or self.pipeline is None or self.module is None:
@@ -177,9 +203,17 @@ def main() -> int:
     parser.add_argument("--max-queue", type=int, default=1)
     parser.add_argument("--job-timeout-seconds", type=int, default=2400)
     parser.add_argument("--allow-download", action="store_true", help="Allow missing model files to download only through the existing OEC storage gate.")
+    parser.add_argument(
+        "--keep-model-cache",
+        action="store_true",
+        help="Keep LTX/Gemma checkpoints on disk even when --allow-download is enabled.",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    provider = LtxProvider(args.allow_download)
+    # Purge only when the operator explicitly enabled the guarded download/recovery
+    # lifecycle. Cache-only mode remains restartable without network access.
+    purge_after_load = args.allow_download and not args.keep_model_cache
+    provider = LtxProvider(args.allow_download, purge_after_load=purge_after_load)
     return serve(provider, args.host, args.port, args.max_queue, args.job_timeout_seconds)
 
 
