@@ -1,11 +1,91 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-21T10:45:00+05:30",
+  "last_updated": "2026-10-21T12:20:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Full OEC demo runbook authored in docs/DEMO_EXECUTION_PLAN.md, with per-model CLI/Gradio/Jupyter paths and final known-failure ledger. Current branch adds a strict FLUX/TRELLIS work-path correction (unique parent plus non-existent child) and a regression test; neither test nor live correction has been verified yet. Historical complete run 39435100568 is 8/8 on its older SHA. Retrieved logs for 39452849617 show FLUX failure and joined QA/HF cancellation, while older tracker notes conflict regarding artifact publication in that run. Root sync 39549368673 preserved 37 loose oec_deploy files and failed closed; model runtime audit 39549368702 failed Qwen2-VL import/cache preflight; storage admission tests 39549368681 passed. A100 local sync and current-source end-to-end acceptance remain unverified.",
+  "latest_summary": "Verified source f17a2f3e012dc58c440daedd4f9358eacadd6c38: static/contract run 39557821438 PASSED including fresh workdir regression; live FLUX.2 Klein→TRELLIS.2 run 39557821401 PASSED; PNG/GLB sizes and SHA-256 match uploaded manifest; GLB reopen passed (2,839 vertices, 4,651 faces). Storage reporting passed; soft quota exceeded under grace and hard headroom declined 45.23→41.48 GB while reserves remained unchanged. Canonical A100 sync 39557821414 remains BLOCKED as 37 loose non-ignored files were preserved in root/oec_deploy. Full current-SHA Brain/LTX/Qwen2-VL QA/HF read-back has not rerun; the Qwen2-VL preflight 39549368702 failed. Historical 8/8 run 39435100568 applies to its older SHA.",
   "experiments": [
+    {
+      "id": "EXP-2026-10-21-OEC-FLUX-TRELLIS-LIVE-VERIFICATION",
+      "date": "2026-10-21",
+      "category": "current-source composite model inference and demo verification",
+      "approach": "Ran bounded A100 FLUX→TRELLIS acceptance after static CI, environment/GPU admission and StorageManager preflight. Downloaded the artifact ZIP and checked PNG/GLB sizes/SHA-256 against artifact-manifest.json.",
+      "reason": "Verify current-source model-to-model inference and the strict work-directory correction.",
+      "parameters": {
+        "branch": "fix/media-stack-supervision-20261019",
+        "source_sha": "f17a2f3e012dc58c440daedd4f9358eacadd6c38",
+        "live_workflow_run": 39557821401,
+        "static_workflow_run": 39557821438,
+        "root_sync_workflow_run": 39557821414,
+        "artifacts": [
+          {
+            "provider": "FLUX.2 Klein",
+            "model": "black-forest-labs/FLUX.2-klein-4B",
+            "revision": "e7b7dc27f91deacad38e78976d1f2b499d76a294",
+            "prompt": "A photorealistic amber glass sphere on a clean studio surface",
+            "seed": 42,
+            "steps": 4,
+            "width": 512,
+            "height": 512,
+            "generation_seconds": 92.407,
+            "bytes": 211978,
+            "sha256": "3571b033e4092ce42a51b132e1509930f79001132a58a5b3b5e73047efecacde"
+          },
+          {
+            "provider": "TRELLIS.2",
+            "model": "microsoft/TRELLIS.2-4B",
+            "revision": "af44b45f2e35a493886929c6d786e563ec68364d",
+            "bytes": 190388,
+            "sha256": "fdd211d18aa3a225592e4578bbd8b12d5c016a5ad8bebab2ae68d11c8d28e4b0",
+            "glb_version": 2,
+            "mesh_count": 1,
+            "primitive_count": 1,
+            "vertices": 2839,
+            "faces": 4651,
+            "trimesh_reopen": "PASS"
+          }
+        ],
+        "pipeline_elapsed_seconds": 714.1,
+        "artifact_id": 12327077104,
+        "artifact_zip_sha256": "39bf70752e43d89fa35d8cce59ce5f80c67bc982cca283b7247ff13eb298e9ad",
+        "environment": "A100 runner oec-2, phase2_3d, cached offline inference",
+        "model_downloads": false,
+        "gpu_inference": true
+      },
+      "results": {
+        "static_suite": "PASS 39557821438",
+        "live_suite": "PASS 39557821401; PNG passed to TRELLIS, GLB exported/reopened, manifest hashes match, storage pre/post recorded and artifact uploaded",
+        "storage_before": {
+          "models_actual_gb": 251.89,
+          "models_target_gb": 280,
+          "models_reserve_gb": 5,
+          "outputs_actual_mb": 348.62,
+          "outputs_reserve_mb": 512,
+          "hard_headroom_gb": 45.23,
+          "soft_quota_grace_active": true
+        },
+        "storage_after": {
+          "models_actual_gb": 255.6,
+          "models_target_gb": 280,
+          "models_reserve_gb": 5,
+          "outputs_actual_mb": 348.8,
+          "outputs_reserve_mb": 512,
+          "hard_headroom_gb": 41.48,
+          "soft_quota_grace_active": true
+        },
+        "artifact_validation": "PASS; GLB 2.0, one mesh/primitive, 2,839 vertices / 4,651 faces; sizes/hashes match manifest.",
+        "canonical_sync": "BLOCKED; 37 loose files preserved",
+        "full_pipeline": "NOT RUN on this SHA; Qwen2-VL preflight failed."
+      },
+      "interpretation": "Current source has verified static acceptance and a real FLUX PNG→TRELLIS GLB composite demo. Full ordered Brain/LTX/QA/HF acceptance and canonical A100 sync remain unverified.",
+      "limitations": [
+        "GLB reopen is structural and does not prove watertightness or semantic quality.",
+        "Storage remained WARNING under soft-quota grace, although admission passed.",
+        "Dedicated composite workflow does not test all notebook UIs or joined E2E.",
+        "Do not force-reset/clean the A100 tree."
+      ]
+    },
     {
       "id": "EXP-2026-10-21-OEC-DEMO-RUNBOOK-WORKDIR-GUARD",
       "date": "2026-10-21",

@@ -8,6 +8,8 @@
 
 ## 1. Presenter run-of-show
 
+**Verified on 2026-10-21:** source SHA `f17a2f3e012dc58c440daedd4f9358eacadd6c38` passed static/contract suite [39557821438](https://github.com/CalamityStriker/OEC/actions/runs/39557821438) and real FLUX.2 Klein → TRELLIS.2 inference [39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401). The composite produced valid PNG/GLB outputs; their sizes and SHA-256 values match the downloaded manifest, GLB reopen passed, StorageManager was checked before/after, and evidence uploaded. This verifies the **composite image-to-3D demo only**, not the full ordered Brain → LTX → QA → Hugging Face pipeline. Canonical A100 sync remains blocked safely because 37 loose files were preserved under `root/oec_deploy` [run 39557821414](https://github.com/CalamityStriker/OEC/actions/runs/39557821414).
+
 OEC is not one model. It is a set of capability-specific runtimes connected by common storage admission, process-aware GPU admission, Gradio clients, loopback job services, a work queue, QA and upload/read-back.
 
 | Segment | Presenter action | Evidence |
@@ -362,7 +364,7 @@ test ! -e "$OEC_FLUX_WORK_DIR" || { echo "Work path must not exist before the or
   --width 512 --height 512 --steps 4
 ```
 
-Expected: pipeline.log, pipeline-report.json, artifacts/ with the source PNG and GLB, artifact-manifest.json with output bytes/SHA and mesh-reopen fields, and a final FLUX_PIPELINE_SMOKE=PASS line. A previous failure was FileExistsError because the orchestrator rejects any already-existing work directory. Passing the directory created by mktemp -d would still fail. The corrected command and ordered workflow must create a unique parent and pass a child path that does not yet exist; this fix and its regression test still need execution evidence.
+Expected: `pipeline.log`, `pipeline-report.json`, `artifacts/` with the PNG and GLB, and `artifact-manifest.json` with byte counts, SHA-256 and mesh-reopen metadata. **Verified PASS on current SHA `f17a2f3e...`** in [run 39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401): `FLUX_PIPELINE_SMOKE=PASS`, both output hashes match the downloaded manifest, and the GLB reopened. Use a unique parent and a new child work path that does not exist yet on each retry.
 
 ## 6. Media service API and lifecycle
 
@@ -680,7 +682,7 @@ Replace the placeholder with the actual ID. The ordered workflow uses GPUs and t
 
 ## 10. Prior accepted evidence and current integration limits
 
-The strongest completed ordered live run is **39435100568**, source SHA 0c53f6a46328bc4ba6ce4d0942556e3077ea6d74, with 8/8 jobs passed. Static/storage run **39452849501** passed on SHA 72b71f861bba72b78da1cec330e4273b00baaabb. The model/config baseline is **2a4223b9a720362365101f94d6378c17eb970f71**; the current documentation/workflow/test edits are later and are not a fresh live pass. These are not a full live pass of the current tip.
+The strongest **complete ordered suite** remains historical run **39435100568** on SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74` (8/8 jobs). Current SHA `f17a2f3e012dc58c440daedd4f9358eacadd6c38` passed static/contract [39557821438](https://github.com/CalamityStriker/OEC/actions/runs/39557821438) and dedicated live FLUX→TRELLIS [39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401). That smoke does not exercise Brain → LTX → Qwen2-VL QA → HF read-back, so current source is **not yet a full ordered E2E pass**.
 
 | Model/path | Historic output evidence | What it proves | Caveat |
 |---|---|---|---|
@@ -692,7 +694,7 @@ The strongest completed ordered live run is **39435100568**, source SHA 0c53f6a4
 | MusicGen | Actual 3 s 32 kHz WAV; example 192,044 bytes, SHA 0b6ada01eed76ac2a8a325c2c4f688cdc51072d31773f62b793ffd7ddf75ab9d | CLI and Gradio callback made audio. | CC-BY-NC-4.0; no common /v1/jobs API. |
 | LTX-2.3 | MP4 example 242,547 bytes, SHA 5d7d54de4354936f66867fecd19d20c0ab6972b5d997ca00c145ab0c1e54ec51 | Real video stream generated. | Test sidecar may stop after the job. |
 | TRELLIS.2 | GLB example 2,777,432 bytes, SHA 889d54ac9f7677615450b69190603c4f1a801b0dfc1a27aa5de2efc79a007f87 | GLB reopened and mesh counts checked. | Not evidence of watertightness or semantic quality. |
-| FLUX→TRELLIS | PNG 211,978 bytes SHA 3571b033e4092ce42a51b132e1509930f79001132a58a5b3b5e73047efecacde; GLB 192,384 bytes SHA 26b5412d3a747ce539ff5b347ded708b64207bede57d7b048e82ee9dafd582ba | Historical real composite pass and mesh reopen. | Newer workflow run failed due work path reuse; fixed workflow requires rerun evidence. |
+| FLUX→TRELLIS | **Current run 39557821401:** PNG 512×512, 211,978 bytes, SHA-256 `3571b033e4092ce42a51b132e1509930f79001132a58a5b3b5e73047efecacde`; GLB 190,388 bytes, SHA-256 `fdd211d18aa3a225592e4578bbd8b12d5c016a5ad8bebab2ae68d11c8d28e4b0` | Current-source live inference passed; GLB 2.0 / one mesh / one primitive, reopen PASS, 2,839 vertices and 4,651 faces; artifact uploaded. | Verifies composite image-to-3D only; not the full ordered pipeline or watertightness/semantic quality. |
 | LTX→Qwen2-VL QA→HF chunk/read-back | 228,845-byte asset with source SHA 3d66b13693184eb7f76841f96836ded2f3407dc1e11b810f2e91c1db8b465392; three remote parts and manifest were verified. | Prior full end-to-end chain/read-back passed. | Newer run was cancelled during remote listing; latest current tip not completed. |
 
 **API boundaries:** LTX (17869), TRELLIS (17868), ACE-Step (7870), Kokoro (7871), Whisper (7872), Qwen3-ASR (7873) have loopback service adapters subject to runtime/readiness. AudioGen, MusicGen and standalone FLUX remain CLI/Gradio and are NOT_EXPOSED as independent common HTTP jobs. Wan is NOT ACCEPTED. Persistent model API release is NOT COMPLETE. OEC_Deploy was not changed; its client integration is not claimed accepted.
@@ -703,11 +705,11 @@ Show this at the end of the presentation. Passing a model stage does not make th
 
 | Item | Evidence | Status | Next action |
 |---|---|---|---|
-| Current tip full live suite | Last 8/8 ordered pass: run 39435100568 on SHA 0c53f6a…; present tip 2a4223b9… | **Not accepted on current tip.** Historic pass is valid for its own SHA. | Rerun current source after root sync and runtime gates pass. |
-| FLUX→TRELLIS in run 39452849617 | Job 118794989470 threw FileExistsError: refusing to reuse existing work directory. | **Failed that attempt**, due reused temp path. | Workflow now uses mktemp directory including run attempt; rerun and keep current-source PASS artifacts. |
+| Current tip full live suite | Static CI [39557821438](https://github.com/CalamityStriker/OEC/actions/runs/39557821438) and composite live [39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401) passed on `f17a2f3e...`. | **Partial current-source verification; full suite not rerun.** Joined Brain/LTX/Qwen2-VL QA/HF remains unverified. | Resolve sync and Qwen2-VL runtime/cache gates, then run the full ordered suite without discarding local files. |
+| FLUX→TRELLIS in run 39452849617 | Historical job `118794989470` failed because its work path already existed. | **That attempt failed; fix verified later.** The workdir regression passed in 39557821438 and live FLUX→TRELLIS passed in 39557821401. | Keep unique-parent/non-existent-child behavior; newer pass does not rewrite old failure. |
 | Joined QA/HF in run 39452849617 | Job 118795638536 cancelled during remote dataset tree listing; subsequent artifact upload returned 403 “job is completed.” | **CANCELLED/incomplete**, not a pass. Earlier historical E2E run passed. | Re-run after Qwen2-VL import/cache preflight is clean; verify parts, reassembly and full source hash. |
-| A100 canonical sync | Run 39549368673/job 119054909157 failed closed: OEC_CANONICAL_SYNC=BLOCKED, submodule root/oec_deploy has non-ignored loose files; 37 files detected; exit 44. | **Canonical local checkout is not verified synced.** Safe guard preserved those files. | Review/back up loose files with their owner; resolve safely and retry. Never reset/clean/force checkout. |
-| Model runtime/cache audit | Run 39549368702: Qwen2-VL imports timed out after 60 seconds in phase1/phase1_ltx/phase2_3d; oec_deploy local-cache probe returned nonzero. Artifact 12322443986. | **Preflight failed; not proof that full model inference fails.** Joined QA remains blocked until explained. | Review audit artifact, check approved runtime/modules/checkpoint; no blind install/download. |
+| A100 canonical sync | Latest [run 39557821414](https://github.com/CalamityStriker/OEC/actions/runs/39557821414), job `119081797995`, failed closed with `OEC_CANONICAL_SYNC=BLOCKED`; 37 non-ignored files under `root/oec_deploy` preserved. | **Canonical local checkout not verified synced.** | Safely review/backup with owner before retrying. Never reset/clean/force checkout. |
+| Model runtime/cache audit | [Run 39549368702](https://github.com/CalamityStriker/OEC/actions/runs/39549368702): Qwen2-VL imports timed out after 60 seconds and the `oec_deploy` cache probe returned non-zero. | **Preflight failure, not proof full inference fails.** | Verify approved runtime/cache without blind installs/downloads, then rerun joined acceptance. |
 | Storage write admission | Run 39549368681 on commit 2a4223b9… | **PASS**, storage guard evidence only. | Retain it; don't call it a live inference pass. |
 | Persistent API release | Runs 39463291348, 39463516709, 39463702968, 39463952004, 39464232552. Latest passed source sync/output admission/four-provider cache checks, then used invalid status audio-api-kokoro; supervisor expects group audio-api. Earlier runs hit sync/capacity/LTX readiness gates. | **No persistent API release completed.** Last attempt failed before service start; no public model weights released. | Correct service-group status handling and LTX readiness mismatch. Release only after fresh admission; verify ready/model_loaded for every API. |
 | ACE-Step current runtime | Prior real FLAC callback passed, later aggregate model audit failed. | **Historic inference passed; persistent/current runtime not certified.** | Verify isolated venv/source/checkpoint and redo admitted live FLAC callback. |

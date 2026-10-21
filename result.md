@@ -1,14 +1,13 @@
-## Full demo-execution plan and latest verified status — 2026-10-21
+## Verified execution and demo results — 2026-10-21
 
-- **Presenter runbook:** [docs/DEMO_EXECUTION_PLAN.md](docs/DEMO_EXECUTION_PLAN.md); the shorter [docs/DEMO_SUITE.md](docs/DEMO_SUITE.md) is retained. The full runbook covers model-by-model CLI/Jupyter/Gradio paths, environment/kernel mapping, component roles, artifact verification, services, FLUX → TRELLIS, Brain → LTX → QA → HF upload/read-back, commands and the failure/incomplete ledger.
-- **Model/config baseline:** `2a4223b9a720362365101f94d6378c17eb970f71` updated the models allocation target to 280 GB. Current guide/workflow/test edits are later commits; they are not live-inference proof.
-- **Current strict-workdir correction:** `pipeline_flux_trellis.py` rejects any existing `--work-dir`. Passing `mktemp -d` itself was also invalid. The ordered workflow and command guide now create a unique parent and pass a child path that does not yet exist; a regression test was added. **That test has not yet been executed and the corrected live visual inference has not yet passed.**
-- **Historical full acceptance:** [run 39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568) completed 8/8 on its own older source SHA. For [run 39452849617](https://github.com/CalamityStriker/OEC/actions/runs/39452849617), retrieved job-level evidence shows FLUX → TRELLIS failed and joined QA/HF was cancelled during remote listing. Older tracker notes conflict about an artifact publication in that run; reconcile the final job manifest/conclusion before claiming the whole newer run passed.
-- **A100 sync blocker:** [run 39549368673](https://github.com/CalamityStriker/OEC/actions/runs/39549368673) failed closed because 37 non-ignored loose files were present under `root/oec_deploy`; the guard preserved them. Local A100 HEAD is not verified synced.
-- **Runtime audit blocker:** [run 39549368702](https://github.com/CalamityStriker/OEC/actions/runs/39549368702) failed in Qwen2-VL import/cache preflight (60-second import timeouts and a non-zero local cache probe). This is not proof full inference itself fails.
-- **Storage admission evidence:** [run 39549368681](https://github.com/CalamityStriker/OEC/actions/runs/39549368681) passed write-admission tests, which is not a live model-inference pass.
-- **Other incomplete work:** persistent model API release has not completed; Wan 2.1 is not accepted; AudioGen, MusicGen and standalone FLUX remain CLI/Gradio paths rather than separate common `/v1/jobs` APIs; current branch histories diverge (previous compare 351 commits ahead / 12 behind). No blind merge or destructive A100 checkout cleanup.
-- **Next verification:** execute `python -m unittest discover -s tests -p 'test_flux_trellis_pipeline.py' -v`, fix any failures, run the visual smoke on an appropriately admitted current-source checkout, then rerun joined QA/HF through remote reassembly and full SHA verification after resolving sync/runtime gates.
+Created [docs/DEMO_EXECUTION_PLAN.md](docs/DEMO_EXECUTION_PLAN.md), linked from [docs/DEMO_SUITE.md](docs/DEMO_SUITE.md). Current source `f17a2f3e012dc58c440daedd4f9358eacadd6c38` passed [static CI 39557821438](https://github.com/CalamityStriker/OEC/actions/runs/39557821438) and live composite FLUX→TRELLIS [39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401).
+
+- **FLUX PNG:** 512×512, 211,978 bytes, SHA-256 `3571b033e4092ce42a51b132e1509930f79001132a58a5b3b5e73047efecacde`.
+- **TRELLIS GLB:** 190,388 bytes, SHA-256 `fdd211d18aa3a225592e4578bbd8b12d5c016a5ad8bebab2ae68d11c8d28e4b0`. GLB 2.0 / one mesh / one primitive; trimesh reopen passed with 2,839 vertices and 4,651 faces. Manifest hashes match; `FLUX_PIPELINE_SMOKE=PASS`.
+- **Storage:** models usage 251.89→255.60 GB / target 280 GB; soft-quota grace active, hard headroom 45.23→41.48 GB; reserves unchanged. Storage state remained WARNING, but admission passed.
+- **Remaining blockers:** A100 sync [39557821414](https://github.com/CalamityStriker/OEC/actions/runs/39557821414) preserved 37 loose files under `root/oec_deploy`; local sync is unverified. Joined Brain/LTX/Qwen2-VL QA/HF read-back was not rerun; prior preflight [39549368702](https://github.com/CalamityStriker/OEC/actions/runs/39549368702) failed.
+- Full 8/8 suite [39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568) is historical evidence for its own SHA. Current PASS covers composite FLUX→TRELLIS, not the entire ordered pipeline or persistent API release.
+
 
 ---
 
