@@ -56,7 +56,7 @@ class FluxTrellisPipelineTests(unittest.TestCase):
                 combined._inspect_glb_header(path)
 
     def test_safe_work_dir_creates_nonexistent_requested_path_and_rejects_reuse(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir="/tmp") as tmp:
             requested = Path(tmp) / "work"
             self.assertFalse(requested.exists())
             result = combined._safe_work_dir(requested)
