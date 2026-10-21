@@ -155,25 +155,34 @@ class StoragePolicyTests(unittest.TestCase):
     def test_live_lustre_quota_parser_preserves_soft_hard_and_grace(self):
         from storage_policy import _live_lustre_quota
 
-        class Result:
-            returncode = 0
-            stdout = (
+        outputs = [
+            (
                 "Disk quotas for grp lmedge (gid 55000):\n"
                 "Filesystem kbytes quota limit grace files quota limit grace\n"
-                "/nlsasfs 2253642804 2147483648 2254857830 5d23h32m 4220723 0 0 -\n"
-            )
-
+                "/nlsasfs 2208264952* 2147483648 2254857830 5d1h1m50s 5351338 0 0 -\n"
+            ),
+            (
+                "Disk quotas for grp lmedge (gid 55000):\n"
+                "Filesystem kbytes quota limit grace files quota limit grace\n"
+                "/nlsasfs/home/lmedge/rahkus/aireos_models\n"
+                "2208264952* 2147483648 2254857830 5d1h1m50s 5351338 0 0 -\n"
+            ),
+        ]
         with tempfile.TemporaryDirectory() as temp:
-            with mock.patch("storage_policy.shutil.which", return_value="/usr/bin/lfs"), \
-                 mock.patch("storage_policy.subprocess.run", return_value=Result()) as run:
-                quota = _live_lustre_quota(temp, "lmedge")
-            self.assertIsNotNone(quota)
-            self.assertEqual(quota.used_bytes, 2253642804 * 1024)
-            self.assertEqual(quota.soft_quota_bytes, 2147483648 * 1024)
-            self.assertEqual(quota.hard_limit_bytes, 2254857830 * 1024)
-            self.assertTrue(quota.grace_active)
-            self.assertIn("lfs quota -g lmedge", quota.source)
-            self.assertEqual(run.call_args.args[0][1:4], ["quota", "-g", "lmedge"])
+            for stdout in outputs:
+                result = type("Result", (), {"returncode": 0, "stdout": stdout})()
+                with mock.patch("storage_policy.shutil.which", return_value="/usr/bin/lfs"), \
+                     mock.patch("storage_policy.subprocess.run", return_value=result) as run:
+                    quota = _live_lustre_quota(temp, "lmedge")
+                self.assertIsNotNone(quota)
+                self.assertEqual(quota.used_bytes, 2208264952 * 1024)
+                self.assertEqual(quota.soft_quota_bytes, 2147483648 * 1024)
+                self.assertEqual(quota.hard_limit_bytes, 2254857830 * 1024)
+                self.assertTrue(quota.soft_quota_exceeded)
+                self.assertTrue(quota.grace_active)
+                self.assertFalse(quota.hard_limit_exceeded)
+                self.assertIn("lfs quota -g lmedge", quota.source)
+                self.assertEqual(run.call_args.args[0][1:4], ["quota", "-g", "lmedge"])
 
     def test_soft_quota_overage_is_allowed_only_during_active_grace_and_below_hard(self):
         with tempfile.TemporaryDirectory() as temp:
