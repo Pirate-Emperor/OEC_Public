@@ -1,0 +1,68 @@
+name: OEC read-only A100 readiness diagnostic
+
+on:
+  push:
+    branches:
+      - diag/a100-readiness-oec1-20261021
+    paths:
+      - ".github/workflows/oec-a100-readiness-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-readonly-a100-diagnostic-oec1
+  cancel-in-progress: true
+
+jobs:
+  readiness:
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout diagnostic source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Read-only GPU ownership and storage report
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-1"
+          test -x "$HOME/Conda/condabin/conda"
+          test -f "$HOME/OEC/storage_config.json"
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+
+          echo "READINESS_HOST=$(hostname)"
+          echo "READINESS_RUNNER=$RUNNER_NAME"
+          echo "GPU_INVENTORY_BEGIN"
+          nvidia-smi --query-gpu=index,name,utilization.gpu,memory.used,memory.free --format=csv
+          echo "GPU_INVENTORY_END"
+
+          echo "GPU_PROCESS_OWNERSHIP_BEGIN"
+          while IFS=, read -r pid used_memory; do
+            pid="$(printf '%s' "$pid" | tr -d '[:space:]')"
+            used_memory="$(printf '%s' "$used_memory" | tr -d '[:space:]')"
+            [[ "$pid" =~ ^[0-9]+$ ]] || continue
+            printf 'GPU_PID=%s GPU_MEMORY=%s\n' "$pid" "$used_memory"
+            ps -o user=,pid=,ppid=,etime=,stat=,comm= -p "$pid" || true
+          done < <(nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader 2>/dev/null || true)
+          echo "GPU_PROCESS_OWNERSHIP_END"
+
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python -c '
+          from oec_gpu_admission import select_idle_a100_gpu
+          import json
+          try:
+              selected = select_idle_a100_gpu(requested=None, min_free_mib=16384, caller="READ_ONLY_DIAGNOSTIC")
+              print("IDLE_A100_AVAILABLE=YES")
+              print("IDLE_A100_SELECTION=" + json.dumps(selected, sort_keys=True))
+          except Exception as exc:
+              print("IDLE_A100_AVAILABLE=NO")
+              print("IDLE_A100_BLOCK_REASON=" + type(exc).__name__ + ": " + str(exc))
+          '
+
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python storage_manager.py --status
+          echo "READINESS_DIAGNOSTIC_ONLY=PASS_NO_MODEL_LOADED_NO_CACHE_CHANGED"
