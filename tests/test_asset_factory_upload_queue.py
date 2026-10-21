@@ -123,7 +123,7 @@ class AssetFactoryUploadQueueTests(unittest.TestCase):
 
         asset_root = self.outputs / "asset_factory"
         client = AssetFactoryClient(output_root=asset_root)
-        payload = b"RIFF" + b"\\x00\\x00\\x00\\x00" + b"WAVE" + b"recovery-audio"
+        payload = b"RIFF" + bytes(4) + b"WAVE" + b"recovery-audio"
         response = _FakeResponse(payload, "audio/wav")
         opener = mock.Mock()
         opener.open.return_value = response
