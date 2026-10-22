@@ -6,9 +6,25 @@
 
 **Safety rule:** Check actual GPU ownership and StorageManager state before every inference or model-cache/output write. A missing checkpoint or rejected quota/lease/GPU gate is a reportable blocker. Do not kill another process, purge a cache, edit a reserve file, install into a shared ML environment, blindly download weights, or upload a production asset just to make a demo pass.
 
+## Current demo / presentation status — 2026-10-23
+
+**Current code candidate:** `fix/media-stack-supervision-20261019` at `ae6c90b891ec80338c9c96446d735b03e1985d8a`. Historical model results below are explicitly distinguished from exact-head results.
+
+- **CURRENT-HEAD LIVE PASS:** [FLUX.2 Klein → TRELLIS.2 A100 inference](https://github.com/CalamityStriker/OEC/actions/runs/39646903815), job 119390662318, runner `oec-1`. GLB v2 reopened; 193,544 bytes; SHA-256 `94daca421e06e191ae5fd7d10da20cf89808ea187c14d338f8a1628bfd08bd66`; 2,886 vertices / 4,752 faces; artifact 12368677410.
+- **CURRENT-HEAD CONTRACT PASS:** [Asset Factory tests](https://github.com/CalamityStriker/OEC/actions/runs/39646903793), job 119384749626; suites of 8, 5 and 16 passed.
+- **CURRENT-HEAD STATIC/STORAGE PASS:** [run 39646903775](https://github.com/CalamityStriker/OEC/actions/runs/39646903775), job 119384750498; 154 tests across 19 unittest invocations, four notebook JSON checks.
+- **BLOCKED — canonical A100 root sync:** [run 39646903801](https://github.com/CalamityStriker/OEC/actions/runs/39646903801), job 119386595162, stopped safely with exit 17 after detecting an active OEC inference/queue process. Do not claim that `$HOME/OEC` is synced to the candidate SHA.
+- **HISTORICAL REAL INFERENCE PASS:** [full live suite 39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568), 8/8 jobs on older SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`. This covers previous real audio/video/3D callbacks and the old joined byte-readback test, not current-HEAD validation.
+- **ENCRYPTION BOUNDARY:** The older joined test checked remote bytes against the local MP4 source. The tracked uploader/harness inspected for this change does not show a private-key decrypt stage. Do not run a raw-upload harness against a public repository until encrypt-before-upload is confirmed. The new verifier downloads existing ciphertext only, validates hashes, invokes the user-supplied local decryptor and verifies the original plaintext hash.
+- **PRESENTER RUNBOOK:** [docs/DEMO_PRESENTATION_QUICKSTART_2026-10-23.md](docs/DEMO_PRESENTATION_QUICKSTART_2026-10-23.md) includes per-model evidence, commands, notebook paths and gaps. `pipeline_demo_acceptance.ipynb` is a compact index; `pipeline_verify_encrypted_hf.ipynb` is the encrypted read-back template.
+
+**Still incomplete/unverified:** current-head live retest of every audio/video provider; common `/v1/jobs` support for standalone FLUX, AudioGen and MusicGen; complete OEC-Deploy/OEC-Play client integration; current-head Brain → LTX → Qwen2-VL QA → encryption → local private-key read-back; synchronization of the canonical A100 checkout.
+
+---
+
 ## 1. Presenter run-of-show
 
-**Verified on 2026-10-21:** source SHA `f17a2f3e012dc58c440daedd4f9358eacadd6c38` passed static/contract suite [39557821438](https://github.com/CalamityStriker/OEC/actions/runs/39557821438) and real FLUX.2 Klein → TRELLIS.2 inference [39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401). The composite produced valid PNG/GLB outputs; their sizes and SHA-256 values match the downloaded manifest, GLB reopen passed, StorageManager was checked before/after, and evidence uploaded. This verifies the **composite image-to-3D demo only**, not the full ordered Brain → LTX → QA → Hugging Face pipeline. Canonical A100 sync remains blocked safely because 37 loose files were preserved under `root/oec_deploy` [run 39557821414](https://github.com/CalamityStriker/OEC/actions/runs/39557821414).
+**Historical accepted evidence on 2026-10-21 (older source SHA):** source SHA `f17a2f3e012dc58c440daedd4f9358eacadd6c38` passed static/contract suite [39557821438](https://github.com/CalamityStriker/OEC/actions/runs/39557821438) and real FLUX.2 Klein → TRELLIS.2 inference [39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401). The composite produced valid PNG/GLB outputs; their sizes and SHA-256 values match the downloaded manifest, GLB reopen passed, StorageManager was checked before/after, and evidence uploaded. This verifies the **composite image-to-3D demo only**, not the full ordered Brain → LTX → QA → Hugging Face pipeline. Canonical A100 sync remains blocked safely because 37 loose files were preserved under `root/oec_deploy` [run 39557821414](https://github.com/CalamityStriker/OEC/actions/runs/39557821414).
 
 OEC is not one model. It is a set of capability-specific runtimes connected by common storage admission, process-aware GPU admission, Gradio clients, loopback job services, a work queue, QA and upload/read-back.
 

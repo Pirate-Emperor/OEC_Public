@@ -1,10 +1,19 @@
 # OEC Demo Suite — reproducible presentation guide
 
+## Current-source live verification — 2026-10-23
+
+- **CURRENT-HEAD PASS:** [FLUX → TRELLIS live A100](https://github.com/CalamityStriker/OEC/actions/runs/39646903815), [Asset Factory contracts](https://github.com/CalamityStriker/OEC/actions/runs/39646903793) and [static/notebook/storage tests](https://github.com/CalamityStriker/OEC/actions/runs/39646903775) on feature SHA `ae6c90b891ec80338c9c96446d735b03e1985d8a`.
+- **BLOCKED:** [canonical A100 root sync](https://github.com/CalamityStriker/OEC/actions/runs/39646903801) refused to mutate the checkout while an OEC inference/queue process was active.
+- **HISTORICAL FULL LIVE SUITE:** [39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568), 8/8 on older SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`; not exact-head all-provider proof.
+- **ENCRYPTION:** old E2E byte-readback did not perform private-key decryption. For an encrypted public object use `pipeline_verify_encrypted_hf.ipynb` and `tools/verify_hf_encrypted_asset.py`; neither uploads data.
+- **Presenter commands/status matrix:** [DEMO_PRESENTATION_QUICKSTART_2026-10-23.md](DEMO_PRESENTATION_QUICKSTART_2026-10-23.md).
+
+---
 **Purpose:** A short, evidence-led demonstration of the current OEC multimodal inference work. This guide is not a claim that every path is production-ready. Run commands from the OEC repository root and record the exact branch and commit used.
 
 > **Complete runbook:** [DEMO_EXECUTION_PLAN.md](DEMO_EXECUTION_PLAN.md) contains the model-by-model CLI/Gradio/Jupyter paths, kernels, expected outputs, service/API lifecycle, FLUX → TRELLIS, Brain → LTX → QA → HF read-back, workflow commands and final error/incomplete ledger. This short guide is retained.
 
-## Current-source live verification — 2026-10-21
+## Historical source verification — 2026-10-21 (superseded by the snapshot above)
 
 - **PASS:** [static/contract suite 39557821438](https://github.com/CalamityStriker/OEC/actions/runs/39557821438).
 - **PASS:** [live FLUX → TRELLIS run 39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401), source SHA `f17a2f3e012dc58c440daedd4f9358eacadd6c38`; PNG/GLB hashes matched manifest, GLB reopened, storage before/after captured and artifact uploaded.

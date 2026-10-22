@@ -1,3 +1,16 @@
+# OEC cumulative result update — 2026-10-23
+
+Source candidate inspected: `ae6c90b891ec80338c9c96446d735b03e1985d8a` on `fix/media-stack-supervision-20261019`.
+
+- Exact-head FLUX → TRELLIS A100 acceptance passed in [run 39646903815](https://github.com/CalamityStriker/OEC/actions/runs/39646903815). GLB v2: 193,544 bytes, SHA-256 `94daca421e06e191ae5fd7d10da20cf89808ea187c14d338f8a1628bfd08bd66`; 2,886 vertices, 4,752 faces; reopen pass; artifact 12368677410.
+- Exact-head Asset Factory contracts passed in [run 39646903793](https://github.com/CalamityStriker/OEC/actions/runs/39646903793); static/storage tests passed in [run 39646903775](https://github.com/CalamityStriker/OEC/actions/runs/39646903775), 154 tests across 19 unittest runs.
+- Canonical A100 root sync was blocked by the active-process guard in [run 39646903801](https://github.com/CalamityStriker/OEC/actions/runs/39646903801); the local canonical SHA remains unverified.
+- The historical 8/8 live suite [39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568) at older SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74` remains useful for real audio/video/3D and remote byte-readback evidence, but it does not verify private-key decryption.
+- The encrypted-HF readback helper validates public ciphertext and runs the local decryptor without uploading. The actual encrypt-before-upload boundary/decryptor interface still needs to be supplied and verified with an already-encrypted object.
+
+Run commands and expected outputs: [demo quickstart](docs/DEMO_PRESENTATION_QUICKSTART_2026-10-23.md).
+
+---
 ## Verified execution and demo results — 2026-10-21
 
 Created [docs/DEMO_EXECUTION_PLAN.md](docs/DEMO_EXECUTION_PLAN.md), linked from [docs/DEMO_SUITE.md](docs/DEMO_SUITE.md). Current source `f17a2f3e012dc58c440daedd4f9358eacadd6c38` passed [static CI 39557821438](https://github.com/CalamityStriker/OEC/actions/runs/39557821438) and live composite FLUX→TRELLIS [39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401).

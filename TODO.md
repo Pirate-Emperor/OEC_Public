@@ -1,3 +1,19 @@
+## Current demo state — 2026-10-23
+
+Candidate: `fix/media-stack-supervision-20261019` / `ae6c90b891ec80338c9c96446d735b03e1985d8a`.
+
+- Exact-head live inference PASS: [FLUX → TRELLIS run 39646903815](https://github.com/CalamityStriker/OEC/actions/runs/39646903815), artifact 12368677410; GLB structurally re-opened.
+- Exact-head Asset Factory contracts PASS: [run 39646903793](https://github.com/CalamityStriker/OEC/actions/runs/39646903793).
+- Exact-head static/storage PASS: [run 39646903775](https://github.com/CalamityStriker/OEC/actions/runs/39646903775); 154 tests across 19 invocations.
+- Canonical root sync BLOCKED by active-process guard: [run 39646903801](https://github.com/CalamityStriker/OEC/actions/runs/39646903801).
+- Historical full model suite: [run 39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568), 8/8 on older SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`.
+- Runbook: [docs/DEMO_PRESENTATION_QUICKSTART_2026-10-23.md](docs/DEMO_PRESENTATION_QUICKSTART_2026-10-23.md); full guide: [docs/DEMO_EXECUTION_PLAN.md](docs/DEMO_EXECUTION_PLAN.md).
+
+**Outstanding:** exact-head live re-run for all audio/video providers; shared `/v1/jobs` for standalone FLUX/AudioGen/MusicGen; persistent OEC-Deploy/OEC-Play end-to-end integration; encrypt-before-upload plus private-key read-back on current source; canonical A100 root sync.
+
+**Before presenting:** verify local branch/SHA and run read-only StorageManager/GPU checks. Never sync over active inference or upload test plaintext to a public dataset. The research model demos remain useful historical evidence; label their tested SHA.
+
+---
 ## Full OEC demo-execution guide and current verification — 2026-10-21
 
 **Runbook:** [docs/DEMO_EXECUTION_PLAN.md](docs/DEMO_EXECUTION_PLAN.md); [docs/DEMO_SUITE.md](docs/DEMO_SUITE.md) remains the quick presentation.

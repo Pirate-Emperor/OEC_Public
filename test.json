@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-21T12:20:00+05:30",
+  "last_updated": "2026-10-23T02:30:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Verified source f17a2f3e012dc58c440daedd4f9358eacadd6c38: static/contract run 39557821438 PASSED including fresh workdir regression; live FLUX.2 Klein→TRELLIS.2 run 39557821401 PASSED; PNG/GLB sizes and SHA-256 match uploaded manifest; GLB reopen passed (2,839 vertices, 4,651 faces). Storage reporting passed; soft quota exceeded under grace and hard headroom declined 45.23→41.48 GB while reserves remained unchanged. Canonical A100 sync 39557821414 remains BLOCKED as 37 loose non-ignored files were preserved in root/oec_deploy. Full current-SHA Brain/LTX/Qwen2-VL QA/HF read-back has not rerun; the Qwen2-VL preflight 39549368702 failed. Historical 8/8 run 39435100568 applies to its older SHA.",
+  "latest_summary": "Verified current feature SHA ae6c90b891ec80338c9c96446d735b03e1985d8a: current-head FLUX.2 Klein→TRELLIS.2 live A100 PASS in run 39646903815 (GLB 193,544 B; SHA-256 94daca421e06e191ae5fd7d10da20cf89808ea187c14d338f8a1628bfd08bd66; mesh reopened); Asset Factory contracts 39646903793 PASS; static/storage 39646903775 PASS (154 tests across 19 unittest invocations, four notebook JSON checks). Canonical A100 root sync 39646903801 was safety-blocked by active OEC inference/queue process; local canonical root sync is unverified. Historical all-provider inference and joined QA/upload/read-back remain evidence for older SHA 0c53f6a46328bc4ba6ce4d0942556e3077ea6d74/run 39435100568, not exact-head proof. Encryption/private-key round-trip not verified by that old byte-readback job; use new verifier with an already-encrypted object and the actual local decryptor.",
   "experiments": [
     {
       "id": "EXP-2026-10-21-OEC-FLUX-TRELLIS-LIVE-VERIFICATION",
@@ -5848,8 +5848,86 @@
         "Rerun the existing short timeout release workflow only for providers that pass current runtime/cache checks and verify ready=true plus model_loaded=true.",
         "Keep loopback endpoints private; no third-party weights are to be rehosted without explicit license/provenance review."
       ]
+    },
+    {
+      "id": "DEMO-2026-10-23-CURRENT-HEAD-PRESENTATION-AND-CIPHER-READBACK",
+      "date": "2026-10-23",
+      "category": "Demo acceptance ledger refresh and encrypted Hugging Face local-readback helper",
+      "branch": "fix/media-stack-supervision-20261019",
+      "source_sha": "ae6c90b891ec80338c9c96446d735b03e1985d8a",
+      "status": "CURRENT_HEAD_PARTIAL_ACCEPTANCE",
+      "exact_head_results": {
+        "flux_trellis": {
+          "status": "PASS",
+          "run_id": 39646903815,
+          "job_id": 119390662318,
+          "artifact_id": 12368677410,
+          "glb_bytes": 193544,
+          "glb_sha256": "94daca421e06e191ae5fd7d10da20cf89808ea187c14d338f8a1628bfd08bd66",
+          "mesh_count": 1,
+          "primitive_count": 1,
+          "vertices": 2886,
+          "faces": 4752,
+          "reopened": true
+        },
+        "asset_factory_contracts": {
+          "status": "PASS",
+          "run_id": 39646903793,
+          "job_id": 119384749626,
+          "suites": [
+            8,
+            5,
+            16
+          ]
+        },
+        "static_storage": {
+          "status": "PASS",
+          "run_id": 39646903775,
+          "job_id": 119384750498,
+          "tests": 154,
+          "unittest_invocations": 19,
+          "notebook_json_checks": 4
+        },
+        "canonical_a100_sync": {
+          "status": "BLOCKED",
+          "run_id": 39646903801,
+          "job_id": 119386595162,
+          "reason": "active OEC inference/queue process detected; safety guard stopped before modifying the canonical checkout"
+        }
+      },
+      "historical_live_suite": {
+        "status": "PASS_OLDER_SHA",
+        "run_id": 39435100568,
+        "source_sha": "0c53f6a46328bc4ba6ce4d0942556e3077ea6d74",
+        "jobs_passed": 8,
+        "jobs_total": 8,
+        "private_key_decryption": "NOT_TESTED_BY_THIS_RUN"
+      },
+      "code_changes_in_candidate": [
+        "docs/DEMO_PRESENTATION_QUICKSTART_2026-10-23.md",
+        "pipeline_demo_acceptance.ipynb",
+        "pipeline_verify_encrypted_hf.ipynb",
+        "tools/verify_hf_encrypted_asset.py",
+        "tests/test_verify_hf_encrypted_asset.py",
+        ".github/workflows/oec-encrypted-hf-verification-tests.yml",
+        "pipeline_ltx_video.ipynb"
+      ],
+      "encrypted_hf_helper": {
+        "action": "read-only download, chunk integrity verification, caller-supplied local decryption and independent plaintext SHA-256 check",
+        "uploads_performed": 0,
+        "private_key_contents_printed": false
+      },
+      "limitations": [
+        "helper unit tests require CI pass before acceptance",
+        "must test using an already-encrypted object; no upload occurs",
+        "actual encryption boundary/decryptor interface not independently located in tracked source",
+        "canonical A100 root SHA remains unverified",
+        "live audio/video inference not repeated on current feature SHA",
+        "common /v1/jobs for standalone FLUX/AudioGen/MusicGen remains outstanding",
+        "persistent OEC-Deploy/OEC-Play E2E remains outstanding"
+      ]
     }
   ],
-  "updated_at": "2026-10-20T22:45:00+05:30",
-  "updated_date": "2026-10-20"
+  "updated_at": "2026-10-23T02:30:00+05:30",
+  "updated_date": "2026-10-23"
 }

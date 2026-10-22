@@ -1,3 +1,7 @@
+## 2026-10-23 — OEC presentation runbook and encrypted read-back
+
+- [Daily changelog](CHANGELOG-2026-10-23.md) records exact-head evidence, new presentation notebooks, ciphertext verification helper and current blockers.
+
 ## Full demo-execution plan and latest verified status — 2026-10-21
 
 - **Presenter runbook:** [docs/DEMO_EXECUTION_PLAN.md](docs/DEMO_EXECUTION_PLAN.md); the shorter [docs/DEMO_SUITE.md](docs/DEMO_SUITE.md) is retained. The full runbook covers model-by-model CLI/Jupyter/Gradio paths, environment/kernel mapping, component roles, artifact verification, services, FLUX → TRELLIS, Brain → LTX → QA → HF upload/read-back, commands and the failure/incomplete ledger.

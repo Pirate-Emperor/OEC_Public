@@ -1,6 +1,17 @@
 # OEC project continuation checklist
 
-## Current verified state — 2026-10-21
+## Current verified state — 2026-10-23
+
+- **Current-head live PASS:** [FLUX.2 Klein → TRELLIS.2](https://github.com/CalamityStriker/OEC/actions/runs/39646903815), candidate `ae6c90b891ec80338c9c96446d735b03e1985d8a`; 193,544-byte GLB re-opened (2,886 vertices / 4,752 faces), artifact 12368677410.
+- **Current-head contract PASS:** [Asset Factory](https://github.com/CalamityStriker/OEC/actions/runs/39646903793), suites 8 + 5 + 16.
+- **Current-head static/storage PASS:** [run 39646903775](https://github.com/CalamityStriker/OEC/actions/runs/39646903775), 154 tests across 19 invocations and four notebook JSON checks.
+- **Canonical A100 sync BLOCKED:** [run 39646903801](https://github.com/CalamityStriker/OEC/actions/runs/39646903801); active OEC inference/queue process detected, so canonical `$HOME/OEC` is not proven synced.
+- **Historical live acceptance:** [run 39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568), 8/8 on older SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`; this is historical real inference and raw byte read-back, not current-head testing or private-key decryption.
+- **Runbook:** `docs/DEMO_PRESENTATION_QUICKSTART_2026-10-23.md`; compact Jupyter index `pipeline_demo_acceptance.ipynb`; encrypted remote ciphertext/private-key round-trip `pipeline_verify_encrypted_hf.ipynb`.
+- **Still incomplete:** exact-head audio/video retests; common `/v1/jobs` integration for standalone FLUX/AudioGen/MusicGen; OEC-Play full integration; current-head encrypted read-back/decrypt; canonical A100 sync.
+
+---
+## Historical verified state — 2026-10-21 (superseded by current snapshot)
 
 - **Known live demo PASS (older code SHA):** FLUX.2 Klein → TRELLIS.2 on SHA `f17a2f3e012dc58c440daedd4f9358eacadd6c38`, workflow [39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401). Independently verified PNG and GLB hashes, GLB reopen/mesh counts. This is a composite image-to-3D smoke, not a whole-project pass.
 - **Static / Asset Factory contracts:** historical full static suite [39557821438](https://github.com/CalamityStriker/OEC/actions/runs/39557821438) passed on `f17a2f3...`. Current Asset Factory contract run [39628509650](https://github.com/CalamityStriker/OEC/actions/runs/39628509650) passed at `f40bfa1510559120d8ea6b00ad947c2c280b0c1c`: compile + JSON validation; 7 provider/Brain prompt/ASR input/HF queue tests and 5 LTX cache-purge policy tests. This verifies local contracts, not live generation or remote HF read-back for every provider.
