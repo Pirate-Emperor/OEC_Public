@@ -1,0 +1,1 @@
+Requested one-off start of persistent Jupyter port 8888 and OEC DGX allocation service on the A100 self-hosted runner. Keep both services detached; do not expose the token in Actions logs.
