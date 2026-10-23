@@ -1,0 +1,171 @@
+name: Start persistent Jupyter and DGX service
+
+on:
+  push:
+    branches:
+      - "ops/persistent-jupyter-dgx-20261023"
+    paths:
+      - ".github/workflows/triggers/start-persistent-jupyter-dgx.txt"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: persistent-jupyter-dgx-oec
+  cancel-in-progress: false
+
+jobs:
+  start-persistent-services:
+    name: Launch detached services on an A100 compute node
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 8
+    steps:
+      - name: Run requested commands detached and collect access details
+        shell: bash
+        run: |
+          set -euo pipefail
+          INFO_DIR="$RUNNER_TEMP/oec-services-info-$GITHUB_RUN_ID"
+          [[ ! -e "$INFO_DIR" && ! -L "$INFO_DIR" ]] || { echo "::error::Run-owned info directory exists"; exit 2; }
+          install -d -m 700 "$INFO_DIR"
+          export OEC_SERVICE_INFO_DIR="$INFO_DIR" OEC_ACTION_RUN_ID="$GITHUB_RUN_ID"
+          set +e
+          python3 - <<'PY'
+          import json, os, socket, subprocess, time
+          from pathlib import Path
+          from datetime import datetime, timezone
+          from urllib.parse import urlparse, parse_qs
+          root=Path(os.environ["OEC_SERVICE_INFO_DIR"])
+          info_file=root/"service-info.json"
+          rid=os.environ["OEC_ACTION_RUN_ID"]
+          node=socket.getfqdn() or socket.gethostname()
+          try:
+              ips=sorted({x[4][0] for x in socket.getaddrinfo(socket.gethostname(),None)
+                  if x[0] in (socket.AF_INET,socket.AF_INET6) and x[4][0] not in ("127.0.0.1","::1")})
+          except OSError: ips=[]
+          persistent=Path.home()/".cache"/"oec-persistent-services"
+          persistent.mkdir(parents=True,exist_ok=True,mode=0o700);os.chmod(persistent,0o700)
+          deploy_dir=Path.home()/"OEC"/"oec_deploy"
+          deploy_script=deploy_dir/"deploy"/"dgx"/"serve_on_allocation.sh"
+          jupyter_pidfile=persistent/"jupyter-8888.pid"
+          deploy_pidfile=persistent/("serve-on-allocation-"+rid+".pid")
+          deploy_log=persistent/"serve-on-allocation.log"
+          errors=[]; token=""; jpid=None; dpid=None
+          jstatus="not_started"; dstatus="not_started"; jstarted=False; dstarted=False
+          def sh(cmd,timeout=8):
+              return subprocess.run(["bash","-lc",cmd],capture_output=True,text=True,timeout=timeout,check=False)
+          def servers():
+              out=sh("jupyter server list --json")
+              arr=[]
+              for line in out.stdout.splitlines():
+                  try: arr.append(json.loads(line))
+                  except json.JSONDecodeError: pass
+              return arr
+          def port(s):
+              try: return int(s.get("port")) if s.get("port") is not None else urlparse(s.get("url","")).port
+              except (TypeError,ValueError): return None
+          def gettoken(s):
+              return str(s.get("token") or parse_qs(urlparse(s.get("url","")).query).get("token",[""])[0])
+          def openport(p):
+              try:
+                  with socket.create_connection(("127.0.0.1",p),timeout=.3): return True
+              except OSError: return False
+          def existing_deploy():
+              found=[]
+              for proc in Path("/proc").iterdir():
+                  if not proc.name.isdigit() or int(proc.name)==os.getpid(): continue
+                  try: text=b" ".join((proc/"cmdline").read_bytes().split(b"\\0")).decode("utf-8","replace")
+                  except OSError: continue
+                  if "deploy/dgx/serve_on_allocation.sh" in text and "--bind" in text and "0.0.0.0" in text: found.append(int(proc.name))
+              return sorted(set(found))
+          try:
+              if sh("command -v jupyter").returncode:
+                  jstatus="failed_jupyter_not_found";errors.append("jupyter not found in the login-shell environment")
+              else:
+                  found=next((s for s in servers() if port(s)==8888),None)
+                  if found:
+                      jpid=found.get("pid");token=gettoken(found);jstatus="already_running"
+                  elif openport(8888):
+                      jstatus="failed_port_in_use";errors.append("port 8888 occupied by an unidentified service; left untouched")
+                  else:
+                      env=os.environ.copy();env["OEC_JUPYTER_PID_FILE"]=str(jupyter_pidfile)
+                      cmd='printf "%s\\n" "$$" > "$OEC_JUPYTER_PID_FILE"; exec jupyter notebook --ip=0.0.0.0 --port=8888 --allow-root --no-browser'
+                      proc=subprocess.Popen(["bash","-lc",cmd],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
+                          env=env,start_new_session=True,close_fds=True)
+                      jpid=proc.pid;jstarted=True;found=None
+                      for _ in range(24):
+                          time.sleep(.75);found=next((s for s in servers() if port(s)==8888),None)
+                          if found or proc.poll() is not None: break
+                      if found:
+                          jpid=found.get("pid") or jpid;token=gettoken(found);jstatus="started_and_listening"
+                      elif proc.poll() is not None:
+                          jstatus="failed_process_exited";errors.append("Jupyter exited during startup")
+                      else:
+                          jstatus="started_not_confirmed";errors.append("Jupyter process alive but port 8888 not confirmed")
+              if not deploy_dir.is_dir() or not deploy_script.is_file():
+                  dstatus="failed_script_missing";errors.append("requested script missing: "+str(deploy_script))
+              else:
+                  pids=existing_deploy()
+                  if pids: dpid=pids[0];dstatus="already_running"
+                  else:
+                      env=os.environ.copy();env["OEC_DEPLOY_PID_FILE"]=str(deploy_pidfile)
+                      cmd='printf "%s\\n" "$$" > "$OEC_DEPLOY_PID_FILE"; cd "$HOME/OEC/oec_deploy" && exec bash deploy/dgx/serve_on_allocation.sh --bind 0.0.0.0'
+                      with deploy_log.open("ab",buffering=0) as log:
+                          os.chmod(deploy_log,0o600)
+                          proc=subprocess.Popen(["bash","-lc",cmd],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,
+                              env=env,start_new_session=True,close_fds=True)
+                      dpid=proc.pid;dstarted=True;time.sleep(4)
+                      if proc.poll() is None: dstatus="started_process_alive"
+                      else: dstatus="failed_process_exited";errors.append("serve_on_allocation.sh exited with code "+str(proc.returncode))
+              urls=["http://"+node+":8888/tree"]+["http://"+ip+":8888/tree" for ip in ips]
+              data={"schema_version":1,"captured_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "workflow_run_id":int(rid),"runner_name":os.environ.get("RUNNER_NAME","unknown"),"compute_node":node,"compute_node_ips":ips,
+                "jupyter":{"status":jstatus,"pid":jpid,"port":8888,"bind":"0.0.0.0","urls_without_token":urls,
+                  "token":token,"token_present":bool(token),"started_by_this_run":jstarted,"pid_file":str(jupyter_pidfile),"stdout_stderr":"/dev/null"},
+                "dgx_service":{"status":dstatus,"pid":dpid,"command":'cd "$HOME/OEC/oec_deploy" && bash deploy/dgx/serve_on_allocation.sh --bind 0.0.0.0',
+                  "started_by_this_run":dstarted,"script_path":str(deploy_script),"log_path":str(deploy_log),"pid_file":str(deploy_pidfile)},
+                "errors":errors,"processes_were_not_killed":True}
+              info_file.write_text(json.dumps(data,indent=2,sort_keys=True)+"\\n",encoding="utf-8");os.chmod(info_file,0o600)
+              if token: print("::add-mask::"+token)
+              print("COMPUTE_NODE="+node);print("COMPUTE_NODE_IPS="+",".join(ips))
+              print("RUNNER_NAME="+data["runner_name"]);print("JUPYTER_STATUS="+jstatus);print("JUPYTER_PID="+str(jpid or "unknown"))
+              print("JUPYTER_TOKEN_CAPTURED="+str(bool(token)).lower());print("DGX_SERVICE_STATUS="+dstatus)
+              print("DGX_SERVICE_PID="+str(dpid or "unknown"));print("PROCESS_TERMINATION_REQUESTED=false")
+              for err in errors: print("SERVICE_START_ERROR="+err)
+              if errors or not token: raise SystemExit(2)
+          except SystemExit:
+              raise
+          except Exception as exc:
+              fallback={"schema_version":1,"captured_at_utc":datetime.now(timezone.utc).isoformat(),
+                "workflow_run_id":int(rid),"runner_name":os.environ.get("RUNNER_NAME","unknown"),"compute_node":node,"compute_node_ips":ips,
+                "jupyter":{"status":jstatus,"token":"","token_present":False},
+                "dgx_service":{"status":dstatus,"pid":dpid,"script_path":str(deploy_script)},
+                "errors":[type(exc).__name__+": "+str(exc)[:800]],"processes_were_not_killed":True}
+              info_file.write_text(json.dumps(fallback,indent=2)+"\\n",encoding="utf-8");os.chmod(info_file,0o600)
+              print("SERVICE_START_ERROR="+fallback["errors"][0]);raise
+          PY
+          rc=$?
+          set -e
+          exit "$rc"
+
+      - name: Hand off private connection details (one-day retention)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-jupyter-dgx-access-${{ github.run_id }}
+          path: ${{ runner.temp }}/oec-services-info-${{ github.run_id }}/service-info.json
+          if-no-files-found: warn
+          retention-days: 1
+          compression-level: 6
+
+      - name: Remove only this run's local token handoff file
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          INFO_DIR="$RUNNER_TEMP/oec-services-info-$GITHUB_RUN_ID"
+          EXPECTED="$RUNNER_TEMP/oec-services-info-$GITHUB_RUN_ID"
+          [[ "$INFO_DIR" == "$EXPECTED" && "$INFO_DIR" == "$RUNNER_TEMP/"* ]] || { echo "::error::Unexpected info directory"; exit 2; }
+          if [[ -L "$INFO_DIR" ]]; then echo "::error::Info directory is symlinked"; exit 2; fi
+          if [[ -d "$INFO_DIR" ]]; then rm -rf -- "$INFO_DIR"; fi
+          [[ ! -e "$INFO_DIR" && ! -L "$INFO_DIR" ]] || { echo "::error::Local token handoff cleanup failed"; exit 2; }
+          echo "LOCAL_TOKEN_HANDOFF_CLEANUP=PASS"
