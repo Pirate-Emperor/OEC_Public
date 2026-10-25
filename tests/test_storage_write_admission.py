@@ -27,8 +27,11 @@ class StorageWriteAdmissionTests(unittest.TestCase):
     def test_shared_model_and_output_writers_do_not_opt_out_of_fresh_quota(self):
         for name in (*NOTEBOOKS, "pipeline_trellis_3d.py"):
             path = ROOT / name
-            if name.endswith(".ipynb"):
-                source = "\n".join(code for _, code in code_cells(name))
+            if name == "pipeline_flux_only.ipynb":
+                # FLUX is a frontend now; cache writes are owned by the API/helper.
+                source = (ROOT / "tools" / "prepare_flux_cache.py").read_text(encoding="utf-8")
+            elif name.endswith(".ipynb"):
+                source = "\\n".join(code for _, code in code_cells(name))
             else:
                 source = path.read_text(encoding="utf-8")
             self.assertNotIn("require_fresh_quota=False", source, name)
@@ -100,11 +103,13 @@ class StorageWriteAdmissionTests(unittest.TestCase):
             source = dict(code_cells(name))[cell]
             self.assertLess(source.index("TRELLIS generation refused before inference"),
                             source.index("mesh = trellis_pipe.run(input_image)[0]"))
-        for name, cell in (("pipeline_flux_only.ipynb", 6),
-                           ("pipeline_trellis_3d.ipynb", 12)):
-            source = dict(code_cells(name))[cell]
-            self.assertLess(source.index("FLUX generation refused before inference"),
-                            source.index("image = flux_pipe("))
+        flux_image = (ROOT / "pipeline_flux_image.py").read_text(encoding="utf-8")
+        flux_generate = flux_image.split("def _generate(", 1)[1].split("\\ndef main(", 1)[0]
+        self.assertLess(
+            flux_generate.index('storage_preflight("outputs"'),
+            flux_generate.index("image = pipe("),
+        )
+        self.assertIn("managed_storage_operation", flux_image)
 
     def test_cli_model_download_and_glb_export_use_fresh_quota(self):
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
