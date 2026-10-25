@@ -47,9 +47,6 @@ jobs:
     defaults:
       run:
         shell: bash
-    env:
-      OEC_ACCEPTANCE_ROOT: ${RUNNER_TEMP}/oec-demo-notebook-acceptance-${GITHUB_RUN_ID}
-      CONDA_EXE: ${HOME}/Conda/condabin/conda
     steps:
       - name: Checkout exact candidate source
         uses: actions/checkout@v4
@@ -60,6 +57,10 @@ jobs:
         id: preflight
         run: |
           set -euo pipefail
+          CONDA_EXE="$HOME/Conda/condabin/conda"
+          OEC_ACCEPTANCE_ROOT="$RUNNER_TEMP/oec-demo-notebook-acceptance-$GITHUB_RUN_ID"
+          echo "CONDA_EXE=$CONDA_EXE" >> "$GITHUB_ENV"
+          echo "OEC_ACCEPTANCE_ROOT=$OEC_ACCEPTANCE_ROOT" >> "$GITHUB_ENV"
           test "$RUNNER_NAME" = "oec-2"
           test -x "$CONDA_EXE"
           test -f "$HOME/OEC/storage_config.json"
@@ -91,13 +92,13 @@ jobs:
       - name: Execute AudioCraft notebook top-to-bottom and generate a WAV
         id: audiogen_full_notebook
         continue-on-error: true
-        env:
-          OEC_AUDIOGEN_HEADLESS_SMOKE: "1"
-          OEC_AUDIOGEN_SMOKE_DIR: ${RUNNER_TEMP}/oec-demo-notebook-acceptance-${GITHUB_RUN_ID}/audiogen-full-notebook
-          GRADIO_ANALYTICS_ENABLED: "False"
         run: |
           set -euo pipefail
+          OEC_AUDIOGEN_SMOKE_DIR="$OEC_ACCEPTANCE_ROOT/audiogen-full-notebook"
           mkdir -p "$OEC_AUDIOGEN_SMOKE_DIR"
+          export OEC_AUDIOGEN_HEADLESS_SMOKE=1
+          export OEC_AUDIOGEN_SMOKE_DIR
+          export GRADIO_ANALYTICS_ENABLED="False"
           timeout --signal=INT --kill-after=20s 1800s "$CONDA_EXE" run --no-capture-output -n phase1 \
             python tools/run_audiogen_notebook_smoke.py 2>&1 | tee "$OEC_AUDIOGEN_SMOKE_DIR/notebook-execution.log"
 
