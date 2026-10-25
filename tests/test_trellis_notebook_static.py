@@ -35,7 +35,7 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertEqual(self.combined_nb["nbformat"], 4)
         self.assertEqual(self.only_nb["nbformat"], 4)
         self.assertEqual(self.flux_only_nb["nbformat"], 4)
-        self.assertEqual(self.flux_only_nb["metadata"]["kernelspec"]["name"], "conda-env-phase2_3d-py")
+        self.assertEqual(self.flux_only_nb["metadata"]["kernelspec"]["name"], "phase2_3d")
         for name, nb in (
             ("combined", self.combined_nb),
             ("trellis-only", self.only_nb),
@@ -154,36 +154,23 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertNotIn("environment.This installs", setup_markdown)
         self.assertNotIn("Compilation & DependenciesThis cell", setup_markdown)
 
-    def test_flux_only_notebook_is_safe_and_storage_gated(self):
-        all_source = "\n".join(self.flux_only)
+    def test_flux_only_notebook_is_safe_and_uses_managed_model_server(self):
+        all_source = "\\n".join(self.flux_only)
         self.assertNotIn("kill 9 2386856", all_source)
         self.assertNotIn("pip install --upgrade jupyter", all_source)
         self.assertNotIn("git+https://github.com/huggingface/diffusers.git", all_source)
         self.assertNotIn("DiskPurgeManager.purge_hf_model", all_source)
-        self.assertIn("CUDA_VISIBLE_DEVICES", all_source)
-        self.assertIn("FLUX_SERVER_PORT", all_source)
-        self.assertIn("COMPUTE_NODE=", all_source)
-        self.assertIn("COMPUTE_NODE", "".join(self.flux_only_nb["cells"][0]["source"]))
-        self.assertIn("7864", "".join(self.flux_only_nb["cells"][0]["source"]))
+        self.assertIn("flux-api", all_source)
+        self.assertIn("API_BASE", all_source)
+        self.assertIn("127.0.0.1:7867", all_source)
+        self.assertIn("/v1/jobs", all_source)
+        self.assertIn("/v1/jobs/", all_source)
         self.assertIn("share=False", all_source)
-        self.assertIn("FLUX_PIPELINE=REUSED_EXISTING_INSTANCE", all_source)
-        setup = self.find(self.flux_only, "FLUX_IMPORT_CHECK=PASS")
-        for package_version in (
-            "diffusers==0.37.0",
-            "huggingface-hub==0.36.0",
-            "transformers==4.56.1",
-        ):
-            self.assertIn(package_version, setup)
-        self.assertIn("storage_preflight(", setup)
-        self.assertIn("require_fresh_quota=True", setup)
-        self.assertIn("managed_storage_operation(", setup)
-        model = self.find(self.flux_only, "def load_flux_pipeline()")
-        self.assertIn("snapshot_download(", model)
-        self.assertIn("local_files_only=True", model)
-        self.assertIn("LocalEntryNotFoundError", model)
-        self.assertIn("FLUX_MODEL_STORAGE_ADMISSION=", model)
-        self.assertIn("local_files_only=False", model)
-        self.assertIn("FLUX_SHARED_MODEL_CACHE=RETAINED", model)
+        self.assertIn("OEC_GRADIO_HEADLESS_SMOKE", all_source)
+        self.assertIn("image/png", all_source)
+        self.assertIn("Image.open(output_path)", all_source)
+        self.assertNotIn("import torch", all_source)
+        self.assertNotIn("import diffusers", all_source)
 
     def test_runtime_smoke_probes_xformers_and_reopens_export(self):
         self.assertIn("XFORMERS_CUDA_ATTENTION=PASS", self.runtime)
