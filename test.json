@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-23T02:30:00+05:30",
+  "last_updated": "2026-10-25T23:14:59+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Verified current feature SHA ae6c90b891ec80338c9c96446d735b03e1985d8a: current-head FLUX.2 Klein→TRELLIS.2 live A100 PASS in run 39646903815 (GLB 193,544 B; SHA-256 94daca421e06e191ae5fd7d10da20cf89808ea187c14d338f8a1628bfd08bd66; mesh reopened); Asset Factory contracts 39646903793 PASS; static/storage 39646903775 PASS (154 tests across 19 unittest invocations, four notebook JSON checks). Canonical A100 root sync 39646903801 was safety-blocked by active OEC inference/queue process; local canonical root sync is unverified. Historical all-provider inference and joined QA/upload/read-back remain evidence for older SHA 0c53f6a46328bc4ba6ce4d0942556e3077ea6d74/run 39435100568, not exact-head proof. Encryption/private-key round-trip not verified by that old byte-readback job; use new verifier with an already-encrypted object and the actual local decryptor.",
+  "latest_summary": "Read-only GitHub audit dated 2026-10-25: current feature head a8c5247c891b4bd997954453944c71bfe3d9ddb5. Exact-head static/storage regressions passed 154 tests across 19 invocations (run 39856646717); encrypted-HF verifier offline unit tests passed 6/6 (run 39856646893). Last live FLUX.2 Klein→TRELLIS.2 A100 acceptance remains on older SHA ae6c90b891ec80338c9c96446d735b03e1985d8a (run 39646903815; GLB 193544 bytes, SHA-256 94daca421e06e191ae5fd7d10da20cf89808ea187c14d338f8a1628bfd08bd66; 2886 vertices / 4752 faces). Current-head canonical sync run 39856646719 was cancelled before its sync job ran; previous run 39646903801 failed closed after detecting active OEC inference/queue work. Current canonical checkout, live process/queue state, and current-head inference remain unverified. Historical experiments are retained as originally recorded; this audit ran no tests or inference.",
   "experiments": [
     {
       "id": "EXP-2026-10-21-OEC-FLUX-TRELLIS-LIVE-VERIFICATION",
