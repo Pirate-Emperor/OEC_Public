@@ -10,6 +10,7 @@ on:
       - "pipeline_audiogen_gradio.ipynb"
       - "pipeline_acestep_gradio.ipynb"
       - "pipeline_flux_only.ipynb"
+      - "pipeline_trellis_3d.ipynb"
       - "pipeline_audiogen.py"
       - "pipeline_flux_image.py"
       - "tools/run_audiogen_notebook_smoke.py"
