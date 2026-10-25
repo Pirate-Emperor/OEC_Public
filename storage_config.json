@@ -12,7 +12,7 @@
     "directories": [
         {
             "name": "models",
-            "target_allocation_gb": 280,
+            "target_allocation_gb": 230,
             "reserve_target_gb": 5,
             "minimum_reserve_gb": 1
         },
