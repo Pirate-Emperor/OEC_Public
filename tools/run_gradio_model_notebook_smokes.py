@@ -22,6 +22,7 @@ if str(ROOT) not in sys.path:
 
 NOTEBOOKS = {
     "audiogen": ("pipeline_audiogen_gradio.ipynb", "phase1", "generate_sound_effect"),
+    "flux": ("pipeline_flux_only.ipynb", "phase2_3d", "generate_flux"),
     "musicgen": ("pipeline_musicgen_gradio.ipynb", "phase1", "generate_music"),
     "ace-step": ("pipeline_acestep_gradio.ipynb", "phase2_3d", "generate_music"),
     "kokoro": ("pipeline_kokoro_gradio.ipynb", "phase2_3d", "synthesize_speech"),
@@ -29,6 +30,7 @@ NOTEBOOKS = {
     "qwen3-asr": ("pipeline_qwen3_asr_gradio.ipynb", "phase2_3d", "transcribe_audio"),
 }
 AUDIO_PROVIDERS = {"audiogen", "musicgen", "ace-step", "kokoro"}
+IMAGE_PROVIDERS = {"flux"}
 ASR_PROVIDERS = {"whisper", "qwen3-asr"}
 
 
@@ -112,6 +114,11 @@ def invoke_via_gradio_client(provider: str, ui_url: str, audio_file: Path | None
     from gradio_client import Client, handle_file
 
     client = Client(ui_url, verbose=True)
+    if provider == "flux":
+        return client.predict(
+            "A photorealistic amber glass sphere on a clean studio background", 42, 512, 512, 4, 1.0,
+            fn_index=0
+        )
     if provider == "audiogen":
         return client.predict(
             "Short OEC acceptance sound: soft rain with distant thunder", 3, 42,
@@ -173,7 +180,7 @@ def main() -> int:
         "expected_ui_environment": expected_env,
         "python_executable": sys.executable,
         "python_prefix": sys.prefix,
-        "media_api_url": os.environ.get("OEC_MEDIA_API_URL") if provider not in {"audiogen", "musicgen"} else None,
+        "media_api_url": os.environ.get("OEC_MEDIA_API_URL") if provider != "musicgen" else None,
         "started_unix": time.time(),
         "status": "FAIL",
     }
@@ -227,6 +234,22 @@ def main() -> int:
                 raise RuntimeError("WAV header validation failed")
             if source.suffix.lower() in {".flac", ".fla"} and header[:4] != b"fLaC":
                 raise RuntimeError("FLAC signature validation failed")
+            import soundfile as sf
+            import numpy as np
+            audio_info = sf.info(str(source))
+            samples, sample_rate = sf.read(str(source), dtype="float32", always_2d=True)
+            peak = float(np.max(np.abs(samples))) if samples.size else 0.0
+            rms = float(np.sqrt(np.mean(np.square(samples)))) if samples.size else 0.0
+            if audio_info.frames <= 0 or sample_rate <= 0 or audio_info.channels <= 0:
+                raise RuntimeError("audio decoder reported invalid stream metadata")
+            if not np.isfinite(samples).all() or peak < 1e-6 or rms < 1e-7:
+                raise RuntimeError(f"generated audio is silent/invalid: peak={peak:.8g}, rms={rms:.8g}")
+            result["audio_validation"] = {
+                "format": audio_info.format, "subtype": audio_info.subtype,
+                "sample_rate_hz": int(sample_rate), "channels": int(audio_info.channels),
+                "duration_seconds": round(float(audio_info.duration), 4),
+                "peak_amplitude": peak, "rms_amplitude": rms,
+            }
             destination = report_dir / f"{provider}-gradio-callback-artifact{source.suffix.lower()}"
             if source.resolve() != destination.resolve():
                 shutil.copy2(source, destination)
@@ -255,6 +278,29 @@ def main() -> int:
                     source.with_suffix(".info.json").unlink(missing_ok=True)
                 except OSError:
                     pass
+        elif provider in IMAGE_PROVIDERS:
+            source = _output_path(output)
+            if not source.is_file() or source.stat().st_size <= 64:
+                raise RuntimeError(f"callback did not generate a non-empty image artifact: {source}")
+            if source.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
+                raise RuntimeError("FLUX result does not have a valid PNG signature")
+            from PIL import Image
+            with Image.open(source) as check:
+                check.verify()
+            with Image.open(source) as check:
+                width, height = check.size
+            if width <= 0 or height <= 0:
+                raise RuntimeError(f"invalid PNG dimensions: {width}x{height}")
+            destination = report_dir / "flux-gradio-callback-artifact.png"
+            if source.resolve() != destination.resolve():
+                shutil.copy2(source, destination)
+            result["artifact_path"] = str(destination)
+            result["artifact_bytes"] = destination.stat().st_size
+            result["artifact_sha256"] = sha256_file(destination)
+            result["image_validation"] = {"format": "PNG", "width": width, "height": height}
+            result_root = Path("/tmp/oec-notebook-results").resolve()
+            if result_root in source.parents and source.name.startswith("job_"):
+                source.unlink(missing_ok=True)
         else:
             transcript = str(output).strip()
             if len(transcript) < 5:
