@@ -1,0 +1,309 @@
+name: OEC targeted model notebook acceptance
+run-name: "AudioGen, ACE-Step and FLUX notebook acceptance"
+
+on:
+  push:
+    branches:
+      - fix/media-stack-supervision-20261019
+    paths:
+      - "pipeline_audiocraft.ipynb"
+      - "pipeline_audiogen_gradio.ipynb"
+      - "pipeline_acestep_gradio.ipynb"
+      - "pipeline_flux_only.ipynb"
+      - "pipeline_audiogen.py"
+      - "pipeline_flux_image.py"
+      - "tools/run_audiogen_notebook_smoke.py"
+      - "tools/run_gradio_model_notebook_smokes.py"
+      - "tools/run_media_model_smokes.py"
+      - "tools/prepare_media_models.py"
+      - "tools/prepare_ace_step_runtime.py"
+      - "tools/prepare_flux_cache.py"
+      - "tools/media_services/audio_api.py"
+      - "tools/media_services/audiocraft_api.py"
+      - "tools/media_services/flux_api.py"
+      - "tools/oec_service_manager.py"
+      - "tests/test_audiocraft_notebook_static.py"
+      - "tests/test_gradio_model_notebooks.py"
+      - "tests/test_flux_image_pipeline.py"
+      - "tests/test_oec_service_manager_media.py"
+      - "tests/test_prepare_flux_cache.py"
+      - "tests/test_storage_write_admission.py"
+      - "tests/test_trellis_notebook_static.py"
+      - ".github/workflows/oec-demo-notebook-acceptance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-media-gpu-storage-serial
+  cancel-in-progress: false
+
+jobs:
+  acceptance:
+    name: Run full notebooks and real model-server Gradio callbacks
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    timeout-minutes: 300
+    defaults:
+      run:
+        shell: bash
+    env:
+      OEC_ACCEPTANCE_ROOT: ${RUNNER_TEMP}/oec-demo-notebook-acceptance-${GITHUB_RUN_ID}
+      CONDA_EXE: ${HOME}/Conda/condabin/conda
+    steps:
+      - name: Checkout exact candidate source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate assigned runner and load live StorageManager configuration
+        id: preflight
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-2"
+          test -x "$CONDA_EXE"
+          test -f "$HOME/OEC/storage_config.json"
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          mkdir -p "$OEC_ACCEPTANCE_ROOT"
+          printf 'RUNNER=%s\nHOST=%s\nCOMMIT=%s\n' "$RUNNER_NAME" "$(hostname)" "$GITHUB_SHA" | tee "$OEC_ACCEPTANCE_ROOT/runner.txt"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/storage-before.log"
+          nvidia-smi | tee "$OEC_ACCEPTANCE_ROOT/nvidia-smi-before.txt"
+
+      - name: Compile code and run static contracts in each intended environment
+        id: contracts
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m py_compile \
+            tools/oec_service_manager.py tools/media_services/flux_api.py tools/prepare_flux_cache.py \
+            tools/run_gradio_model_notebook_smokes.py tools/run_media_model_smokes.py \
+            tests/test_gradio_model_notebooks.py tests/test_flux_image_pipeline.py \
+            tests/test_oec_service_manager_media.py tests/test_prepare_flux_cache.py \
+            tests/test_storage_write_admission.py tests/test_trellis_notebook_static.py
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_gradio_model_notebooks.py' -v
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_flux_image_pipeline.py' -v
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_oec_service_manager_media.py' -v
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_prepare_flux_cache.py' -v
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_storage_write_admission.py' -v
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_trellis_notebook_static.py' -v
+          "$CONDA_EXE" run --no-capture-output -n phase1 python -m unittest discover -s tests -p 'test_audiocraft_notebook_static.py' -v
+
+      - name: Execute AudioCraft notebook top-to-bottom and generate a WAV
+        id: audiogen_full_notebook
+        continue-on-error: true
+        env:
+          OEC_AUDIOGEN_HEADLESS_SMOKE: "1"
+          OEC_AUDIOGEN_SMOKE_DIR: ${RUNNER_TEMP}/oec-demo-notebook-acceptance-${GITHUB_RUN_ID}/audiogen-full-notebook
+          GRADIO_ANALYTICS_ENABLED: "False"
+        run: |
+          set -euo pipefail
+          mkdir -p "$OEC_AUDIOGEN_SMOKE_DIR"
+          timeout --signal=INT --kill-after=20s 1800s "$CONDA_EXE" run --no-capture-output -n phase1 \
+            python tools/run_audiogen_notebook_smoke.py 2>&1 | tee "$OEC_AUDIOGEN_SMOKE_DIR/notebook-execution.log"
+
+      - name: Start the AudioGen server on an admitted idle A100
+        id: audiogen_start
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/audiogen-gradio"
+          mkdir -p "$R"
+          GPU="$("$CONDA_EXE" run --no-capture-output -n phase2_3d python -c 'from oec_gpu_admission import select_idle_a100_gpu; print(select_idle_a100_gpu(caller="AUDIOGEN_NOTEBOOK_ACCEPTANCE")["index"])' | tail -n 1)"
+          echo "AUDIOGEN_PHYSICAL_GPU=$GPU" | tee "$R/gpu.txt"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py start audiocraft-api \
+            --provider audiogen --gpu "$GPU" --port 7874 --allow-download --accept-noncommercial-license 2>&1 | tee "$R/service-start.log"
+
+      - name: Wait for AudioGen model server readiness
+        id: audiogen_health
+        if: always() && steps.audiogen_start.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/audiogen-gradio"
+          HEALTH_CODE='import json,urllib.request; op=urllib.request.build_opener(urllib.request.ProxyHandler({})); h=json.load(op.open("http://127.0.0.1:7874/health",timeout=3)); assert h.get("ready") and h.get("model_loaded"),h; print(json.dumps(h))'
+          ready=0
+          for _ in $(seq 1 240); do
+            if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
+            sleep 5
+          done
+          cat "$R/health-check.log"
+          test "$ready" -eq 1
+
+      - name: Launch AudioGen Gradio UI and submit a real server inference
+        id: audiogen_gradio
+        if: always() && steps.audiogen_health.outcome == 'success'
+        continue-on-error: true
+        env:
+          OEC_MEDIA_API_URL: "http://127.0.0.1:7874"
+          OEC_GRADIO_HEADLESS_SMOKE: "1"
+          GRADIO_ANALYTICS_ENABLED: "False"
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/audiogen-gradio"
+          mkdir -p "$R"
+          timeout --signal=INT --kill-after=20s 1800s "$CONDA_EXE" run --no-capture-output -n phase1 \
+            python tools/run_gradio_model_notebook_smokes.py --provider audiogen --report-dir "$R" 2>&1 | tee "$R/gradio-callback.log"
+
+      - name: Stop the managed AudioGen service
+        if: always()
+        run: |
+          set +e
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py logs audiocraft-api --tail 100 >"$OEC_ACCEPTANCE_ROOT/audiogen-gradio/service-final.log" 2>&1
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py stop audiocraft-api --grace-seconds 25 >>"$OEC_ACCEPTANCE_ROOT/audiogen-gradio/service-final.log" 2>&1
+          exit 0
+
+      - name: Prepare ACE-Step checkpoints and isolated runtime
+        id: ace_prepare
+        if: always()
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/ace-step"
+          mkdir -p "$R"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-before.log"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/prepare_media_models.py download --model ace-step-main 2>&1 | tee "$R/prepare-main.log"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/prepare_media_models.py download --model ace-step-lm-0.6b 2>&1 | tee "$R/prepare-lm.log"
+          ACE_BASE_PYTHON=""
+          for candidate in \
+            "$HOME/Conda/envs/oec_deploy/bin/python" \
+            "$HOME/Conda/envs/phase1_ltx/bin/python" \
+            "$HOME/Conda/envs/phase2_3d/bin/python" \
+            "$HOME/Conda/envs/phase1/bin/python"; do
+            [[ -x "$candidate" ]] || continue
+            version="$("$candidate" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || true)"
+            case "$version" in
+              3.11|3.12) ACE_BASE_PYTHON="$candidate"; echo "ACE_STEP_BOOTSTRAP_PYTHON=$candidate" | tee -a "$R/runtime-setup.log"; break ;;
+            esac
+          done
+          test -n "$ACE_BASE_PYTHON"
+          "$ACE_BASE_PYTHON" tools/prepare_ace_step_runtime.py ensure 2>&1 | tee "$R/runtime-setup.log"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-after-prepare.log"
+
+      - name: Run ACE-Step isolated server and Gradio callback acceptance
+        id: ace_gradio
+        if: always() && steps.ace_prepare.outcome == 'success'
+        continue-on-error: true
+        env:
+          GRADIO_ANALYTICS_ENABLED: "False"
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/ace-step"
+          mkdir -p "$R"
+          timeout --signal=INT --kill-after=30s 3600s "$CONDA_EXE" run --no-capture-output -n phase2_3d \
+            python tools/run_media_model_smokes.py --providers ace-step --check-gradio-notebooks --require-pass 2>&1 | tee "$R/ace-step-gradio-acceptance.log"
+          test -f "$RUNNER_TEMP/oec-media-smoke-logs/ace-step-gradio-notebook-smoke.json"
+          cp "$RUNNER_TEMP/oec-media-smoke-logs/ace-step-gradio-notebook-smoke.json" "$R/ace-step-gradio-notebook-smoke.json"
+
+      - name: Prepare FLUX cache through StorageManager admission
+        id: flux_cache_prepare
+        if: always()
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/flux"
+          mkdir -p "$R"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-before.log"
+          timeout --signal=INT --kill-after=30s 1800s "$CONDA_EXE" run --no-capture-output -n phase2_3d \
+            python tools/prepare_flux_cache.py --allow-download 2>&1 | tee "$R/flux-cache-preparation.log"
+
+      - name: Start the FLUX model server on an admitted idle A100
+        id: flux_start
+        if: always()
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/flux"
+          mkdir -p "$R"
+          GPU="$("$CONDA_EXE" run --no-capture-output -n phase2_3d python -c 'from oec_gpu_admission import select_idle_a100_gpu; print(select_idle_a100_gpu(caller="FLUX_NOTEBOOK_ACCEPTANCE")["index"])' | tail -n 1)"
+          echo "FLUX_PHYSICAL_GPU=$GPU" | tee "$R/gpu.txt"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py start flux-api \
+            --gpu "$GPU" --port 7867 --allow-download 2>&1 | tee "$R/service-start.log"
+
+      - name: Wait for FLUX model server readiness
+        id: flux_health
+        if: always() && steps.flux_start.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/flux"
+          HEALTH_CODE='import json,urllib.request; op=urllib.request.build_opener(urllib.request.ProxyHandler({})); h=json.load(op.open("http://127.0.0.1:7867/health",timeout=3)); assert h.get("ready") and h.get("model_loaded"),h; print(json.dumps(h))'
+          ready=0
+          for _ in $(seq 1 240); do
+            if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
+            sleep 5
+          done
+          cat "$R/health-check.log"
+          test "$ready" -eq 1
+
+      - name: Launch FLUX Gradio UI and generate a real PNG through the model server
+        id: flux_gradio
+        if: always() && steps.flux_health.outcome == 'success'
+        continue-on-error: true
+        env:
+          OEC_MEDIA_API_URL: "http://127.0.0.1:7867"
+          OEC_GRADIO_HEADLESS_SMOKE: "1"
+          GRADIO_ANALYTICS_ENABLED: "False"
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/flux"
+          mkdir -p "$R"
+          timeout --signal=INT --kill-after=30s 2400s "$CONDA_EXE" run --no-capture-output -n phase2_3d \
+            python tools/run_gradio_model_notebook_smokes.py --provider flux --report-dir "$R" 2>&1 | tee "$R/flux-gradio-callback.log"
+
+      - name: Stop the managed FLUX service and record final storage status
+        if: always()
+        run: |
+          set +e
+          R="$OEC_ACCEPTANCE_ROOT/flux"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py logs flux-api --tail 100 >"$R/service-final.log" 2>&1
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py stop flux-api --grace-seconds 25 >>"$R/service-final.log" 2>&1
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status >"$R/storage-after.log" 2>&1
+          exit 0
+
+      - name: Capture final OEC storage and GPU state
+        if: always()
+        run: |
+          set +e
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status >"$OEC_ACCEPTANCE_ROOT/storage-after.log" 2>&1
+          nvidia-smi >"$OEC_ACCEPTANCE_ROOT/nvidia-smi-after.txt" 2>&1
+          exit 0
+
+      - name: Upload model outputs, metadata, traces, and storage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-targeted-model-notebook-acceptance-${{ github.run_id }}
+          path: ${{ runner.temp }}/oec-demo-notebook-acceptance-${{ github.run_id }}/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Require every model acceptance stage to pass
+        if: always()
+        env:
+          CONTRACTS_OUTCOME: ${{ steps.contracts.outcome }}
+          AUDIOGEN_NOTEBOOK_OUTCOME: ${{ steps.audiogen_full_notebook.outcome }}
+          AUDIOGEN_START_OUTCOME: ${{ steps.audiogen_start.outcome }}
+          AUDIOGEN_HEALTH_OUTCOME: ${{ steps.audiogen_health.outcome }}
+          AUDIOGEN_GRADIO_OUTCOME: ${{ steps.audiogen_gradio.outcome }}
+          ACE_PREPARE_OUTCOME: ${{ steps.ace_prepare.outcome }}
+          ACE_GRADIO_OUTCOME: ${{ steps.ace_gradio.outcome }}
+          FLUX_CACHE_OUTCOME: ${{ steps.flux_cache_prepare.outcome }}
+          FLUX_START_OUTCOME: ${{ steps.flux_start.outcome }}
+          FLUX_HEALTH_OUTCOME: ${{ steps.flux_health.outcome }}
+          FLUX_GRADIO_OUTCOME: ${{ steps.flux_gradio.outcome }}
+        run: |
+          set -euo pipefail
+          printf 'CONTRACTS_OUTCOME=%s\n' "$CONTRACTS_OUTCOME"
+          printf 'AUDIOGEN_NOTEBOOK_OUTCOME=%s\n' "$AUDIOGEN_NOTEBOOK_OUTCOME"
+          printf 'AUDIOGEN_START_OUTCOME=%s\n' "$AUDIOGEN_START_OUTCOME"
+          printf 'AUDIOGEN_HEALTH_OUTCOME=%s\n' "$AUDIOGEN_HEALTH_OUTCOME"
+          printf 'AUDIOGEN_GRADIO_OUTCOME=%s\n' "$AUDIOGEN_GRADIO_OUTCOME"
+          printf 'ACE_PREPARE_OUTCOME=%s\n' "$ACE_PREPARE_OUTCOME"
+          printf 'ACE_GRADIO_OUTCOME=%s\n' "$ACE_GRADIO_OUTCOME"
+          printf 'FLUX_CACHE_OUTCOME=%s\n' "$FLUX_CACHE_OUTCOME"
+          printf 'FLUX_START_OUTCOME=%s\n' "$FLUX_START_OUTCOME"
+          printf 'FLUX_HEALTH_OUTCOME=%s\n' "$FLUX_HEALTH_OUTCOME"
+          printf 'FLUX_GRADIO_OUTCOME=%s\n' "$FLUX_GRADIO_OUTCOME"
+          for outcome in "$CONTRACTS_OUTCOME" "$AUDIOGEN_NOTEBOOK_OUTCOME" "$AUDIOGEN_START_OUTCOME" "$AUDIOGEN_HEALTH_OUTCOME" "$AUDIOGEN_GRADIO_OUTCOME" "$ACE_PREPARE_OUTCOME" "$ACE_GRADIO_OUTCOME" "$FLUX_CACHE_OUTCOME" "$FLUX_START_OUTCOME" "$FLUX_HEALTH_OUTCOME" "$FLUX_GRADIO_OUTCOME"; do
+            test "$outcome" = "success"
+          done
