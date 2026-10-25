@@ -253,6 +253,20 @@ jobs:
           timeout --signal=INT --kill-after=30s 2400s "$CONDA_EXE" run --no-capture-output -n phase2_3d \
             python tools/run_gradio_model_notebook_smokes.py --provider flux --report-dir "$R" 2>&1 | tee "$R/flux-gradio-callback.log"
 
+      - name: Launch combined notebook FLUX Gradio cell against the live server
+        id: flux_combined_gradio
+        if: always() && steps.flux_health.outcome == 'success'
+        continue-on-error: true
+        env:
+          OEC_FLUX_API_URL: "http://127.0.0.1:7867"
+          OEC_GRADIO_HEADLESS_SMOKE: "1"
+          GRADIO_ANALYTICS_ENABLED: "False"
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/flux"
+          mkdir -p "$R"
+          timeout --signal=INT --kill-after=30s 2400s "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/run_gradio_model_notebook_smokes.py --provider flux-combined --report-dir "$R" 2>&1 | tee "$R/flux-combined-gradio-callback.log"
+
       - name: Stop the managed FLUX service and record final storage status
         if: always()
         run: |
@@ -295,6 +309,7 @@ jobs:
           FLUX_START_OUTCOME: ${{ steps.flux_start.outcome }}
           FLUX_HEALTH_OUTCOME: ${{ steps.flux_health.outcome }}
           FLUX_GRADIO_OUTCOME: ${{ steps.flux_gradio.outcome }}
+          FLUX_COMBINED_GRADIO_OUTCOME: ${{ steps.flux_combined_gradio.outcome }}
         run: |
           set -euo pipefail
           printf 'CONTRACTS_OUTCOME=%s\n' "$CONTRACTS_OUTCOME"
@@ -308,6 +323,7 @@ jobs:
           printf 'FLUX_START_OUTCOME=%s\n' "$FLUX_START_OUTCOME"
           printf 'FLUX_HEALTH_OUTCOME=%s\n' "$FLUX_HEALTH_OUTCOME"
           printf 'FLUX_GRADIO_OUTCOME=%s\n' "$FLUX_GRADIO_OUTCOME"
-          for outcome in "$CONTRACTS_OUTCOME" "$AUDIOGEN_NOTEBOOK_OUTCOME" "$AUDIOGEN_START_OUTCOME" "$AUDIOGEN_HEALTH_OUTCOME" "$AUDIOGEN_GRADIO_OUTCOME" "$ACE_PREPARE_OUTCOME" "$ACE_GRADIO_OUTCOME" "$FLUX_CACHE_OUTCOME" "$FLUX_START_OUTCOME" "$FLUX_HEALTH_OUTCOME" "$FLUX_GRADIO_OUTCOME"; do
+          printf 'FLUX_COMBINED_GRADIO_OUTCOME=%s\n' "$FLUX_COMBINED_GRADIO_OUTCOME"
+          for outcome in "$CONTRACTS_OUTCOME" "$AUDIOGEN_NOTEBOOK_OUTCOME" "$AUDIOGEN_START_OUTCOME" "$AUDIOGEN_HEALTH_OUTCOME" "$AUDIOGEN_GRADIO_OUTCOME" "$ACE_PREPARE_OUTCOME" "$ACE_GRADIO_OUTCOME" "$FLUX_CACHE_OUTCOME" "$FLUX_START_OUTCOME" "$FLUX_HEALTH_OUTCOME" "$FLUX_GRADIO_OUTCOME" "$FLUX_COMBINED_GRADIO_OUTCOME"; do
             test "$outcome" = "success"
           done
