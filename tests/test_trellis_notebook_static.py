@@ -124,7 +124,7 @@ class TrellisNotebookStaticTests(unittest.TestCase):
     def test_setup_markdown_is_not_duplicate_or_misjoined(self):
         setup_markdown = "\\n".join(
             source for source in self.combined if source.startswith("# Step 1: TRELLIS.2 (Setup)")
-            or source.startswith("# Step 2: FLUX.2 (Setup)")
+            or source.startswith("# Step 2: FLUX.2")
         )
         self.assertIn("Prepare TRELLIS.2 Python and native dependencies.", setup_markdown)
         self.assertIn("restart the kernel before continuing", setup_markdown.lower())
