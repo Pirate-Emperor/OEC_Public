@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
 NOTEBOOKS = {
     "audiogen": ("pipeline_audiogen_gradio.ipynb", "phase1", "generate_sound_effect"),
     "flux": ("pipeline_flux_only.ipynb", "phase2_3d", "generate_flux"),
+    "flux-combined": ("pipeline_trellis_3d.ipynb", "phase2_3d", "generate_concept"),
     "musicgen": ("pipeline_musicgen_gradio.ipynb", "phase1", "generate_music"),
     "ace-step": ("pipeline_acestep_gradio.ipynb", "phase2_3d", "generate_music"),
     "kokoro": ("pipeline_kokoro_gradio.ipynb", "phase2_3d", "synthesize_speech"),
@@ -30,7 +31,9 @@ NOTEBOOKS = {
     "qwen3-asr": ("pipeline_qwen3_asr_gradio.ipynb", "phase2_3d", "transcribe_audio"),
 }
 AUDIO_PROVIDERS = {"audiogen", "musicgen", "ace-step", "kokoro"}
-IMAGE_PROVIDERS = {"flux"}
+IMAGE_PROVIDERS = {"flux", "flux-combined"}
+NOTEBOOK_CELL_SELECTION = {"flux-combined": {8, 12}}
+DEMO_VARIABLES = {"flux-combined": "demo_flux"}
 ASR_PROVIDERS = {"whisper", "qwen3-asr"}
 
 
@@ -89,7 +92,7 @@ def wait_for_ui(url: str, timeout: float = 20.0) -> tuple[int, str]:
     raise TimeoutError(f"Gradio UI did not return HTTP 200 HTML: {last_error}")
 
 
-def execute_notebook(path: Path) -> dict:
+def execute_notebook(path: Path, *, code_cell_indexes: set[int] | None = None, demo_name: str = "demo") -> dict:
     document = json.loads(path.read_text(encoding="utf-8"))
     if document.get("nbformat") != 4 or not isinstance(document.get("cells"), list):
         raise ValueError(f"invalid notebook structure: {path}")
@@ -98,14 +101,16 @@ def execute_notebook(path: Path) -> dict:
     for index, cell in enumerate(document["cells"]):
         if cell.get("cell_type") != "code":
             continue
+        if code_cell_indexes is not None and index not in code_cell_indexes:
+            continue
         source = "".join(cell.get("source", []))
         if not source.strip():
             continue
         compiled = compile(source, f"{path.name}:cell-{index}", "exec")
         exec(compiled, scope, scope)
         code_cells += 1
-    if "demo" not in scope:
-        raise RuntimeError(f"{path.name} did not construct a Gradio Interface")
+    if demo_name not in scope:
+        raise RuntimeError(f"{path.name} did not construct the expected Gradio app {demo_name!r}")
     return {"scope": scope, "code_cells": code_cells}
 
 
@@ -117,6 +122,11 @@ def invoke_via_gradio_client(provider: str, ui_url: str, audio_file: Path | None
     if provider == "flux":
         return client.predict(
             "A photorealistic amber glass sphere on a clean studio background", 42, 512, 512, 4, 1.0,
+            fn_index=0
+        )
+    if provider == "flux-combined":
+        return client.predict(
+            "A photorealistic amber glass sphere on a clean studio background", 42, False,
             fn_index=0
         )
     if provider == "audiogen":
@@ -180,7 +190,10 @@ def main() -> int:
         "expected_ui_environment": expected_env,
         "python_executable": sys.executable,
         "python_prefix": sys.prefix,
-        "media_api_url": os.environ.get("OEC_MEDIA_API_URL") if provider != "musicgen" else None,
+        "media_api_url": (
+            os.environ.get("OEC_FLUX_API_URL") if provider == "flux-combined"
+            else os.environ.get("OEC_MEDIA_API_URL") if provider != "musicgen" else None
+        ),
         "started_unix": time.time(),
         "status": "FAIL",
     }
@@ -197,9 +210,15 @@ def main() -> int:
     try:
         if not notebook_path.is_file():
             raise FileNotFoundError(f"notebook missing: {notebook_path}")
-        executed = execute_notebook(notebook_path)
+        if provider == "flux-combined" and not os.environ.get("OEC_FLUX_API_URL"):
+            os.environ["OEC_FLUX_API_URL"] = os.environ.get("OEC_MEDIA_API_URL", "http://127.0.0.1:7867")
+        executed = execute_notebook(
+            notebook_path,
+            code_cell_indexes=NOTEBOOK_CELL_SELECTION.get(provider),
+            demo_name=DEMO_VARIABLES.get(provider, "demo"),
+        )
         scope = executed["scope"]
-        demo = scope["demo"]
+        demo = scope[DEMO_VARIABLES.get(provider, "demo")]
         result["code_cells_executed"] = executed["code_cells"]
         result["gradio_version"] = importlib.metadata.version("gradio")
         result["callback_name"] = callback_name
@@ -219,9 +238,13 @@ def main() -> int:
         raw_output = invoke_via_gradio_client(
             provider, ui_url, args.audio_file.expanduser().resolve() if args.audio_file else None
         )
-        if not isinstance(raw_output, (tuple, list)) or len(raw_output) != 2:
-            raise RuntimeError(f"Gradio /predict returned an unexpected result shape: {type(raw_output).__name__}")
-        output, details = raw_output
+        expected_outputs = 3 if provider == "flux-combined" else 2
+        if not isinstance(raw_output, (tuple, list)) or len(raw_output) != expected_outputs:
+            actual_shape = len(raw_output) if isinstance(raw_output, (tuple, list)) else type(raw_output).__name__
+            raise RuntimeError(
+                f"Gradio /predict returned an unexpected result shape: expected {expected_outputs}, got {actual_shape}"
+            )
+        output, details = raw_output[0], raw_output[-1]
         result["callback"] = "PASS"
         result["callback_transport"] = "gradio_client HTTP/event API /predict"
         result["details"] = str(details)[:10000]
@@ -291,7 +314,7 @@ def main() -> int:
                 width, height = check.size
             if width <= 0 or height <= 0:
                 raise RuntimeError(f"invalid PNG dimensions: {width}x{height}")
-            destination = report_dir / "flux-gradio-callback-artifact.png"
+            destination = report_dir / f"{provider}-gradio-callback-artifact.png"
             if source.resolve() != destination.resolve():
                 shutil.copy2(source, destination)
             result["artifact_path"] = str(destination)
