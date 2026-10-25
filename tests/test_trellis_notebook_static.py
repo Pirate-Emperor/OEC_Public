@@ -105,11 +105,12 @@ class TrellisNotebookStaticTests(unittest.TestCase):
 
     def test_combined_flux_uses_separate_model_server_without_dependency_mutation(self):
         setup = self.find(self.combined, "FLUX_SERVER_CLIENT_DEPENDENCIES=PASS")
-        self.assertIn('metadata.version("gradio")', setup)
-        self.assertIn('metadata.version("requests")', setup)
+        self.assertIn('for package in ("gradio", "requests", "Pillow")', setup)
+        self.assertIn("metadata.version(package)", setup)
         self.assertIn("Do not pip-install/upgrade Diffusers", setup)
         self.assertNotIn("diffusers==", setup)
-        self.assertNotIn("pip", setup.lower().split("print")[-1])
+        self.assertNotIn("subprocess", setup)
+        self.assertNotIn('"pip", "install"', setup)
         client = self.find(self.combined, "def flux_service_health")
         self.assertIn("127.0.0.1:7867", client)
         self.assertIn("/v1/jobs", client)
