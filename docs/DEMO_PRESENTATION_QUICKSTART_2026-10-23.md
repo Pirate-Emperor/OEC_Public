@@ -7,11 +7,11 @@ Research demonstration runbook. Start from the canonical OEC root and run one GP
 Current inspected feature branch: fix/media-stack-supervision-20261019  
 Current inspected feature SHA: ae6c90b891ec80338c9c96446d735b03e1985d8a.
 
-- **Current-head real inference PASS:** [FLUX.2 Klein → TRELLIS.2](https://github.com/CalamityStriker/OEC/actions/runs/39646903815), job 119390662318, runner oec-1. FLUX generated a source PNG; TRELLIS generated a GLB v2. The logged GLB was 193,544 bytes, SHA-256 94daca421e06e191ae5fd7d10da20cf89808ea187c14d338f8a1628bfd08bd66; one mesh/primitive, 2,886 vertices, 4,752 faces; trimesh reopen passed. Artifact ID 12368677410.
-- **Current-head Asset Factory contract tests PASS:** [run 39646903793](https://github.com/CalamityStriker/OEC/actions/runs/39646903793), job 119384749626; logged suites of 8, 5 and 16 tests passed.
-- **Current-head static/notebook/storage tests PASS:** [run 39646903775](https://github.com/CalamityStriker/OEC/actions/runs/39646903775), job 119384750498; 154 tests across 19 unittest executions passed and four notebook JSON checks passed.
-- **Canonical A100 sync BLOCKED:** [run 39646903801](https://github.com/CalamityStriker/OEC/actions/runs/39646903801), job 119386595162. The safety guard found an active OEC inference/queue process and stopped with exit 17. Successful sync was not established.
-- **Historical live model suite PASS:** [run 39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568), 8/8 jobs, SHA 0c53f6a46328bc4ba6ce4d0942556e3077ea6d74. This is historical inference evidence, not current-HEAD proof for every model.
+- **Current-head real inference PASS:** [FLUX.2 Klein → TRELLIS.2](https://github.com/xflexwork/OEC/actions/runs/39646903815), job 119390662318, runner oec-1. FLUX generated a source PNG; TRELLIS generated a GLB v2. The logged GLB was 193,544 bytes, SHA-256 94daca421e06e191ae5fd7d10da20cf89808ea187c14d338f8a1628bfd08bd66; one mesh/primitive, 2,886 vertices, 4,752 faces; trimesh reopen passed. Artifact ID 12368677410.
+- **Current-head Asset Factory contract tests PASS:** [run 39646903793](https://github.com/xflexwork/OEC/actions/runs/39646903793), job 119384749626; logged suites of 8, 5 and 16 tests passed.
+- **Current-head static/notebook/storage tests PASS:** [run 39646903775](https://github.com/xflexwork/OEC/actions/runs/39646903775), job 119384750498; 154 tests across 19 unittest executions passed and four notebook JSON checks passed.
+- **Canonical A100 sync BLOCKED:** [run 39646903801](https://github.com/xflexwork/OEC/actions/runs/39646903801), job 119386595162. The safety guard found an active OEC inference/queue process and stopped with exit 17. Successful sync was not established.
+- **Historical live model suite PASS:** [run 39435100568](https://github.com/xflexwork/OEC/actions/runs/39435100568), 8/8 jobs, SHA 0c53f6a46328bc4ba6ce4d0942556e3077ea6d74. This is historical inference evidence, not current-HEAD proof for every model.
 
 ## Read-only preflight
 
@@ -164,10 +164,10 @@ The helper needs huggingface_hub in the selected Python environment and authenti
 ## Workflow artifacts
 
 ~~~bash
-gh run view 39646903815 --repo CalamityStriker/OEC
-gh run download 39646903815 --repo CalamityStriker/OEC --dir demo-evidence/current-flux-trellis
-gh run view 39435100568 --repo CalamityStriker/OEC
-gh run download 39435100568 --repo CalamityStriker/OEC --dir demo-evidence/historical-full-live
+gh run view 39646903815 --repo xflexwork/OEC
+gh run download 39646903815 --repo xflexwork/OEC --dir demo-evidence/current-flux-trellis
+gh run view 39435100568 --repo xflexwork/OEC
+gh run download 39435100568 --repo xflexwork/OEC --dir demo-evidence/historical-full-live
 ~~~
 
 ## Incomplete / not yet accepted on current HEAD

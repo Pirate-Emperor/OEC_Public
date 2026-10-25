@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-23T02:30:00+05:30",
+  "last_updated": "2026-10-26T00:25:20+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Verified current feature SHA ae6c90b891ec80338c9c96446d735b03e1985d8a: current-head FLUX.2 Klein→TRELLIS.2 live A100 PASS in run 39646903815 (GLB 193,544 B; SHA-256 94daca421e06e191ae5fd7d10da20cf89808ea187c14d338f8a1628bfd08bd66; mesh reopened); Asset Factory contracts 39646903793 PASS; static/storage 39646903775 PASS (154 tests across 19 unittest invocations, four notebook JSON checks). Canonical A100 root sync 39646903801 was safety-blocked by active OEC inference/queue process; local canonical root sync is unverified. Historical all-provider inference and joined QA/upload/read-back remain evidence for older SHA 0c53f6a46328bc4ba6ce4d0942556e3077ea6d74/run 39435100568, not exact-head proof. Encryption/private-key round-trip not verified by that old byte-readback job; use new verifier with an already-encrypted object and the actual local decryptor.",
+  "latest_summary": "2026-10-26 targeted model-cache purge PASS in Actions run 40223425738 on operations commit 9fe0a7e2f7348f8c3949e5226af1795799b5e839. Post-purge model_cache_manager status confirms FLUX.2 Klein (Hub and legacy), TRELLIS.2-4B, legacy TRELLIS-image-large, both LTX-2.3 paths, both Gemma-3 LTX-encoder paths, Qwen2-VL-7B legacy, AudioGen-medium and MusicGen-medium caches absent. StorageManager model-directory accounting fell 251.89 GB to 57.29 GB; group-quota hard headroom rose 51.76 GB to 143.53 GB and quota grace cleared. ACE-Step, Kokoro, Qwen3-ASR and Whisper Turbo were preserved due remote/unknown runtime locks on scn30-mn; unknown caches, source trees and protected reserve/lock files were not touched. No inference was run after cleanup.",
   "experiments": [
     {
       "id": "EXP-2026-10-21-OEC-FLUX-TRELLIS-LIVE-VERIFICATION",
@@ -104,9 +104,9 @@
         "commands": [
           "python -m unittest discover -s tests -p 'test_flux_trellis_pipeline.py' -v",
           "python tools/run_flux_pipeline_smoke.py --work-dir <non-existent-child-path> --report-dir <run-scoped-report> --width 512 --height 512 --steps 4",
-          "gh run view 39452849617 --repo CalamityStriker/OEC --log-failed",
-          "gh run view 39549368673 --repo CalamityStriker/OEC",
-          "gh run view 39549368702 --repo CalamityStriker/OEC"
+          "gh run view 39452849617 --repo xflexwork/OEC --log-failed",
+          "gh run view 39549368673 --repo xflexwork/OEC",
+          "gh run view 39549368702 --repo xflexwork/OEC"
         ],
         "environment": "GitHub repository/workflow editing and source inspection; no direct A100 shell, new model downloads or GPU inference were used.",
         "model_downloads": false,
@@ -142,8 +142,8 @@
         "joined_job_id": 118795638536,
         "fix_commit": "59689f57b172719cd9f3cd518fe6eb11f3f27973",
         "commands": [
-          "gh run view 39452849617 --repo CalamityStriker/OEC",
-          "gh run view 39452849617 --repo CalamityStriker/OEC --log-failed",
+          "gh run view 39452849617 --repo xflexwork/OEC",
+          "gh run view 39452849617 --repo xflexwork/OEC --log-failed",
           "python -m unittest discover -s tests -p 'test_flux_image_pipeline.py' -v",
           "python -m unittest discover -s tests -p 'test_flux_trellis_pipeline.py' -v"
         ],
@@ -220,7 +220,7 @@
       "parameters": {
         "run_id": 37942265623,
         "environment": "isolated scratch virtualenv; not shared phase2_3d",
-        "artifact": "https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623/artifacts/11622412194"
+        "artifact": "https://github.com/xflexwork/Connector_1/actions/runs/37942265623/artifacts/11622412194"
       },
       "results": {
         "marker": "TRELLIS_IMAGE_TO_3D_SMOKE=PASS",
@@ -257,7 +257,7 @@
         "total_tests_passed": 114,
         "total_tests_failed": 0
       },
-      "artifacts_and_logs": "https://github.com/Killer4K-N/Connector_1/actions/runs/38157725815",
+      "artifacts_and_logs": "https://github.com/xflexwork/Connector_1/actions/runs/38157725815",
       "limitations": [
         "Static/CPU-side tests only; no model inference or package installation."
       ]
@@ -558,12 +558,12 @@
           {
             "id": 38160673020,
             "source_sha": "a1c341bc5b9fbc397f98d7e754aa1cde68ae1493",
-            "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38160673020"
+            "url": "https://github.com/xflexwork/Connector_1/actions/runs/38160673020"
           },
           {
             "id": 38160777602,
             "source_sha": "337390e938d8b1c0bfa7f446fb7ed05e53edde67",
-            "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38160777602"
+            "url": "https://github.com/xflexwork/Connector_1/actions/runs/38160777602"
           }
         ],
         "target_files": [
@@ -632,7 +632,7 @@
       "reason": "Ensure the working tree has the project's current tracking contract and results, not only the model code, while maintaining the guarded sync boundary.",
       "parameters": {
         "run_id": 38160976083,
-        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38160976083",
+        "url": "https://github.com/xflexwork/Connector_1/actions/runs/38160976083",
         "source_sha": "70411afa152a862e4356cb09ccdc83cb1278b2fc",
         "runner_label": "connector-1",
         "tracking_log_experiments_at_run": 12,
@@ -661,7 +661,7 @@
       "reason": "The previous marker edit accidentally omitted its closing double quote. Catch script syntax regressions before entering snapshot/stage/copy operations.",
       "parameters": {
         "failed_run_id": 38161193474,
-        "failed_run_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38161193474",
+        "failed_run_url": "https://github.com/xflexwork/Connector_1/actions/runs/38161193474",
         "failed_orchestration_commit": "3a714828f00f8b596b96a5ff2fc9a8f3ec0ceb7a",
         "artifact_id": 11710901351,
         "artifact_file": "verification.log",
@@ -685,7 +685,7 @@
       "reason": "Prevent the previous missing quote in the trigger marker from stopping the sync before staging or copy.",
       "parameters": {
         "run_id": 38161408008,
-        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38161408008",
+        "url": "https://github.com/xflexwork/Connector_1/actions/runs/38161408008",
         "source_sha": "e7a470a0c0c0791e03daa6db369fc5bcaa5f5480",
         "script_fix_commit": "49a720b8f2429f0698759bbfc3bdf113a1717a4f",
         "bash_n_preflight_commit": "69cd5b02b317b82f6ecf4ea3a2f41e5a22c9ff21",
@@ -724,7 +724,7 @@
       "reason": "Validate that the missing-quote failure is fully resolved and that the requested tracking records exist in the live tree alongside the notebook and worker changes.",
       "parameters": {
         "run_id": 38161747478,
-        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38161747478",
+        "url": "https://github.com/xflexwork/Connector_1/actions/runs/38161747478",
         "source_sha": "141567d4a322261dd41c977f80b6b2f8314535b0",
         "runner": "connector-1",
         "bash_preflight": "bash -n tools/sync_trellis_and_audit_oec.sh",
@@ -763,7 +763,7 @@
       "approach": "Inspect the last live workflow log and official TRELLIS.2, xFormers, Diffusers and AudioCraft repositories. In an isolated Connector_1 branch, require fresh quota for every package/model write preflight; constrain CUDA-compatible xFormers and AudioCraft dependency repair to wheels; correct the QA Slurm GPU argument and ownership-sensitive retirement sequence; include the new daily changelog in explicit staging. Prepare this cumulative experiment record before running the remediation workflow.",
       "reason": "The prior action failed closed because no fresh quota snapshot existed, and code review found optional-quota calls in install/download helpers, an incomplete AudioCraft Thinc repair, and unsafe QA replacement timing/GPU selection. Fix the helper logic before retrying runtime setup.",
       "parameters": {
-        "connector_repository": "Killer4K-N/Connector_1",
+        "connector_repository": "xflexwork/Connector_1",
         "branch": "ops/runtime-remediation-20261012",
         "latest_helper_commit": "67e5f28d9fc5f496a866a7b9c3988b5b2221ad1c",
         "previous_audit_run_id": 38161901000,
@@ -815,11 +815,11 @@
       "objective": "Reconcile the latest baseline output in Connector_1 run 38175212786 with older xFormers and Diffusers/Hub import failures.",
       "reason": "Previous consolidated notes still described xformers.post1 and the Flux2 Klein import mismatch as the latest shared environment state, but the later action log contains a successful live baseline before the storage-admission gate.",
       "environment": {
-        "repository": "Killer4K-N/Connector_1",
+        "repository": "xflexwork/Connector_1",
         "branch": "ops/runtime-remediation-20261012",
         "run_id": 38175212786,
         "job_id": 114576061200,
-        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38175212786",
+        "url": "https://github.com/xflexwork/Connector_1/actions/runs/38175212786",
         "runner": "connector-1 / scn17-mn",
         "environment": "phase2_3d",
         "python": "3.10.20",
@@ -891,7 +891,7 @@
           "storage_config.json",
           "tools/runner_control.py"
         ],
-        "connector_repository": "Killer4K-N/Connector_1",
+        "connector_repository": "xflexwork/Connector_1",
         "connector_branch": "diagnose/oec-storage-telemetry-20261014",
         "connector_commit": "70d9000ba48cfdd6a6413276d7a4d4fe2888ad17",
         "runner": "connector-1 / scn17-mn",
@@ -900,10 +900,10 @@
       },
       "workflow": {
         "run_id": 38555689884,
-        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884",
+        "url": "https://github.com/xflexwork/Connector_1/actions/runs/38555689884",
         "job_id": 115824133792,
         "artifact_id": 11888967874,
-        "artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38555689884/artifacts/11888967874",
+        "artifact_url": "https://github.com/xflexwork/Connector_1/actions/runs/38555689884/artifacts/11888967874",
         "result": "SUCCESS",
         "checks": [
           "py_compile PASS",
@@ -1000,11 +1000,11 @@
       "objective": "Add a regression suite proving shared model and output writes require fresh quota and recheck policy inside the StorageManager lock.",
       "reason": "Source review found explicit require_fresh_quota=False calls, and managed_storage_operation() accepts quota parameters for compatibility but does not itself enforce a fresh snapshot.",
       "environment": {
-        "repository": "Killer4K-N/OEC",
+        "repository": "xflexwork/OEC",
         "branch": "fix/storage-admission-write-guards-20261014",
         "commit": "01327b02f67f254d1d3e980074b7466220a47794",
         "workflow_run_id": 38558509401,
-        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38558509401",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/38558509401",
         "job_id": 115833504283,
         "runner": "GitHub-hosted ubuntu-latest",
         "python": "3.11.17"
@@ -1032,11 +1032,11 @@
       "objective": "Attempt a single FLUX.2 Klein image generation without installing packages or downloading model files.",
       "reason": "The most recent phase2_3d baseline had a successful Flux2 Klein import and a local cache hit; a runtime generation smoke was the missing checkpoint.",
       "environment": {
-        "repository": "Killer4K-N/Connector_1",
+        "repository": "xflexwork/Connector_1",
         "branch": "diagnose/flux-cache-only-smoke-20261014",
         "commit": "c0f638a9959c2dc1f4988ce61e0c3176b636d4e9",
         "run_id": 38558972259,
-        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38558972259",
+        "url": "https://github.com/xflexwork/Connector_1/actions/runs/38558972259",
         "job_id": 115835024285,
         "runner": "connector-1 / scn17-mn",
         "python": "3.10.20",
@@ -1073,11 +1073,11 @@
       "objective": "Recheck cache-only FLUX inference with explicit read-only per-device GPU occupancy diagnostics and improved stage timing.",
       "reason": "The first safe preflight blocked before recording which condition prevented inference; the retry needed to disclose active compute presence without querying process owners or signaling processes.",
       "environment": {
-        "repository": "Killer4K-N/Connector_1",
+        "repository": "xflexwork/Connector_1",
         "branch": "diagnose/flux-cache-only-smoke-20261014",
         "commit": "a4a8492c80a2eff5bdc612866301d6fbe86ee2a6",
         "run_id": 38559255790,
-        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38559255790",
+        "url": "https://github.com/xflexwork/Connector_1/actions/runs/38559255790",
         "job_id": 115835971223,
         "runner": "connector-1 / scn17-mn",
         "python": "3.10.20",
@@ -1129,11 +1129,11 @@
       "objective": "Verify the quota-admission source guards and preserve the existing notebook/CLI regression guarantees after fixing the failures caught in the first run.",
       "reason": "Prevent notebook/CLI dependency or model writes from using filesystem-only admission on shared Lustre; verify under-lock checks because managed_storage_operation() is a lock/reserve coordinator and not a substitute for StoragePolicy preflight.",
       "environment": {
-        "repository": "Killer4K-N/OEC",
+        "repository": "xflexwork/OEC",
         "branch": "fix/storage-admission-write-guards-20261014",
         "commit": "4ade353d566bfeb525949f5f4c1905a1ae1e135c",
         "workflow_run_id": 38559330370,
-        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38559330370",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/38559330370",
         "job_id": 115836225568,
         "runner": "GitHub-hosted ubuntu-latest",
         "python": "3.11.17"
@@ -1184,11 +1184,11 @@
       "objective": "Confirm the committed changelog, TODO, results and cumulative test registry changes did not disturb the validated source candidate.",
       "reason": "A push to the source candidate branch automatically reran the isolated GitHub-hosted static validation workflow.",
       "environment": {
-        "repository": "Killer4K-N/OEC",
+        "repository": "xflexwork/OEC",
         "branch": "fix/storage-admission-write-guards-20261014",
         "commit": "dac91f09bc6cecd896e38213072fe19142d30390",
         "workflow_run_id": 38559861094,
-        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38559861094",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/38559861094",
         "job_id": 115837970246,
         "runner": "GitHub-hosted ubuntu-latest"
       },
@@ -1221,11 +1221,11 @@
       "objective": "Generate an actual image-to-3D asset from already-cached TRELLIS.2 weights on the shared phase2_3d environment without downloading weights or installing packages.",
       "reason": "Confirm a complete current image-to-GLB path, not merely imports or static test success, and distinguish a model/cache issue from the GPU scheduling prerequisite.",
       "environment": {
-        "repository": "Killer4K-N/Connector_1",
+        "repository": "xflexwork/Connector_1",
         "branch": "diagnose/trellis-asset-generation-20261014",
         "commit": "c5411612b482e43913e24e6e16decf80a07ac1d8",
         "workflow_run_id": 38571363231,
-        "workflow_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231",
+        "workflow_url": "https://github.com/xflexwork/Connector_1/actions/runs/38571363231",
         "job_id": 115877117266,
         "runner": "connector-1 / scn17-mn",
         "environment": "$HOME/Conda/envs/phase2_3d",
@@ -1237,7 +1237,7 @@
       "results": {
         "workflow_result": "FAIL_SAFE; stopped before importing torch or running inference",
         "report_artifact_id": 11897043384,
-        "report_download": "https://api.github.com/repos/Killer4K-N/Connector_1/actions/artifacts/11897043384/zip",
+        "report_download": "https://api.github.com/repos/xflexwork/Connector_1/actions/artifacts/11897043384/zip",
         "status": "BLOCKED_GPU_OCCUPANCY",
         "reason": "No idle GPU with at least 30000 MiB free; inference not started",
         "source_checkout": "PASS at /nlsasfs/home/lmedge/rahkus/aireos_models/TRELLIS.2",
@@ -1273,11 +1273,11 @@
       "reason": "The current shared-runner smoke was blocked before inference due GPU occupancy, but the prior successful TRELLIS Action still has its full diagnostic artifact and GLB.",
       "environment": {
         "original_workflow_run_id": 37942265623,
-        "original_workflow_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/37942265623",
+        "original_workflow_url": "https://github.com/xflexwork/Connector_1/actions/runs/37942265623",
         "original_job_id": 113859380847,
         "original_environment": "isolated TRELLIS smoke virtual environment on connector-1 / scn17-mn",
         "original_artifact_id": 11622412194,
-        "artifact_url": "https://api.github.com/repos/Killer4K-N/Connector_1/actions/artifacts/11622412194/zip",
+        "artifact_url": "https://api.github.com/repos/xflexwork/Connector_1/actions/artifacts/11622412194/zip",
         "recovered_file": "/mnt/data/TRELLIS2-historical-validated-asset.glb"
       },
       "approach": "Retrieve the previously successful Action artifact, extract the recorded test_100k.glb, then validate GLB magic/version/declared length, parse its JSON chunk, require mesh primitives with nonempty POSITION and index accessors, and reopen it with trimesh.",
@@ -1338,11 +1338,11 @@
       "objective": "Fix cache-root false negatives and avoid spending expensive inference time when output admission is already denied; validate exported assets rather than assuming generation means a valid file exists.",
       "reason": "Live diagnostics found cached FLUX weights in a different cache root than the combined notebook searched. TRELLIS cache snapshots may contain actual safetensor shards but lack root markers that the old status checks required. The CLI also ran inference before output admission.",
       "environment": {
-        "repository": "Killer4K-N/OEC",
+        "repository": "xflexwork/OEC",
         "branch": "fix/storage-admission-write-guards-20261014",
         "latest_source_commit": "f571f508fc693d2afd96c17544702d64a0c29c27",
         "latest_workflow_run_id": 38571665298,
-        "latest_workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38571665298"
+        "latest_workflow_url": "https://github.com/xflexwork/OEC/actions/runs/38571665298"
       },
       "approach": "For TRELLIS, try standard local Hugging Face resolution then search its configured cache for safetensors snapshots before declaring a miss. For the combined FLUX notebook, probe both aireos_models and aireos_models/hub. Add fresh-quota preflight before expensive inference, recheck inside the managed output-write lock, and verify expected GLB/PNG signatures; the CLI additionally parses the GLB JSON chunk and requires nonempty mesh position/index accessors.",
       "expected": "No explicit optional-quota bypasses; recognized cache hits are reused without downloading; blocked output admission prevents heavy inference; exported GLBs must have real mesh accessors.",
@@ -1381,11 +1381,11 @@
       "objective": "Inspect model cache, quota availability and GPU occupancy across registered runners.",
       "reason": "Earlier GPU smokes were blocked; check alternate runners without interrupting workloads.",
       "environment": {
-        "repository": "Killer4K-N/Connector_1",
+        "repository": "xflexwork/Connector_1",
         "branch": "diagnose/oec-runtime-capacity-matrix-20261014",
         "commit": "2fa7c920ecd9693749e22bea5903eb8873a9abb1",
         "run_id": 38567624868,
-        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38567624868"
+        "url": "https://github.com/xflexwork/Connector_1/actions/runs/38567624868"
       },
       "approach": "Initial matrix workflow used malformed interpolation in the job name/runner fields.",
       "expected": "Three read-only jobs should start.",
@@ -1407,10 +1407,10 @@
       "objective": "Find cached model assets and a safe idle GPU target for TRELLIS/FLUX.",
       "reason": "Avoid repeated attempts on occupied GPUs and do not interrupt unidentified workloads.",
       "environment": {
-        "repository": "Killer4K-N/Connector_1",
+        "repository": "xflexwork/Connector_1",
         "branch": "diagnose/oec-runtime-capacity-matrix-20261014",
         "run_id": 38567743531,
-        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38567743531",
+        "url": "https://github.com/xflexwork/Connector_1/actions/runs/38567743531",
         "connector1_job_id": 115864665164,
         "host": "scn17-mn"
       },
@@ -1449,11 +1449,11 @@
       "objective": "Confirm the latest cache fallback and output-admission fixes for TRELLIS/FLUX pass after source updates.",
       "reason": "The updates address false-negative Hugging Face cache detection and deny expensive inference before it starts when output storage admission is already blocked.",
       "environment": {
-        "repository": "Killer4K-N/OEC",
+        "repository": "xflexwork/OEC",
         "branch": "fix/storage-admission-write-guards-20261014",
         "commit": "f8ed9453f296594fc2da0cdfd55c32f79f6e1359",
         "workflow_run_id": 38572444007,
-        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38572444007",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/38572444007",
         "job_id": 115880848367,
         "runner": "GitHub-hosted ubuntu-latest",
         "python": "3.11"
@@ -1487,16 +1487,16 @@
       "objective": "Push the tested model source fixes and cumulative logs/test/experiment records to main, as explicitly requested.",
       "reason": "The work and its pass/fail evidence must be discoverable on main, not only the candidate branch.",
       "environment": {
-        "repository": "Killer4K-N/OEC",
+        "repository": "xflexwork/OEC",
         "target_branch": "main",
         "source_branch": "fix/storage-admission-write-guards-20261014",
         "source_commit": "f8ed9453f296594fc2da0cdfd55c32f79f6e1359",
         "previous_main_sha": "82346c0753e139b92240f53734eb48d2113ed9ad",
         "main_commit": "9c9d7acc12e47658f37e71840449f8558b42ee2b",
-        "main_commit_url": "https://github.com/Killer4K-N/OEC/commit/9c9d7acc12e47658f37e71840449f8558b42ee2b",
+        "main_commit_url": "https://github.com/xflexwork/OEC/commit/9c9d7acc12e47658f37e71840449f8558b42ee2b",
         "main_workflow_run_id": 38575822798,
         "main_workflow_job_id": 115892512804,
-        "main_workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38575822798"
+        "main_workflow_url": "https://github.com/xflexwork/OEC/actions/runs/38575822798"
       },
       "approach": "Overlay the tested TRELLIS/FLUX notebooks/CLI, static tests and workflow, TODO, changelogs, results, and cumulative JSON on the verified main tree.",
       "expected": "Main contains the source fixes and 32 experiment records; main-hosted tests start on this source commit.",
@@ -1530,11 +1530,11 @@
       "objective": "Validate the exact main-branch integration commit containing TRELLIS/FLUX source fixes, static regressions and the cumulative tracking records.",
       "reason": "The candidate passed, but main must be tested independently after integrating the source files and workflow.",
       "environment": {
-        "repository": "Killer4K-N/OEC",
+        "repository": "xflexwork/OEC",
         "branch": "main",
         "commit": "9c9d7acc12e47658f37e71840449f8558b42ee2b",
         "workflow_run_id": 38575822798,
-        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/38575822798",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/38575822798",
         "job_id": 115892512804,
         "runner": "GitHub-hosted ubuntu-latest",
         "python": "3.11"
@@ -1575,11 +1575,11 @@
       "objective": "Re-attempt a real TRELLIS asset generation using the already cached source, input image and seven-safetensor-shard model snapshot, with no package installation or model download.",
       "reason": "The previous attempt was blocked by GPU occupancy; a rerun checks whether an idle A100 became available, as the historical asset pass does not prove current-session generation.",
       "environment": {
-        "repository": "Killer4K-N/Connector_1",
+        "repository": "xflexwork/Connector_1",
         "branch": "diagnose/trellis-asset-generation-20261014",
         "run_id": 38571363231,
         "run_attempt": 2,
-        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231",
+        "url": "https://github.com/xflexwork/Connector_1/actions/runs/38571363231",
         "job_id": 115893795773,
         "host": "scn17-mn",
         "model_id": "microsoft/TRELLIS.2-4B"
@@ -1597,7 +1597,7 @@
         "model_download": false,
         "gpu_process_change": false,
         "report_artifact_id": 11899728417,
-        "report_artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38571363231/artifacts/11899728417"
+        "report_artifact_url": "https://github.com/xflexwork/Connector_1/actions/runs/38571363231/artifacts/11899728417"
       },
       "interpretation": "This is a fail-safe capacity block, not a TRELLIS model or export failure. Historical real generation remains confirmed by run 37942265623 and validated artifact 11622412194.",
       "limitations": [
@@ -1617,11 +1617,11 @@
       "objective": "Re-attempt one FLUX.2 Klein PNG generation from the existing cached snapshot without package installation or network download.",
       "reason": "The first FLUX run was blocked by GPU occupancy; rerun verifies whether an idle A100 has become available.",
       "environment": {
-        "repository": "Killer4K-N/Connector_1",
+        "repository": "xflexwork/Connector_1",
         "branch": "diagnose/flux-cache-only-smoke-20261014",
         "run_id": 38559255790,
         "run_attempt": 2,
-        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38559255790",
+        "url": "https://github.com/xflexwork/Connector_1/actions/runs/38559255790",
         "job_id": 115894428716,
         "host": "scn17-mn",
         "model_id": "black-forest-labs/FLUX.2-klein-4B",
@@ -1672,10 +1672,10 @@
       "objective": "Run expanded 10-test suite after loader fix and run generation only if all tests pass.",
       "reason": "The loader-fix runtime run succeeded, but the additional overlay test must prove pipeline.json is only added to the temporary view.",
       "environment": {
-        "repository": "Killer4K-N/Connector_1",
+        "repository": "xflexwork/Connector_1",
         "branch": "diagnose/trellis-asset-generation-20261014",
         "run_id": 38598881722,
-        "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598881722",
+        "url": "https://github.com/xflexwork/Connector_1/actions/runs/38598881722",
         "commit": "293718c8743a8720296a77a94672b105e244eb46"
       },
       "approach": "Execute the 10 GPU-admission/config-overlay tests before any inference.",
@@ -1692,13 +1692,13 @@
         "artifact_upload_issue": "Broad /tmp wildcard uploaded a prior run's GLB after generation was skipped; artifact 11913875417 is stale for this run."
       },
       "fix_commits": [
-        "https://github.com/Killer4K-N/Connector_1/commit/4dde5fdd9c815e7c1eee5e11e1e2c2f8840c2908",
-        "https://github.com/Killer4K-N/Connector_1/commit/d543a062b5695a07fd2952396ab8dc88f81a85d6"
+        "https://github.com/xflexwork/Connector_1/commit/4dde5fdd9c815e7c1eee5e11e1e2c2f8840c2908",
+        "https://github.com/xflexwork/Connector_1/commit/d543a062b5695a07fd2952396ab8dc88f81a85d6"
       ],
       "follow_up_runs": {
         "corrected_test_retry": {
           "id": 38601626147,
-          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38601626147",
+          "url": "https://github.com/xflexwork/Connector_1/actions/runs/38601626147",
           "status": "PASS_10_TESTS_AND_GENERATION; exact-run guard also passed",
           "generated_glb": {
             "bytes": 8952036,
@@ -1712,10 +1712,10 @@
         },
         "run_scoped_artifact_retry": {
           "id": 38602330418,
-          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418",
+          "url": "https://github.com/xflexwork/Connector_1/actions/runs/38602330418",
           "status": "PASS_10_TESTS_GENERATION_AND_EXACT_RUN_ARTIFACT_UPLOAD",
           "artifact_id": 11914941709,
-          "artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11914941709",
+          "artifact_url": "https://github.com/xflexwork/Connector_1/actions/runs/38602330418/artifacts/11914941709",
           "report_artifact_id": 11913529964,
           "glb_sha256": "22caca5fe9c02c50c095e4385a7c17e94b214b5fc7d87417b94b48c796a89257",
           "glb_bytes": 8865916,
@@ -1738,25 +1738,25 @@
       "objective": "Validate shared cache-only pipeline-config helper used by standalone CLI and both TRELLIS notebooks.",
       "reason": "Cached weight snapshots lacked pipeline.json. Early candidate CI attempts also exposed notebook source-array newline loss during editing; restore line endings and rerun full lightweight suite.",
       "environment": {
-        "repository": "Killer4K-N/OEC",
+        "repository": "xflexwork/OEC",
         "branch": "fix/trellis-offline-pipeline-config-20261014",
         "candidate_commit": "9b97c7d316d861993463ded43e8488154f060728",
-        "pull_request": "https://github.com/Killer4K-N/OEC/pull/10",
+        "pull_request": "https://github.com/xflexwork/OEC/pull/10",
         "earlier_failed_runs": [
           {
             "id": 38601664024,
-            "url": "https://github.com/Killer4K-N/OEC/actions/runs/38601664024",
+            "url": "https://github.com/xflexwork/OEC/actions/runs/38601664024",
             "reason": "notebook code-cell line breaks lost during serialization"
           },
           {
             "id": 38601828023,
-            "url": "https://github.com/Killer4K-N/OEC/actions/runs/38601828023",
+            "url": "https://github.com/xflexwork/OEC/actions/runs/38601828023",
             "reason": "same notebook source-array SyntaxError"
           }
         ],
         "passing_run": {
           "id": 38601987037,
-          "url": "https://github.com/Killer4K-N/OEC/actions/runs/38601987037"
+          "url": "https://github.com/xflexwork/OEC/actions/runs/38601987037"
         }
       },
       "approach": "Pin official pipeline.json to the known cached snapshot; make a read-only-weight /tmp overlay and isolated cache view; fail closed on unknown snapshots; disable implicit Hub downloads during pipeline load.",
@@ -1791,63 +1791,63 @@
       "objective": "Fix the live cached TRELLIS smoke after GPU admission so the local weight snapshot can load its pipeline config without a Hugging Face network request, then generate and validate a fresh GLB.",
       "reason": "Run 38587490301 passed all 7 admission/cache unit tests and selected GPU 1 safely (39,902 MiB free, 0% utilization, 416 MiB existing process memory), but model load failed because pipeline.json was absent from the isolated HF cache and from_pretrained was still called with the Hub model ID.",
       "environment": {
-        "repository": "Killer4K-N/Connector_1",
+        "repository": "xflexwork/Connector_1",
         "branch": "diagnose/trellis-asset-generation-20261014",
         "observed_failure_run_id": 38587490301,
         "observed_failure_job_id": 115933256897,
-        "failure_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38587490301",
+        "failure_url": "https://github.com/xflexwork/Connector_1/actions/runs/38587490301",
         "model_id": "microsoft/TRELLIS.2-4B",
         "cached_snapshot": "af44b45f2e35a493886929c6d786e563ec68364d",
         "runtime": "phase2_3d",
         "host": "scn17-mn",
         "successful_runtime_run_id": 38598822415,
         "successful_runtime_job_id": 115972423543,
-        "successful_runtime_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415"
+        "successful_runtime_url": "https://github.com/xflexwork/Connector_1/actions/runs/38598822415"
       },
       "approach": "Vendor the official pipeline.json pinned to the selected cache revision, resolve configs only from local files, create a /tmp snapshot overlay with a copied config and read-only links to cached entries, mirror cached HF snapshot/ref metadata into a temporary local cache, and load via the local snapshot path. Add unit coverage for pinned config validation, safe overlay linking, cached repository metadata and fail-closed unknown revisions.",
       "expected": "The smoke loads cached TRELLIS weights without a Hub request, performs image-to-3D inference, exports one GLB to local /tmp, and validates GLB 2.0 plus non-empty mesh geometry. No downloads or shared cache writes.",
       "fix_commits": [
-        "https://github.com/Killer4K-N/Connector_1/commit/0fe92d6525540e83819f7a0943fbfded29dad8d6",
-        "https://github.com/Killer4K-N/Connector_1/commit/dcc0eb9f8be81e20437416679414b67def6da358",
-        "https://github.com/Killer4K-N/Connector_1/commit/293718c8743a8720296a77a94672b105e244eb46",
-        "https://github.com/Killer4K-N/Connector_1/commit/4dde5fdd9c815e7c1eee5e11e1e2c2f8840c2908",
-        "https://github.com/Killer4K-N/Connector_1/commit/d543a062b5695a07fd2952396ab8dc88f81a85d6",
-        "https://github.com/Killer4K-N/OEC/commit/9260b6a0522b675d9a4e46ceda3f134118d0b1c4"
+        "https://github.com/xflexwork/Connector_1/commit/0fe92d6525540e83819f7a0943fbfded29dad8d6",
+        "https://github.com/xflexwork/Connector_1/commit/dcc0eb9f8be81e20437416679414b67def6da358",
+        "https://github.com/xflexwork/Connector_1/commit/293718c8743a8720296a77a94672b105e244eb46",
+        "https://github.com/xflexwork/Connector_1/commit/4dde5fdd9c815e7c1eee5e11e1e2c2f8840c2908",
+        "https://github.com/xflexwork/Connector_1/commit/d543a062b5695a07fd2952396ab8dc88f81a85d6",
+        "https://github.com/xflexwork/OEC/commit/9260b6a0522b675d9a4e46ceda3f134118d0b1c4"
       ],
       "validation_runs": {
         "config_vendor_run": {
           "id": 38598747382,
-          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598747382",
+          "url": "https://github.com/xflexwork/Connector_1/actions/runs/38598747382",
           "status": "FAILED_EXPECTED_PIPELINE_CONFIG_NOT_WIRED"
         },
         "loader_fix_run": {
           "id": 38598822415,
-          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415",
+          "url": "https://github.com/xflexwork/Connector_1/actions/runs/38598822415",
           "status": "PASS_GLB_GENERATION_AND_REOPEN",
           "artifact_id": 11912523421,
-          "artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415/artifacts/11912523421",
+          "artifact_url": "https://github.com/xflexwork/Connector_1/actions/runs/38598822415/artifacts/11912523421",
           "report_artifact_id": 11913208247,
-          "report_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415/artifacts/11913208247",
+          "report_url": "https://github.com/xflexwork/Connector_1/actions/runs/38598822415/artifacts/11913208247",
           "commit": "dcc0eb9f8be81e20437416679414b67def6da358"
         },
         "regression_suite_run": {
           "id": 38598881722,
-          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598881722",
+          "url": "https://github.com/xflexwork/Connector_1/actions/runs/38598881722",
           "status": "FAIL_TEST_ASSERTION_ONLY; GENERATION_SKIPPED",
           "reason": "9/10 tests passed; the overlay test incorrectly expected config.json in a synthetic snapshot that intentionally contained only weight.safetensors. The broad artifact path also picked up a previous run's GLB; artifact 11913875417 is stale for this failed run.",
           "artifact_id_stale": 11913875417,
-          "artifact_url_stale": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598881722/artifacts/11913875417"
+          "artifact_url_stale": "https://github.com/xflexwork/Connector_1/actions/runs/38598881722/artifacts/11913875417"
         },
         "regression_suite_retry": {
           "id": 38601626147,
-          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38601626147",
+          "url": "https://github.com/xflexwork/Connector_1/actions/runs/38601626147",
           "status": "PASS_10_TESTS_AND_GENERATION; BROAD_ARTIFACT_GLOB_SUPERSEDED_BY_EXACT_RUN_UPLOAD",
           "commit": "4dde5fdd9c815e7c1eee5e11e1e2c2f8840c2908",
           "job_id": 115982042418,
           "artifact_id": 11913877767,
-          "artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38601626147/artifacts/11913877767",
+          "artifact_url": "https://github.com/xflexwork/Connector_1/actions/runs/38601626147/artifacts/11913877767",
           "report_artifact_id": 11913962436,
-          "report_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38601626147/artifacts/11913962436",
+          "report_url": "https://github.com/xflexwork/Connector_1/actions/runs/38601626147/artifacts/11913962436",
           "generated_glb": {
             "bytes": 8952036,
             "sha256": "2ddf74205d88dec2875dd3126e2c1a4f5600a29bfedad280b5e16452d7aae575",
@@ -1859,7 +1859,7 @@
         },
         "artifact_path_guard": {
           "id": 38602330418,
-          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418",
+          "url": "https://github.com/xflexwork/Connector_1/actions/runs/38602330418",
           "status": "PASS",
           "commit": "d543a062b5695a07fd2952396ab8dc88f81a85d6",
           "reason": "Restrict GLB upload to the exact run ID so a failed run cannot publish an older file from another /tmp directory.",
@@ -1901,13 +1901,13 @@
           "artifacts": {
             "glb": {
               "id": 11914941709,
-              "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11914941709",
+              "url": "https://github.com/xflexwork/Connector_1/actions/runs/38602330418/artifacts/11914941709",
               "size_in_bytes": 7243343,
               "digest": "sha256:b534fb64bf151530297752fb048124b742f10b2cb73ff91b394c40a93c41d9dd"
             },
             "report": {
               "id": 11913529964,
-              "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11913529964",
+              "url": "https://github.com/xflexwork/Connector_1/actions/runs/38602330418/artifacts/11913529964",
               "size_in_bytes": 1497,
               "digest": "sha256:74e79e17222dc3bdb0e7db65d33d815761a7e81f19b3f8afffbf3e59f7ee6c75"
             }
@@ -1916,7 +1916,7 @@
         },
         "oec_source_ci": {
           "id": 38601987037,
-          "url": "https://github.com/Killer4K-N/OEC/actions/runs/38601987037",
+          "url": "https://github.com/xflexwork/OEC/actions/runs/38601987037",
           "status": "PASS_34_TESTS_AND_STATIC_VALIDATION",
           "commit": "9b97c7d316d861993463ded43e8488154f060728",
           "results": {
@@ -1944,11 +1944,11 @@
         "tests_after_fix": "Runtime generation passed. A subsequent 10-test attempt found one incorrect fixture assertion (9/10); it is fixed, and the corrected test step passed on run 38601626147 before generation started.",
         "fresh_glb_created": true,
         "generation_run": 38598822415,
-        "generation_run_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415",
+        "generation_run_url": "https://github.com/xflexwork/Connector_1/actions/runs/38598822415",
         "artifact_id": 11912523421,
-        "artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415/artifacts/11912523421",
+        "artifact_url": "https://github.com/xflexwork/Connector_1/actions/runs/38598822415/artifacts/11912523421",
         "report_artifact_id": 11913208247,
-        "report_artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38598822415/artifacts/11913208247",
+        "report_artifact_url": "https://github.com/xflexwork/Connector_1/actions/runs/38598822415/artifacts/11913208247",
         "glb_bytes": 8870632,
         "glb_sha256": "0ba06de0e028d975b7108f4dcb9856a81dcdd76037e94cc852883fc5b2ad6b1e",
         "glb_validation": {
@@ -1981,7 +1981,7 @@
         "active_gpu_process_terminated": false,
         "authoritative_quota_snapshot": "MISSING",
         "latest_successful_runtime_run": 38601626147,
-        "latest_successful_runtime_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38601626147",
+        "latest_successful_runtime_url": "https://github.com/xflexwork/Connector_1/actions/runs/38601626147",
         "latest_generated_glb": {
           "bytes": 8952036,
           "sha256": "2ddf74205d88dec2875dd3126e2c1a4f5600a29bfedad280b5e16452d7aae575",
@@ -2005,7 +2005,7 @@
         },
         "final_guarded_run": {
           "id": 38602330418,
-          "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418",
+          "url": "https://github.com/xflexwork/Connector_1/actions/runs/38602330418",
           "commit": "d543a062b5695a07fd2952396ab8dc88f81a85d6",
           "job_id": 115984412406,
           "status": "PASS",
@@ -2046,13 +2046,13 @@
           "artifacts": {
             "glb": {
               "id": 11914941709,
-              "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11914941709",
+              "url": "https://github.com/xflexwork/Connector_1/actions/runs/38602330418/artifacts/11914941709",
               "size_in_bytes": 7243343,
               "digest": "sha256:b534fb64bf151530297752fb048124b742f10b2cb73ff91b394c40a93c41d9dd"
             },
             "report": {
               "id": 11913529964,
-              "url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11913529964",
+              "url": "https://github.com/xflexwork/Connector_1/actions/runs/38602330418/artifacts/11913529964",
               "size_in_bytes": 1497,
               "digest": "sha256:74e79e17222dc3bdb0e7db65d33d815761a7e81f19b3f8afffbf3e59f7ee6c75"
             }
@@ -2071,7 +2071,7 @@
       "oec_candidate": {
         "branch": "fix/trellis-offline-pipeline-config-20261014",
         "commit": "9b97c7d316d861993463ded43e8488154f060728",
-        "pull_request": "https://github.com/Killer4K-N/OEC/pull/10",
+        "pull_request": "https://github.com/xflexwork/OEC/pull/10",
         "status": "OPEN_FOR_REVIEW_NOT_MERGED"
       }
     },
@@ -2083,7 +2083,7 @@
       "reason": "Verify the missing pipeline.json/offline Hub lookup fix end to end and ensure a failed/test-only run cannot accidentally upload a stale GLB from another attempt.",
       "parameters": {
         "run_id": 38602330418,
-        "run_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418",
+        "run_url": "https://github.com/xflexwork/Connector_1/actions/runs/38602330418",
         "job_id": 115984412406,
         "commit": "d543a062b5695a07fd2952396ab8dc88f81a85d6",
         "source_branch": "diagnose/trellis-asset-generation-20261014",
@@ -2101,8 +2101,8 @@
           "active_compute_process_mib": 416,
           "process_terminated": false
         },
-        "glb_artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11914941709",
-        "report_artifact_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11913529964"
+        "glb_artifact_url": "https://github.com/xflexwork/Connector_1/actions/runs/38602330418/artifacts/11914941709",
+        "report_artifact_url": "https://github.com/xflexwork/Connector_1/actions/runs/38602330418/artifacts/11913529964"
       },
       "results": {
         "status": "PASS",
@@ -2142,10 +2142,10 @@
       "approach": "Enumerate every page of the source repository's Actions workflow-runs API (7 pages, 100 per page except the last), preserve the run ID, workflow path/name, title, branch, commit SHA, trigger, attempt, timestamps, result/status, actor, PR references and canonical source URL as a versioned JSON archive in OEC. Cross-link the latest TRELLIS and FLUX outcomes with the existing detailed experiment records. Keep original run logs and binary artifacts at their source-run URLs; do not claim GitHub Actions run objects themselves were moved.",
       "reason": "Before dispatching jobs onto OEC's new oec-1/oec-2/oec-3 runners, preserve the legacy Connector_1 history so earlier work, failures, blockers and validated outputs remain discoverable and comparisons stay auditable.",
       "parameters": {
-        "source_repository": "Killer4K-N/Connector_1",
-        "target_repository": "Killer4K-N/OEC",
+        "source_repository": "xflexwork/Connector_1",
+        "target_repository": "xflexwork/OEC",
         "archive_path": "docs/runner_migration/connector_1_actions_runs.json",
-        "archive_url": "https://github.com/Killer4K-N/OEC/blob/main/docs/runner_migration/connector_1_actions_runs.json",
+        "archive_url": "https://github.com/xflexwork/OEC/blob/main/docs/runner_migration/connector_1_actions_runs.json",
         "archive_commit": "56fa0df575654ff5b8d86caddcf7c0ef2b3056a1",
         "total_runs_reported": 677,
         "records_captured": 677,
@@ -2178,8 +2178,8 @@
         },
         "job_level_runner_assignment_details": "not expanded for all 677 runs; the migrated snapshot contains run-level outcome metadata and canonical links, while original per-job logs/artifacts remain source-of-truth",
         "trellis_latest_success_run": 38602330418,
-        "trellis_asset_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11914941709",
-        "trellis_report_url": "https://github.com/Killer4K-N/Connector_1/actions/runs/38602330418/artifacts/11913529964",
+        "trellis_asset_url": "https://github.com/xflexwork/Connector_1/actions/runs/38602330418/artifacts/11914941709",
+        "trellis_report_url": "https://github.com/xflexwork/Connector_1/actions/runs/38602330418/artifacts/11913529964",
         "flux_latest_cache_smoke_run": 38559255790,
         "flux_latest_cache_smoke_status": "FAILURE_BEFORE_INFERENCE_GPU_ADMISSION; no PNG created"
       },
@@ -2193,7 +2193,7 @@
       "reason": "Verify migration targets can accept OEC repository jobs and preserve runner-specific environment/cache facts before attempting FLUX inference.",
       "parameters": {
         "run_id": 38610558599,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38610558599",
+        "run_url": "https://github.com/xflexwork/OEC/actions/runs/38610558599",
         "branch": "fix/trellis-offline-pipeline-config-20261014",
         "source_commit": "da697c83f14bcf0a9de36c27abfb31220af0dffa",
         "labels": [
@@ -2203,9 +2203,9 @@
         ],
         "concurrency": "max-parallel=1",
         "artifacts": {
-          "oec-1": "https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11916534964",
-          "oec-2": "https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11918195061",
-          "oec-3": "https://github.com/Killer4K-N/OEC/actions/runs/38610558599/artifacts/11918525046"
+          "oec-1": "https://github.com/xflexwork/OEC/actions/runs/38610558599/artifacts/11916534964",
+          "oec-2": "https://github.com/xflexwork/OEC/actions/runs/38610558599/artifacts/11918195061",
+          "oec-3": "https://github.com/xflexwork/OEC/actions/runs/38610558599/artifacts/11918525046"
         }
       },
       "results": {
@@ -2256,7 +2256,7 @@
       "reason": "Ensure source and tests are coherent before relying on live FLUX image generation on oec-1/oec-2/oec-3.",
       "parameters": {
         "run_id": 38612345392,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38612345392",
+        "run_url": "https://github.com/xflexwork/OEC/actions/runs/38612345392",
         "source_commit": "5a846bf2b2787c72979db38cee587112fb0cb69c",
         "branch": "fix/trellis-offline-pipeline-config-20261014",
         "test_suites": {
@@ -2303,7 +2303,7 @@
       "reason": "Validate actual image generation on the replacement OEC runner pool after inventory confirmed cached weights and the released dependency set.",
       "parameters": {
         "run_id": 38611186955,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38611186955",
+        "run_url": "https://github.com/xflexwork/OEC/actions/runs/38611186955",
         "job_id": 116014658405,
         "runner": "oec-1",
         "runner_id": 21,
@@ -2321,8 +2321,8 @@
         "job_completed_utc": "2026-10-14T18:09:29Z",
         "elapsed_minutes_approx": 11,
         "followup_runs": {
-          "first_queued": "https://github.com/Killer4K-N/OEC/actions/runs/38613199844",
-          "updated_logging_and_lock_workflow": "https://github.com/Killer4K-N/OEC/actions/runs/38613575959"
+          "first_queued": "https://github.com/xflexwork/OEC/actions/runs/38613199844",
+          "updated_logging_and_lock_workflow": "https://github.com/xflexwork/OEC/actions/runs/38613575959"
         }
       },
       "results": {
@@ -2355,7 +2355,7 @@
       "reason": "First live run terminated after ~11 minutes with no retrievable logs or uploaded output. The new source avoids CPU-load-then-GPU-copy peak host memory and makes the next run diagnosable; static CI checks correctness without risking a GPU run while runner availability is uncertain.",
       "parameters": {
         "run_id": 38613904439,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38613904439",
+        "run_url": "https://github.com/xflexwork/OEC/actions/runs/38613904439",
         "source_commit": "e59426970956ff83fbd433612adc29eb9364d0f8",
         "branch": "fix/trellis-offline-pipeline-config-20261014",
         "runner_workflow": "oec-flux-image-smoke.yml",
@@ -2391,7 +2391,7 @@
       "reason": "Verify the entire image-to-3D handoff in the OEC phase2_3d environment, beyond separate FLUX and TRELLIS success evidence.",
       "parameters": {
         "run_id": 38723286765,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38723286765",
+        "run_url": "https://github.com/xflexwork/OEC/actions/runs/38723286765",
         "job_id": 116382882587,
         "branch": "fix/flux-trellis-pipeline-20261015",
         "tested_sha": "fc1844f8db77dcab7317ad1e6c253a429fe6b0e4",
@@ -2420,8 +2420,8 @@
         "shared_output_writes": false
       },
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38723286765",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38723286765/artifacts/11966744703"
+        "https://github.com/xflexwork/OEC/actions/runs/38723286765",
+        "https://github.com/xflexwork/OEC/actions/runs/38723286765/artifacts/11966744703"
       ],
       "follow_up": "Added import subprocess and a findmnt-path unit test. Tightened idle GPU admission to require known utilization <=5%, re-sampling up to 180 seconds. Verified the fixes via CI 38725202281 and final combined run 38725376076."
     },
@@ -2433,7 +2433,7 @@
       "reason": "Verify the subprocess import and GPU-admission policy corrections and prove the generated image is consumed by TRELLIS in the same run.",
       "parameters": {
         "run_id": 38725376076,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38725376076",
+        "run_url": "https://github.com/xflexwork/OEC/actions/runs/38725376076",
         "job_id": 116389784906,
         "branch": "fix/flux-trellis-pipeline-20261015",
         "tested_source_commit": "3092ee7e11b56413a08f4b849e21f806537a2ea5",
@@ -2489,8 +2489,8 @@
         ]
       },
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38725376076",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38725376076/artifacts/11967418646"
+        "https://github.com/xflexwork/OEC/actions/runs/38725376076",
+        "https://github.com/xflexwork/OEC/actions/runs/38725376076/artifacts/11967418646"
       ],
       "follow_up": "Integrated runtime acceptance is complete for the tested cached oec-1 path. Keep fresh-quota guards for future downloads and managed writes. Code branch remains under review, not merged to main."
     },
@@ -2502,7 +2502,7 @@
       "reason": "Ensure the real runtime failure fix and high-utilization admission hardening have regression coverage before retrying GPU inference.",
       "parameters": {
         "run_id": 38725202281,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38725202281",
+        "run_url": "https://github.com/xflexwork/OEC/actions/runs/38725202281",
         "job_id": 116389198433,
         "branch": "fix/flux-trellis-pipeline-20261015",
         "commit": "d075b4442d87904e5b57128cb2f430bc53781738",
@@ -2517,7 +2517,7 @@
         "model_inference": "NOT_RUN_STATIC_CI_ONLY"
       },
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38725202281"
+        "https://github.com/xflexwork/OEC/actions/runs/38725202281"
       ],
       "follow_up": "Combined inference then passed in run 38725376076. Continue to keep quota-required operations fail-closed."
     },
@@ -2532,7 +2532,7 @@
         "pr": 11,
         "latest_commit": "2ccac41e32ca23a07f149900f865c0be1fab63ad",
         "latest_ci_run_id": 38743800209,
-        "latest_ci_run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38743800209",
+        "latest_ci_run_url": "https://github.com/xflexwork/OEC/actions/runs/38743800209",
         "tests": {
           "notebook_static": 13,
           "trellis_cli": 6,
@@ -2555,13 +2555,13 @@
         "previous_failed_runs": [
           {
             "run_id": 38743502455,
-            "url": "https://github.com/Killer4K-N/OEC/actions/runs/38743502455",
+            "url": "https://github.com/xflexwork/OEC/actions/runs/38743502455",
             "status": "FAIL",
             "reason": "Existing TRELLIS CLI test expected the former 3-mode list; updated expectation for generate-batch and --input-dir."
           },
           {
             "run_id": 38743634536,
-            "url": "https://github.com/Killer4K-N/OEC/actions/runs/38743634536",
+            "url": "https://github.com/xflexwork/OEC/actions/runs/38743634536",
             "status": "FAIL",
             "reason": "SyntaxError in new supervisor shutdown test's multi-context with statement; corrected to parenthesized context manager."
           }
@@ -2592,11 +2592,11 @@
         "main_source_merge": "NOT_PERFORMED"
       },
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38743800209",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38743502455",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38743634536",
-        "https://github.com/Killer4K-N/OEC/pull/11",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38725376076"
+        "https://github.com/xflexwork/OEC/actions/runs/38743800209",
+        "https://github.com/xflexwork/OEC/actions/runs/38743502455",
+        "https://github.com/xflexwork/OEC/actions/runs/38743634536",
+        "https://github.com/xflexwork/OEC/pull/11",
+        "https://github.com/xflexwork/OEC/actions/runs/38725376076"
       ],
       "follow_up": "Deploy PR branch on selected test host; verify physical GPUs with nvidia-smi; live-smoke the LTX control/worker and QA as separate managed services; open FLUX, TRELLIS and combined Gradio ports through approved SSH tunnels and submit one small generation in each UI; run TRELLIS batch on a small existing-image folder and inspect every GLB. Do not download missing weights/packages or write managed shared outputs unless fresh quota admission passes. Evaluate brain_config.json changes only through controlled metrics-backed experiments."
     },
@@ -2611,9 +2611,9 @@
         "pr": 11,
         "tested_commit": "7741b80d7e830c78e264042f6821391e15fdaf7c",
         "run_id": 38744924124,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38744924124",
+        "run_url": "https://github.com/xflexwork/OEC/actions/runs/38744924124",
         "prior_full_pass_run_id": 38743800209,
-        "prior_full_pass_run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38743800209",
+        "prior_full_pass_run_url": "https://github.com/xflexwork/OEC/actions/runs/38743800209",
         "qa_environment": {
           "AIEROS_QA_GPU": "selected physical GPU",
           "CUDA_VISIBLE_DEVICES": "selected physical GPU before interpreter startup"
@@ -2645,8 +2645,8 @@
         "quota_telemetry": "MISSING"
       },
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38744924124",
-        "https://github.com/Killer4K-N/OEC/pull/11"
+        "https://github.com/xflexwork/OEC/actions/runs/38744924124",
+        "https://github.com/xflexwork/OEC/pull/11"
       ],
       "follow_up": "Proceed with a separately authorized cache-only live smoke on an identified compute host: check nvidia-smi for unmanaged processes first, start/stop QA/LTX services through the supervisor, submit a small request to each Gradio UI over approved SSH tunnels, then run a small folder-mode TRELLIS batch and validate every GLB. Do not start duplicate daemons beside existing manually launched background processes. No model downloads or managed shared-output writes until fresh quota admission passes."
     },
@@ -2661,7 +2661,7 @@
         "pr": 11,
         "tested_commit": "3d89941d6d5054eee74725e5e744b16e4e5a9c82",
         "run_id": 38760561720,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38760561720",
+        "run_url": "https://github.com/xflexwork/OEC/actions/runs/38760561720",
         "job_id": 116510408236,
         "runner": "GitHub-hosted ubuntu-latest",
         "test_suites": {
@@ -2717,13 +2717,13 @@
         "main_source_merge": "NOT_PERFORMED"
       },
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38760561720",
-        "https://github.com/Killer4K-N/OEC/pull/11",
-        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tools/oec_service_manager.py",
-        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tools/oec_cluster_services.example.json",
-        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_trellis_3d.ipynb",
-        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_trellis_3d_only.ipynb",
-        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_flux_only.ipynb"
+        "https://github.com/xflexwork/OEC/actions/runs/38760561720",
+        "https://github.com/xflexwork/OEC/pull/11",
+        "https://github.com/xflexwork/OEC/blob/fix/flux-trellis-pipeline-20261015/tools/oec_service_manager.py",
+        "https://github.com/xflexwork/OEC/blob/fix/flux-trellis-pipeline-20261015/tools/oec_cluster_services.example.json",
+        "https://github.com/xflexwork/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_trellis_3d.ipynb",
+        "https://github.com/xflexwork/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_trellis_3d_only.ipynb",
+        "https://github.com/xflexwork/OEC/blob/fix/flux-trellis-pipeline-20261015/pipeline_flux_only.ipynb"
       ],
       "follow_up": "Do not start the cluster profile until the user-configured SSH aliases/project and Conda paths are checked, every node has the same reviewed branch and environment, and existing manually launched jobs have been inventoried. Then perform an authorized cache-only live smoke of service startup/status/stop and Gradio submissions. Folder-mode TRELLIS batch inference still needs a small real GPU batch with GLB reopen validation. Do not perform model/package downloads or managed shared-output writes until fresh quota admission succeeds."
     },
@@ -2738,7 +2738,7 @@
         "pr": 11,
         "tested_commit": "d33bc876bc1edd082e6e94be4158cf17e50f75ff",
         "run_id": 38761087455,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38761087455",
+        "run_url": "https://github.com/xflexwork/OEC/actions/runs/38761087455",
         "job_id": 116512226198,
         "runner": "GitHub-hosted ubuntu-latest",
         "conda_root_template": "~/OEC/Conda",
@@ -2772,9 +2772,9 @@
         "fresh_quota": "MISSING"
       },
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38761087455",
-        "https://github.com/Killer4K-N/OEC/pull/11",
-        "https://github.com/Killer4K-N/OEC/blob/fix/flux-trellis-pipeline-20261015/tools/oec_cluster_services.example.json"
+        "https://github.com/xflexwork/OEC/actions/runs/38761087455",
+        "https://github.com/xflexwork/OEC/pull/11",
+        "https://github.com/xflexwork/OEC/blob/fix/flux-trellis-pipeline-20261015/tools/oec_cluster_services.example.json"
       ],
       "follow_up": "Before an authorized live test, copy the example config to the ignored local config, replace SSH aliases and paths on all three nodes, confirm the same reviewed checkout and environments exist on each, inspect existing GPU/process usage, then run cluster-plan followed by a small cache-only cluster launch. Do not perform missing-cache model/dependency downloads or managed shared writes while authoritative fresh quota telemetry is unavailable."
     },
@@ -2785,11 +2785,11 @@
       "approach": "Ran the new structured snapshot parser and storage admission regressions after adding schema-v2 identity, limit, source and exact-integer validation. Existing storage-policy fixture for a hard-limit-overage diagnostic contained schema_version and soft/hard fields but omitted quota_kind, quota_name and source, which are now mandatory for structured telemetry.",
       "reason": "Ensure malformed structured quota records fail closed rather than silently weakening storage admission. The initial failure showed the test fixture needed to meet the newly explicit schema contract.",
       "parameters": {
-        "repository": "Killer4K-N/OEC",
+        "repository": "xflexwork/OEC",
         "branch": "fix/lustre-soft-hard-quota-snapshot-20261016",
         "commit": "b70c1c72f8c0cfdc665399a0380963b64d1ffbbb",
         "run_id": 38903339731,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38903339731",
+        "run_url": "https://github.com/xflexwork/OEC/actions/runs/38903339731",
         "test_groups_before_failure": [
           12,
           5,
@@ -2808,8 +2808,8 @@
         "production_code_changed_in_fixture_fix": false
       },
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38903339731",
-        "https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38898669614"
+        "https://github.com/xflexwork/OEC/actions/runs/38903339731",
+        "https://github.com/xflexwork/OEC_AireOS_Freezed/actions/runs/38898669614"
       ],
       "follow_up": "Add quota_kind=group, quota_name=research and a non-empty source to the schema-v2 hard-overage fixture, then rerun all six test groups. Failure preserved; do not mark this attempt PASS."
     },
@@ -2820,13 +2820,13 @@
       "approach": "Maintained backward compatibility for legacy single-limit snapshots; added a structured schema-v2 writer and strict consumer validation for separate soft quota, hard limit, grace, identity, source, timestamp and effective limit. Admission blocks above-soft usage while retaining hard-limit headroom for diagnostics only. Added tests for invalid identities/schema versions, negative/fractional/unset limits, malformed JSON roots, exact large-integer handling and preflight behavior.",
       "reason": "The read-only Lustre investigation proved usage exceeded soft quota while hard-limit headroom and grace remained. One single-limit field cannot preserve these distinctions without either rejecting valid telemetry or hiding a soft-quota overage.",
       "parameters": {
-        "repository": "Killer4K-N/OEC",
+        "repository": "xflexwork/OEC",
         "branch": "fix/lustre-soft-hard-quota-snapshot-20261016",
         "commit": "6182edd4cafe22f65145b94e1f66998b31bcc182",
         "pull_request": 12,
-        "pull_request_url": "https://github.com/Killer4K-N/OEC/pull/12",
+        "pull_request_url": "https://github.com/xflexwork/OEC/pull/12",
         "run_id": 38903458777,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38903458777",
+        "run_url": "https://github.com/xflexwork/OEC/actions/runs/38903458777",
         "job_id": 116981112079,
         "test_group_counts": {
           "trellis_notebook_static": 12,
@@ -2855,13 +2855,13 @@
         "main_source_merge": "NOT_PERFORMED"
       },
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38898669614",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38903339731",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38903458777",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38903458777/job/116981112079",
-        "https://github.com/Killer4K-N/OEC/pull/12",
+        "https://github.com/xflexwork/OEC_AireOS_Freezed/actions/runs/38898669614",
+        "https://github.com/xflexwork/OEC/actions/runs/38903339731",
+        "https://github.com/xflexwork/OEC/actions/runs/38903458777",
+        "https://github.com/xflexwork/OEC/actions/runs/38903458777/job/116981112079",
+        "https://github.com/xflexwork/OEC/pull/12",
         "https://wiki.lustre.org/Lustre_Quota_Administration",
-        "https://github.com/Killer4K-N/OEC-Viewer/blob/main/diagrams/model_learning.json"
+        "https://github.com/xflexwork/OEC-Viewer/blob/main/diagrams/model_learning.json"
       ],
       "follow_up": "Keep PR #12 draft/unmerged pending source review and an explicit deployment/snapshot publication decision. Use a fresh authoritative read-only quota capture; do not write a stale sample. Storage admission remains blocked by captured soft-quota overage, even though hard-limit headroom remained at probe time."
     },
@@ -2872,7 +2872,7 @@
       "approach": "Execute actual final UI cells from pipeline_flux_only.ipynb, pipeline_trellis_3d_only.ipynb, and pipeline_trellis_3d.ipynb on the designated oec-1 runner with cached model snapshots and run-owned scratch outputs. Record each mode separately so combined-app startup is not conflated with inference.",
       "reason": "Prior notebook final cells were reported as failing or insufficiently verified; a focused execution suite needed to prove real API requests, fresh generated artifacts, and cleanup without triggering downloads or shared-storage writes.",
       "parameters": {
-        "repository": "Killer4K-N/OEC",
+        "repository": "xflexwork/OEC",
         "branch": "fix/flux-trellis-pipeline-20261015",
         "commit": "715fd005aa3746a148aa3a7030cb87eddf06e9c9",
         "runner": "oec-1",
@@ -2880,10 +2880,10 @@
         "environment": "phase2_3d",
         "gpu": "0 (NVIDIA A100-SXM4-40GB)",
         "run_id": 38912593770,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/38912593770",
+        "run_url": "https://github.com/xflexwork/OEC/actions/runs/38912593770",
         "job_id": 117011880046,
         "artifact_id": 12052395126,
-        "artifact_url": "https://github.com/Killer4K-N/OEC/actions/runs/38912593770/artifacts/12052395126",
+        "artifact_url": "https://github.com/xflexwork/OEC/actions/runs/38912593770/artifacts/12052395126",
         "artifact_sha256": "6764845113a90b85d46699612ff1f975e77bbf85be793968eb3ba208ca7cd95e",
         "seed": 2048,
         "downloads_enabled": false,
@@ -2938,9 +2938,9 @@
         "training_started": "NO"
       },
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/38912593770",
-        "https://github.com/Killer4K-N/OEC/actions/runs/38912593912",
-        "https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38924202279"
+        "https://github.com/xflexwork/OEC/actions/runs/38912593770",
+        "https://github.com/xflexwork/OEC/actions/runs/38912593912",
+        "https://github.com/xflexwork/OEC_AireOS_Freezed/actions/runs/38924202279"
       ],
       "follow_up": "Keep the result as component-level cache-only evidence. The combined TRELLIS notebook needs a separate live generate request and exact output inspection before the combined path is claimed. Continue blocking managed storage writes and model/data downloads until a fresh quota snapshot and normal storage admission are approved. Resolve the independent oec-freeze blockers before any real-model PEFT experiment."
     },
@@ -3046,7 +3046,7 @@
         "The newly added parser unit test still requires an explicit focused-suite pass."
       ],
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/39135140660"
+        "https://github.com/xflexwork/OEC/actions/runs/39135140660"
       ]
     },
     {
@@ -3118,7 +3118,7 @@
         "Actions uploaded no artifact archive; evidence is in the job acceptance logs and managed output files."
       ],
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/39135140660"
+        "https://github.com/xflexwork/OEC/actions/runs/39135140660"
       ]
     },
     {
@@ -3168,7 +3168,7 @@
         "wav_sha256": "d4cd48e45890ec2668321a6dfbf95b3e57f3541b9d7cb414afe484cd349805cc",
         "pip_check_warning": "thinc 8.3.6 requires numpy>=2.0, but phase1 has numpy 1.26.4; warning only, AudioCraft import and generation passed; no packages were changed",
         "shared_outputs_written": false,
-        "artifact_url": "https://github.com/Killer4K-N/OEC/actions/runs/39135140674/artifacts/12140085687"
+        "artifact_url": "https://github.com/xflexwork/OEC/actions/runs/39135140674/artifacts/12140085687"
       },
       "interpretation": "The repaired notebook harness passed all code cells, used the existing cached AudioGen snapshot, loaded the model on an A100 and generated a valid, audible-looking 3-second WAV (nonzero peak/RMS and finite samples). This is one SFX smoke, not a quality/robustness benchmark.",
       "limitations": [
@@ -3178,8 +3178,8 @@
         "AudioGen weights are research-only pending a commercial-rights review."
       ],
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/39135140674",
-        "https://github.com/Killer4K-N/OEC/actions/runs/39135140674/artifacts/12140085687"
+        "https://github.com/xflexwork/OEC/actions/runs/39135140674",
+        "https://github.com/xflexwork/OEC/actions/runs/39135140674/artifacts/12140085687"
       ]
     },
     {
@@ -3216,9 +3216,9 @@
         "LTX fix has a regression test but still needs a current A100 live /health + job + MP4 decode pass."
       ],
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC/actions/runs/39142905429",
-        "https://github.com/Killer4K-N/OEC/actions/runs/39143306660",
-        "https://github.com/Killer4K-N/OEC/actions/runs/39148645009"
+        "https://github.com/xflexwork/OEC/actions/runs/39142905429",
+        "https://github.com/xflexwork/OEC/actions/runs/39143306660",
+        "https://github.com/xflexwork/OEC/actions/runs/39148645009"
       ]
     },
     {
@@ -3255,9 +3255,9 @@
         "Service sidecar URLs must remain Not configured until current OEC TRELLIS/LTX live artifact acceptance passes."
       ],
       "supporting_urls": [
-        "https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39120715995",
-        "https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39120715944",
-        "https://github.com/Killer4K-N/OEC_Deploy/actions/runs/39148052034"
+        "https://github.com/xflexwork/OEC_Deploy/actions/runs/39120715995",
+        "https://github.com/xflexwork/OEC_Deploy/actions/runs/39120715944",
+        "https://github.com/xflexwork/OEC_Deploy/actions/runs/39148052034"
       ]
     },
     {
@@ -3376,7 +3376,7 @@
         "downloads_allowed": false
       },
       "environment": {
-        "repository": "Killer4K-N/OEC",
+        "repository": "xflexwork/OEC",
         "runtime_validation": "not run"
       },
       "results": {
@@ -3420,7 +3420,7 @@
         "shared_db_migrated": false
       },
       "environment": {
-        "repository": "Killer4K-N/OEC",
+        "repository": "xflexwork/OEC",
         "branch": "fix/media-stack-supervision-20261019"
       },
       "results": {
@@ -3442,7 +3442,7 @@
       "rationale": "Verify live model inference after resolving the stale outputs pause lock, separately from source tests and model cache checks.",
       "parameters": {
         "workflow_run_id": 39209090292,
-        "run_url": "https://github.com/Killer4K-N/OEC/actions/runs/39209090292",
+        "run_url": "https://github.com/xflexwork/OEC/actions/runs/39209090292",
         "commit_sha": "1c9dda097d88f594b22ba3faa680c0b75cb6fdcd",
         "providers": [
           "kokoro",
@@ -3540,7 +3540,7 @@
       "rationale": "Re-validate AudioGen on the corrected OEC model-pipeline commit and preserve a reproducible output plus runner and resource evidence.",
       "parameters": {
         "workflow_run_id": 39240127736,
-        "workflow_url": "https://github.com/Killer4K-N/OEC/actions/runs/39240127736",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39240127736",
         "job_id": 118018656307,
         "commit_sha": "21f576b774e25c7766d7c2876b793366918f0436",
         "branch": "fix/media-stack-supervision-20261019",
@@ -3591,7 +3591,7 @@
         "peak_cuda_reserved_gib": 5.385,
         "storage_pre_and_post_checks": "PASS",
         "artifact_id": 12181271517,
-        "artifact_url": "https://github.com/Killer4K-N/OEC/actions/runs/39240127736/artifacts/12181271517",
+        "artifact_url": "https://github.com/xflexwork/OEC/actions/runs/39240127736/artifacts/12181271517",
         "artifact_zip_sha256": "a08d5c8e69ab1093a22f18d41773f98ee4dbd54528f89b9377c9024339d2cf53",
         "pip_check_warning": "thinc 8.3.6 declares numpy>=2.0.0 but this pinned AudioCraft environment has numpy 1.26.4; no packages were changed",
         "live_storage_snapshot": {
@@ -3655,7 +3655,7 @@
       "reason": "Verify new QA physical-GPU selection ordering and the FLUX path-guard fixture repair without allocating A100s or weakening storage safety.",
       "parameters": {
         "workflow_run_id": 39268510242,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39268510242",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39268510242",
         "job_id": 118114323063,
         "branch": "fix/media-stack-supervision-20261019",
         "commit_sha": "d655b25c7eded5976890e717e611c9add8d127e1",
@@ -3719,7 +3719,7 @@
         "No live QA compliance decision or media upload was performed.",
         "Current branch remains unmerged."
       ],
-      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39268510242"
+      "artifact": "https://github.com/xflexwork/OEC/actions/runs/39268510242"
     },
     {
       "id": "EXP-2026-10-19-FLUX-TRELLIS-LIVE-ACCEPTANCE-39267211597",
@@ -3729,7 +3729,7 @@
       "reason": "Confirm corrected output-path regressions and acquire real PNG→GLB evidence from the current pipeline.",
       "parameters": {
         "workflow_run_id": 39267211597,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39267211597",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39267211597",
         "job_id": 118111510929,
         "branch": "fix/media-stack-supervision-20261019",
         "commit_sha": "e5e4018bf7fcf46622fd7eacd029adc42a0d71aa",
@@ -3754,7 +3754,7 @@
           "outputs_target_gb": 1024
         },
         "artifact_id": 12194310008,
-        "artifact_url": "https://github.com/CalamityStriker/OEC/actions/runs/39267211597/artifacts/12194310008"
+        "artifact_url": "https://github.com/xflexwork/OEC/actions/runs/39267211597/artifacts/12194310008"
       },
       "environment": {
         "runner": "oec-1",
@@ -3777,7 +3777,7 @@
         "Storage values are historical run telemetry and do not authorize later writes.",
         "No process was signalled or killed."
       ],
-      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39267211597/artifacts/12194310008"
+      "artifact": "https://github.com/xflexwork/OEC/actions/runs/39267211597/artifacts/12194310008"
     },
     {
       "id": "EXP-2026-10-19-SPEECH-AND-ACE-STEP-BOOTSTRAP-39268082165",
@@ -3787,7 +3787,7 @@
       "reason": "Record each provider separately and determine whether ACE-Step is genuinely runnable rather than treating checkpoint presence as inference acceptance.",
       "parameters": {
         "workflow_run_id": 39268082165,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39268082165",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39268082165",
         "job_id": 118112826187,
         "branch": "fix/media-stack-supervision-20261019",
         "commit_sha": "8c75fcc4cb86981e3f208a5d0d5ae58e1e1fe9a1",
@@ -3848,7 +3848,7 @@
       "reason": "Verify the end-to-end queue's source-level and disposable-SQLite contracts without allocating an A100 or contacting a live dataset repository.",
       "parameters": {
         "workflow_run_id": 39272166140,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39272166140",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39272166140",
         "job_id": 118127020858,
         "branch": "fix/media-stack-supervision-20261019",
         "commit_sha": "3db0a5294e170fd61dc95f1e84b4ead4be538dd2",
@@ -3907,7 +3907,7 @@
         "No actual Qwen2-VL compliance inference.",
         "No individual-file resumable chunker has been found or verified."
       ],
-      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39272166140"
+      "artifact": "https://github.com/xflexwork/OEC/actions/runs/39272166140"
     },
     {
       "id": "EXP-2026-10-19-FLUX-TRELLIS-A100-OWNERSHIP-GATE-39271901007",
@@ -3917,7 +3917,7 @@
       "reason": "Acquire safe current-run GPU ownership evidence and produce a real FLUX PNG plus TRELLIS GLB if an eligible idle A100 is available.",
       "parameters": {
         "workflow_run_id": 39271901007,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39271901007",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39271901007",
         "job_id": 118126083988,
         "branch": "fix/media-stack-supervision-20261019",
         "workflow_patch_commit": "60b9e85f157d931498d58b2916674e1752a46b6b",
@@ -3929,7 +3929,7 @@
         ],
         "steps": 4,
         "diagnostic_artifact_id": 12195338666,
-        "diagnostic_artifact_url": "https://github.com/CalamityStriker/OEC/actions/runs/39271901007/artifacts/12195338666",
+        "diagnostic_artifact_url": "https://github.com/xflexwork/OEC/actions/runs/39271901007/artifacts/12195338666",
         "gpu_snapshot": {
           "device": "NVIDIA A100-SXM4-40GB",
           "compute_pid": 3347078,
@@ -3990,7 +3990,7 @@
         "Storage headroom is historical after this run and does not authorize future writes.",
         "Do not terminate the process; the owning user must release the allocation normally."
       ],
-      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39271901007/artifacts/12195338666"
+      "artifact": "https://github.com/xflexwork/OEC/actions/runs/39271901007/artifacts/12195338666"
     },
     {
       "id": "EXP-2026-10-19-ONE-SHOT-UPLOAD-CONTRACTS-39275020758",
@@ -4000,7 +4000,7 @@
       "reason": "Make the live remote-upload acceptance command safe to execute against a shared pending queue without accidentally shipping unrelated assets or cleaning unrelated shared queue state.",
       "parameters": {
         "workflow_run_id": 39275020758,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39275020758",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39275020758",
         "job_id": 118136949142,
         "commit_sha": "1580fdfce033c0aedaea88f3fd5e2360aebe5a38",
         "branch": "fix/media-stack-supervision-20261019",
@@ -4089,7 +4089,7 @@
         "A successful API upload is not independently read-after-write verified by current one-shot code.",
         "Upload batching is archive batching of whole file pairs, not individual-file chunking."
       ],
-      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39275020758"
+      "artifact": "https://github.com/xflexwork/OEC/actions/runs/39275020758"
     },
     {
       "id": "EXP-2026-10-19-SPEECH-SMOKE-ACE-STEP-GATE-39274961054",
@@ -4099,7 +4099,7 @@
       "reason": "Ensure speech providers are still live after environment bootstrapping and distinguish ACE-Step checkpoint/runtime preparation from generated-audio acceptance.",
       "parameters": {
         "workflow_run_id": 39274961054,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39274961054",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39274961054",
         "job_id": 118136738946,
         "commit_sha": "e58e5daf699d01774b4d2ca014ecfaabf702e3a7",
         "branch": "fix/media-stack-supervision-20261019",
@@ -4222,7 +4222,7 @@
         "latest_complete_suite": {
           "run_id": 39278190899,
           "job_id": 118147459705,
-          "url": "https://github.com/CalamityStriker/OEC/actions/runs/39278190899",
+          "url": "https://github.com/xflexwork/OEC/actions/runs/39278190899",
           "sha": "486e467d8bb2b178c5b6501a376c9295b03708a3",
           "status": "success",
           "tests": 86,
@@ -4248,7 +4248,7 @@
         "Fresh live StorageManager quota is still required at runtime.",
         "No remote Hugging Face upload."
       ],
-      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39278190899"
+      "artifact": "https://github.com/xflexwork/OEC/actions/runs/39278190899"
     },
     {
       "id": "EXP-2026-10-19-SPEECH-ACE-STEP-BOOTSTRAP-39277286186",
@@ -4258,7 +4258,7 @@
       "reason": "Re-verify speech providers and distinguish ACE-Step cache/runtime readiness from a generated audio artifact.",
       "parameters": {
         "workflow_run_id": 39277286186,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39277286186",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39277286186",
         "job_id": 118144848005,
         "branch": "fix/media-stack-supervision-20261019",
         "source_sha": "227c6eb32409d1010926a3ec6f36c7bcddc1c625",
@@ -4317,7 +4317,7 @@
       "reason": "Recheck live speech service smokes and ACE-Step generation on a newer source head while preserving StorageManager admission and isolated Torch.",
       "parameters": {
         "workflow_run_id": 39278145617,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39278145617",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39278145617",
         "job_id": 118147435541,
         "branch": "fix/media-stack-supervision-20261019",
         "source_sha": "249b34e7738cda7596b5019c8b096144825955bc",
@@ -4392,7 +4392,7 @@
       "reason": "Establish actual API + model load + job submission + terminal state + artifact-file validation for TRELLIS and LTX, extending prior standalone notebook results.",
       "parameters": {
         "workflow_run_id": 39278268411,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39278268411",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39278268411",
         "job_id": 118148474821,
         "branch": "fix/media-stack-supervision-20261019",
         "source_sha": "9ed203a9f1122046a28af45f0df84ceda634885f",
@@ -4481,7 +4481,7 @@
           "id": 12198722285,
           "name": "oec-visual-sidecar-smoke-39278268411",
           "bytes": 1820957,
-          "url": "https://github.com/CalamityStriker/OEC/actions/runs/39278268411/artifacts/12198722285",
+          "url": "https://github.com/xflexwork/OEC/actions/runs/39278268411/artifacts/12198722285",
           "zip_sha256": "33ebf5028082ae2dd1d608d71e0cf254d4a396a617ad42693846372b6df9e24c",
           "inspected_contents": [
             "trellis-acceptance.glb",
@@ -4558,7 +4558,7 @@
         "Individual-file resumable upload chunking is not implemented.",
         "Storage quota values are historical; a fresh admission is required for further writes."
       ],
-      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39278268411/artifacts/12198722285"
+      "artifact": "https://github.com/xflexwork/OEC/actions/runs/39278268411/artifacts/12198722285"
     },
     {
       "id": "EXP-2026-10-19-UPLOAD-RESUMABLE-CHUNKING-PROTOCOL",
@@ -4571,7 +4571,7 @@
         "test_commit": "85431311caf28e6e3ede293fdcc959f86419c402",
         "branch": "fix/media-stack-supervision-20261019",
         "workflow_run_id": 39291422187,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39291422187",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39291422187",
         "job_id": 118192741690,
         "chunk_cli": "python hf_upload_daemon.py --once --asset-id ID --chunk-oversize",
         "protocol": "oec-asset-chunks-v1",
@@ -4661,7 +4661,7 @@
         "No actual Qwen2-VL media policy decision or joined Brain→worker→QA→upload→OEC-Play job was performed.",
         "The visual sidecar outputs use synthetic input/prompt and TRELLIS mesh is not watertight."
       ],
-      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39291422187"
+      "artifact": "https://github.com/xflexwork/OEC/actions/runs/39291422187"
     },
     {
       "id": "EXP-2026-10-19-LIVE-E2E-GPU-ADMISSION-BLOCKED-39300850928",
@@ -4671,13 +4671,13 @@
       "reason": "Move from isolated component/contract evidence to an actual joined asset lifecycle, while refusing GPU overlap and avoiding the shared upload queue.",
       "parameters": {
         "workflow_run_id": 39300850928,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39300850928",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39300850928",
         "job_id": 118225345452,
         "source_sha": "80cc89480ee79f18d1ec7c101f97cfc310379ed1",
         "branch": "fix/media-stack-supervision-20261019",
         "runner": "oec-1",
         "report_artifact_id": 12211286861,
-        "report_artifact_url": "https://github.com/CalamityStriker/OEC/actions/runs/39300850928/artifacts/12211286861",
+        "report_artifact_url": "https://github.com/xflexwork/OEC/actions/runs/39300850928/artifacts/12211286861",
         "report_artifact_sha256": "662beaa9a52c82274a0b4997dd9a7995f94f3da1a904f9fffd890cbf8c339add",
         "report_artifact_bytes": 1758,
         "blocker": "A100 compute processes are already present; refusing overlap",
@@ -4713,7 +4713,7 @@
         },
         "static_companion_run": {
           "run_id": 39300850953,
-          "url": "https://github.com/CalamityStriker/OEC/actions/runs/39300850953",
+          "url": "https://github.com/xflexwork/OEC/actions/runs/39300850953",
           "job_id": 118225345013,
           "status": "success",
           "tests": 96,
@@ -4744,7 +4744,7 @@
         "No real Hugging Face credentials were exercised and no dataset was modified.",
         "No full pipeline success claim is justified."
       ],
-      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39300850928/artifacts/12211286861"
+      "artifact": "https://github.com/xflexwork/OEC/actions/runs/39300850928/artifacts/12211286861"
     },
     {
       "id": "EXP-2026-10-20-GRADIO-NOTEBOOK-STATIC-PASS-39379246551",
@@ -4754,7 +4754,7 @@
       "reason": "Validate notebook structure and environment isolation without a model download or GPU allocation.",
       "parameters": {
         "workflow_run_id": 39379246551,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39379246551",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39379246551",
         "job_id": 118484298605,
         "source_sha": "c79401c00182e94f3bc3f4d38109174f0662c7f5",
         "branch": "fix/media-stack-supervision-20261019",
@@ -4786,7 +4786,7 @@
         "ACE-Step generation and MusicGen inference remain unaccepted; speech live evidence exists only from earlier bounded one-clip tests.",
         "Live Gradio browser interactions were not exercised."
       ],
-      "artifacts": "https://github.com/CalamityStriker/OEC/actions/runs/39379246551"
+      "artifacts": "https://github.com/xflexwork/OEC/actions/runs/39379246551"
     },
     {
       "id": "EXP-2026-10-20-PERSISTENT-A100-SYNC-BLOCKED-39379246680",
@@ -4796,7 +4796,7 @@
       "reason": "Keep the long-lived $HOME/OEC checkout synchronized to GitHub without overwriting local changes or silently changing branch/history.",
       "parameters": {
         "workflow_run_id": 39379246680,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39379246680",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39379246680",
         "job_id": 118484298968,
         "expected_branch": "fix/media-stack-supervision-20261019",
         "runner": "oec-1",
@@ -4824,7 +4824,7 @@
         "No expected/actual synced SHA comparison occurred.",
         "This run did not make the persistent checkout match GitHub."
       ],
-      "artifact": "https://github.com/CalamityStriker/OEC/actions/runs/39379246680"
+      "artifact": "https://github.com/xflexwork/OEC/actions/runs/39379246680"
     },
     {
       "id": "EXP-2026-10-20-STATIC-REGRESSION-PASS-39379628368",
@@ -4834,7 +4834,7 @@
       "reason": "Ensure notebook structures, code cells, model environment boundaries and pre-existing CLI/storage/QA/uploader regression contracts remain valid without consuming A100 inference resources.",
       "parameters": {
         "workflow_run_id": 39379628368,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39379628368",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39379628368",
         "job_id": 118485509728,
         "source_sha": "b6de4b086705caa30a1705039baf4ac49996725a",
         "branch": "fix/media-stack-supervision-20261019",
@@ -4870,7 +4870,7 @@
       "reason": "Understand why the long-lived checkout was not synchronized without overwriting local state.",
       "parameters": {
         "workflow_run_id": 39379628387,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39379628387",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39379628387",
         "job_id": 118485509739,
         "runner": "oec-1",
         "expected_branch": "fix/media-stack-supervision-20261019",
@@ -4908,13 +4908,13 @@
       "reason": "Verify the joined OEC media lifecycle after separate component acceptance.",
       "parameters": {
         "workflow_run_id": 39320471955,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39320471955",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39320471955",
         "run_attempt": 2,
         "job_id": 118480769324,
         "source_sha": "2ca832a5e814d5f8bce43617ca04d2f7fdfee682",
         "runner": "oec-1",
         "report_artifact_id": 12244625569,
-        "report_artifact_url": "https://github.com/CalamityStriker/OEC/actions/runs/39320471955/artifacts/12244625569",
+        "report_artifact_url": "https://github.com/xflexwork/OEC/actions/runs/39320471955/artifacts/12244625569",
         "gpu_process_pid": 3347078,
         "gpu_memory_mib": {
           "gpu0": 8194,
@@ -4956,7 +4956,7 @@
       "reason": "Make the current model notebooks/tests available in a local A100 checkout without overwriting pre-existing local user state.",
       "parameters": {
         "workflow_run_id": 39380653563,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39380653563",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39380653563",
         "job_id": 118488776455,
         "branch": "fix/media-stack-supervision-20261019",
         "target_path": "$HOME/OEC_feature_sync",
@@ -4994,7 +4994,7 @@
       "reason": "Establish source correctness and environment isolation while live GPUs are safely unavailable.",
       "parameters": {
         "workflow_run_id": 39380653548,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39380653548",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39380653548",
         "job_id": 118488776376,
         "source_sha": "32e1a5f9203ed94214f4151c51e2504fe6589002",
         "runner": "GitHub-hosted ubuntu-latest / Python 3.11",
@@ -5028,7 +5028,7 @@
       "reason": "Ensure the final branch source remains valid without starting model inference on GPUs whose ownership is blocked.",
       "parameters": {
         "workflow_run_id": 39380928743,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39380928743",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39380928743",
         "job_id": 118489623553,
         "source_sha": "132a8a5820a104ec27c14a87c9af3d4f84e83b98",
         "branch": "fix/media-stack-supervision-20261019",
@@ -5057,7 +5057,7 @@
       "reason": "Expose current branch source locally while preserving existing local untracked/dirty data.",
       "parameters": {
         "workflow_run_id": 39380928762,
-        "workflow_url": "https://github.com/CalamityStriker/OEC/actions/runs/39380928762",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/39380928762",
         "job_id": 118489623737,
         "runner": "oec-1",
         "branch": "fix/media-stack-supervision-20261019",
@@ -5817,13 +5817,13 @@
         "branch": "fix/media-stack-supervision-20261019",
         "inference_sha": "72b71f861bba72b78da1cec330e4273b00baaabb",
         "latest_release_attempt_sha": "d68fa32f0542e4481a972b45eaf2fcbb22465842",
-        "live_acceptance_run": "https://github.com/CalamityStriker/OEC/actions/runs/39452849617",
-        "api_release_run": "https://github.com/CalamityStriker/OEC/actions/runs/39464232552",
+        "live_acceptance_run": "https://github.com/xflexwork/OEC/actions/runs/39452849617",
+        "api_release_run": "https://github.com/xflexwork/OEC/actions/runs/39464232552",
         "prior_attempts": [
-          "https://github.com/CalamityStriker/OEC/actions/runs/39463291348",
-          "https://github.com/CalamityStriker/OEC/actions/runs/39463516709",
-          "https://github.com/CalamityStriker/OEC/actions/runs/39463702968",
-          "https://github.com/CalamityStriker/OEC/actions/runs/39463952004"
+          "https://github.com/xflexwork/OEC/actions/runs/39463291348",
+          "https://github.com/xflexwork/OEC/actions/runs/39463516709",
+          "https://github.com/xflexwork/OEC/actions/runs/39463702968",
+          "https://github.com/xflexwork/OEC/actions/runs/39463952004"
         ]
       },
       "results": {
@@ -5926,8 +5926,71 @@
         "common /v1/jobs for standalone FLUX/AudioGen/MusicGen remains outstanding",
         "persistent OEC-Deploy/OEC-Play E2E remains outstanding"
       ]
+    },
+    {
+      "id": "OEC-MODEL-CACHE-CLEANUP-2026-10-26",
+      "date": "2026-10-26",
+      "category": "Targeted idle OEC media-model cache cleanup",
+      "approach": "One-shot self-hosted Actions purge through the existing DiskPurgeManager-backed model_cache_manager CLI after fresh StorageManager quota, GPU process, OEC process and target runtime-lock checks on all three configured runner labels.",
+      "reason": "User requested removing downloaded OEC media-model weights that are not currently in use to free shared storage.",
+      "parameters": {
+        "repository": "xflexwork/OEC",
+        "operations_branch": "ops/oec-model-cache-cleanup-20261026",
+        "operations_commit": "9fe0a7e2f7348f8c3949e5226af1795799b5e839",
+        "workflow_run_id": 40223425738,
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/40223425738",
+        "runner_preflights": [
+          "oec-1",
+          "oec-2",
+          "oec-3"
+        ],
+        "purge_runner": "oec-1",
+        "target_models": [
+          "flux-klein-4b",
+          "trellis-2-4b",
+          "trellis-image-large",
+          "ltx-2.3",
+          "gemma-3-ltx",
+          "qwen2-vl-7b",
+          "audiogen-medium",
+          "musicgen-medium"
+        ],
+        "removal_method": "tools/model_cache_manager.py purge <model> --confirm; DiskPurgeManager path checks",
+        "protected_reserve_files_touched": false
+      },
+      "results": {
+        "status": "PASS_TARGETED_CACHE_PURGE",
+        "targeted_models_absent_after": true,
+        "targeted_cache_bytes_after": 0,
+        "model_directory_reported_usage_before_gb": 251.89,
+        "model_directory_reported_usage_after_gb": 57.29,
+        "model_directory_accounting_delta_gb": 194.6,
+        "group_quota_hard_headroom_before_gb": 51.76,
+        "group_quota_hard_headroom_after_gb": 143.53,
+        "group_quota_hard_headroom_delta_gb": 91.77,
+        "quota_grace_active_after": false,
+        "active_locked_models_preserved": [
+          "ace-step",
+          "kokoro",
+          "qwen3-asr-0.6b",
+          "whisper-turbo"
+        ],
+        "unknown_cache_directories_preserved": true,
+        "model_source_checkouts_preserved": [
+          "LTX-2-Source",
+          "TRELLIS.2"
+        ],
+        "protected_storage_files_touched": false
+      },
+      "interpretation": "Known idle OEC media-model weights and duplicate legacy copies have been removed. Post-purge model_cache_manager status reports absent targets. The conservative observed group-quota headroom increase is 91.77 GB; folder-level byte estimates may count duplicate or hard-linked content more than once.",
+      "limitations": [
+        "No inference or model-readiness test was run after deleting the caches; those models must be re-provisioned through normal quota/license-gated setup when needed.",
+        "ACE-Step, Kokoro, Qwen3-ASR and Whisper Turbo remain because their runtime-lock records point to scn30-mn. Strict SSH host-key validation failed because that host key was not trusted; this session did not bypass host-key checking.",
+        "Unmapped cache directories and model weights potentially owned by other OEC workstreams were preserved.",
+        "No canonical $HOME/OEC checkout synchronization was performed."
+      ]
     }
   ],
-  "updated_at": "2026-10-23T02:30:00+05:30",
-  "updated_date": "2026-10-23"
+  "updated_at": "2026-10-26T00:25:20+05:30",
+  "updated_date": "2026-10-26"
 }

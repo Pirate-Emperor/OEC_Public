@@ -11,7 +11,7 @@ At the start of every session, use this order. Refresh live state; never assume 
 3. Read [`TODO.md`](../TODO.md), [`result.md`](../result.md), [`test.json`](../test.json), [`changelog/README.md`](../changelog/README.md), the most recent `changelog/CHANGELOG-YYYY-MM-DD.md`, and applicable `docs/` conventions.
 4. Read the latest GitHub branch heads, commits, open PRs, and workflow YAML for the repository in scope. Review recent and active workflow runs, then the job list, runner identity, relevant step logs and actual artifacts. Check whether the tested source SHA equals the current branch head. Preserve failed and superseded attempts as history.
 5. Read the workstream's own research plan, data/model contracts, tests, and current result records before changing code or claims.
-6. For cross-repository claims, read the current OEC-Viewer graphs and source links. For academic deliverables, read the authoritative rules and latest source-scan checkpoint in [`Report_Docs/research/CONTINUATION_RULES_AND_DELIVERABLE_CHECKLIST.md`](https://github.com/Killer4K-N/Report_Docs/blob/main/research/CONTINUATION_RULES_AND_DELIVERABLE_CHECKLIST.md) and [`SOURCE_SCAN_CHECKPOINTS_2026-10-19.md`](https://github.com/Killer4K-N/Report_Docs/blob/main/research/SOURCE_SCAN_CHECKPOINTS_2026-10-19.md); refresh the actual main head before relying on either snapshot.
+6. For cross-repository claims, read the current OEC-Viewer graphs and source links. For academic deliverables, read the authoritative rules and latest source-scan checkpoint in [`Report_Docs/research/CONTINUATION_RULES_AND_DELIVERABLE_CHECKLIST.md`](https://github.com/xflexwork/Report_Docs/blob/main/research/CONTINUATION_RULES_AND_DELIVERABLE_CHECKLIST.md) and [`SOURCE_SCAN_CHECKPOINTS_2026-10-19.md`](https://github.com/xflexwork/Report_Docs/blob/main/research/SOURCE_SCAN_CHECKPOINTS_2026-10-19.md); refresh the actual main head before relying on either snapshot.
 
 If a source or tool cannot be accessed, record exactly what was unavailable and continue with independent work. Do not claim inspection, tests, GPU use, runner access, paper build or inference unless there is retrieved evidence.
 
@@ -19,14 +19,14 @@ If a source or tool cannot be accessed, record exactly what was unavailable and 
 
 | Repository | Scope | Required execution environment |
 |---|---|---|
-| [OEC](https://github.com/Killer4K-N/OEC) | Core pipeline, workers, service manager, runtime and storage contracts | Only the runners actually configured in the current workflow; historically `oec-1`, `oec-2`, `oec-3` |
-| [OEC_AireOS_Full_Model](https://github.com/Killer4K-N/OEC_AireOS_Full_Model) | From-scratch model training and full-model research | `oec-train` only, environment `oec_train` |
-| [OEC_AireOS_Freezed](https://github.com/Killer4K-N/OEC_AireOS_Freezed) | Frozen backbones, LoRA/adapters/PEFT | `oec-freeze` only, environment `oec_freeze`, Python 3.11 |
-| [OEC_AireOS_MOE](https://github.com/Killer4K-N/OEC_AireOS_MOE) | Expert composition, routing and MoE experiments | `oec-moe` only |
-| [OEC_Deploy](https://github.com/Killer4K-N/OEC_Deploy) | Packaged application, GUI and deployment | `oec-deploy` and the environment/workflow currently configured |
-| [OEC-Viewer](https://github.com/Killer4K-N/OEC-Viewer) | Canonical architecture/pipeline/hardware/model-learning diagrams | Reference and validate its source graph files, schema and changelog |
-| [Report_Docs](https://github.com/Killer4K-N/Report_Docs) | Authoritative dissertation/report, presentation and academic poster source | Use its template, versioning and build rules |
-| [Report_Logpoints](https://github.com/Killer4K-N/Report_Logpoints) | Research logpoint archive/viewer | Use its source-checkpoint and record-count conventions |
+| [OEC](https://github.com/xflexwork/OEC) | Core pipeline, workers, service manager, runtime and storage contracts | Only the runners actually configured in the current workflow; historically `oec-1`, `oec-2`, `oec-3` |
+| [OEC_AireOS_Full_Model](https://github.com/xflexwork/OEC_AireOS_Full_Model) | From-scratch model training and full-model research | `oec-train` only, environment `oec_train` |
+| [OEC_AireOS_Freezed](https://github.com/xflexwork/OEC_AireOS_Freezed) | Frozen backbones, LoRA/adapters/PEFT | `oec-freeze` only, environment `oec_freeze`, Python 3.11 |
+| [OEC_AireOS_MOE](https://github.com/xflexwork/OEC_AireOS_MOE) | Expert composition, routing and MoE experiments | `oec-moe` only |
+| [OEC_Deploy](https://github.com/xflexwork/OEC_Deploy) | Packaged application, GUI and deployment | `oec-deploy` and the environment/workflow currently configured |
+| [OEC-Viewer](https://github.com/xflexwork/OEC-Viewer) | Canonical architecture/pipeline/hardware/model-learning diagrams | Reference and validate its source graph files, schema and changelog |
+| [Report_Docs](https://github.com/xflexwork/Report_Docs) | Authoritative dissertation/report, presentation and academic poster source | Use its template, versioning and build rules |
+| [Report_Logpoints](https://github.com/xflexwork/Report_Logpoints) | Research logpoint archive/viewer | Use its source-checkpoint and record-count conventions |
 
 Recheck each workflow's `runs-on`, branch/ref, checkout SHA, runner hostname, working directory, Python/Conda environment and actual GPU allocation on every consequential run. Do not redirect a workstream to another runner just because the assigned runner is unavailable. Do not assume that visible GPUs mean distributed training ran.
 
