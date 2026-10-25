@@ -1,0 +1,105 @@
+name: Apply OEC model-directory allocation config
+run-name: "Apply OEC model target from storage_config.json"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - storage_config.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-storage-config-deployment
+  cancel-in-progress: false
+
+jobs:
+  apply-model-target:
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Safely apply only the model-directory target to the deployed OEC config
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = oec-1
+          LIVE_CONFIG="$HOME/OEC/storage_config.json"
+          test -f "$LIVE_CONFIG"
+          test ! -L "$LIVE_CONFIG"
+          python3 - "$GITHUB_WORKSPACE/storage_config.json" "$LIVE_CONFIG" <<'PY'
+          import copy
+          import json
+          import os
+          import shutil
+          import stat
+          import sys
+          import tempfile
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          source_path, live_path = map(Path, sys.argv[1:3])
+          source = json.loads(source_path.read_text(encoding="utf-8"))
+          live = json.loads(live_path.read_text(encoding="utf-8"))
+
+          def models_entry(config, label):
+              directories = config.get("directories")
+              if not isinstance(directories, list):
+                  raise SystemExit(f"{label}: directories must be a list")
+              matches = [item for item in directories if isinstance(item, dict) and item.get("name") == "models"]
+              if len(matches) != 1:
+                  raise SystemExit(f"{label}: expected exactly one models directory entry")
+              return matches[0]
+
+          source_entry = models_entry(source, "repository config")
+          live_entry = models_entry(live, "deployed config")
+          if source_entry.get("target_allocation_gb") != 230:
+              raise SystemExit("repository storage_config.json must set models.target_allocation_gb to 230")
+          current = live_entry.get("target_allocation_gb")
+          if current not in (280, 230):
+              raise SystemExit(f"deployed model target is {current!r}, not the expected old/new value (280/230); refusing overwrite")
+
+          if current == 230:
+              print("CONFIG_APPLY=ALREADY_SET target_allocation_gb=230; no write needed")
+              raise SystemExit(0)
+
+          if live_path.is_symlink() or not live_path.is_file():
+              raise SystemExit("deployed config is not a regular file; refusing write")
+          original_mode = stat.S_IMODE(live_path.stat().st_mode)
+          stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+          backup = live_path.with_name(live_path.name + ".bak-" + stamp)
+          shutil.copy2(live_path, backup)
+
+          live_entry["target_allocation_gb"] = 230
+          fd, temp_name = tempfile.mkstemp(prefix=".storage_config.json.", dir=str(live_path.parent))
+          try:
+              with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                  json.dump(live, handle, indent=4, ensure_ascii=False)
+                  handle.write("\n")
+                  handle.flush()
+                  os.fsync(handle.fileno())
+              os.chmod(temp_name, original_mode)
+              os.replace(temp_name, live_path)
+          finally:
+              try:
+                  os.unlink(temp_name)
+              except FileNotFoundError:
+                  pass
+
+          verified = json.loads(live_path.read_text(encoding="utf-8"))
+          if models_entry(verified, "verified deployed config").get("target_allocation_gb") != 230:
+              raise SystemExit("post-write verification failed")
+          print(json.dumps({
+              "CONFIG_APPLY": "SUCCESS",
+              "live_config": str(live_path),
+              "backup": str(backup),
+              "old_target_allocation_gb": 280,
+              "new_target_allocation_gb": 230
+          }, sort_keys=True))
+          PY
