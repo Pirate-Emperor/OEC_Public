@@ -7,9 +7,10 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOKS = {
-    "pipeline_audiogen_gradio.ipynb": ("phase1", "pipeline_audiogen.py"),
+    "pipeline_audiogen_gradio.ipynb": ("phase1", "audiocraft-api"),
     "pipeline_musicgen_gradio.ipynb": ("phase1", "pipeline_musicgen.py"),
     "pipeline_acestep_gradio.ipynb": ("phase2_3d", "oec-acestep-py311"),
+    "pipeline_flux_only.ipynb": ("phase2_3d", "flux-api"),
     "pipeline_kokoro_gradio.ipynb": ("phase2_3d", "oec-audio-py311"),
     "pipeline_whisper_gradio.ipynb": ("phase2_3d", "oec-audio-py311"),
     "pipeline_qwen3_asr_gradio.ipynb": ("phase2_3d", "oec-audio-py311"),
@@ -36,9 +37,12 @@ class ModelNotebookTests(unittest.TestCase):
             self.assertIn('server_name="127.0.0.1"', text, name)
             self.assertIn("share=False", text, name)
             self.assertNotIn("pip install", text.lower(), name)
-            if name in {"pipeline_audiogen_gradio.ipynb", "pipeline_musicgen_gradio.ipynb"}:
+            if name == "pipeline_musicgen_gradio.ipynb":
                 self.assertIn('Path("/tmp") / f"oec-', text, name)
                 self.assertNotIn('Path(tempfile.gettempdir()) / f"oec-', text, name)
+            if name == "pipeline_audiogen_gradio.ipynb":
+                self.assertIn('"/v1/jobs"', text, name)
+                self.assertIn("audiocraft-api", text, name)
     def test_live_gradio_smoke_harness_is_valid_python(self):
         source = (ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
         ast.parse(source, filename="tools/run_gradio_model_notebook_smokes.py")
@@ -75,10 +79,28 @@ class ModelNotebookTests(unittest.TestCase):
 
     def test_service_ui_does_not_import_provider_ml_packages(self):
         for name in ("pipeline_acestep_gradio.ipynb","pipeline_kokoro_gradio.ipynb",
-                     "pipeline_whisper_gradio.ipynb","pipeline_qwen3_asr_gradio.ipynb"):
+                     "pipeline_whisper_gradio.ipynb","pipeline_qwen3_asr_gradio.ipynb",
+                     "pipeline_flux_only.ipynb"):
             nb = json.loads((ROOT / name).read_text(encoding="utf-8"))
             text = "\n".join("".join(c.get("source", [])) for c in nb["cells"] if c.get("cell_type")=="code")
-            for forbidden in ("import torch","import whisper","from kokoro","import acestep","from qwen_asr"):
+            for forbidden in ("import torch","import whisper","from kokoro","import acestep","from qwen_asr",
+                              "import diffusers","from diffusers"):
                 self.assertNotIn(forbidden, text, name)
+
+    def test_target_model_notebooks_have_no_stale_execution_outputs(self):
+        for name in ("pipeline_audiocraft.ipynb", "pipeline_audiogen_gradio.ipynb",
+                     "pipeline_acestep_gradio.ipynb", "pipeline_flux_only.ipynb"):
+            nb = json.loads((ROOT / name).read_text(encoding="utf-8"))
+            for index, cell in enumerate(nb["cells"]):
+                if cell.get("cell_type") == "code":
+                    self.assertIsNone(cell.get("execution_count"), f"{name}:cell-{index}")
+                    self.assertEqual(cell.get("outputs", []), [], f"{name}:cell-{index}")
+
+    def test_flux_gradio_smoke_validates_image_outputs(self):
+        source = (ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
+        self.assertIn('"flux": ("pipeline_flux_only.ipynb", "phase2_3d", "generate_flux")', source)
+        self.assertIn("IMAGE_PROVIDERS", source)
+        self.assertIn("Image.open(source)", source)
+        self.assertIn("callback_transport", source)
 if __name__ == "__main__":
     unittest.main()
