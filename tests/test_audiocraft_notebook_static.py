@@ -77,6 +77,12 @@ class AudioCraftNotebookTests(unittest.TestCase):
         self.assertLess(source.index('os.environ["CUDA_VISIBLE_DEVICES"] = selected_gpu["index"]'),
                         source.index("import torch", source.index("selected_gpu = select_idle_a100_gpu()")))
         self.assertIn('report["physical_gpu_index"] = selected_gpu["index"]', source)
+        self.assertIn("client.predict(", source)
+        self.assertIn("fn_index=0", source)
+        self.assertIn('report["gradio_ui_launch"] = "PASS"', source)
+        self.assertIn('report["gradio_callback"] = "PASS"', source)
+        self.assertIn("gradio_client HTTP/event API /predict", source)
+        self.assertIn("def validate_audio(", source)
 
     def test_headless_smoke_is_explicit_and_default_output_stays_managed(self):
         setup = self.sources[1]
