@@ -103,50 +103,26 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertIn('os.environ["CUDA_VISIBLE_DEVICES"] = TARGET_GPU', first_code)
         self.assertNotIn("import torch", first_code)
 
-    def test_combined_flux_uses_released_compatible_stack_before_studio(self):
-        setup = self.find(self.combined, "FLUX_IMPORT_CHECK=PASS")
-        self.assertIn("diffusers==0.37.0", setup)
-        self.assertIn("huggingface-hub==0.36.0", setup)
-        self.assertIn("transformers==4.56.1", setup)
+    def test_combined_flux_uses_separate_model_server_without_dependency_mutation(self):
+        setup = self.find(self.combined, "FLUX_SERVER_CLIENT_DEPENDENCIES=PASS")
+        self.assertIn('metadata.version("gradio")', setup)
+        self.assertIn('metadata.version("requests")', setup)
+        self.assertIn("Do not pip-install/upgrade Diffusers", setup)
+        self.assertNotIn("diffusers==", setup)
+        self.assertNotIn("pip", setup.lower().split("print")[-1])
+        client = self.find(self.combined, "def flux_service_health")
+        self.assertIn("127.0.0.1:7867", client)
+        self.assertIn("/v1/jobs", client)
+        self.assertIn("image/png", client)
+        self.assertIn("share=False", client)
+        self.assertNotIn("from diffusers", client)
+        self.assertNotIn("import torch", client)
         trellis_studio = self.find(self.combined, "def load_trellis_pipeline()")
         self.assertLess(self.combined.index(setup), self.combined.index(trellis_studio))
-
-    def test_combined_flux_dependency_install_is_quota_gated(self):
-        setup = self.find(self.combined, "FLUX_IMPORT_CHECK=PASS")
-        self.assertIn("REQUIRED_FLUX_PACKAGES", setup)
-        self.assertIn("metadata.version(package)", setup)
-        self.assertIn("storage_preflight(", setup)
-        self.assertIn("require_fresh_quota=True", setup)
-        self.assertIn("if not ok:", setup)
-        self.assertIn("managed_storage_operation(", setup)
-        self.assertIn("FLUX_SETUP_STORAGE_ADMISSION=", setup)
-        self.assertIn("FLUX_DEPENDENCY_INSTALL=SKIPPED", setup)
 
     def test_setup_markdown_is_not_duplicate_or_misjoined(self):
         setup_markdown = "\\n".join(
             source for source in self.combined if source.startswith("# Step 1: TRELLIS.2 (Setup)")
-            or source.startswith("# Step 2: FLUX.2 (Setup)")
-        )
-        self.assertIn("Prepare TRELLIS.2 Python and native dependencies.", setup_markdown)
-        self.assertIn("restart the kernel before continuing", setup_markdown.lower())
-        self.assertNotIn("environment.This installs", setup_markdown)
-        self.assertNotIn("Compilation & DependenciesThis cell", setup_markdown)
-
-    def test_combined_flux_dependency_install_is_quota_gated(self):
-        setup = self.find(self.combined, "FLUX_IMPORT_CHECK=PASS")
-        self.assertIn("REQUIRED_FLUX_PACKAGES", setup)
-        self.assertIn("metadata.version(package)", setup)
-        self.assertIn("storage_preflight(", setup)
-        self.assertIn("require_fresh_quota=True", setup)
-        self.assertIn("if not ok:", setup)
-        self.assertIn("managed_storage_operation(", setup)
-        self.assertIn("FLUX_SETUP_STORAGE_ADMISSION=", setup)
-        self.assertIn("FLUX_DEPENDENCY_INSTALL=SKIPPED", setup)
-
-    def test_setup_markdown_is_not_duplicate_or_misjoined(self):
-        setup_markdown = "\n".join(
-            source for source in self.combined
-            if source.startswith("# Step 1: TRELLIS.2 (Setup)")
             or source.startswith("# Step 2: FLUX.2 (Setup)")
         )
         self.assertIn("Prepare TRELLIS.2 Python and native dependencies.", setup_markdown)
