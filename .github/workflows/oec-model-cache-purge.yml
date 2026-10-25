@@ -1,0 +1,155 @@
+name: OEC idle model-cache cleanup
+run-name: "OEC idle model-cache cleanup - ${{ github.ref_name }}"
+
+on:
+  push:
+    branches:
+      - ops/oec-model-cache-cleanup-20261026
+    paths:
+      - .github/workflows/oec-model-cache-purge.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-media-gpu-storage-serial
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    if: contains(github.event.head_commit.message, '[execute-oec-model-purge]')
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [oec-1, oec-2, oec-3]
+    runs-on: [self-hosted, linux, x64, gpu, a100, "${{ matrix.runner }}"]
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Inspect fresh quota, GPU use, OEC processes, and target runtime locks
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "${{ matrix.runner }}"
+          test -x "$HOME/Conda/condabin/conda"
+          test -f "$HOME/OEC/storage_config.json"
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          PYTHON="$("$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python -c 'import sys; print(sys.executable)' | tail -n 1)"
+          test -x "$PYTHON"
+          "$PYTHON" storage_manager.py --status | tee "$RUNNER_TEMP/oec-model-purge-storage-${{ matrix.runner }}.txt"
+          nvidia-smi --query-compute-apps=pid,process_name,used_gpu_memory --format=csv,noheader | tee "$RUNNER_TEMP/oec-model-purge-gpu-${{ matrix.runner }}.txt"
+          "$PYTHON" - "$GITHUB_WORKSPACE" "$RUNNER_TEMP/oec-model-purge-storage-${{ matrix.runner }}.txt" "$RUNNER_TEMP/oec-model-purge-gpu-${{ matrix.runner }}.txt" <<'PY'
+          import json, os, re, socket, sys
+          from pathlib import Path
+          workspace, status_path, gpu_path = map(Path, sys.argv[1:4])
+          sys.path[:0] = [str(workspace / 'tools'), str(workspace)]
+          from media_services.model_cache import model_targets, read_lock
+          status = status_path.read_text(encoding='utf-8', errors='replace')
+          quota = re.search(r'Quota source=(.*?) age=([0-9.]+)s', status)
+          if 'Group quota: UNAVAILABLE' in status or not quota or float(quota.group(2)) > 900:
+              raise SystemExit('PURGE BLOCKED: authoritative group quota missing or stale')
+          gpu = [x.strip() for x in gpu_path.read_text(encoding='utf-8', errors='replace').splitlines() if x.strip() and 'no running processes' not in x.lower()]
+          if gpu: raise SystemExit('PURGE BLOCKED: GPU compute processes present: ' + json.dumps(gpu))
+          targets = ('flux-klein-4b','trellis-2-4b','trellis-image-large','ltx-2.3','gemma-3-ltx','qwen2-vl-7b','audiogen-medium','musicgen-medium')
+          bad_locks = []
+          for name in targets:
+              lock = read_lock(name)
+              if lock is not None: bad_locks.append({'model':name,'state':lock.get('state','unknown'),'host':lock.get('host'),'pid':lock.get('pid')})
+          if bad_locks: raise SystemExit('PURGE BLOCKED: target model locks exist: ' + json.dumps(bad_locks, sort_keys=True))
+          needles = ('brain.py','hf_upload_daemon.py','qa_compliance_worker.py','worker_ltx_video.py','audio_api.py','trellis_api.py','ltx_api.py','flux_api.py','audiocraft_api.py','pipeline_audiogen.py','pipeline_musicgen.py','pipeline_flux_image.py','pipeline_flux_trellis.py','pipeline_trellis_3d.py','pipeline_flux_only.py','ipykernel_launcher','asset_factory.worker')
+          active=[]
+          for proc in Path('/proc').glob('[0-9]*'):
+              try:
+                  if int(proc.name) == os.getpid(): continue
+                  cmd=(proc/'cmdline').read_bytes().replace(b'\x00',b' ').decode('utf-8','ignore')
+                  hits=[n for n in needles if n in cmd]
+                  if hits: active.append({'pid':int(proc.name),'comm':(proc/'comm').read_text(errors='replace').strip()[:80],'matches':hits})
+              except OSError: pass
+          if active: raise SystemExit('PURGE BLOCKED: model/service process detected: ' + json.dumps(active, sort_keys=True))
+          print(json.dumps({'preflight':'PASS','runner':os.environ.get('RUNNER_NAME'),'host':socket.gethostname(),'quota_source':quota.group(1),'quota_age_seconds':float(quota.group(2)),'gpu_processes':[],'target_locks':[],'preserved_active_locked_models':['ace-step','kokoro','qwen3-asr-0.6b','whisper-turbo']},sort_keys=True))
+          PY
+      - name: Upload runner preflight evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-model-purge-preflight-${{ github.run_id }}-${{ matrix.runner }}
+          path: ${{ runner.temp }}/oec-model-purge-*-${{ matrix.runner }}.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+  purge:
+    if: contains(github.event.head_commit.message, '[execute-oec-model-purge]') && needs.audit.result == 'success'
+    needs: audit
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Recheck safety gates immediately before purge
+        env:
+          OEC_PURGE_EVIDENCE: ${{ runner.temp }}/oec-model-purge-${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = oec-1
+          test -f "$HOME/OEC/storage_config.json"
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          mkdir -p "$OEC_PURGE_EVIDENCE"
+          PYTHON="$("$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python -c 'import sys; print(sys.executable)' | tail -n 1)"
+          "$PYTHON" storage_manager.py --status > "$OEC_PURGE_EVIDENCE/storage-before.txt"
+          nvidia-smi --query-compute-apps=pid,process_name,used_gpu_memory --format=csv,noheader > "$OEC_PURGE_EVIDENCE/gpu-before.txt"
+          "$PYTHON" - "$GITHUB_WORKSPACE" "$OEC_PURGE_EVIDENCE/storage-before.txt" "$OEC_PURGE_EVIDENCE/gpu-before.txt" <<'PY'
+          import json, os, re, sys
+          from pathlib import Path
+          workspace, status_path, gpu_path = map(Path, sys.argv[1:4])
+          sys.path[:0]=[str(workspace/'tools'),str(workspace)]
+          from media_services.model_cache import read_lock
+          status=status_path.read_text(encoding='utf-8',errors='replace')
+          quota=re.search(r'Quota source=(.*?) age=([0-9.]+)s',status)
+          if 'Group quota: UNAVAILABLE' in status or not quota or float(quota.group(2)) > 900: raise SystemExit('PURGE BLOCKED: fresh quota unavailable')
+          gpu=[x.strip() for x in gpu_path.read_text(encoding='utf-8',errors='replace').splitlines() if x.strip() and 'no running processes' not in x.lower()]
+          if gpu: raise SystemExit('PURGE BLOCKED: GPU compute process present: '+json.dumps(gpu))
+          targets=('flux-klein-4b','trellis-2-4b','trellis-image-large','ltx-2.3','gemma-3-ltx','qwen2-vl-7b','audiogen-medium','musicgen-medium')
+          locks=[{'model':n,**read_lock(n)} for n in targets if read_lock(n) is not None]
+          if locks: raise SystemExit('PURGE BLOCKED: target lock found: '+json.dumps(locks,sort_keys=True))
+          needles=('brain.py','hf_upload_daemon.py','qa_compliance_worker.py','worker_ltx_video.py','audio_api.py','trellis_api.py','ltx_api.py','flux_api.py','audiocraft_api.py','pipeline_audiogen.py','pipeline_musicgen.py','pipeline_flux_image.py','pipeline_flux_trellis.py','pipeline_trellis_3d.py','pipeline_flux_only.py','ipykernel_launcher','asset_factory.worker')
+          active=[]
+          for p in Path('/proc').glob('[0-9]*'):
+              try:
+                  if int(p.name)==os.getpid(): continue
+                  cmd=(p/'cmdline').read_bytes().replace(b'\x00',b' ').decode('utf-8','ignore')
+                  hits=[n for n in needles if n in cmd]
+                  if hits: active.append({'pid':int(p.name),'matches':hits})
+              except OSError: pass
+          if active: raise SystemExit('PURGE BLOCKED: OEC model process found: '+json.dumps(active,sort_keys=True))
+          print('PURGE_PREFLIGHT=PASS '+json.dumps({'quota_source':quota.group(1),'quota_age_seconds':float(quota.group(2)),'gpu_processes':[],'target_locks':[]},sort_keys=True))
+          PY
+      - name: Purge exact idle OEC model-cache targets with DiskPurgeManager
+        env:
+          OEC_PURGE_EVIDENCE: ${{ runner.temp }}/oec-model-purge-${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          PYTHON="$("$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python -c 'import sys; print(sys.executable)' | tail -n 1)"
+          "$PYTHON" tools/model_cache_manager.py status | tee "$OEC_PURGE_EVIDENCE/cache-before.json"
+          : > "$OEC_PURGE_EVIDENCE/purge-commands.txt"
+          for model in flux-klein-4b trellis-2-4b trellis-image-large ltx-2.3 gemma-3-ltx qwen2-vl-7b audiogen-medium musicgen-medium; do
+            echo "BEGIN_PURGE=$model" | tee -a "$OEC_PURGE_EVIDENCE/purge-commands.txt"
+            "$PYTHON" tools/model_cache_manager.py purge "$model" --confirm 2>&1 | tee -a "$OEC_PURGE_EVIDENCE/purge-commands.txt"
+          done
+          "$PYTHON" tools/model_cache_manager.py status | tee "$OEC_PURGE_EVIDENCE/cache-after.json"
+          "$PYTHON" storage_manager.py --status | tee "$OEC_PURGE_EVIDENCE/storage-after.txt"
+      - name: Upload purge report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-model-purge-report-${{ github.run_id }}
+          path: ${{ runner.temp }}/oec-model-purge-${{ github.run_id }}/
+          if-no-files-found: warn
+          retention-days: 14
