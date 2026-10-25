@@ -149,6 +149,7 @@ jobs:
         if: always()
         run: |
           set +e
+          mkdir -p "$OEC_ACCEPTANCE_ROOT/audiogen-gradio"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py logs audiocraft-api --tail 100 >"$OEC_ACCEPTANCE_ROOT/audiogen-gradio/service-final.log" 2>&1
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py stop audiocraft-api --grace-seconds 25 >>"$OEC_ACCEPTANCE_ROOT/audiogen-gradio/service-final.log" 2>&1
           exit 0
@@ -256,6 +257,7 @@ jobs:
         run: |
           set +e
           R="$OEC_ACCEPTANCE_ROOT/flux"
+          mkdir -p "$R"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py logs flux-api --tail 100 >"$R/service-final.log" 2>&1
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py stop flux-api --grace-seconds 25 >>"$R/service-final.log" 2>&1
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status >"$R/storage-after.log" 2>&1
