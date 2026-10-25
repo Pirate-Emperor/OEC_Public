@@ -2,9 +2,9 @@
 
 ## Current-source live verification — 2026-10-23
 
-- **CURRENT-HEAD PASS:** [FLUX → TRELLIS live A100](https://github.com/CalamityStriker/OEC/actions/runs/39646903815), [Asset Factory contracts](https://github.com/CalamityStriker/OEC/actions/runs/39646903793) and [static/notebook/storage tests](https://github.com/CalamityStriker/OEC/actions/runs/39646903775) on feature SHA `ae6c90b891ec80338c9c96446d735b03e1985d8a`.
-- **BLOCKED:** [canonical A100 root sync](https://github.com/CalamityStriker/OEC/actions/runs/39646903801) refused to mutate the checkout while an OEC inference/queue process was active.
-- **HISTORICAL FULL LIVE SUITE:** [39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568), 8/8 on older SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`; not exact-head all-provider proof.
+- **CURRENT-HEAD PASS:** [FLUX → TRELLIS live A100](https://github.com/xflexwork/OEC/actions/runs/39646903815), [Asset Factory contracts](https://github.com/xflexwork/OEC/actions/runs/39646903793) and [static/notebook/storage tests](https://github.com/xflexwork/OEC/actions/runs/39646903775) on feature SHA `ae6c90b891ec80338c9c96446d735b03e1985d8a`.
+- **BLOCKED:** [canonical A100 root sync](https://github.com/xflexwork/OEC/actions/runs/39646903801) refused to mutate the checkout while an OEC inference/queue process was active.
+- **HISTORICAL FULL LIVE SUITE:** [39435100568](https://github.com/xflexwork/OEC/actions/runs/39435100568), 8/8 on older SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`; not exact-head all-provider proof.
 - **ENCRYPTION:** old E2E byte-readback did not perform private-key decryption. For an encrypted public object use `pipeline_verify_encrypted_hf.ipynb` and `tools/verify_hf_encrypted_asset.py`; neither uploads data.
 - **Presenter commands/status matrix:** [DEMO_PRESENTATION_QUICKSTART_2026-10-23.md](DEMO_PRESENTATION_QUICKSTART_2026-10-23.md).
 
@@ -15,9 +15,9 @@
 
 ## Historical source verification — 2026-10-21 (superseded by the snapshot above)
 
-- **PASS:** [static/contract suite 39557821438](https://github.com/CalamityStriker/OEC/actions/runs/39557821438).
-- **PASS:** [live FLUX → TRELLIS run 39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401), source SHA `f17a2f3e012dc58c440daedd4f9358eacadd6c38`; PNG/GLB hashes matched manifest, GLB reopened, storage before/after captured and artifact uploaded.
-- **BLOCKED:** [canonical A100 sync 39557821414](https://github.com/CalamityStriker/OEC/actions/runs/39557821414) preserved 37 loose files under `root/oec_deploy`.
+- **PASS:** [static/contract suite 39557821438](https://github.com/xflexwork/OEC/actions/runs/39557821438).
+- **PASS:** [live FLUX → TRELLIS run 39557821401](https://github.com/xflexwork/OEC/actions/runs/39557821401), source SHA `f17a2f3e012dc58c440daedd4f9358eacadd6c38`; PNG/GLB hashes matched manifest, GLB reopened, storage before/after captured and artifact uploaded.
+- **BLOCKED:** [canonical A100 sync 39557821414](https://github.com/xflexwork/OEC/actions/runs/39557821414) preserved 37 loose files under `root/oec_deploy`.
 - **NOT YET VERIFIED:** full Brain → LTX → Qwen2-VL QA → HF upload/read-back on current SHA.
 
 ## 1. What to show
@@ -35,7 +35,7 @@ Recommended 8–12 minute sequence:
 From a machine with Git and GitHub CLI (`gh`) configured:
 
 ```bash
-git clone https://github.com/CalamityStriker/OEC.git
+git clone https://github.com/xflexwork/OEC.git
 cd OEC
 git fetch --all --prune
 git status --short --branch
@@ -83,19 +83,19 @@ These checks establish syntax/contract behavior only. They do **not** prove that
 
 ```bash
 gh auth status
-gh run list --repo CalamityStriker/OEC --branch fix/media-stack-supervision-20261019 --limit 20
-gh run view 39435100568 --repo CalamityStriker/OEC
-gh run view 39452849501 --repo CalamityStriker/OEC
-gh run view 39452849617 --repo CalamityStriker/OEC
-gh run view 39452849617 --repo CalamityStriker/OEC --log-failed
+gh run list --repo xflexwork/OEC --branch fix/media-stack-supervision-20261019 --limit 20
+gh run view 39435100568 --repo xflexwork/OEC
+gh run view 39452849501 --repo xflexwork/OEC
+gh run view 39452849617 --repo xflexwork/OEC
+gh run view 39452849617 --repo xflexwork/OEC --log-failed
 ```
 
 To download evidence from a specific completed run into a new local directory:
 
 ```bash
 mkdir -p demo-evidence
-gh run download 39435100568 --repo CalamityStriker/OEC --dir demo-evidence/run-39435100568
-gh run download 39452849617 --repo CalamityStriker/OEC --dir demo-evidence/run-39452849617
+gh run download 39435100568 --repo xflexwork/OEC --dir demo-evidence/run-39435100568
+gh run download 39452849617 --repo xflexwork/OEC --dir demo-evidence/run-39452849617
 find demo-evidence -maxdepth 3 -type f -print
 ```
 
@@ -118,9 +118,9 @@ Do not start a fresh heavyweight job just for the presentation if a recent, rele
 
 ## 6. Current evidence to use carefully
 
-- [Completed A100 live suite, run 39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568): recorded as the 8/8 completed live suite on source SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`. It includes successful MusicGen, AudioGen, speech/ACE-Step, LTX/TRELLIS, FLUX→TRELLIS, and LTX→Qwen2-VL→remote upload/read-back jobs. Use the exact artifacts attached to that run.
-- [Static/storage regression run 39452849501](https://github.com/CalamityStriker/OEC/actions/runs/39452849501): passed on source SHA `72b71f861bba72b78da1cec330e4273b00baaabb`.
-- [Newer exact-head live suite, run 39452849617](https://github.com/CalamityStriker/OEC/actions/runs/39452849617): **not a full pass**. MusicGen, AudioGen, speech/ACE-Step and LTX/TRELLIS jobs passed; the FLUX PNG→TRELLIS GLB job failed, and the joined LTX/Qwen2-VL/HF upload/read-back job was cancelled. Do not describe this run as 8/8 or as a complete end-to-end pass. Inspect its failure logs before claiming a fix.
+- [Completed A100 live suite, run 39435100568](https://github.com/xflexwork/OEC/actions/runs/39435100568): recorded as the 8/8 completed live suite on source SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`. It includes successful MusicGen, AudioGen, speech/ACE-Step, LTX/TRELLIS, FLUX→TRELLIS, and LTX→Qwen2-VL→remote upload/read-back jobs. Use the exact artifacts attached to that run.
+- [Static/storage regression run 39452849501](https://github.com/xflexwork/OEC/actions/runs/39452849501): passed on source SHA `72b71f861bba72b78da1cec330e4273b00baaabb`.
+- [Newer exact-head live suite, run 39452849617](https://github.com/xflexwork/OEC/actions/runs/39452849617): **not a full pass**. MusicGen, AudioGen, speech/ACE-Step and LTX/TRELLIS jobs passed; the FLUX PNG→TRELLIS GLB job failed, and the joined LTX/Qwen2-VL/HF upload/read-back job was cancelled. Do not describe this run as 8/8 or as a complete end-to-end pass. Inspect its failure logs before claiming a fix.
 
 The artifacts above are time-limited GitHub Actions artifacts. Download and verify them before the presentation rather than assuming they will remain available.
 

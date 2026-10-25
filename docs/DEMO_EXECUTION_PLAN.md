@@ -10,11 +10,11 @@
 
 **Current code candidate:** `fix/media-stack-supervision-20261019` at `ae6c90b891ec80338c9c96446d735b03e1985d8a`. Historical model results below are explicitly distinguished from exact-head results.
 
-- **CURRENT-HEAD LIVE PASS:** [FLUX.2 Klein → TRELLIS.2 A100 inference](https://github.com/CalamityStriker/OEC/actions/runs/39646903815), job 119390662318, runner `oec-1`. GLB v2 reopened; 193,544 bytes; SHA-256 `94daca421e06e191ae5fd7d10da20cf89808ea187c14d338f8a1628bfd08bd66`; 2,886 vertices / 4,752 faces; artifact 12368677410.
-- **CURRENT-HEAD CONTRACT PASS:** [Asset Factory tests](https://github.com/CalamityStriker/OEC/actions/runs/39646903793), job 119384749626; suites of 8, 5 and 16 passed.
-- **CURRENT-HEAD STATIC/STORAGE PASS:** [run 39646903775](https://github.com/CalamityStriker/OEC/actions/runs/39646903775), job 119384750498; 154 tests across 19 unittest invocations, four notebook JSON checks.
-- **BLOCKED — canonical A100 root sync:** [run 39646903801](https://github.com/CalamityStriker/OEC/actions/runs/39646903801), job 119386595162, stopped safely with exit 17 after detecting an active OEC inference/queue process. Do not claim that `$HOME/OEC` is synced to the candidate SHA.
-- **HISTORICAL REAL INFERENCE PASS:** [full live suite 39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568), 8/8 jobs on older SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`. This covers previous real audio/video/3D callbacks and the old joined byte-readback test, not current-HEAD validation.
+- **CURRENT-HEAD LIVE PASS:** [FLUX.2 Klein → TRELLIS.2 A100 inference](https://github.com/xflexwork/OEC/actions/runs/39646903815), job 119390662318, runner `oec-1`. GLB v2 reopened; 193,544 bytes; SHA-256 `94daca421e06e191ae5fd7d10da20cf89808ea187c14d338f8a1628bfd08bd66`; 2,886 vertices / 4,752 faces; artifact 12368677410.
+- **CURRENT-HEAD CONTRACT PASS:** [Asset Factory tests](https://github.com/xflexwork/OEC/actions/runs/39646903793), job 119384749626; suites of 8, 5 and 16 passed.
+- **CURRENT-HEAD STATIC/STORAGE PASS:** [run 39646903775](https://github.com/xflexwork/OEC/actions/runs/39646903775), job 119384750498; 154 tests across 19 unittest invocations, four notebook JSON checks.
+- **BLOCKED — canonical A100 root sync:** [run 39646903801](https://github.com/xflexwork/OEC/actions/runs/39646903801), job 119386595162, stopped safely with exit 17 after detecting an active OEC inference/queue process. Do not claim that `$HOME/OEC` is synced to the candidate SHA.
+- **HISTORICAL REAL INFERENCE PASS:** [full live suite 39435100568](https://github.com/xflexwork/OEC/actions/runs/39435100568), 8/8 jobs on older SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`. This covers previous real audio/video/3D callbacks and the old joined byte-readback test, not current-HEAD validation.
 - **ENCRYPTION BOUNDARY:** The older joined test checked remote bytes against the local MP4 source. The tracked uploader/harness inspected for this change does not show a private-key decrypt stage. Do not run a raw-upload harness against a public repository until encrypt-before-upload is confirmed. The new verifier downloads existing ciphertext only, validates hashes, invokes the user-supplied local decryptor and verifies the original plaintext hash.
 - **PRESENTER RUNBOOK:** [docs/DEMO_PRESENTATION_QUICKSTART_2026-10-23.md](docs/DEMO_PRESENTATION_QUICKSTART_2026-10-23.md) includes per-model evidence, commands, notebook paths and gaps. `pipeline_demo_acceptance.ipynb` is a compact index; `pipeline_verify_encrypted_hf.ipynb` is the encrypted read-back template.
 
@@ -24,7 +24,7 @@
 
 ## 1. Presenter run-of-show
 
-**Historical accepted evidence on 2026-10-21 (older source SHA):** source SHA `f17a2f3e012dc58c440daedd4f9358eacadd6c38` passed static/contract suite [39557821438](https://github.com/CalamityStriker/OEC/actions/runs/39557821438) and real FLUX.2 Klein → TRELLIS.2 inference [39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401). The composite produced valid PNG/GLB outputs; their sizes and SHA-256 values match the downloaded manifest, GLB reopen passed, StorageManager was checked before/after, and evidence uploaded. This verifies the **composite image-to-3D demo only**, not the full ordered Brain → LTX → QA → Hugging Face pipeline. Canonical A100 sync remains blocked safely because 37 loose files were preserved under `root/oec_deploy` [run 39557821414](https://github.com/CalamityStriker/OEC/actions/runs/39557821414).
+**Historical accepted evidence on 2026-10-21 (older source SHA):** source SHA `f17a2f3e012dc58c440daedd4f9358eacadd6c38` passed static/contract suite [39557821438](https://github.com/xflexwork/OEC/actions/runs/39557821438) and real FLUX.2 Klein → TRELLIS.2 inference [39557821401](https://github.com/xflexwork/OEC/actions/runs/39557821401). The composite produced valid PNG/GLB outputs; their sizes and SHA-256 values match the downloaded manifest, GLB reopen passed, StorageManager was checked before/after, and evidence uploaded. This verifies the **composite image-to-3D demo only**, not the full ordered Brain → LTX → QA → Hugging Face pipeline. Canonical A100 sync remains blocked safely because 37 loose files were preserved under `root/oec_deploy` [run 39557821414](https://github.com/xflexwork/OEC/actions/runs/39557821414).
 
 OEC is not one model. It is a set of capability-specific runtimes connected by common storage admission, process-aware GPU admission, Gradio clients, loopback job services, a work queue, QA and upload/read-back.
 
@@ -380,7 +380,7 @@ test ! -e "$OEC_FLUX_WORK_DIR" || { echo "Work path must not exist before the or
   --width 512 --height 512 --steps 4
 ```
 
-Expected: `pipeline.log`, `pipeline-report.json`, `artifacts/` with the PNG and GLB, and `artifact-manifest.json` with byte counts, SHA-256 and mesh-reopen metadata. **Verified PASS on current SHA `f17a2f3e...`** in [run 39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401): `FLUX_PIPELINE_SMOKE=PASS`, both output hashes match the downloaded manifest, and the GLB reopened. Use a unique parent and a new child work path that does not exist yet on each retry.
+Expected: `pipeline.log`, `pipeline-report.json`, `artifacts/` with the PNG and GLB, and `artifact-manifest.json` with byte counts, SHA-256 and mesh-reopen metadata. **Verified PASS on current SHA `f17a2f3e...`** in [run 39557821401](https://github.com/xflexwork/OEC/actions/runs/39557821401): `FLUX_PIPELINE_SMOKE=PASS`, both output hashes match the downloaded manifest, and the GLB reopened. Use a unique parent and a new child work path that does not exist yet on each retry.
 
 ## 6. Media service API and lifecycle
 
@@ -647,50 +647,50 @@ GLB structural validation does not prove watertightness or quality. Save run ID,
 First inspect the existing work to avoid duplicate GPU inference:
 
 ```bash
-gh run list --repo CalamityStriker/OEC \
+gh run list --repo xflexwork/OEC \
   --branch fix/media-stack-supervision-20261019 --limit 20
-gh run view 39435100568 --repo CalamityStriker/OEC
-gh run view 39452849501 --repo CalamityStriker/OEC
-gh run view 39452849617 --repo CalamityStriker/OEC
-gh run view 39549368673 --repo CalamityStriker/OEC
-gh run view 39549368702 --repo CalamityStriker/OEC
-gh run view 39435100568 --repo CalamityStriker/OEC --log
-gh run view 39452849617 --repo CalamityStriker/OEC --log-failed
+gh run view 39435100568 --repo xflexwork/OEC
+gh run view 39452849501 --repo xflexwork/OEC
+gh run view 39452849617 --repo xflexwork/OEC
+gh run view 39549368673 --repo xflexwork/OEC
+gh run view 39549368702 --repo xflexwork/OEC
+gh run view 39435100568 --repo xflexwork/OEC --log
+gh run view 39452849617 --repo xflexwork/OEC --log-failed
 mkdir -p "$RUNNER_TEMP/oec-demo-evidence-39435100568"
-gh run download 39435100568 --repo CalamityStriker/OEC \
+gh run download 39435100568 --repo xflexwork/OEC \
   --dir "$RUNNER_TEMP/oec-demo-evidence-39435100568"
 ```
 
 Run links:
-- Completed ordered live run: https://github.com/CalamityStriker/OEC/actions/runs/39435100568
-- Newer partial/failed live suite: https://github.com/CalamityStriker/OEC/actions/runs/39452849617
-- Current A100 root-sync failure: https://github.com/CalamityStriker/OEC/actions/runs/39549368673
-- Current model audit failure: https://github.com/CalamityStriker/OEC/actions/runs/39549368702
-- Current storage write-admission tests: https://github.com/CalamityStriker/OEC/actions/runs/39549368681
+- Completed ordered live run: https://github.com/xflexwork/OEC/actions/runs/39435100568
+- Newer partial/failed live suite: https://github.com/xflexwork/OEC/actions/runs/39452849617
+- Current A100 root-sync failure: https://github.com/xflexwork/OEC/actions/runs/39549368673
+- Current model audit failure: https://github.com/xflexwork/OEC/actions/runs/39549368702
+- Current storage write-admission tests: https://github.com/xflexwork/OEC/actions/runs/39549368681
 
 These commands dispatch actual work and should be used only in an approved acceptance window after the GPU/quota gate passes:
 
 ```bash
 gh workflow run oec-live-acceptance-suite.yml \
-  --repo CalamityStriker/OEC --ref fix/media-stack-supervision-20261019
+  --repo xflexwork/OEC --ref fix/media-stack-supervision-20261019
 gh workflow run oec-flux-pipeline-smoke.yml \
-  --repo CalamityStriker/OEC --ref fix/media-stack-supervision-20261019
+  --repo xflexwork/OEC --ref fix/media-stack-supervision-20261019
 gh workflow run oec-visual-media-sidecar-smoke.yml \
-  --repo CalamityStriker/OEC --ref fix/media-stack-supervision-20261019
+  --repo xflexwork/OEC --ref fix/media-stack-supervision-20261019
 gh workflow run oec-musicgen-smoke.yml \
-  --repo CalamityStriker/OEC --ref fix/media-stack-supervision-20261019
+  --repo xflexwork/OEC --ref fix/media-stack-supervision-20261019
 gh workflow run oec-audiogen-notebook-smoke.yml \
-  --repo CalamityStriker/OEC --ref fix/media-stack-supervision-20261019
+  --repo xflexwork/OEC --ref fix/media-stack-supervision-20261019
 ```
 
 After a dispatch, use the actual returned/new run ID:
 
 ```bash
-gh run list --repo CalamityStriker/OEC \
+gh run list --repo xflexwork/OEC \
   --branch fix/media-stack-supervision-20261019 --limit 10
-gh run watch <NEW_RUN_ID> --repo CalamityStriker/OEC --exit-status
-gh run view <NEW_RUN_ID> --repo CalamityStriker/OEC --log-failed
-gh run download <NEW_RUN_ID> --repo CalamityStriker/OEC \
+gh run watch <NEW_RUN_ID> --repo xflexwork/OEC --exit-status
+gh run view <NEW_RUN_ID> --repo xflexwork/OEC --log-failed
+gh run download <NEW_RUN_ID> --repo xflexwork/OEC \
   --dir "$RUNNER_TEMP/oec-demo-evidence-<NEW_RUN_ID>"
 ```
 
@@ -698,7 +698,7 @@ Replace the placeholder with the actual ID. The ordered workflow uses GPUs and t
 
 ## 10. Prior accepted evidence and current integration limits
 
-The strongest **complete ordered suite** remains historical run **39435100568** on SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74` (8/8 jobs). Current SHA `f17a2f3e012dc58c440daedd4f9358eacadd6c38` passed static/contract [39557821438](https://github.com/CalamityStriker/OEC/actions/runs/39557821438) and dedicated live FLUX→TRELLIS [39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401). That smoke does not exercise Brain → LTX → Qwen2-VL QA → HF read-back, so current source is **not yet a full ordered E2E pass**.
+The strongest **complete ordered suite** remains historical run **39435100568** on SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74` (8/8 jobs). Current SHA `f17a2f3e012dc58c440daedd4f9358eacadd6c38` passed static/contract [39557821438](https://github.com/xflexwork/OEC/actions/runs/39557821438) and dedicated live FLUX→TRELLIS [39557821401](https://github.com/xflexwork/OEC/actions/runs/39557821401). That smoke does not exercise Brain → LTX → Qwen2-VL QA → HF read-back, so current source is **not yet a full ordered E2E pass**.
 
 | Model/path | Historic output evidence | What it proves | Caveat |
 |---|---|---|---|
@@ -721,11 +721,11 @@ Show this at the end of the presentation. Passing a model stage does not make th
 
 | Item | Evidence | Status | Next action |
 |---|---|---|---|
-| Current tip full live suite | Static CI [39557821438](https://github.com/CalamityStriker/OEC/actions/runs/39557821438) and composite live [39557821401](https://github.com/CalamityStriker/OEC/actions/runs/39557821401) passed on `f17a2f3e...`. | **Partial current-source verification; full suite not rerun.** Joined Brain/LTX/Qwen2-VL QA/HF remains unverified. | Resolve sync and Qwen2-VL runtime/cache gates, then run the full ordered suite without discarding local files. |
+| Current tip full live suite | Static CI [39557821438](https://github.com/xflexwork/OEC/actions/runs/39557821438) and composite live [39557821401](https://github.com/xflexwork/OEC/actions/runs/39557821401) passed on `f17a2f3e...`. | **Partial current-source verification; full suite not rerun.** Joined Brain/LTX/Qwen2-VL QA/HF remains unverified. | Resolve sync and Qwen2-VL runtime/cache gates, then run the full ordered suite without discarding local files. |
 | FLUX→TRELLIS in run 39452849617 | Historical job `118794989470` failed because its work path already existed. | **That attempt failed; fix verified later.** The workdir regression passed in 39557821438 and live FLUX→TRELLIS passed in 39557821401. | Keep unique-parent/non-existent-child behavior; newer pass does not rewrite old failure. |
 | Joined QA/HF in run 39452849617 | Job 118795638536 cancelled during remote dataset tree listing; subsequent artifact upload returned 403 “job is completed.” | **CANCELLED/incomplete**, not a pass. Earlier historical E2E run passed. | Re-run after Qwen2-VL import/cache preflight is clean; verify parts, reassembly and full source hash. |
-| A100 canonical sync | Latest [run 39557821414](https://github.com/CalamityStriker/OEC/actions/runs/39557821414), job `119081797995`, failed closed with `OEC_CANONICAL_SYNC=BLOCKED`; 37 non-ignored files under `root/oec_deploy` preserved. | **Canonical local checkout not verified synced.** | Safely review/backup with owner before retrying. Never reset/clean/force checkout. |
-| Model runtime/cache audit | [Run 39549368702](https://github.com/CalamityStriker/OEC/actions/runs/39549368702): Qwen2-VL imports timed out after 60 seconds and the `oec_deploy` cache probe returned non-zero. | **Preflight failure, not proof full inference fails.** | Verify approved runtime/cache without blind installs/downloads, then rerun joined acceptance. |
+| A100 canonical sync | Latest [run 39557821414](https://github.com/xflexwork/OEC/actions/runs/39557821414), job `119081797995`, failed closed with `OEC_CANONICAL_SYNC=BLOCKED`; 37 non-ignored files under `root/oec_deploy` preserved. | **Canonical local checkout not verified synced.** | Safely review/backup with owner before retrying. Never reset/clean/force checkout. |
+| Model runtime/cache audit | [Run 39549368702](https://github.com/xflexwork/OEC/actions/runs/39549368702): Qwen2-VL imports timed out after 60 seconds and the `oec_deploy` cache probe returned non-zero. | **Preflight failure, not proof full inference fails.** | Verify approved runtime/cache without blind installs/downloads, then rerun joined acceptance. |
 | Storage write admission | Run 39549368681 on commit 2a4223b9… | **PASS**, storage guard evidence only. | Retain it; don't call it a live inference pass. |
 | Persistent API release | Runs 39463291348, 39463516709, 39463702968, 39463952004, 39464232552. Latest passed source sync/output admission/four-provider cache checks, then used invalid status audio-api-kokoro; supervisor expects group audio-api. Earlier runs hit sync/capacity/LTX readiness gates. | **No persistent API release completed.** Last attempt failed before service start; no public model weights released. | Correct service-group status handling and LTX readiness mismatch. Release only after fresh admission; verify ready/model_loaded for every API. |
 | ACE-Step current runtime | Prior real FLAC callback passed, later aggregate model audit failed. | **Historic inference passed; persistent/current runtime not certified.** | Verify isolated venv/source/checkpoint and redo admitted live FLAC callback. |
@@ -733,7 +733,7 @@ Show this at the end of the presentation. Passing a model stage does not make th
 | Wan 2.1 | Notebook only; unbound SYSTEM_DIRS and simplistic GPU selection; no accepted worker/Gradio path. | **NOT ACCEPTED / not integrated.** | Isolated runtime, proper admission, worker/client, tests and real inference. |
 | Standalone FLUX API | `tools/media_services/flux_api.py` exposes common loopback job/status/result routes; Asset Factory registers port 7867. | **IMPLEMENTED IN SOURCE; current-source live API/Brain/upload acceptance not yet recorded.** The older CLI composite pass alone does not prove this route. | Run the isolated FLUX API acceptance and verify PNG, manifest, upload-queue row and remote read-back. |
 | AudioGen/MusicGen APIs | `tools/media_services/audiocraft_api.py` exposes shared loopback jobs; registry uses ports 7874/7875. | **IMPLEMENTED IN SOURCE; current-source sidecar and Brain/HF path not live-accepted.** Checkpoint use is non-commercial unless rights are independently confirmed. | Run separate license-gated live smoke tests and verify artifacts, API states, local queue and remote read-back. |
-| OEC_Deploy integration | Media bridge source is committed under `v1/Biome/server-components/server/media_services.py` on child `hpc-dgx-deployment`; child CI / persistent sync passed [39625971386](https://github.com/CalamityStriker/OEC_Deploy/actions/runs/39625971386), [39625971452](https://github.com/CalamityStriker/OEC_Deploy/actions/runs/39625971452), and Media Lab GUI smoke passed [39623186134](https://github.com/CalamityStriker/OEC_Deploy/actions/runs/39623186134). OEC parent commit `55ff86e83fea9bc9344be669f734e044256eb5cd` pins child revision `5e7d601ec593a8d9d6aedd3c5cecfc4a2f2bbd52`. | **Source and mocked contract/GUI integration committed; not yet live-model accepted through OEC-Play.** Latest OEC A100 checkout has not yet proven it synchronized to the new parent SHA. | Verify the bounded A100 parent/submodule sync, then run one-provider readiness and inference through the UI bridge with the matching OEC sidecar; separately verify Asset Factory queue/uploader/remote read-back. |
+| OEC_Deploy integration | Media bridge source is committed under `v1/Biome/server-components/server/media_services.py` on child `hpc-dgx-deployment`; child CI / persistent sync passed [39625971386](https://github.com/xflexwork/OEC_Deploy/actions/runs/39625971386), [39625971452](https://github.com/xflexwork/OEC_Deploy/actions/runs/39625971452), and Media Lab GUI smoke passed [39623186134](https://github.com/xflexwork/OEC_Deploy/actions/runs/39623186134). OEC parent commit `55ff86e83fea9bc9344be669f734e044256eb5cd` pins child revision `5e7d601ec593a8d9d6aedd3c5cecfc4a2f2bbd52`. | **Source and mocked contract/GUI integration committed; not yet live-model accepted through OEC-Play.** Latest OEC A100 checkout has not yet proven it synchronized to the new parent SHA. | Verify the bounded A100 parent/submodule sync, then run one-provider readiness and inference through the UI bridge with the matching OEC sidecar; separately verify Asset Factory queue/uploader/remote read-back. |
 | Quality validation | Past tests emphasize non-empty outputs, format, hashes and GLB reopen. | **Functional smoke only**, not quality benchmark. | Speech WER, watertightness, semantic visual quality and broader human/metric evaluation remain. |
 | Merge to main | Feature compare reports 351 ahead, 12 behind; history diverged. | **No full merge completed.** | Reconcile 12 main commits and feature delta; don't merge blindly or drop content. |
 | Repo ↔ A100 sync | Latest canonical sync failed closed due loose submodule files. | **No same-SHA A100 sync proof.** | Resolve the blocker, retry bounded sync, compare local HEAD and GitHub SHA and inspect working tree. |

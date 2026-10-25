@@ -7,7 +7,7 @@
 
 | Model / workflow | Notebook | UI kernel / inference environment | Backend | Current evidence |
 |---|---|---|---|---|
-| LTX-2.3 text/image-to-video | pipeline_ltx_video.ipynb | phase1_ltx | Existing LTX worker/sidecar, manager default loopback port 17869 (smoke may override) | Valid MP4 from [A100 run 39278268411](https://github.com/CalamityStriker/OEC/actions/runs/39278268411); joined Brain→QA→upload remains open |
+| LTX-2.3 text/image-to-video | pipeline_ltx_video.ipynb | phase1_ltx | Existing LTX worker/sidecar, manager default loopback port 17869 (smoke may override) | Valid MP4 from [A100 run 39278268411](https://github.com/xflexwork/OEC/actions/runs/39278268411); joined Brain→QA→upload remains open |
 | TRELLIS.2 image-to-3D | pipeline_trellis_3d.ipynb, pipeline_trellis_3d_only.ipynb | phase2_3d | Existing worker/sidecar, manager default loopback port 17868 (smoke may override) | GLB generated and reopened; mesh was not watertight |
 | FLUX image generation | pipeline_flux_only.ipynb | phase2_3d | pipeline_flux_image.py; combined CLI pipeline_flux_trellis.py | Current-head PNG→GLB A100 acceptance still open |
 | AudioGen sound effects | pipeline_audiogen_gradio.ipynb; existing pipeline_audiocraft.ipynb retained | phase1 / AudioCraft 1.3.0, Torch 2.1.0, CUDA 11.8 | pipeline_audiogen.py --offline | Previous short WAV smoke PASS; CC-BY-NC 4.0 weights |
@@ -89,7 +89,7 @@ Keep models in OEC core worker/service processes; do not import model packages i
 
 ## Persistent A100 checkout synchronization
 
-A fail-closed workflow attempts to fast-forward the persistent $HOME/OEC checkout after branch updates. It will not clone, switch branches, reset files, overwrite local changes or replace a divergent history. It proceeds only when the checkout exists, origin identifies CalamityStriker/OEC, the local branch is fix/media-stack-supervision-20261019, the working tree is clean and origin is a fast-forward descendant. The workflow must show OEC_A100_SYNC=PASS and matching before/after/target SHAs before we claim that the long-lived checkout is synced. If it blocks, preserve the local tree and resolve its branch/dirty/origin issue manually.
+A fail-closed workflow attempts to fast-forward the persistent $HOME/OEC checkout after branch updates. It will not clone, switch branches, reset files, overwrite local changes or replace a divergent history. It proceeds only when the checkout exists, origin identifies xflexwork/OEC, the local branch is fix/media-stack-supervision-20261019, the working tree is clean and origin is a fast-forward descendant. The workflow must show OEC_A100_SYNC=PASS and matching before/after/target SHAs before we claim that the long-lived checkout is synced. If it blocks, preserve the local tree and resolve its branch/dirty/origin issue manually.
 
 
 ## Latest state and local sync caveat (2026-10-20)
@@ -101,7 +101,7 @@ A fail-closed workflow attempts to fast-forward the persistent $HOME/OEC checkou
 
 ## Exact persistent checkout status (2026-10-20)
 
-Read-only preflight in run 39379628387/job 118485509739 confirmed: origin matches CalamityStriker/OEC; $HOME/OEC is detached at 081aaf34f6379873bdc925d1dcf6b9c3d50349d3; the expected local branch does not exist; the origin tracking ref does exist; 662 dirty/untracked entries are present. The sync helper correctly stopped. Do not run reset/clean/checkout over this state. Review the local status/diffs and back up user work first, or prepare a separate clean worktree once storage and path capacity are verified.
+Read-only preflight in run 39379628387/job 118485509739 confirmed: origin matches xflexwork/OEC; $HOME/OEC is detached at 081aaf34f6379873bdc925d1dcf6b9c3d50349d3; the expected local branch does not exist; the origin tracking ref does exist; 662 dirty/untracked entries are present. The sync helper correctly stopped. Do not run reset/clean/checkout over this state. Review the local status/diffs and back up user work first, or prepare a separate clean worktree once storage and path capacity are verified.
 
 
 ## Additional repository model: Wan 2.1 (not yet accepted)
@@ -118,7 +118,7 @@ For every notebook/test command, use `OEC_ROOT="${OEC_ROOT:-$HOME/OEC}"` and `cd
 
 ## Historical sync result
 
-The former worktree-based run [39380928762](https://github.com/CalamityStriker/OEC/actions/runs/39380928762), job 118489623737, advanced `$HOME/OEC_feature_sync` to `132a8a5820a104ec27c14a87c9af3d4f84e83b98` while deliberately preserving the old dirty/detached `$HOME/OEC` checkout. That result is historical; verify the latest canonical-root workflow for the actual A100 checkout SHA. The static workflow [39380928743](https://github.com/CalamityStriker/OEC/actions/runs/39380928743) validated source/static tests, not live inference.
+The former worktree-based run [39380928762](https://github.com/xflexwork/OEC/actions/runs/39380928762), job 118489623737, advanced `$HOME/OEC_feature_sync` to `132a8a5820a104ec27c14a87c9af3d4f84e83b98` while deliberately preserving the old dirty/detached `$HOME/OEC` checkout. That result is historical; verify the latest canonical-root workflow for the actual A100 checkout SHA. The static workflow [39380928743](https://github.com/xflexwork/OEC/actions/runs/39380928743) validated source/static tests, not live inference.
 
 
 ## Live Gradio callback acceptance
@@ -149,7 +149,7 @@ On oec-2, model setup and the visual sidecar stage only check for remaining `.st
 
 ## Current live test outcomes
 
-- Existing AudioGen notebook: **PASS** on oec-2, actual 3.0-second non-silent WAV, 96,078 bytes; SHA-256 `30b67f2c8f0dbfd017a319705091f607cada98f44f086bf5e545a0cff4893c92`. Run [39384873799](https://github.com/CalamityStriker/OEC/actions/runs/39384873799), artifact [12247855010](https://github.com/CalamityStriker/OEC/actions/runs/39384873799/artifacts/12247855010).
+- Existing AudioGen notebook: **PASS** on oec-2, actual 3.0-second non-silent WAV, 96,078 bytes; SHA-256 `30b67f2c8f0dbfd017a319705091f607cada98f44f086bf5e545a0cff4893c92`. Run [39384873799](https://github.com/xflexwork/OEC/actions/runs/39384873799), artifact [12247855010](https://github.com/xflexwork/OEC/actions/runs/39384873799/artifacts/12247855010).
 - Dedicated AudioGen Gradio UI/callback: **FAIL before callback** because proxy settings blocked Gradio's localhost accessibility check. The harness now explicitly bypasses the proxy for loopback hosts and disables analytics during this test; the next run is required to mark this path passed.
 - MusicGen: **BLOCKED before model load/inference** because `select_idle_a100_gpu` found no eligible idle GPU. No WAV was generated by this run and no process was killed. Keep the guard and retry after a fresh GPU inventory shows an admissible A100.
 
@@ -179,8 +179,8 @@ After each live smoke the job closes its sidecars; therefore the saved post-run 
 
 ## Latest evidence note — 2026-10-20
 
-The full A100 acceptance run [39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568), source SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`, passed all 8 ordered jobs. Actual inference and real callbacks were verified for ACE-Step, Kokoro, Whisper Turbo, Qwen3-ASR, AudioGen and MusicGen; temporary service inference/structural artifact checks passed for LTX-2.3 and TRELLIS.2; FLUX PNG→TRELLIS GLB passed. Joined job `118691033786` passed LTX generation → Qwen2-VL QA → three-part `oec-asset-chunks-v1` upload → separate remote read-back/reassembly. The 228,845-byte asset SHA-256 was `3d66b13693184eb7f76841f96836ded2f3407dc1e11b810f2e91c1db8b465392`, matching the local QA-passed source; metadata SHA-256 `67c48f7483c3eccf836e9daef75e271c4c400026852f0e3da0ad4012d8b822de`.
+The full A100 acceptance run [39435100568](https://github.com/xflexwork/OEC/actions/runs/39435100568), source SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`, passed all 8 ordered jobs. Actual inference and real callbacks were verified for ACE-Step, Kokoro, Whisper Turbo, Qwen3-ASR, AudioGen and MusicGen; temporary service inference/structural artifact checks passed for LTX-2.3 and TRELLIS.2; FLUX PNG→TRELLIS GLB passed. Joined job `118691033786` passed LTX generation → Qwen2-VL QA → three-part `oec-asset-chunks-v1` upload → separate remote read-back/reassembly. The 228,845-byte asset SHA-256 was `3d66b13693184eb7f76841f96836ded2f3407dc1e11b810f2e91c1db8b465392`, matching the local QA-passed source; metadata SHA-256 `67c48f7483c3eccf836e9daef75e271c4c400026852f0e3da0ad4012d8b822de`.
 
-Current source SHA is `72b71f861bba72b78da1cec330e4273b00baaabb`. Static/storage run [39452849501](https://github.com/CalamityStriker/OEC/actions/runs/39452849501) passed on this exact SHA. Live run [39452849617](https://github.com/CalamityStriker/OEC/actions/runs/39452849617) is in progress after its source-sync job passed. This commit adds validated Whisper `segment_timestamps` metadata and unit coverage for correct and malformed timestamps, while preserving existing text-artifact bytes/format and segment count. Wait for run 39452849617 before claiming the changed Whisper provider accepted.
+Current source SHA is `72b71f861bba72b78da1cec330e4273b00baaabb`. Static/storage run [39452849501](https://github.com/xflexwork/OEC/actions/runs/39452849501) passed on this exact SHA. Live run [39452849617](https://github.com/xflexwork/OEC/actions/runs/39452849617) is in progress after its source-sync job passed. This commit adds validated Whisper `segment_timestamps` metadata and unit coverage for correct and malformed timestamps, while preserving existing text-artifact bytes/format and segment count. Wait for run 39452849617 before claiming the changed Whisper provider accepted.
 
 The isolated `$HOME/OEC_feature_sync` on A100 matched the SHA and was clean. The original dirty/detached `$HOME/OEC` checkout was deliberately preserved. Workflow-local HTTP services shut down after test exit; a post-run unreachable endpoint does not prove deploy readiness. Standalone FLUX, AudioGen and MusicGen remain `NOT_EXPOSED` on the shared supervised `/v1/jobs` API. AudioGen/MusicGen weights are CC-BY-NC-4.0. The persistent service/consumer route, high-load reliability, broad semantic metrics and TRELLIS watertightness remain outstanding.
