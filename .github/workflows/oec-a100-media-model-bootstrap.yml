@@ -7,7 +7,6 @@ on:
     branches:
       - feat/media-service-sidecars-20261018
     paths:
-      - ".github/workflows/oec-a100-media-model-bootstrap.yml"
       # Model bootstrap is expensive and shares the A100/storage lane. Keep QA,
       # upload/status and workflow-file-only edits on CPU contract CI; trigger this
       # only for model/runtime/cache/storage changes that need real model acceptance.
@@ -25,7 +24,6 @@ on:
       - "tests/test_oec_service_manager_media.py"
       - "tools/run_media_model_smokes.py"
       - "oec_gpu_admission.py"
-      - "tools/run_gradio_model_notebook_smokes.py"
       - "tests/test_ace_step_runtime.py"
       - "tools/media_services/**"
       - "tools/model_cache_manager.py"

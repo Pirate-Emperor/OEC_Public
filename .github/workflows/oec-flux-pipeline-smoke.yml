@@ -6,7 +6,6 @@ on:
       - feat/media-service-sidecars-20261018
       - fix/media-stack-supervision-20261019
     paths:
-      - ".github/workflows/oec-flux-pipeline-smoke.yml"
       - "pipeline_flux_image.py"
       - "oec_gpu_admission.py"
       - "pipeline_flux_trellis.py"
