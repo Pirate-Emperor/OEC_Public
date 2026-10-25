@@ -93,6 +93,8 @@ class MediaServiceSpecTests(unittest.TestCase):
         self.assertEqual(args.service, "audiocraft-api")
         self.assertEqual(args.provider, "musicgen")
         self.assertTrue(args.accept_noncommercial_license)
+        args = parser.parse_args(["start", "flux-api", "--gpu", "1", "--allow-download"])
+        self.assertTrue(args.allow_download)
         args = parser.parse_args(["start", "asset-factory-worker", "--asset-factory-timeout-seconds", "600"])
         self.assertEqual(args.service, "asset-factory-worker")
         self.assertEqual(args.asset_factory_timeout_seconds, 600)
@@ -135,6 +137,21 @@ class MediaServiceSpecTests(unittest.TestCase):
         self.assertEqual(trellis["env_updates"]["CUDA_VISIBLE_DEVICES"], "2")
         self.assertEqual(ltx["env_updates"]["CUDA_VISIBLE_DEVICES"], "3")
         self.assertNotIn("--allow-download", ltx["script_args"])
+
+
+    def test_explicit_download_opt_in_is_passed_to_audio_and_flux_providers(self):
+        with mock.patch.object(manager, "_assert_port_range"):
+            audio = manager._build_media_service_spec(
+                "audiocraft-api", "audiogen", "2", port=7874,
+                accept_noncommercial_license=True, allow_download=True
+            )
+            flux = manager._build_media_service_spec(
+                "flux-api", gpu="1", port=7867, allow_download=True
+            )
+        self.assertIn("--allow-download", audio["script_args"])
+        self.assertIn("--allow-download", flux["script_args"])
+        self.assertEqual(audio["env_updates"]["HF_HUB_OFFLINE"], "0")
+        self.assertEqual(flux["env_updates"]["TRANSFORMERS_OFFLINE"], "0")
 
     def test_ltx_disk_cache_purge_is_explicit_opt_in(self):
         with mock.patch.object(manager, "_assert_port_range"):
