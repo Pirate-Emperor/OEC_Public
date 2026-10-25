@@ -150,7 +150,7 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertNotIn("import diffusers", all_source)
 
     def test_combined_flux_smoke_uses_model_server_client_cells(self):
-        source = (ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
+        source = (self.ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
         self.assertIn('"flux-combined": ("pipeline_trellis_3d.ipynb", "phase2_3d", "generate_concept")', source)
         self.assertIn('NOTEBOOK_CELL_SELECTION = {"flux-combined": {8, 12}}', source)
         self.assertIn('code_cell_indexes=NOTEBOOK_CELL_SELECTION.get(provider)', source)
