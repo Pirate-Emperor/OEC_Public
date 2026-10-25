@@ -41,7 +41,7 @@ class ModelNotebookTests(unittest.TestCase):
                 self.assertIn('Path("/tmp") / f"oec-', text, name)
                 self.assertNotIn('Path(tempfile.gettempdir()) / f"oec-', text, name)
             if name == "pipeline_audiogen_gradio.ipynb":
-                self.assertIn('"/v1/jobs"', text, name)
+                self.assertIn("/v1/jobs", text, name)
                 self.assertIn("audiocraft-api", text, name)
     def test_live_gradio_smoke_harness_is_valid_python(self):
         source = (ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
