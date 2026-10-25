@@ -1,0 +1,162 @@
+name: OEC model-cache cleanup audit
+run-name: "OEC model-cache audit - ${{ github.ref_name }}"
+
+on:
+  push:
+    branches:
+      - ops/oec-model-cache-cleanup-20261026
+    paths:
+      - .github/workflows/oec-model-cache-cleanup.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-media-gpu-storage-serial
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    if: contains(github.event.head_commit.message, '[audit-oec-model-cache]')
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [oec-1, oec-2, oec-3]
+    runs-on: [self-hosted, linux, x64, gpu, a100, "${{ matrix.runner }}"]
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout audit code without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate runner and select an existing OEC Python environment
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "${{ matrix.runner }}"
+          test -f "$HOME/OEC/storage_config.json"
+          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          CONDA="$HOME/Conda/condabin/conda"
+          test -x "$CONDA"
+          selected=""
+          for name in oec_deploy phase1 phase1_ltx phase2_3d; do
+            py="$("$CONDA" run --no-capture-output -n "$name" python -c 'import sys; print(sys.executable)' 2>/dev/null | tail -n 1 || true)"
+            if [[ -z "$py" || ! -x "$py" ]]; then continue; fi
+            if PYTHONPATH="$GITHUB_WORKSPACE/tools:$GITHUB_WORKSPACE" "$py" -c 'import core_config, huggingface_hub, storage_manager; from media_services.model_cache import model_targets, read_lock' >/dev/null 2>&1; then
+              selected="$py"
+              echo "OEC_SELECTED_ENV=$name" >> "$GITHUB_ENV"
+              break
+            fi
+          done
+          test -n "$selected" || { echo 'No pre-existing Python environment passed the import checks; no install attempted.'; exit 2; }
+          echo "OEC_PYTHON=$selected" >> "$GITHUB_ENV"
+          echo "RUNNER_NAME=$RUNNER_NAME HOST=$(hostname) ENV=$name PYTHON=$selected"
+
+      - name: Capture read-only quota, process, lock, and model-cache inventory
+        env:
+          OEC_MODEL_AUDIT_DIR: ${{ runner.temp }}/oec-model-cache-audit-${{ github.run_id }}-${{ matrix.runner }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$OEC_MODEL_AUDIT_DIR"
+          printf 'runner=%s\nhost=%s\nbranch=%s\ncommit=%s\n' "$RUNNER_NAME" "$(hostname)" "$GITHUB_REF_NAME" "$GITHUB_SHA" > "$OEC_MODEL_AUDIT_DIR/meta.txt"
+          "$OEC_PYTHON" storage_manager.py --status > "$OEC_MODEL_AUDIT_DIR/storage-status.txt" 2>&1 || echo $? > "$OEC_MODEL_AUDIT_DIR/storage-status.exit"
+          nvidia-smi --query-gpu=index,name,memory.total,memory.used,utilization.gpu --format=csv > "$OEC_MODEL_AUDIT_DIR/gpu-status.csv"
+          nvidia-smi --query-compute-apps=pid,process_name,used_gpu_memory --format=csv,noheader > "$OEC_MODEL_AUDIT_DIR/gpu-processes.csv" 2>&1 || true
+          "$OEC_PYTHON" - "$OEC_MODEL_AUDIT_DIR" "$GITHUB_WORKSPACE" "$RUNNER_NAME" <<'PY'
+          import json, os, re, socket, sys
+          from pathlib import Path
+          out, workspace, runner = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
+          sys.path.insert(0, str(workspace / 'tools'))
+          sys.path.insert(0, str(workspace))
+          from core_config import SYSTEM_DIRS
+          from media_services.model_cache import MODELS_ROOT, model_targets, read_lock
+          model_root = Path(MODELS_ROOT).expanduser().resolve()
+          quota_text = (out / 'storage-status.txt').read_text(encoding='utf-8', errors='replace')
+          quota = {'available': 'Group quota: UNAVAILABLE' not in quota_text, 'source': None, 'age_seconds': None, 'fresh_900s': False}
+          m = re.search(r'Quota source=([^ ]+) age=([0-9.]+)s', quota_text)
+          if m:
+              quota['source'], quota['age_seconds'] = m.group(1), float(m.group(2))
+              quota['fresh_900s'] = quota['age_seconds'] <= 900
+          locks = []
+          for key in model_targets():
+              row = read_lock(key)
+              if row is not None:
+                  locks.append({'model': key, 'state': row.get('state','unknown'), 'host': row.get('host'), 'pid': row.get('pid')})
+          processes = []
+          keywords = ('brain.py','hf_upload_daemon.py','qa_compliance_worker.py','worker_ltx_video.py','audio_api.py','trellis_api.py','ltx_api.py','flux_api.py','audiocraft_api.py','pipeline_audiogen.py','pipeline_musicgen.py','pipeline_flux_image.py','pipeline_flux_trellis.py','pipeline_trellis_3d.py','pipeline_flux_only.py','ipykernel_launcher','jupyter-lab','jupyter-notebook','asset_factory.worker')
+          for proc in Path('/proc').glob('[0-9]*'):
+              try:
+                  pid = int(proc.name)
+                  if pid == os.getpid(): continue
+                  cmd = (proc / 'cmdline').read_bytes().replace(b'\x00', b' ').decode('utf-8', 'ignore')
+                  matched = [k for k in keywords if k in cmd]
+                  if matched:
+                      comm = (proc / 'comm').read_text(encoding='utf-8', errors='replace').strip()[:80]
+                      processes.append({'pid': pid, 'comm': comm, 'matched_markers': matched})
+              except (OSError, PermissionError):
+                  continue
+          gpu_processes = (out / 'gpu-processes.csv').read_text(encoding='utf-8', errors='replace').strip()
+          inventory = {'runner': runner, 'host': socket.gethostname(), 'models_root': str(model_root), 'quota': quota,
+                       'runtime_locks': locks, 'matched_model_processes': processes,
+                       'gpu_process_lines': [line for line in gpu_processes.splitlines() if line.strip() and 'no running processes' not in line.lower()] }
+          def size_bytes(path):
+              if path.is_symlink() or not path.exists(): return 0
+              if path.is_file():
+                  try: return path.stat().st_size
+                  except OSError: return 0
+              total = 0
+              for folder, dirs, files in os.walk(path, followlinks=False):
+                  dirs[:] = [n for n in dirs if not (Path(folder) / n).is_symlink()]
+                  for name in files:
+                      f = Path(folder) / name
+                      if f.is_symlink(): continue
+                      try: total += f.stat().st_size
+                      except OSError: pass
+              return total
+          if runner == 'oec-1':
+              rows = []
+              known = model_targets()
+              for key, paths in known.items():
+                  for target in paths:
+                      rows.append({'model': key, 'path': str(target), 'present': target.exists() and not target.is_symlink(), 'bytes': size_bytes(target), 'source': 'model_cache_manager_allowlist'})
+              extra_ids = ['Lightricks/LTX-2.3','google/gemma-3-12b-it-qat-q4_0-unquantized','Qwen/Qwen2-VL-7B-Instruct']
+              hub = model_root / 'hub'
+              for repo_id in extra_ids:
+                  target = hub / ('models--' + repo_id.replace('/','--'))
+                  rows.append({'model': repo_id, 'path': str(target), 'present': target.exists() and not target.is_symlink(), 'bytes': size_bytes(target), 'source': 'OEC_pipeline_exact_repo_id'})
+              known_paths = {str(Path(p).resolve()) for paths in known.values() for p in paths if not Path(p).is_symlink()}
+              for target in sorted(hub.glob('models--*')) if hub.is_dir() else []:
+                  if target.is_symlink() or str(target.resolve()) in known_paths or any(str(target.resolve()) == row['path'] for row in rows): continue
+                  rows.append({'model': 'UNMAPPED_HF_CACHE', 'path': str(target), 'present': True, 'bytes': size_bytes(target), 'source': 'inventory_only_do_not_purge_automatically'})
+              for target in sorted(model_root.iterdir()) if model_root.is_dir() else []:
+                  if target.name in ('hub','whisper','ace-step-1.5') or target.is_symlink(): continue
+                  rows.append({'model': 'UNMAPPED_MODELS_ROOT_CHILD', 'path': str(target), 'present': True, 'bytes': size_bytes(target), 'source': 'inventory_only_do_not_purge_automatically'})
+              inventory['model_cache_inventory'] = rows
+          report = out / 'report.json'
+          report.write_text(json.dumps(inventory, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print('OEC_MODEL_CACHE_AUDIT=' + json.dumps(inventory, sort_keys=True))
+          PY
+          echo '--- StorageManager status ---'
+          tail -n 50 "$OEC_MODEL_AUDIT_DIR/storage-status.txt" || true
+          echo '--- GPU process inventory ---'
+          cat "$OEC_MODEL_AUDIT_DIR/gpu-processes.csv" || true
+          echo '--- Model-cache audit summary ---'
+          "$OEC_PYTHON" - "$OEC_MODEL_AUDIT_DIR/report.json" <<'PY'
+          import json, sys
+          d=json.load(open(sys.argv[1], encoding='utf-8'))
+          print(json.dumps({k:d.get(k) for k in ('runner','host','models_root','quota','runtime_locks','matched_model_processes','gpu_process_lines')}, indent=2, sort_keys=True))
+          if 'model_cache_inventory' in d:
+              print(json.dumps({'model_cache_inventory':d['model_cache_inventory']}, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-model-cache-audit-${{ github.run_id }}-${{ matrix.runner }}
+          path: ${{ runner.temp }}/oec-model-cache-audit-${{ github.run_id }}-${{ matrix.runner }}/
+          if-no-files-found: warn
+          retention-days: 7
