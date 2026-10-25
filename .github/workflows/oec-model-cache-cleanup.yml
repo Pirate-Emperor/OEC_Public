@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   audit:
-    if: contains(github.event.head_commit.message, '[audit-oec-model-cache]')
+    if: contains(github.event.head_commit.message, '[audit-oec-model-cache]') || contains(github.event.head_commit.message, '[remote-oec-cache-check]')
     strategy:
       fail-fast: false
       matrix:
@@ -76,7 +76,7 @@ jobs:
           model_root = Path(MODELS_ROOT).expanduser().resolve()
           quota_text = (out / 'storage-status.txt').read_text(encoding='utf-8', errors='replace')
           quota = {'available': 'Group quota: UNAVAILABLE' not in quota_text, 'source': None, 'age_seconds': None, 'fresh_900s': False}
-          m = re.search(r'Quota source=([^ ]+) age=([0-9.]+)s', quota_text)
+          m = re.search(r'Quota source=(.*?) age=([0-9.]+)s', quota_text)
           if m:
               quota['source'], quota['age_seconds'] = m.group(1), float(m.group(2))
               quota['fresh_900s'] = quota['age_seconds'] <= 900
@@ -127,12 +127,26 @@ jobs:
               for repo_id in extra_ids:
                   target = hub / ('models--' + repo_id.replace('/','--'))
                   rows.append({'model': repo_id, 'path': str(target), 'present': target.exists() and not target.is_symlink(), 'bytes': size_bytes(target), 'source': 'OEC_pipeline_exact_repo_id'})
+              legacy_targets = [
+                  ('legacy-flux-klein-4b', model_root / 'models--black-forest-labs--FLUX.2-klein-4B'),
+                  ('qwen2-vl-7b-instruct', model_root / 'models--Qwen--Qwen2-VL-7B-Instruct'),
+                  ('legacy-audiogen-medium', model_root / 'models--facebook--audiogen-medium'),
+                  ('legacy-musicgen-medium', model_root / 'models--facebook--musicgen-medium'),
+                  ('ltx-local-weights', model_root / 'LTX-2.3'),
+                  ('gemma-local-weights', model_root / 'gemma-3-12b-it-qat-q4_0-unquantized'),
+                  ('trellis-image-large-legacy', hub / 'models--microsoft--TRELLIS-image-large'),
+              ]
+              for key, target in legacy_targets:
+                  rows.append({'model': key, 'path': str(target), 'present': target.exists() and not target.is_symlink(), 'bytes': size_bytes(target), 'source': 'OEC_pipeline_exact_legacy_path'})
               known_paths = {str(Path(p).resolve()) for paths in known.values() for p in paths if not Path(p).is_symlink()}
+              known_paths.update(str(t.resolve()) for _, t in legacy_targets if t.parent == hub and not t.is_symlink())
               for target in sorted(hub.glob('models--*')) if hub.is_dir() else []:
                   if target.is_symlink() or str(target.resolve()) in known_paths or any(str(target.resolve()) == row['path'] for row in rows): continue
                   rows.append({'model': 'UNMAPPED_HF_CACHE', 'path': str(target), 'present': True, 'bytes': size_bytes(target), 'source': 'inventory_only_do_not_purge_automatically'})
+              exact_root_target_names = {t.name for _, t in legacy_targets if t.parent == model_root}
+              protected_or_metadata = {'.storage_reserve.bin', '.storage_manager.lock', '.locks', '.ipynb_checkpoints', '.agent_harnesses.json'}
               for target in sorted(model_root.iterdir()) if model_root.is_dir() else []:
-                  if target.name in ('hub','whisper','ace-step-1.5') or target.is_symlink(): continue
+                  if target.name in ('hub','whisper','ace-step-1.5') or target.name in protected_or_metadata or target.name in exact_root_target_names or target.is_symlink(): continue
                   rows.append({'model': 'UNMAPPED_MODELS_ROOT_CHILD', 'path': str(target), 'present': True, 'bytes': size_bytes(target), 'source': 'inventory_only_do_not_purge_automatically'})
               inventory['model_cache_inventory'] = rows
           report = out / 'report.json'
@@ -151,6 +165,39 @@ jobs:
           if 'model_cache_inventory' in d:
               print(json.dumps({'model_cache_inventory':d['model_cache_inventory']}, indent=2, sort_keys=True))
           PY
+
+      - name: Read-only remote process probe for shared model-lock host
+        if: matrix.runner == 'oec-1' && contains(github.event.head_commit.message, '[remote-oec-cache-check]')
+        env:
+          OEC_MODEL_AUDIT_DIR: ${{ runner.temp }}/oec-model-cache-audit-${{ github.run_id }}-${{ matrix.runner }}
+        run: |
+          set +e
+          command -v ssh >/dev/null 2>&1 || { echo 'REMOTE_HOST_PROBE=UNAVAILABLE reason=ssh-not-installed'; exit 0; }
+          timeout 25s ssh -o BatchMode=yes -o ConnectTimeout=7 -o StrictHostKeyChecking=yes scn30-mn python3 - <<'PY' > "$OEC_MODEL_AUDIT_DIR/remote-scn30-process-audit.txt" 2>&1
+          import json, os, socket, subprocess
+          from pathlib import Path
+          keys=('brain.py','hf_upload_daemon.py','qa_compliance_worker.py','worker_ltx_video.py','audio_api.py','trellis_api.py','ltx_api.py','flux_api.py','audiocraft_api.py','pipeline_audiogen.py','pipeline_musicgen.py','pipeline_flux_image.py','pipeline_flux_trellis.py','pipeline_trellis_3d.py','pipeline_flux_only.py','ipykernel_launcher','jupyter-lab','jupyter-notebook','asset_factory.worker')
+          found=[]
+          for p in Path('/proc').glob('[0-9]*'):
+            try:
+              pid=int(p.name)
+              cmd=(p/'cmdline').read_bytes().replace(b'\x00',b' ').decode('utf-8','ignore')
+              hit=[k for k in keys if k in cmd]
+              if hit:
+                comm=(p/'comm').read_text(errors='replace').strip()[:80]
+                found.append({'pid':pid,'comm':comm,'markers':hit})
+            except OSError: pass
+          gpu=subprocess.run(['nvidia-smi','--query-compute-apps=pid,process_name,used_gpu_memory','--format=csv,noheader'],text=True,capture_output=True,timeout=10)
+          locked_pids=[]
+          for pid in (774590,767977,771488,770804):
+            p=subprocess.run(['ps','-p',str(pid),'-o','pid=,comm=,etime=,stat='],text=True,capture_output=True,timeout=5)
+            if p.stdout.strip(): locked_pids.append(p.stdout.strip())
+          print(json.dumps({'host':socket.gethostname(),'matched_model_processes':found,'gpu_process_returncode':gpu.returncode,'gpu_processes':gpu.stdout.strip(),'gpu_probe_stderr':gpu.stderr[-500:],'known_lock_pid_status':locked_pids},sort_keys=True))
+          PY
+          rc=$?
+          echo "REMOTE_HOST_PROBE_EXIT=$rc"
+          cat "$OEC_MODEL_AUDIT_DIR/remote-scn30-process-audit.txt" || true
+          if [[ "$rc" != 0 ]]; then echo 'REMOTE_HOST_PROBE=UNAVAILABLE; any purge of potentially active remote models must remain blocked.'; fi
 
       - name: Upload audit evidence
         if: always()
