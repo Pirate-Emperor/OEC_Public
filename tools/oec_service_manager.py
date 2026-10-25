@@ -453,6 +453,7 @@ def _build_media_service_spec(
     python_override: str | None = None,
     *,
     accept_noncommercial_license: bool = False,
+    allow_download: bool = False,
     purge_ltx_cache_after_load: bool = False,
     asset_factory_poll_seconds: float = 5.0,
     asset_factory_timeout_seconds: int = 1800,
@@ -465,6 +466,9 @@ def _build_media_service_spec(
         "TRANSFORMERS_OFFLINE": "1",
         "OEC_USE_MANAGER_DIRECTORY_ONLY": "0",
     }
+    if allow_download:
+        base_env["HF_HUB_OFFLINE"] = "0"
+        base_env["TRANSFORMERS_OFFLINE"] = "0"
 
     # The Asset Factory consumer is CPU-only and must not claim a GPU or port.
     if service == "asset-factory-worker":
@@ -511,6 +515,8 @@ def _build_media_service_spec(
             selected_python = python_override or str(Path.home() / ".local" / "venvs" / "oec-audio-py311" / "bin" / "python")
         instance_id = f"audio-api-{provider}"
         script_args = ["--model", provider, "--host", "127.0.0.1", "--port", str(selected_port)]
+        if allow_download:
+            script_args.append("--allow-download")
     elif service == "audiocraft-api":
         if provider not in AUDIOCRAFT_API_DEFAULT_PORTS:
             raise ValueError("audiocraft-api supports only audiogen or musicgen.")
@@ -529,6 +535,8 @@ def _build_media_service_spec(
             "--model", provider, "--host", "127.0.0.1", "--port", str(selected_port),
             "--gpu", gpu_id, "--accept-noncommercial-license",
         ]
+        if allow_download:
+            script_args.append("--allow-download")
     elif service in {"flux-api", "trellis-api", "ltx-api", *MEDIA_SIDECAR_DEFAULT_PORTS}:
         if service == "flux-api":
             selected_port = port if port is not None else ASSET_FACTORY_API_PORTS[service]
@@ -539,6 +547,8 @@ def _build_media_service_spec(
             # FLUX's selector applies CUDA_VISIBLE_DEVICES only after physical-GPU selection.
             gpu_mask = None
             script_args = ["--host", "127.0.0.1", "--port", str(selected_port), "--gpu", gpu_id]
+            if allow_download:
+                script_args.append("--allow-download")
         elif service in {"ltx-api", "ltx-sidecar"}:
             selected_port = port if port is not None else (
                 ASSET_FACTORY_API_PORTS["ltx-api"] if service == "ltx-api" else MEDIA_SIDECAR_DEFAULT_PORTS[service]
@@ -608,6 +618,7 @@ def _start_media_service(args: argparse.Namespace, service: str, conda_root: Pat
         service=service, provider=args.provider, gpu=args.gpu,
         port=args.media_port, python_override=args.python,
         accept_noncommercial_license=args.accept_noncommercial_license,
+        allow_download=args.allow_download,
         purge_ltx_cache_after_load=args.purge_ltx_cache_after_load,
         asset_factory_poll_seconds=args.asset_factory_poll_seconds,
         asset_factory_timeout_seconds=args.asset_factory_timeout_seconds,
@@ -1288,6 +1299,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--accept-noncommercial-license", action="store_true",
         help="Acknowledge AudioGen/MusicGen CC-BY-NC-4.0 boundary; required for audiocraft-api.",
     )
+    child.add_argument("--allow-download", action="store_true",
+                       help="Explicitly permit missing model files to be downloaded only after provider StorageManager admission passes.")
     child.add_argument(
         "--purge-ltx-cache-after-load", action="store_true",
         help="Explicitly opt into storage-gated LTX load and cache purge only after successful model load.",
