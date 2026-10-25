@@ -1,4 +1,11 @@
-## Current demo state — 2026-10-23
+## Current maintenance update — 2026-10-26
+
+- [x] Targeted idle OEC media-model weight cleanup completed in [Actions run 40223425738](https://github.com/xflexwork/OEC/actions/runs/40223425738). Known FLUX/TRELLIS/LTX/Gemma/Qwen2-VL/AudioGen/MusicGen weight-cache paths were removed through `DiskPurgeManager`; post-purge inventory confirms zero bytes remain at those targets.
+- [x] StorageManager reports models usage 251.89 GB → 57.29 GB and group-quota hard headroom 51.76 GB → 143.53 GB; grace is inactive after cleanup.
+- [ ] Verify the remote `scn30-mn` runtime-lock host through a trusted SSH host key before considering cleanup of ACE-Step, Kokoro, Qwen3-ASR or Whisper Turbo. These caches remain untouched while lock state is remote/unknown.
+- [ ] Add a tested model-specific retention policy for subsequent use: permit cache recreation through normal quota/license-gated preparation, then purge only after service/job shutdown, GPU/process checks and lock clearance. See [2026-10-26 changelog](changelog/CHANGELOG-2026-10-26.md) and [checklist](docs/checklist.md).
+
+## Historical demo state — 2026-10-23 (retained)
 
 Candidate: `fix/media-stack-supervision-20261019` / `ae6c90b891ec80338c9c96446d735b03e1985d8a`.
 

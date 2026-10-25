@@ -1,3 +1,13 @@
+# OEC model-cache cleanup result — 2026-10-26
+
+- Guarded cache purge [run 40223425738](https://github.com/xflexwork/OEC/actions/runs/40223425738) completed successfully after fresh StorageManager, GPU process, OEC process and target-lock checks on runner labels `oec-1`, `oec-2` and `oec-3`; the purge job ran on `oec-1`.
+- `DiskPurgeManager` removed the known idle OEC media-model weight paths: FLUX.2 Klein (Hub + legacy), TRELLIS.2-4B, legacy TRELLIS-image-large, LTX-2.3 (Hub + local weights), Gemma-3 LTX encoder (Hub + local weights), Qwen2-VL-7B legacy cache, AudioGen-medium legacy cache and MusicGen-medium legacy cache. Post-purge status returned `present=false` and `disk_bytes=0` for each target.
+- StorageManager models-directory usage fell from 251.89 GB to 57.29 GB; fresh group-quota hard headroom increased from 51.76 GB to 143.53 GB and quota grace cleared. Path-level sizes can count duplicate/hard-linked files more than once; use the group-quota delta as the conservative space-reclamation measure.
+- ACE-Step, Kokoro, Qwen3-ASR and Whisper Turbo were intentionally preserved because their runtime-lock records point to `scn30-mn`; the connection could not be verified under strict SSH host-key checking. Unknown cache directories and source checkouts were preserved, and no reserve/lock files were touched.
+- This was cache cleanup only; no inference was performed afterward and no model-readiness or current-head inference claim follows from it.
+
+---
+
 # OEC cumulative result update — 2026-10-23
 
 Source candidate inspected: `ae6c90b891ec80338c9c96446d735b03e1985d8a` on `fix/media-stack-supervision-20261019`.

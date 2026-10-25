@@ -1,3 +1,7 @@
+## 2026-10-26 — targeted idle model-cache cleanup
+
+- [Daily changelog](CHANGELOG-2026-10-26.md) records the guarded cleanup of known OEC media-model weights, the post-purge StorageManager/quota results and model caches intentionally preserved because their runtime-lock host could not be verified.
+
 ## 2026-10-25 — repository namespace and A100 handoff refresh
 
 - [Daily changelog](CHANGELOG-2026-10-25.md) records current `xflexwork/OEC` refs, exact-feature-head static/unit results, the cancelled canonical A100 sync, account-namespace cleanup and open acceptance gates. Historical failed attempts remain in the record.

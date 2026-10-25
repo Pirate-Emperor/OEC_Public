@@ -1,6 +1,17 @@
 # OEC project continuation checklist
 
-## Current verified state — 2026-10-25T23:14:59+05:30 (Asia/Kolkata)
+## Current verified state — 2026-10-26T00:25:20+05:30 (Asia/Kolkata)
+
+- **Targeted model-cache cleanup PASS:** [Actions run 40223425738](https://github.com/xflexwork/OEC/actions/runs/40223425738), source SHA `9fe0a7e2f7348f8c3949e5226af1795799b5e839` on the temporary operations branch `ops/oec-model-cache-cleanup-20261026`. All three runner-label preflights passed and the purge job completed successfully.
+- **Removed and verified absent:** FLUX.2 Klein Hub + legacy caches; TRELLIS.2-4B cache; legacy TRELLIS-image-large cache; both LTX-2.3 weight paths; both Gemma-3 LTX-encoder paths; Qwen2-VL-7B legacy cache; AudioGen-medium and MusicGen-medium legacy caches. Post-purge `model_cache_manager.py status` reports each targeted key as `present=false`, `disk_bytes=0`.
+- **StorageManager after cleanup:** models-directory reported use fell from 251.89 GB to 57.29 GB. Fresh group-quota hard headroom rose from 51.76 GB to 143.53 GB (+91.77 GB); quota grace is now inactive and admission reports within the conservative quota limit. Folder counters can double-count duplicate/hard-linked content; the group-quota headroom change is the conservative reclamation signal.
+- **Preserved conservatively:** ACE-Step, Kokoro, Qwen3-ASR and Whisper Turbo caches still have runtime-lock records for host `scn30-mn`. The read-only SSH probe could not verify that host because its host key was not trusted; strict host-key checking was not bypassed. Unmapped caches, `LTX-2-Source`, `TRELLIS.2`, datasets, checkpoints, outputs, reserve files and storage locks were not targeted.
+- **Not claimed:** no inference was run after removing these weights, and the canonical `$HOME/OEC` Git checkout was not changed. When these models are next needed, re-provision them only through the existing licensed, quota-gated model setup process.
+- **Next priority:** add/validate a consistent model-specific retention lifecycle so future downloads are evicted only after their service/job stops and no process or runtime lock remains. Do not enable automatic post-load deletion for a model until lazy-loading/runtime behavior is tested.
+
+---
+
+## Historical verified state — 2026-10-25T23:14:59+05:30 (retained)
 
 - **Canonical repository:** `xflexwork/OEC`. `main` is at `ada21d40616bf7753732c4f92133d0baafafa3dd`; `fix/media-stack-supervision-20261019` is at `a8c5247c891b4bd997954453944c71bfe3d9ddb5`. The feature branch is 396 commits ahead and 14 behind `main`; do not merge blindly.
 - **Exact feature-head static/storage regressions:** [run 39856646717](https://github.com/xflexwork/OEC/actions/runs/39856646717) passed 154 tests across 19 unittest invocations and notebook JSON validation.

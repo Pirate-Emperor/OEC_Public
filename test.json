@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-25T23:14:59+05:30",
+  "last_updated": "2026-10-26T00:25:20+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Read-only GitHub audit dated 2026-10-25: current feature head a8c5247c891b4bd997954453944c71bfe3d9ddb5. Exact-head static/storage regressions passed 154 tests across 19 invocations (run 39856646717); encrypted-HF verifier offline unit tests passed 6/6 (run 39856646893). Last live FLUX.2 Klein→TRELLIS.2 A100 acceptance remains on older SHA ae6c90b891ec80338c9c96446d735b03e1985d8a (run 39646903815; GLB 193544 bytes, SHA-256 94daca421e06e191ae5fd7d10da20cf89808ea187c14d338f8a1628bfd08bd66; 2886 vertices / 4752 faces). Current-head canonical sync run 39856646719 was cancelled before its sync job ran; previous run 39646903801 failed closed after detecting active OEC inference/queue work. Current canonical checkout, live process/queue state, and current-head inference remain unverified. Historical experiments are retained as originally recorded; this audit ran no tests or inference.",
+  "latest_summary": "2026-10-26 targeted model-cache purge PASS in Actions run 40223425738 on operations commit 9fe0a7e2f7348f8c3949e5226af1795799b5e839. Post-purge model_cache_manager status confirms FLUX.2 Klein (Hub and legacy), TRELLIS.2-4B, legacy TRELLIS-image-large, both LTX-2.3 paths, both Gemma-3 LTX-encoder paths, Qwen2-VL-7B legacy, AudioGen-medium and MusicGen-medium caches absent. StorageManager model-directory accounting fell 251.89 GB to 57.29 GB; group-quota hard headroom rose 51.76 GB to 143.53 GB and quota grace cleared. ACE-Step, Kokoro, Qwen3-ASR and Whisper Turbo were preserved due remote/unknown runtime locks on scn30-mn; unknown caches, source trees and protected reserve/lock files were not touched. No inference was run after cleanup.",
   "experiments": [
     {
       "id": "EXP-2026-10-21-OEC-FLUX-TRELLIS-LIVE-VERIFICATION",
@@ -5926,8 +5926,71 @@
         "common /v1/jobs for standalone FLUX/AudioGen/MusicGen remains outstanding",
         "persistent OEC-Deploy/OEC-Play E2E remains outstanding"
       ]
+    },
+    {
+      "id": "OEC-MODEL-CACHE-CLEANUP-2026-10-26",
+      "date": "2026-10-26",
+      "category": "Targeted idle OEC media-model cache cleanup",
+      "approach": "One-shot self-hosted Actions purge through the existing DiskPurgeManager-backed model_cache_manager CLI after fresh StorageManager quota, GPU process, OEC process and target runtime-lock checks on all three configured runner labels.",
+      "reason": "User requested removing downloaded OEC media-model weights that are not currently in use to free shared storage.",
+      "parameters": {
+        "repository": "xflexwork/OEC",
+        "operations_branch": "ops/oec-model-cache-cleanup-20261026",
+        "operations_commit": "9fe0a7e2f7348f8c3949e5226af1795799b5e839",
+        "workflow_run_id": 40223425738,
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/40223425738",
+        "runner_preflights": [
+          "oec-1",
+          "oec-2",
+          "oec-3"
+        ],
+        "purge_runner": "oec-1",
+        "target_models": [
+          "flux-klein-4b",
+          "trellis-2-4b",
+          "trellis-image-large",
+          "ltx-2.3",
+          "gemma-3-ltx",
+          "qwen2-vl-7b",
+          "audiogen-medium",
+          "musicgen-medium"
+        ],
+        "removal_method": "tools/model_cache_manager.py purge <model> --confirm; DiskPurgeManager path checks",
+        "protected_reserve_files_touched": false
+      },
+      "results": {
+        "status": "PASS_TARGETED_CACHE_PURGE",
+        "targeted_models_absent_after": true,
+        "targeted_cache_bytes_after": 0,
+        "model_directory_reported_usage_before_gb": 251.89,
+        "model_directory_reported_usage_after_gb": 57.29,
+        "model_directory_accounting_delta_gb": 194.6,
+        "group_quota_hard_headroom_before_gb": 51.76,
+        "group_quota_hard_headroom_after_gb": 143.53,
+        "group_quota_hard_headroom_delta_gb": 91.77,
+        "quota_grace_active_after": false,
+        "active_locked_models_preserved": [
+          "ace-step",
+          "kokoro",
+          "qwen3-asr-0.6b",
+          "whisper-turbo"
+        ],
+        "unknown_cache_directories_preserved": true,
+        "model_source_checkouts_preserved": [
+          "LTX-2-Source",
+          "TRELLIS.2"
+        ],
+        "protected_storage_files_touched": false
+      },
+      "interpretation": "Known idle OEC media-model weights and duplicate legacy copies have been removed. Post-purge model_cache_manager status reports absent targets. The conservative observed group-quota headroom increase is 91.77 GB; folder-level byte estimates may count duplicate or hard-linked content more than once.",
+      "limitations": [
+        "No inference or model-readiness test was run after deleting the caches; those models must be re-provisioned through normal quota/license-gated setup when needed.",
+        "ACE-Step, Kokoro, Qwen3-ASR and Whisper Turbo remain because their runtime-lock records point to scn30-mn. Strict SSH host-key validation failed because that host key was not trusted; this session did not bypass host-key checking.",
+        "Unmapped cache directories and model weights potentially owned by other OEC workstreams were preserved.",
+        "No canonical $HOME/OEC checkout synchronization was performed."
+      ]
     }
   ],
-  "updated_at": "2026-10-23T02:30:00+05:30",
-  "updated_date": "2026-10-23"
+  "updated_at": "2026-10-26T00:25:20+05:30",
+  "updated_date": "2026-10-26"
 }
