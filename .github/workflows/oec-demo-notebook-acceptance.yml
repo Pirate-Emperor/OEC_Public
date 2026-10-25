@@ -155,7 +155,7 @@ jobs:
 
       - name: Prepare ACE-Step checkpoints and isolated runtime
         id: ace_prepare
-        if: always()
+        if: always() && steps.preflight.outcome == 'success'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -197,7 +197,7 @@ jobs:
 
       - name: Prepare FLUX cache through StorageManager admission
         id: flux_cache_prepare
-        if: always()
+        if: always() && steps.preflight.outcome == 'success'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -209,7 +209,7 @@ jobs:
 
       - name: Start the FLUX model server on an admitted idle A100
         id: flux_start
-        if: always()
+        if: always() && steps.preflight.outcome == 'success'
         continue-on-error: true
         run: |
           set -euo pipefail
