@@ -16,22 +16,55 @@ LOCK_ROOT = Path(SYSTEM_DIRS["outputs"]).expanduser().resolve() / "media_service
 WHISPER_SIZES = ("tiny", "base", "small", "medium", "large-v3", "turbo")
 
 def model_targets() -> dict[str, list[Path]]:
+    # Older pipeline versions used MODELS_ROOT as HF cache_dir; newer ones
+    # use MODELS_ROOT/hub. Cleanup lists both exact model-owned layouts.
     targets = {
         "ace-step": [MODELS_ROOT / "ace-step-1.5"],
-        "flux-klein-4b": [MODELS_ROOT / "hub" / "models--black-forest-labs--FLUX.2-klein-4B"],
-        "trellis-2-4b": [MODELS_ROOT / "hub" / "models--microsoft--TRELLIS.2-4B"],
-        "audiogen-medium": [MODELS_ROOT / "hub" / "models--facebook--audiogen-medium"],
-        "musicgen-medium": [MODELS_ROOT / "hub" / "models--facebook--musicgen-medium"],
-        "kokoro": [MODELS_ROOT / "hub" / "models--hexgrad--Kokoro-82M"],
-        "qwen3-asr-0.6b": [MODELS_ROOT / "hub" / "models--Qwen--Qwen3-ASR-0.6B"],
+        "flux-klein-4b": [
+            MODELS_ROOT / "hub" / "models--black-forest-labs--FLUX.2-klein-4B",
+            MODELS_ROOT / "models--black-forest-labs--FLUX.2-klein-4B",
+        ],
+        "trellis-2-4b": [
+            MODELS_ROOT / "hub" / "models--microsoft--TRELLIS.2-4B",
+            MODELS_ROOT / "models--microsoft--TRELLIS.2-4B",
+        ],
+        "audiogen-medium": [
+            MODELS_ROOT / "hub" / "models--facebook--audiogen-medium",
+            MODELS_ROOT / "models--facebook--audiogen-medium",
+        ],
+        "musicgen-medium": [
+            MODELS_ROOT / "hub" / "models--facebook--musicgen-medium",
+            MODELS_ROOT / "models--facebook--musicgen-medium",
+        ],
+        "kokoro": [
+            MODELS_ROOT / "hub" / "models--hexgrad--Kokoro-82M",
+            MODELS_ROOT / "models--hexgrad--Kokoro-82M",
+        ],
+        "qwen3-asr-0.6b": [
+            MODELS_ROOT / "hub" / "models--Qwen--Qwen3-ASR-0.6B",
+            MODELS_ROOT / "models--Qwen--Qwen3-ASR-0.6B",
+        ],
+        "ltx-2.3": [
+            MODELS_ROOT / "hub" / "models--Lightricks--LTX-2.3",
+            MODELS_ROOT / "models--Lightricks--LTX-2.3",
+            MODELS_ROOT / "LTX-2.3",
+        ],
+        "gemma-3-12b": [
+            MODELS_ROOT / "hub" / "models--google--gemma-3-12b-it-qat-q4_0-unquantized",
+            MODELS_ROOT / "models--google--gemma-3-12b-it-qat-q4_0-unquantized",
+            MODELS_ROOT / "gemma-3-12b-it-qat-q4_0-unquantized",
+        ],
         "wan-t2v-14b": [
             MODELS_ROOT / "hub" / "models--Wan-AI--Wan2.1-T2V-14B-Diffusers",
             MODELS_ROOT / "hub" / "models--Wan-AI--Wan2.1-T2V-14B",
+            MODELS_ROOT / "models--Wan-AI--Wan2.1-T2V-14B-Diffusers",
+            MODELS_ROOT / "models--Wan-AI--Wan2.1-T2V-14B",
         ],
     }
     for size in WHISPER_SIZES:
         targets[f"whisper-{size}"] = [MODELS_ROOT / "whisper" / size]
     return targets
+
 
 def _path_size(path: Path) -> int:
     if path.is_symlink() or not path.exists():
