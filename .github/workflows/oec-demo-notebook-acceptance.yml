@@ -283,6 +283,90 @@ jobs:
           test -f "$RUNNER_TEMP/oec-media-smoke-logs/ace-step-gradio-notebook-smoke.json"
           cp "$RUNNER_TEMP/oec-media-smoke-logs/ace-step-gradio-notebook-smoke.json" "$R/ace-step-gradio-notebook-smoke.json"
 
+      - name: Verify storage admission before TRELLIS cache/model startup
+        id: trellis_prepare
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/trellis"
+          mkdir -p "$R"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-before.log"
+
+      - name: Start TRELLIS model server on an admitted idle A100
+        id: trellis_start
+        if: always() && steps.trellis_prepare.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/trellis"
+          GPU="$("$CONDA_EXE" run --no-capture-output -n phase2_3d python -c 'from oec_gpu_admission import select_idle_a100_gpu; print(select_idle_a100_gpu(caller="TRELLIS_NOTEBOOK_ACCEPTANCE")["index"])' | tail -n 1)"
+          echo "TRELLIS_PHYSICAL_GPU=$GPU" | tee "$R/gpu.txt"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py start trellis-api --gpu "$GPU" --port 7868 --allow-download 2>&1 | tee "$R/service-start.log"
+
+      - name: Wait for TRELLIS model server readiness
+        id: trellis_health
+        if: always() && steps.trellis_start.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/trellis"
+          HEALTH_CODE='import json,urllib.request; op=urllib.request.build_opener(urllib.request.ProxyHandler({})); h=json.load(op.open("http://127.0.0.1:7868/health",timeout=3)); assert h.get("ready") and h.get("model_loaded"),h; print(json.dumps(h))'
+          ready=0
+          for _ in $(seq 1 240); do
+            if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
+            sleep 5
+          done
+          cat "$R/health-check.log"
+          test "$ready" -eq 1
+
+      - name: Exercise standalone TRELLIS notebook Gradio callback and validate GLB
+        id: trellis_only_gradio
+        if: always() && steps.trellis_health.outcome == 'success'
+        continue-on-error: true
+        env:
+          OEC_MEDIA_API_URL: "http://127.0.0.1:7868"
+          OEC_TRELLIS_API_URL: "http://127.0.0.1:7868"
+          OEC_GRADIO_HEADLESS_SMOKE: "1"
+          GRADIO_ANALYTICS_ENABLED: "False"
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/trellis"
+          timeout --signal=INT --kill-after=30s 2400s "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/run_gradio_model_notebook_smokes.py --provider trellis-only --report-dir "$R" 2>&1 | tee "$R/trellis-only-gradio-callback.log"
+
+      - name: Exercise combined TRELLIS/FLUX notebook TRELLIS callback and validate GLB
+        id: trellis_combined_gradio
+        if: always() && steps.trellis_health.outcome == 'success'
+        continue-on-error: true
+        env:
+          OEC_MEDIA_API_URL: "http://127.0.0.1:7868"
+          OEC_TRELLIS_API_URL: "http://127.0.0.1:7868"
+          OEC_GRADIO_HEADLESS_SMOKE: "1"
+          GRADIO_ANALYTICS_ENABLED: "False"
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/trellis"
+          timeout --signal=INT --kill-after=30s 2400s "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/run_gradio_model_notebook_smokes.py --provider trellis-combined --report-dir "$R" 2>&1 | tee "$R/trellis-combined-gradio-callback.log"
+
+      - name: Stop managed TRELLIS service and save diagnostics
+        if: always()
+        run: |
+          set +e
+          R="$OEC_ACCEPTANCE_ROOT/trellis"
+          mkdir -p "$R"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py logs trellis-api --tail 150 >"$R/service-final.log" 2>&1
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py stop trellis-api --grace-seconds 25 >>"$R/service-final.log" 2>&1
+          exit 0
+
+      - name: Purge TRELLIS model cache after verified service shutdown
+        id: trellis_purge
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py purge trellis-2-4b --confirm 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/trellis/cache-cleanup.log"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/trellis/cache-cleanup.log"
+
       - name: Prepare FLUX cache through StorageManager admission
         id: flux_cache_prepare
         if: always() && steps.preflight.outcome == 'success'
@@ -405,6 +489,12 @@ jobs:
           MUSICGEN_PURGE_OUTCOME: ${{ steps.musicgen_purge.outcome }}
           ACE_PREPARE_OUTCOME: ${{ steps.ace_prepare.outcome }}
           ACE_GRADIO_OUTCOME: ${{ steps.ace_gradio.outcome }}
+          TRELLIS_PREPARE_OUTCOME: ${{ steps.trellis_prepare.outcome }}
+          TRELLIS_START_OUTCOME: ${{ steps.trellis_start.outcome }}
+          TRELLIS_HEALTH_OUTCOME: ${{ steps.trellis_health.outcome }}
+          TRELLIS_ONLY_GRADIO_OUTCOME: ${{ steps.trellis_only_gradio.outcome }}
+          TRELLIS_COMBINED_GRADIO_OUTCOME: ${{ steps.trellis_combined_gradio.outcome }}
+          TRELLIS_PURGE_OUTCOME: ${{ steps.trellis_purge.outcome }}
           FLUX_CACHE_OUTCOME: ${{ steps.flux_cache_prepare.outcome }}
           FLUX_START_OUTCOME: ${{ steps.flux_start.outcome }}
           FLUX_HEALTH_OUTCOME: ${{ steps.flux_health.outcome }}
@@ -425,12 +515,18 @@ jobs:
           printf 'MUSICGEN_PURGE_OUTCOME=%s\n' "$MUSICGEN_PURGE_OUTCOME"
           printf 'ACE_PREPARE_OUTCOME=%s\n' "$ACE_PREPARE_OUTCOME"
           printf 'ACE_GRADIO_OUTCOME=%s\n' "$ACE_GRADIO_OUTCOME"
+          printf 'TRELLIS_PREPARE_OUTCOME=%s\n' "$TRELLIS_PREPARE_OUTCOME"
+          printf 'TRELLIS_START_OUTCOME=%s\n' "$TRELLIS_START_OUTCOME"
+          printf 'TRELLIS_HEALTH_OUTCOME=%s\n' "$TRELLIS_HEALTH_OUTCOME"
+          printf 'TRELLIS_ONLY_GRADIO_OUTCOME=%s\n' "$TRELLIS_ONLY_GRADIO_OUTCOME"
+          printf 'TRELLIS_COMBINED_GRADIO_OUTCOME=%s\n' "$TRELLIS_COMBINED_GRADIO_OUTCOME"
+          printf 'TRELLIS_PURGE_OUTCOME=%s\n' "$TRELLIS_PURGE_OUTCOME"
           printf 'FLUX_CACHE_OUTCOME=%s\n' "$FLUX_CACHE_OUTCOME"
           printf 'FLUX_START_OUTCOME=%s\n' "$FLUX_START_OUTCOME"
           printf 'FLUX_HEALTH_OUTCOME=%s\n' "$FLUX_HEALTH_OUTCOME"
           printf 'FLUX_GRADIO_OUTCOME=%s\n' "$FLUX_GRADIO_OUTCOME"
           printf 'FLUX_COMBINED_GRADIO_OUTCOME=%s\n' "$FLUX_COMBINED_GRADIO_OUTCOME"
           printf 'FLUX_PURGE_OUTCOME=%s\n' "$FLUX_PURGE_OUTCOME"
-          for outcome in "$CONTRACTS_OUTCOME" "$AUDIOGEN_NOTEBOOK_OUTCOME" "$AUDIOGEN_START_OUTCOME" "$AUDIOGEN_HEALTH_OUTCOME" "$AUDIOGEN_GRADIO_OUTCOME" "$AUDIOGEN_PURGE_OUTCOME" "$MUSICGEN_START_OUTCOME" "$MUSICGEN_HEALTH_OUTCOME" "$MUSICGEN_GRADIO_OUTCOME" "$MUSICGEN_PURGE_OUTCOME" "$ACE_PREPARE_OUTCOME" "$ACE_GRADIO_OUTCOME" "$FLUX_CACHE_OUTCOME" "$FLUX_START_OUTCOME" "$FLUX_HEALTH_OUTCOME" "$FLUX_GRADIO_OUTCOME" "$FLUX_COMBINED_GRADIO_OUTCOME" "$FLUX_PURGE_OUTCOME"; do
+          for outcome in "$CONTRACTS_OUTCOME" "$AUDIOGEN_NOTEBOOK_OUTCOME" "$AUDIOGEN_START_OUTCOME" "$AUDIOGEN_HEALTH_OUTCOME" "$AUDIOGEN_GRADIO_OUTCOME" "$AUDIOGEN_PURGE_OUTCOME" "$MUSICGEN_START_OUTCOME" "$MUSICGEN_HEALTH_OUTCOME" "$MUSICGEN_GRADIO_OUTCOME" "$MUSICGEN_PURGE_OUTCOME" "$ACE_PREPARE_OUTCOME" "$ACE_GRADIO_OUTCOME" "$TRELLIS_PREPARE_OUTCOME" "$TRELLIS_START_OUTCOME" "$TRELLIS_HEALTH_OUTCOME" "$TRELLIS_ONLY_GRADIO_OUTCOME" "$TRELLIS_COMBINED_GRADIO_OUTCOME" "$TRELLIS_PURGE_OUTCOME" "$FLUX_CACHE_OUTCOME" "$FLUX_START_OUTCOME" "$FLUX_HEALTH_OUTCOME" "$FLUX_GRADIO_OUTCOME" "$FLUX_COMBINED_GRADIO_OUTCOME" "$FLUX_PURGE_OUTCOME"; do
             test "$outcome" = "success"
           done
