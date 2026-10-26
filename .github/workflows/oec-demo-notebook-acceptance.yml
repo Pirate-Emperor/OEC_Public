@@ -41,6 +41,7 @@ on:
       - "tools/oec_service_manager.py"
       - "tests/test_audiocraft_notebook_static.py"
       - "tests/test_gradio_model_notebooks.py"
+      - "tests/test_audio_service_validation.py"
       - "tests/test_flux_image_pipeline.py"
       - "tests/test_oec_service_manager_media.py"
       - "tests/test_media_smoke_process_cleanup.py"
@@ -100,10 +101,11 @@ jobs:
             tools/media_services/flux_api.py tools/media_services/trellis_api.py tools/media_services/ltx_api.py \
             tools/media_services/model_cache.py tools/prepare_flux_cache.py tools/cleanup_test_model_caches.py tools/run_safe_notebook_smokes.py tools/audit_notebook_suite.py \
             tools/run_wan_notebook_smoke.py tools/run_gradio_model_notebook_smokes.py tools/run_media_model_smokes.py \
-            tests/test_gradio_model_notebooks.py tests/test_flux_image_pipeline.py \
+            tests/test_gradio_model_notebooks.py tests/test_audio_service_validation.py tests/test_flux_image_pipeline.py \
             tests/test_oec_service_manager_media.py tests/test_media_smoke_process_cleanup.py tests/test_prepare_flux_cache.py \
             tests/test_storage_write_admission.py tests/test_trellis_notebook_static.py
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_gradio_model_notebooks.py' -v
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_audio_service_validation.py' -v
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_flux_image_pipeline.py' -v
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_oec_service_manager_media.py' -v
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_media_smoke_process_cleanup.py' -v
