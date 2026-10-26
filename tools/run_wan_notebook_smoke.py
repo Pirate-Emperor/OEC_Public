@@ -82,7 +82,7 @@ def main() -> int:
         if document.get("nbformat") != 4:
             raise RuntimeError("invalid notebook format")
         shell = InteractiveShell()
-        namespace = {"__name__": "__main__", "__file__": str(NOTEBOOK)}
+        namespace = {"__name__": "__main__", "__file__": str(NOTEBOOK), "get_ipython": lambda: shell}
         executed: list[int] = []
         for index, cell in enumerate(document["cells"]):
             if cell.get("cell_type") != "code":
