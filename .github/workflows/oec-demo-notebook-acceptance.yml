@@ -30,6 +30,7 @@ on:
       - "tools/prepare_media_models.py"
       - "tools/prepare_ace_step_runtime.py"
       - "tools/prepare_flux_cache.py"
+      - "tools/cleanup_test_model_caches.py"
       - "tools/media_services/audio_api.py"
       - "tools/media_services/audiocraft_api.py"
       - "tools/media_services/flux_api.py"
@@ -92,7 +93,7 @@ jobs:
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m py_compile \
             tools/oec_service_manager.py tools/media_services/audio_api.py tools/media_services/audiocraft_api.py \
             tools/media_services/flux_api.py tools/media_services/trellis_api.py tools/media_services/ltx_api.py \
-            tools/media_services/model_cache.py tools/prepare_flux_cache.py tools/audit_notebook_suite.py \
+            tools/media_services/model_cache.py tools/prepare_flux_cache.py tools/cleanup_test_model_caches.py tools/audit_notebook_suite.py \
             tools/run_wan_notebook_smoke.py tools/run_gradio_model_notebook_smokes.py tools/run_media_model_smokes.py \
             tests/test_gradio_model_notebooks.py tests/test_flux_image_pipeline.py \
             tests/test_oec_service_manager_media.py tests/test_prepare_flux_cache.py \
@@ -179,6 +180,23 @@ jobs:
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py purge audiogen-medium --confirm 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/audiogen-gradio/cache-cleanup.log"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/audiogen-gradio/cache-cleanup.log"
 
+      - name: Test standalone MusicGen CLI mode and decode its WAV
+        id: musicgen_cli
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/musicgen-cli"
+          mkdir -p "$R"
+          OUT="$R/musicgen-direct.wav"
+          timeout --signal=INT --kill-after=30s 1800s "$CONDA_EXE" run --no-capture-output -n phase1 \
+            python pipeline_musicgen.py --mode generate --allow-download --scratch-output \
+            --output "$OUT" --duration 3 --seed 42 \
+            --prompt "A short calm instrumental cue, warm piano and mellow strings" 2>&1 | tee "$R/model-generation.log"
+          "$CONDA_EXE" run --no-capture-output -n phase1 python -c 'import soundfile,sys; x=soundfile.info(sys.argv[1]); print("MUSICGEN_CLI_WAV=PASS",x); assert x.frames>0 and x.samplerate>0 and x.channels>0 and x.duration>0' "$OUT"
+          sha256sum "$OUT" | tee "$R/artifact.sha256"
+          rm -f "$OUT" "$OUT.info.json"
+
       - name: Start the MusicGen server on an admitted idle A100
         id: musicgen_start
         if: always() && steps.preflight.outcome == 'success'
@@ -240,6 +258,37 @@ jobs:
           set -euo pipefail
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py purge musicgen-medium --confirm 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/musicgen-gradio/cache-cleanup.log"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/musicgen-gradio/cache-cleanup.log"
+
+      - name: Prepare speech checkpoints and isolated runtime
+        id: speech_prepare
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/speech"
+          mkdir -p "$R"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-before.log"
+          for model in kokoro whisper-turbo qwen3-asr-0.6b; do
+            "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/prepare_media_models.py download --model "$model" 2>&1 | tee -a "$R/checkpoint-preparation.log"
+          done
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/prepare_media_runtime.py 2>&1 | tee "$R/runtime-setup.log"
+
+      - name: Run Kokoro, Whisper and Qwen3-ASR Gradio modes and purge each tested cache
+        id: speech_gradio
+        if: always() && steps.speech_prepare.outcome == 'success'
+        continue-on-error: true
+        env:
+          GRADIO_ANALYTICS_ENABLED: "False"
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/speech"
+          timeout --signal=INT --kill-after=30s 3600s "$CONDA_EXE" run --no-capture-output -n phase2_3d \
+            python tools/run_media_model_smokes.py --providers kokoro,whisper,qwen3-asr \
+            --check-gradio-notebooks --purge-after --require-pass 2>&1 | tee "$R/speech-gradio-acceptance.log"
+          for report in kokoro whisper qwen3-asr; do
+            find "$RUNNER_TEMP/oec-media-smoke-logs" -maxdepth 1 -type f -name "\${report}-gradio-notebook-smoke.json" -exec cp {} "$R/" \;
+          done
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee "$R/cache-status-after.log"
 
       - name: Prepare ACE-Step checkpoints and isolated runtime
         id: ace_prepare
