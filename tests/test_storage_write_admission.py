@@ -24,6 +24,16 @@ def code_cells(name: str) -> list[tuple[int, str]]:
 
 
 class StorageWriteAdmissionTests(unittest.TestCase):
+    def test_models_allocation_target_is_230_gb_and_reserves_are_unchanged(self):
+        config = json.loads((ROOT / "storage_config.json").read_text(encoding="utf-8"))
+        directories = {entry["name"]: entry for entry in config["directories"]}
+        self.assertEqual(directories["models"]["target_allocation_gb"], 230)
+        self.assertEqual(directories["models"]["reserve_target_gb"], 5)
+        self.assertEqual(directories["models"]["minimum_reserve_gb"], 1)
+        self.assertEqual(directories["outputs"]["target_allocation_gb"], 1)
+        self.assertEqual(directories["outputs"]["reserve_target_gb"], 0.5)
+        self.assertEqual(directories["outputs"]["minimum_reserve_gb"], 0.25)
+
     def test_shared_model_and_output_writers_do_not_opt_out_of_fresh_quota(self):
         for name in NOTEBOOKS:
             if name == "pipeline_flux_only.ipynb":

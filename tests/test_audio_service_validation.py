@@ -29,6 +29,20 @@ import common
 import model_cache
 
 class AudioValidationTests(unittest.TestCase):
+    def test_model_loader_health_error_preserves_a_sanitized_root_cause(self):
+        error = common._format_runtime_load_error(
+            RuntimeError("ACE-Step DiT initialization failed: missing model config")
+        )
+        self.assertEqual(
+            error,
+            "RuntimeError: ACE-Step DiT initialization failed: missing model config",
+        )
+        secret = common._format_runtime_load_error(
+            RuntimeError("request failed with token=hf_ABCDEFGHIJKLMNOPQRSTUVWXYZ123456")
+        )
+        self.assertNotIn("ABCDEFGHIJKLMNOPQRSTUVWXYZ123456", secret)
+        self.assertIn("[REDACTED", secret)
+
     def test_weight_presence_requires_nonempty_checkpoint_file(self):
         with tempfile.TemporaryDirectory() as folder:
             checkpoint = Path(folder) / "checkpoint"

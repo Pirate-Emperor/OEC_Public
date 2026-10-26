@@ -26,6 +26,16 @@ from typing import Any
 from urllib.parse import unquote, urlsplit
 
 LOG = logging.getLogger("oec.media_service")
+
+def _format_runtime_load_error(exc: BaseException) -> str:
+    """Expose a bounded, sanitized startup cause to the loopback-only health endpoint."""
+    detail = " ".join(str(exc).split())
+    detail = re.sub(r"(?i)hf_[A-Za-z0-9_-]{20,}", "[REDACTED_HF_TOKEN]", detail)
+    detail = re.sub(r"(?i)(token|password|authorization)\s*[:=]\s*\S+", r"\1=[REDACTED]", detail)
+    if not detail:
+        detail = "model runtime could not be loaded"
+    return f"{type(exc).__name__}: {detail[:600]}"
+
 MAX_HTTP_BODY = 20 * 1024 * 1024
 MAX_IMAGE_BYTES = 12 * 1024 * 1024
 MAX_AUDIO_BYTES = 12 * 1024 * 1024
@@ -554,7 +564,7 @@ class MediaJobService:
             with self.lock:
                 self.loading = False
                 self.ready = False
-                self.fatal_error = f"{type(exc).__name__}: model runtime could not be loaded"
+                self.fatal_error = _format_runtime_load_error(exc)
             LOG.exception("%s runtime load failed (%s); traceback follows", self.provider.name, type(exc).__name__)
 
         while True:
