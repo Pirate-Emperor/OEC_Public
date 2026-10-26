@@ -17,6 +17,8 @@ import traceback
 import urllib.request
 from pathlib import Path
 
+from IPython.core.interactiveshell import InteractiveShell
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -42,8 +44,10 @@ NOTEBOOK_CELL_SELECTION = {
     "flux-combined": {8, 12},
     "trellis-only": {1, 2},
     "trellis-combined": {6, 10},
-    "ltx-text-video": {4, 5},
-    "ltx-image-video": {4, 5},
+    # Execute every non-empty code cell in pipeline_ltx_video.ipynb, including
+    # core_config checks and read-only nvidia-smi/ps cells, before the live callback.
+    "ltx-text-video": {1, 2, 3, 4, 5, 6, 7},
+    "ltx-image-video": {1, 2, 3, 4, 5, 6, 7},
 }
 DEMO_VARIABLES = {
     "flux-combined": "demo_flux",
@@ -115,8 +119,9 @@ def execute_notebook(path: Path, *, code_cell_indexes: set[int] | None = None, d
     document = json.loads(path.read_text(encoding="utf-8"))
     if document.get("nbformat") != 4 or not isinstance(document.get("cells"), list):
         raise ValueError(f"invalid notebook structure: {path}")
-    scope = {"__name__": "__main__"}
+    scope = {"__name__": "__main__", "__file__": str(path)}
     code_cells = 0
+    shell = InteractiveShell()
     for index, cell in enumerate(document["cells"]):
         if cell.get("cell_type") != "code":
             continue
@@ -125,7 +130,8 @@ def execute_notebook(path: Path, *, code_cell_indexes: set[int] | None = None, d
         source = "".join(cell.get("source", []))
         if not source.strip():
             continue
-        compiled = compile(source, f"{path.name}:cell-{index}", "exec")
+        transformed = shell.transform_cell(source)
+        compiled = compile(transformed, f"{path.name}:cell-{index}", "exec")
         exec(compiled, scope, scope)
         code_cells += 1
     if demo_name not in scope:
