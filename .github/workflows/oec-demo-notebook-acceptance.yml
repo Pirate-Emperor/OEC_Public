@@ -308,6 +308,8 @@ jobs:
           for report in kokoro whisper qwen3-asr; do
             find "$RUNNER_TEMP/oec-media-smoke-logs" -maxdepth 1 -type f -name "\${report}-gradio-notebook-smoke.json" -exec cp {} "$R/" \;
           done
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/cleanup_test_model_caches.py \
+            --models kokoro,whisper-turbo,qwen3-asr-0.6b --report-json "$R/cache-cleanup.json" 2>&1 | tee "$R/cache-cleanup.log"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee "$R/cache-status-after.log"
 
       - name: Prepare ACE-Step checkpoints and isolated runtime
@@ -351,6 +353,18 @@ jobs:
             python tools/run_media_model_smokes.py --providers ace-step --check-gradio-notebooks --purge-after --require-pass 2>&1 | tee "$R/ace-step-gradio-acceptance.log"
           test -f "$RUNNER_TEMP/oec-media-smoke-logs/ace-step-gradio-notebook-smoke.json"
           cp "$RUNNER_TEMP/oec-media-smoke-logs/ace-step-gradio-notebook-smoke.json" "$R/ace-step-gradio-notebook-smoke.json"
+
+      - name: Assert ACE-Step model cache cleanup after inference
+        id: ace_purge
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/ace-step"
+          mkdir -p "$R"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/cleanup_test_model_caches.py \
+            --models ace-step --report-json "$R/cache-cleanup.json" 2>&1 | tee "$R/cache-cleanup.log"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-after-cleanup.log"
 
       - name: Verify storage admission before TRELLIS cache/model startup
         id: trellis_prepare
@@ -663,6 +677,7 @@ jobs:
           MUSICGEN_PURGE_OUTCOME: ${{ steps.musicgen_purge.outcome }}
           ACE_PREPARE_OUTCOME: ${{ steps.ace_prepare.outcome }}
           ACE_GRADIO_OUTCOME: ${{ steps.ace_gradio.outcome }}
+          ACE_PURGE_OUTCOME: ${{ steps.ace_purge.outcome }}
           TRELLIS_PREPARE_OUTCOME: ${{ steps.trellis_prepare.outcome }}
           TRELLIS_START_OUTCOME: ${{ steps.trellis_start.outcome }}
           TRELLIS_HEALTH_OUTCOME: ${{ steps.trellis_health.outcome }}
@@ -700,6 +715,7 @@ jobs:
           printf 'MUSICGEN_PURGE_OUTCOME=%s\n' "$MUSICGEN_PURGE_OUTCOME"
           printf 'ACE_PREPARE_OUTCOME=%s\n' "$ACE_PREPARE_OUTCOME"
           printf 'ACE_GRADIO_OUTCOME=%s\n' "$ACE_GRADIO_OUTCOME"
+          printf 'ACE_PURGE_OUTCOME=%s\n' "$ACE_PURGE_OUTCOME"
           printf 'TRELLIS_PREPARE_OUTCOME=%s\n' "$TRELLIS_PREPARE_OUTCOME"
           printf 'TRELLIS_START_OUTCOME=%s\n' "$TRELLIS_START_OUTCOME"
           printf 'TRELLIS_HEALTH_OUTCOME=%s\n' "$TRELLIS_HEALTH_OUTCOME"
@@ -722,6 +738,6 @@ jobs:
           printf 'LTX_PURGE_OUTCOME=%s\n' "$LTX_PURGE_OUTCOME"
           printf 'WAN_NOTEBOOK_OUTCOME=%s\n' "$WAN_NOTEBOOK_OUTCOME"
           printf 'WAN_PURGE_OUTCOME=%s\n' "$WAN_PURGE_OUTCOME"
-          for outcome in "$CONTRACTS_OUTCOME" "$SAFE_CONTROL_NOTEBOOKS_OUTCOME" "$AUDIOGEN_NOTEBOOK_OUTCOME" "$AUDIOGEN_START_OUTCOME" "$AUDIOGEN_HEALTH_OUTCOME" "$AUDIOGEN_GRADIO_OUTCOME" "$AUDIOGEN_PURGE_OUTCOME" "$MUSICGEN_START_OUTCOME" "$MUSICGEN_HEALTH_OUTCOME" "$MUSICGEN_GRADIO_OUTCOME" "$MUSICGEN_PURGE_OUTCOME" "$ACE_PREPARE_OUTCOME" "$ACE_GRADIO_OUTCOME" "$TRELLIS_PREPARE_OUTCOME" "$TRELLIS_START_OUTCOME" "$TRELLIS_HEALTH_OUTCOME" "$TRELLIS_ONLY_GRADIO_OUTCOME" "$TRELLIS_COMBINED_GRADIO_OUTCOME" "$TRELLIS_PURGE_OUTCOME" "$FLUX_CACHE_OUTCOME" "$FLUX_START_OUTCOME" "$FLUX_HEALTH_OUTCOME" "$FLUX_GRADIO_OUTCOME" "$FLUX_COMBINED_GRADIO_OUTCOME" "$FLUX_PURGE_OUTCOME" "$MUSICGEN_CLI_OUTCOME" "$SPEECH_PREPARE_OUTCOME" "$SPEECH_GRADIO_OUTCOME" "$LTX_START_OUTCOME" "$LTX_HEALTH_OUTCOME" "$LTX_TEXT_VIDEO_OUTCOME" "$LTX_IMAGE_VIDEO_OUTCOME" "$LTX_PURGE_OUTCOME" "$WAN_NOTEBOOK_OUTCOME" "$WAN_PURGE_OUTCOME"; do
+          for outcome in "$CONTRACTS_OUTCOME" "$SAFE_CONTROL_NOTEBOOKS_OUTCOME" "$AUDIOGEN_NOTEBOOK_OUTCOME" "$AUDIOGEN_START_OUTCOME" "$AUDIOGEN_HEALTH_OUTCOME" "$AUDIOGEN_GRADIO_OUTCOME" "$AUDIOGEN_PURGE_OUTCOME" "$MUSICGEN_START_OUTCOME" "$MUSICGEN_HEALTH_OUTCOME" "$MUSICGEN_GRADIO_OUTCOME" "$MUSICGEN_PURGE_OUTCOME" "$ACE_PREPARE_OUTCOME" "$ACE_GRADIO_OUTCOME" "$ACE_PURGE_OUTCOME" "$TRELLIS_PREPARE_OUTCOME" "$TRELLIS_START_OUTCOME" "$TRELLIS_HEALTH_OUTCOME" "$TRELLIS_ONLY_GRADIO_OUTCOME" "$TRELLIS_COMBINED_GRADIO_OUTCOME" "$TRELLIS_PURGE_OUTCOME" "$FLUX_CACHE_OUTCOME" "$FLUX_START_OUTCOME" "$FLUX_HEALTH_OUTCOME" "$FLUX_GRADIO_OUTCOME" "$FLUX_COMBINED_GRADIO_OUTCOME" "$FLUX_PURGE_OUTCOME" "$MUSICGEN_CLI_OUTCOME" "$SPEECH_PREPARE_OUTCOME" "$SPEECH_GRADIO_OUTCOME" "$LTX_START_OUTCOME" "$LTX_HEALTH_OUTCOME" "$LTX_TEXT_VIDEO_OUTCOME" "$LTX_IMAGE_VIDEO_OUTCOME" "$LTX_PURGE_OUTCOME" "$WAN_NOTEBOOK_OUTCOME" "$WAN_PURGE_OUTCOME"; do
             test "$outcome" = "success"
           done
