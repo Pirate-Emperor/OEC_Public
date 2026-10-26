@@ -375,7 +375,7 @@ def _process_cmdline(pid: int) -> list[str] | None:
         raw = Path(f"/proc/{pid}/cmdline").read_bytes()
     except (OSError, ValueError):
         return None
-    return [part.decode("utf-8", errors="replace") for part in raw.split(b"\\0") if part]
+    return [part.decode("utf-8", errors="replace") for part in raw.split(b"\0") if part]
 
 
 def _pid_alive(pid: int) -> bool:
