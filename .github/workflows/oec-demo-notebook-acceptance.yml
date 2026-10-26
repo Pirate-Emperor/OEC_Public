@@ -189,13 +189,15 @@ jobs:
           set -euo pipefail
           R="$OEC_ACCEPTANCE_ROOT/musicgen-cli"
           mkdir -p "$R"
-          OUT="$R/musicgen-direct.wav"
+          OUT="/tmp/oec-musicgen-acceptance-$GITHUB_RUN_ID.wav"
           timeout --signal=INT --kill-after=30s 1800s "$CONDA_EXE" run --no-capture-output -n phase1 \
             python pipeline_musicgen.py --mode generate --allow-download --scratch-output \
             --output "$OUT" --duration 3 --seed 42 \
             --prompt "A short calm instrumental cue, warm piano and mellow strings" 2>&1 | tee "$R/model-generation.log"
           "$CONDA_EXE" run --no-capture-output -n phase1 python -c 'import soundfile,sys; x=soundfile.info(sys.argv[1]); print("MUSICGEN_CLI_WAV=PASS",x); assert x.frames>0 and x.samplerate>0 and x.channels>0 and x.duration>0' "$OUT"
-          sha256sum "$OUT" | tee "$R/artifact.sha256"
+          cp "$OUT" "$R/musicgen-direct.wav"
+          cp "$OUT.info.json" "$R/musicgen-direct.info.json"
+          sha256sum "$R/musicgen-direct.wav" | tee "$R/artifact.sha256"
           rm -f "$OUT" "$OUT.info.json"
 
       - name: Start the MusicGen server on an admitted idle A100
