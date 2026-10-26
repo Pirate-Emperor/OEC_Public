@@ -18,7 +18,9 @@ on:
       - "Untitled.ipynb"
       - "pipeline_demo_acceptance.ipynb"
       - "phase1_test_compute_node.ipynb"
+      - "phase1_test_login_node.ipynb"
       - "oec_deply_install.ipynb"
+      - "pipeline_verify_encrypted_hf.ipynb"
       - "phase1_test_compute_node.ipynb"
       - "pipeline_audiogen.py"
       - "pipeline_flux_image.py"
@@ -115,17 +117,49 @@ jobs:
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_trellis_notebook_static.py' -v
           "$CONDA_EXE" run --no-capture-output -n phase1 python -m unittest discover -s tests -p 'test_audiocraft_notebook_static.py' -v
 
-      - name: Execute safe control/preflight notebooks top-to-bottom
+      - name: Execute safe control notebooks in their declared Conda environments
         id: safe_control_notebooks
         if: always() && steps.preflight.outcome == 'success'
         continue-on-error: true
         run: |
           set -euo pipefail
           R="$OEC_ACCEPTANCE_ROOT/control-notebooks"
+          mkdir -p "$R/base" "$R/compute"
+          export OEC_START_HF_UPLOAD_DAEMON=0
+          export OEC_TEST_ENABLE_CLOUD_UPLOAD=0
+          export OEC_DEPLOY_LAUNCH_BIOME=0
+          export OEC_SAFE_NOTEBOOK_SMOKE_DIR="$R/base"
+          timeout --signal=INT --kill-after=20s 300s "$CONDA_EXE" run --no-capture-output -n base \
+            python tools/run_safe_notebook_smokes.py --notebooks Untitled.ipynb 2>&1 | tee "$R/base/notebook-execution.log"
+          export OEC_SAFE_NOTEBOOK_SMOKE_DIR="$R/compute"
+          timeout --signal=INT --kill-after=20s 600s "$CONDA_EXE" run --no-capture-output -n phase1_ltx \
+            python tools/run_safe_notebook_smokes.py --notebooks pipeline_demo_acceptance.ipynb phase1_test_compute_node.ipynb 2>&1 | tee "$R/compute/notebook-execution.log"
+
+      - name: Execute deployment diagnostics in the oec_deploy environment
+        id: deployment_notebook
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/deployment-notebook"
+          mkdir -p "$R"
+          test -x "$HOME/Conda/envs/oec_deploy/bin/python"
+          export OEC_SAFE_NOTEBOOK_SMOKE_DIR="$R"
+          export OEC_DEPLOY_LAUNCH_BIOME=0
+          timeout --signal=INT --kill-after=20s 600s "$CONDA_EXE" run --no-capture-output -n oec_deploy \
+            python tools/run_safe_notebook_smokes.py --notebooks oec_deply_install.ipynb 2>&1 | tee "$R/notebook-execution.log"
+
+      - name: Assess encrypted Hugging Face read-back notebook without credentials
+        id: encrypted_hf_preflight
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/encrypted-hf-preflight"
           mkdir -p "$R"
           export OEC_SAFE_NOTEBOOK_SMOKE_DIR="$R"
-          timeout --signal=INT --kill-after=20s 600s "$CONDA_EXE" run --no-capture-output -n phase1_ltx \
-            python tools/run_safe_notebook_smokes.py 2>&1 | tee "$R/notebook-execution.log"
+          timeout --signal=INT --kill-after=20s 300s "$CONDA_EXE" run --no-capture-output -n base \
+            python tools/run_safe_notebook_smokes.py --notebooks pipeline_verify_encrypted_hf.ipynb 2>&1 | tee "$R/notebook-execution.log"
 
       - name: Execute AudioCraft notebook top-to-bottom and generate a WAV
         id: audiogen_full_notebook
@@ -714,6 +748,8 @@ jobs:
         env:
           CONTRACTS_OUTCOME: ${{ steps.contracts.outcome }}
           SAFE_CONTROL_NOTEBOOKS_OUTCOME: ${{ steps.safe_control_notebooks.outcome }}
+          DEPLOYMENT_NOTEBOOK_OUTCOME: ${{ steps.deployment_notebook.outcome }}
+          ENCRYPTED_HF_PREFLIGHT_OUTCOME: ${{ steps.encrypted_hf_preflight.outcome }}
           AUDIOGEN_NOTEBOOK_OUTCOME: ${{ steps.audiogen_full_notebook.outcome }}
           AUDIOGEN_START_OUTCOME: ${{ steps.audiogen_start.outcome }}
           AUDIOGEN_HEALTH_OUTCOME: ${{ steps.audiogen_health.outcome }}
@@ -754,6 +790,8 @@ jobs:
           set -euo pipefail
           printf 'CONTRACTS_OUTCOME=%s\n' "$CONTRACTS_OUTCOME"
           printf 'SAFE_CONTROL_NOTEBOOKS_OUTCOME=%s\n' "$SAFE_CONTROL_NOTEBOOKS_OUTCOME"
+          printf 'DEPLOYMENT_NOTEBOOK_OUTCOME=%s\n' "$DEPLOYMENT_NOTEBOOK_OUTCOME"
+          printf 'ENCRYPTED_HF_PREFLIGHT_OUTCOME=%s\n' "$ENCRYPTED_HF_PREFLIGHT_OUTCOME"
           printf 'AUDIOGEN_NOTEBOOK_OUTCOME=%s\n' "$AUDIOGEN_NOTEBOOK_OUTCOME"
           printf 'AUDIOGEN_START_OUTCOME=%s\n' "$AUDIOGEN_START_OUTCOME"
           printf 'AUDIOGEN_HEALTH_OUTCOME=%s\n' "$AUDIOGEN_HEALTH_OUTCOME"
@@ -790,6 +828,6 @@ jobs:
           printf 'LTX_PURGE_OUTCOME=%s\n' "$LTX_PURGE_OUTCOME"
           printf 'WAN_NOTEBOOK_OUTCOME=%s\n' "$WAN_NOTEBOOK_OUTCOME"
           printf 'WAN_PURGE_OUTCOME=%s\n' "$WAN_PURGE_OUTCOME"
-          for outcome in "$CONTRACTS_OUTCOME" "$SAFE_CONTROL_NOTEBOOKS_OUTCOME" "$AUDIOGEN_NOTEBOOK_OUTCOME" "$AUDIOGEN_START_OUTCOME" "$AUDIOGEN_HEALTH_OUTCOME" "$AUDIOGEN_GRADIO_OUTCOME" "$AUDIOGEN_PURGE_OUTCOME" "$MUSICGEN_START_OUTCOME" "$MUSICGEN_HEALTH_OUTCOME" "$MUSICGEN_GRADIO_OUTCOME" "$MUSICGEN_PURGE_OUTCOME" "$ACE_PREPARE_OUTCOME" "$ACE_GRADIO_OUTCOME" "$ACE_PURGE_OUTCOME" "$TRELLIS_PREPARE_OUTCOME" "$TRELLIS_START_OUTCOME" "$TRELLIS_HEALTH_OUTCOME" "$TRELLIS_ONLY_GRADIO_OUTCOME" "$TRELLIS_COMBINED_GRADIO_OUTCOME" "$TRELLIS_PURGE_OUTCOME" "$FLUX_CACHE_OUTCOME" "$FLUX_START_OUTCOME" "$FLUX_HEALTH_OUTCOME" "$FLUX_GRADIO_OUTCOME" "$FLUX_COMBINED_GRADIO_OUTCOME" "$FLUX_PURGE_OUTCOME" "$MUSICGEN_CLI_OUTCOME" "$SPEECH_PREPARE_OUTCOME" "$SPEECH_GRADIO_OUTCOME" "$SPEECH_PURGE_RECOVERY_OUTCOME" "$ACE_PROCESS_RECOVERY_OUTCOME" "$LTX_START_OUTCOME" "$LTX_HEALTH_OUTCOME" "$LTX_TEXT_VIDEO_OUTCOME" "$LTX_IMAGE_VIDEO_OUTCOME" "$LTX_PURGE_OUTCOME" "$WAN_NOTEBOOK_OUTCOME" "$WAN_PURGE_OUTCOME"; do
+          for outcome in "$CONTRACTS_OUTCOME" "$SAFE_CONTROL_NOTEBOOKS_OUTCOME" "$DEPLOYMENT_NOTEBOOK_OUTCOME" "$AUDIOGEN_NOTEBOOK_OUTCOME" "$AUDIOGEN_START_OUTCOME" "$AUDIOGEN_HEALTH_OUTCOME" "$AUDIOGEN_GRADIO_OUTCOME" "$AUDIOGEN_PURGE_OUTCOME" "$MUSICGEN_START_OUTCOME" "$MUSICGEN_HEALTH_OUTCOME" "$MUSICGEN_GRADIO_OUTCOME" "$MUSICGEN_PURGE_OUTCOME" "$ACE_PREPARE_OUTCOME" "$ACE_GRADIO_OUTCOME" "$ACE_PURGE_OUTCOME" "$TRELLIS_PREPARE_OUTCOME" "$TRELLIS_START_OUTCOME" "$TRELLIS_HEALTH_OUTCOME" "$TRELLIS_ONLY_GRADIO_OUTCOME" "$TRELLIS_COMBINED_GRADIO_OUTCOME" "$TRELLIS_PURGE_OUTCOME" "$FLUX_CACHE_OUTCOME" "$FLUX_START_OUTCOME" "$FLUX_HEALTH_OUTCOME" "$FLUX_GRADIO_OUTCOME" "$FLUX_COMBINED_GRADIO_OUTCOME" "$FLUX_PURGE_OUTCOME" "$MUSICGEN_CLI_OUTCOME" "$SPEECH_PREPARE_OUTCOME" "$SPEECH_GRADIO_OUTCOME" "$SPEECH_PURGE_RECOVERY_OUTCOME" "$ACE_PROCESS_RECOVERY_OUTCOME" "$LTX_START_OUTCOME" "$LTX_HEALTH_OUTCOME" "$LTX_TEXT_VIDEO_OUTCOME" "$LTX_IMAGE_VIDEO_OUTCOME" "$LTX_PURGE_OUTCOME" "$WAN_NOTEBOOK_OUTCOME" "$WAN_PURGE_OUTCOME"; do
             test "$outcome" = "success"
           done

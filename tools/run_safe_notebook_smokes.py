@@ -8,6 +8,7 @@ IPython shell diagnostics.
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -27,6 +28,11 @@ SAFE_NOTEBOOKS = (
     "pipeline_demo_acceptance.ipynb",
     "phase1_test_compute_node.ipynb",
 )
+EXPLICIT_DIAGNOSTIC_NOTEBOOKS = (
+    "oec_deply_install.ipynb",
+    "pipeline_verify_encrypted_hf.ipynb",
+)
+NOTEBOOK_ALLOWLIST = SAFE_NOTEBOOKS + EXPLICIT_DIAGNOSTIC_NOTEBOOKS
 
 
 def run_notebook(path: Path) -> dict[str, Any]:
@@ -51,17 +57,28 @@ def run_notebook(path: Path) -> dict[str, Any]:
         exec(compile(transformed, f"{path.name}:cell-{index}", "exec"), namespace, namespace)
         executed.append(index)
         print(f"SAFE_NOTEBOOK_CELL_PASS={path.name}:{index}", flush=True)
+    notebook_status = namespace.get("OEC_NOTEBOOK_STATUS", "PASS")
+    if notebook_status not in {"PASS", "BLOCKED"}:
+        raise RuntimeError(f"unexpected OEC_NOTEBOOK_STATUS={notebook_status!r}")
     return {
         "notebook": path.name,
         "kernel_metadata": (document.get("metadata") or {}).get("kernelspec", {}),
         "code_cells_executed": executed,
         "code_cells_nonempty": len(executed),
         "source_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-        "status": "PASS",
+        "status": notebook_status,
+        "acceptance_note": "Runtime diagnostic did not prove encrypted read-back when status is BLOCKED." if notebook_status == "BLOCKED" else None,
     }
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--notebooks", nargs="+", choices=NOTEBOOK_ALLOWLIST,
+        help="Run only the selected safe/diagnostic notebook(s); default is the compute-safe control set.",
+    )
+    args = parser.parse_args()
+    selected_notebooks = tuple(args.notebooks or SAFE_NOTEBOOKS)
     if not (ROOT / "storage_manager.py").is_file():
         raise RuntimeError("Run from the OEC repository checkout.")
     output_root = Path(os.environ.get("OEC_SAFE_NOTEBOOK_SMOKE_DIR", str(Path("/tmp") / "oec-safe-notebook-smoke"))).resolve()
@@ -84,17 +101,18 @@ def main() -> int:
         "root": str(ROOT),
         "python": sys.executable,
         "output_root": str(output_root),
+        "selected_notebooks": list(selected_notebooks),
         "notebooks": [],
         "excluded_for_context_or_credentials": {
-            "phase1_test_login_node.ipynb": "login/control-plane only; must not run as a compute-node notebook",
-            "oec_deply_install.ipynb": "deployment-path and service launch checks belong in the configured deployment environment; launch flag forced off in the target notebook context",
-            "pipeline_verify_encrypted_hf.ipynb": "requires a real encrypted remote object and authorized private-key/decryptor credentials",
+            "phase1_test_login_node.ipynb": "login/control-plane notebook; do not execute on the A100 compute runner. It requires a login-node-labelled runner.",
+            "oec_deply_install.ipynb": "not part of the default compute-safe batch; explicitly run with --notebooks under the oec_deploy Conda environment and launch disabled.",
+            "pipeline_verify_encrypted_hf.ipynb": "the notebook can report BLOCKED without touching credentials, but real proof requires a real encrypted remote object, private key and local decryptor.",
         },
         "status": "FAIL",
     }
     failed = False
     started = time.time()
-    for name in SAFE_NOTEBOOKS:
+    for name in selected_notebooks:
         path = ROOT / name
         if not path.is_file():
             report["notebooks"].append({"notebook": name, "status": "FAIL", "error": "file missing"})
@@ -114,16 +132,18 @@ def main() -> int:
             report["notebooks"].append(row)
             print("SAFE_NOTEBOOK_FAILURE " + json.dumps(row, ensure_ascii=False), flush=True)
     report["elapsed_seconds"] = round(time.time() - started, 3)
-    report["status"] = "FAIL" if failed else "PASS"
+    blocked = sum(row.get("status") == "BLOCKED" for row in report["notebooks"])
+    report["status"] = "FAIL" if failed else ("BLOCKED" if blocked else "PASS")
     target = output_root / "safe-notebook-smoke-report.json"
     target.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print("SAFE_NOTEBOOK_SMOKE_SUMMARY " + json.dumps({
         "status": report["status"],
         "passed": sum(x.get("status") == "PASS" for x in report["notebooks"]),
-        "failed": sum(x.get("status") != "PASS" for x in report["notebooks"]),
+        "blocked": blocked,
+        "failed": sum(x.get("status") == "FAIL" for x in report["notebooks"]),
         "report": str(target),
     }, ensure_ascii=False), flush=True)
-    return 1 if failed else 0
+    return 1 if failed else (2 if blocked else 0)
 
 
 if __name__ == "__main__":

@@ -149,7 +149,8 @@ class ModelNotebookTests(unittest.TestCase):
                      "pipeline_musicgen_gradio.ipynb", "pipeline_acestep_gradio.ipynb",
                      "pipeline_trellis_3d_only.ipynb", "pipeline_trellis_3d.ipynb",
                      "pipeline_flux_only.ipynb", "pipeline_wan_video.ipynb",
-                     "pipeline_ltx_video.ipynb"):
+                     "pipeline_ltx_video.ipynb", "phase1_test_login_node.ipynb",
+                     "oec_deply_install.ipynb", "pipeline_verify_encrypted_hf.ipynb"):
             nb = json.loads((ROOT / name).read_text(encoding="utf-8"))
             for index, cell in enumerate(nb["cells"]):
                 if cell.get("cell_type") == "code":
@@ -193,6 +194,30 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertEqual(workflow.count("HEALTH_CODE='import json, urllib.request;"), 5)
         self.assertIn("assert health.get(\"ready\") and health.get(\"model_loaded\"), health", workflow)
         self.assertIn("ProxyHandler({})", workflow)
+
+    def test_non_model_notebooks_guard_optional_final_cells_and_keep_status_explicit(self):
+        login = json.loads((ROOT / "phase1_test_login_node.ipynb").read_text(encoding="utf-8"))
+        login_source = "".join(login["cells"][6].get("source", []))
+        self.assertIn('os.environ.get("AIEROS_QUOTA_USED_GB")', login_source)
+        self.assertIn('QUOTA_SNAPSHOT=SKIPPED', login_source)
+        self.assertNotIn('os.environ["AIEROS_QUOTA_USED_GB"]', login_source)
+
+        deployment = json.loads((ROOT / "oec_deply_install.ipynb").read_text(encoding="utf-8"))
+        directory_cell = "".join(deployment["cells"][3].get("source", []))
+        self.assertIn("if DEPLOY_ROOT.is_dir():", directory_cell)
+        self.assertIn("OEC_DEPLOY_LAUNCH_BIOME", "".join(deployment["cells"][7].get("source", [])))
+        self.assertIn('OEC_NOTEBOOK_STATUS = "PASS" if', "".join(deployment["cells"][6].get("source", [])))
+
+        encrypted = json.loads((ROOT / "pipeline_verify_encrypted_hf.ipynb").read_text(encoding="utf-8"))
+        encrypted_source = "".join(encrypted["cells"][1].get("source", []))
+        self.assertIn('ENCRYPTED_HF_READBACK=BLOCKED_CONFIG_REQUIRED', encrypted_source)
+        self.assertIn('OEC_NOTEBOOK_STATUS = "BLOCKED"', encrypted_source)
+        self.assertIn("result.returncode", encrypted_source)
+        self.assertNotIn("raise ValueError('Fill repo", encrypted_source)
+
+        runner = (ROOT / "tools" / "run_safe_notebook_smokes.py").read_text(encoding="utf-8")
+        self.assertIn('parser.add_argument(\n        "--notebooks"', runner)
+        self.assertIn('namespace.get("OEC_NOTEBOOK_STATUS", "PASS")', runner)
 
     def test_superseded_acceptance_run_is_cancelled_before_new_head_retest(self):
         root_sync = (ROOT / ".github" / "workflows" / "oec-root-sync.yml").read_text(encoding="utf-8")
