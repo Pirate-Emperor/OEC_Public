@@ -10,12 +10,23 @@ on:
       - "pipeline_audiogen_gradio.ipynb"
       - "pipeline_acestep_gradio.ipynb"
       - "pipeline_flux_only.ipynb"
+      - "pipeline_musicgen_gradio.ipynb"
       - "pipeline_trellis_3d.ipynb"
+      - "pipeline_trellis_3d_only.ipynb"
+      - "pipeline_ltx_video.ipynb"
+      - "pipeline_wan_video.ipynb"
+      - "oec_deply_install.ipynb"
+      - "phase1_test_compute_node.ipynb"
       - "pipeline_audiogen.py"
       - "pipeline_flux_image.py"
       - "tools/run_audiogen_notebook_smoke.py"
       - "tools/run_gradio_model_notebook_smokes.py"
       - "tools/run_media_model_smokes.py"
+      - "tools/audit_notebook_suite.py"
+      - "tools/run_wan_notebook_smoke.py"
+      - "tools/media_services/model_cache.py"
+      - "tools/media_services/trellis_api.py"
+      - "tools/media_services/ltx_api.py"
       - "tools/prepare_media_models.py"
       - "tools/prepare_ace_step_runtime.py"
       - "tools/prepare_flux_cache.py"
@@ -76,9 +87,13 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/audit_notebook_suite.py \
+            --strict-clean --report-json "$OEC_ACCEPTANCE_ROOT/notebook-audit.json"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m py_compile \
-            tools/oec_service_manager.py tools/media_services/flux_api.py tools/prepare_flux_cache.py \
-            tools/run_gradio_model_notebook_smokes.py tools/run_media_model_smokes.py \
+            tools/oec_service_manager.py tools/media_services/audio_api.py tools/media_services/audiocraft_api.py \
+            tools/media_services/flux_api.py tools/media_services/trellis_api.py tools/media_services/ltx_api.py \
+            tools/media_services/model_cache.py tools/prepare_flux_cache.py tools/audit_notebook_suite.py \
+            tools/run_wan_notebook_smoke.py tools/run_gradio_model_notebook_smokes.py tools/run_media_model_smokes.py \
             tests/test_gradio_model_notebooks.py tests/test_flux_image_pipeline.py \
             tests/test_oec_service_manager_media.py tests/test_prepare_flux_cache.py \
             tests/test_storage_write_admission.py tests/test_trellis_notebook_static.py
@@ -155,6 +170,77 @@ jobs:
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py stop audiocraft-api --grace-seconds 25 >>"$OEC_ACCEPTANCE_ROOT/audiogen-gradio/service-final.log" 2>&1
           exit 0
 
+      - name: Purge AudioGen cache after the service is stopped
+        id: audiogen_purge
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py purge audiogen-medium --confirm 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/audiogen-gradio/cache-cleanup.log"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/audiogen-gradio/cache-cleanup.log"
+
+      - name: Start the MusicGen server on an admitted idle A100
+        id: musicgen_start
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/musicgen-gradio"
+          mkdir -p "$R"
+          GPU="$("$CONDA_EXE" run --no-capture-output -n phase2_3d python -c 'from oec_gpu_admission import select_idle_a100_gpu; print(select_idle_a100_gpu(caller="MUSICGEN_NOTEBOOK_ACCEPTANCE")["index"])' | tail -n 1)"
+          echo "MUSICGEN_PHYSICAL_GPU=$GPU" | tee "$R/gpu.txt"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py start audiocraft-api \
+            --provider musicgen --gpu "$GPU" --port 7875 --allow-download --accept-noncommercial-license 2>&1 | tee "$R/service-start.log"
+
+      - name: Wait for MusicGen model server readiness
+        id: musicgen_health
+        if: always() && steps.musicgen_start.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/musicgen-gradio"
+          HEALTH_CODE='import json,urllib.request; op=urllib.request.build_opener(urllib.request.ProxyHandler({})); h=json.load(op.open("http://127.0.0.1:7875/health",timeout=3)); assert h.get("ready") and h.get("model_loaded"),h; print(json.dumps(h))'
+          ready=0
+          for _ in $(seq 1 240); do
+            if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
+            sleep 5
+          done
+          cat "$R/health-check.log"
+          test "$ready" -eq 1
+
+      - name: Launch MusicGen Gradio UI and generate real music
+        id: musicgen_gradio
+        if: always() && steps.musicgen_health.outcome == 'success'
+        continue-on-error: true
+        env:
+          OEC_MEDIA_API_URL: "http://127.0.0.1:7875"
+          OEC_GRADIO_HEADLESS_SMOKE: "1"
+          GRADIO_ANALYTICS_ENABLED: "False"
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/musicgen-gradio"
+          timeout --signal=INT --kill-after=20s 1800s "$CONDA_EXE" run --no-capture-output -n phase1 \
+            python tools/run_gradio_model_notebook_smokes.py --provider musicgen --report-dir "$R" 2>&1 | tee "$R/gradio-callback.log"
+
+      - name: Stop the managed MusicGen service
+        if: always()
+        run: |
+          set +e
+          R="$OEC_ACCEPTANCE_ROOT/musicgen-gradio"
+          mkdir -p "$R"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py logs audiocraft-api --tail 120 >"$R/service-final.log" 2>&1
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py stop audiocraft-api --grace-seconds 25 >>"$R/service-final.log" 2>&1
+          exit 0
+
+      - name: Purge MusicGen cache after the service is stopped
+        id: musicgen_purge
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py purge musicgen-medium --confirm 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/musicgen-gradio/cache-cleanup.log"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/musicgen-gradio/cache-cleanup.log"
+
       - name: Prepare ACE-Step checkpoints and isolated runtime
         id: ace_prepare
         if: always() && steps.preflight.outcome == 'success'
@@ -193,7 +279,7 @@ jobs:
           R="$OEC_ACCEPTANCE_ROOT/ace-step"
           mkdir -p "$R"
           timeout --signal=INT --kill-after=30s 3600s "$CONDA_EXE" run --no-capture-output -n phase2_3d \
-            python tools/run_media_model_smokes.py --providers ace-step --check-gradio-notebooks --require-pass 2>&1 | tee "$R/ace-step-gradio-acceptance.log"
+            python tools/run_media_model_smokes.py --providers ace-step --check-gradio-notebooks --purge-after --require-pass 2>&1 | tee "$R/ace-step-gradio-acceptance.log"
           test -f "$RUNNER_TEMP/oec-media-smoke-logs/ace-step-gradio-notebook-smoke.json"
           cp "$RUNNER_TEMP/oec-media-smoke-logs/ace-step-gradio-notebook-smoke.json" "$R/ace-step-gradio-notebook-smoke.json"
 
@@ -278,6 +364,15 @@ jobs:
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status >"$R/storage-after.log" 2>&1
           exit 0
 
+      - name: Purge FLUX cache after the model service is stopped
+        id: flux_purge
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py purge flux-klein-4b --confirm 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/flux/cache-cleanup.log"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/flux/cache-cleanup.log"
+
       - name: Capture final OEC storage and GPU state
         if: always()
         run: |
@@ -303,6 +398,11 @@ jobs:
           AUDIOGEN_START_OUTCOME: ${{ steps.audiogen_start.outcome }}
           AUDIOGEN_HEALTH_OUTCOME: ${{ steps.audiogen_health.outcome }}
           AUDIOGEN_GRADIO_OUTCOME: ${{ steps.audiogen_gradio.outcome }}
+          AUDIOGEN_PURGE_OUTCOME: ${{ steps.audiogen_purge.outcome }}
+          MUSICGEN_START_OUTCOME: ${{ steps.musicgen_start.outcome }}
+          MUSICGEN_HEALTH_OUTCOME: ${{ steps.musicgen_health.outcome }}
+          MUSICGEN_GRADIO_OUTCOME: ${{ steps.musicgen_gradio.outcome }}
+          MUSICGEN_PURGE_OUTCOME: ${{ steps.musicgen_purge.outcome }}
           ACE_PREPARE_OUTCOME: ${{ steps.ace_prepare.outcome }}
           ACE_GRADIO_OUTCOME: ${{ steps.ace_gradio.outcome }}
           FLUX_CACHE_OUTCOME: ${{ steps.flux_cache_prepare.outcome }}
@@ -310,6 +410,7 @@ jobs:
           FLUX_HEALTH_OUTCOME: ${{ steps.flux_health.outcome }}
           FLUX_GRADIO_OUTCOME: ${{ steps.flux_gradio.outcome }}
           FLUX_COMBINED_GRADIO_OUTCOME: ${{ steps.flux_combined_gradio.outcome }}
+          FLUX_PURGE_OUTCOME: ${{ steps.flux_purge.outcome }}
         run: |
           set -euo pipefail
           printf 'CONTRACTS_OUTCOME=%s\n' "$CONTRACTS_OUTCOME"
@@ -317,6 +418,11 @@ jobs:
           printf 'AUDIOGEN_START_OUTCOME=%s\n' "$AUDIOGEN_START_OUTCOME"
           printf 'AUDIOGEN_HEALTH_OUTCOME=%s\n' "$AUDIOGEN_HEALTH_OUTCOME"
           printf 'AUDIOGEN_GRADIO_OUTCOME=%s\n' "$AUDIOGEN_GRADIO_OUTCOME"
+          printf 'AUDIOGEN_PURGE_OUTCOME=%s\n' "$AUDIOGEN_PURGE_OUTCOME"
+          printf 'MUSICGEN_START_OUTCOME=%s\n' "$MUSICGEN_START_OUTCOME"
+          printf 'MUSICGEN_HEALTH_OUTCOME=%s\n' "$MUSICGEN_HEALTH_OUTCOME"
+          printf 'MUSICGEN_GRADIO_OUTCOME=%s\n' "$MUSICGEN_GRADIO_OUTCOME"
+          printf 'MUSICGEN_PURGE_OUTCOME=%s\n' "$MUSICGEN_PURGE_OUTCOME"
           printf 'ACE_PREPARE_OUTCOME=%s\n' "$ACE_PREPARE_OUTCOME"
           printf 'ACE_GRADIO_OUTCOME=%s\n' "$ACE_GRADIO_OUTCOME"
           printf 'FLUX_CACHE_OUTCOME=%s\n' "$FLUX_CACHE_OUTCOME"
@@ -324,6 +430,7 @@ jobs:
           printf 'FLUX_HEALTH_OUTCOME=%s\n' "$FLUX_HEALTH_OUTCOME"
           printf 'FLUX_GRADIO_OUTCOME=%s\n' "$FLUX_GRADIO_OUTCOME"
           printf 'FLUX_COMBINED_GRADIO_OUTCOME=%s\n' "$FLUX_COMBINED_GRADIO_OUTCOME"
-          for outcome in "$CONTRACTS_OUTCOME" "$AUDIOGEN_NOTEBOOK_OUTCOME" "$AUDIOGEN_START_OUTCOME" "$AUDIOGEN_HEALTH_OUTCOME" "$AUDIOGEN_GRADIO_OUTCOME" "$ACE_PREPARE_OUTCOME" "$ACE_GRADIO_OUTCOME" "$FLUX_CACHE_OUTCOME" "$FLUX_START_OUTCOME" "$FLUX_HEALTH_OUTCOME" "$FLUX_GRADIO_OUTCOME" "$FLUX_COMBINED_GRADIO_OUTCOME"; do
+          printf 'FLUX_PURGE_OUTCOME=%s\n' "$FLUX_PURGE_OUTCOME"
+          for outcome in "$CONTRACTS_OUTCOME" "$AUDIOGEN_NOTEBOOK_OUTCOME" "$AUDIOGEN_START_OUTCOME" "$AUDIOGEN_HEALTH_OUTCOME" "$AUDIOGEN_GRADIO_OUTCOME" "$AUDIOGEN_PURGE_OUTCOME" "$MUSICGEN_START_OUTCOME" "$MUSICGEN_HEALTH_OUTCOME" "$MUSICGEN_GRADIO_OUTCOME" "$MUSICGEN_PURGE_OUTCOME" "$ACE_PREPARE_OUTCOME" "$ACE_GRADIO_OUTCOME" "$FLUX_CACHE_OUTCOME" "$FLUX_START_OUTCOME" "$FLUX_HEALTH_OUTCOME" "$FLUX_GRADIO_OUTCOME" "$FLUX_COMBINED_GRADIO_OUTCOME" "$FLUX_PURGE_OUTCOME"; do
             test "$outcome" = "success"
           done
