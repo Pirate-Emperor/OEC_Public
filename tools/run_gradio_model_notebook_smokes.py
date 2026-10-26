@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import socket
+import subprocess
 import sys
 import tempfile
 import time
@@ -31,6 +32,8 @@ NOTEBOOKS = {
     "kokoro": ("pipeline_kokoro_gradio.ipynb", "phase2_3d", "synthesize_speech"),
     "whisper": ("pipeline_whisper_gradio.ipynb", "phase2_3d", "transcribe_audio"),
     "qwen3-asr": ("pipeline_qwen3_asr_gradio.ipynb", "phase2_3d", "transcribe_audio"),
+    "ltx-text-video": ("pipeline_ltx_video.ipynb", "phase1_ltx", "generate_video"),
+    "ltx-image-video": ("pipeline_ltx_video.ipynb", "phase1_ltx", "generate_video"),
 }
 AUDIO_PROVIDERS = {"audiogen", "musicgen", "ace-step", "kokoro"}
 IMAGE_PROVIDERS = {"flux", "flux-combined"}
@@ -39,13 +42,18 @@ NOTEBOOK_CELL_SELECTION = {
     "flux-combined": {8, 12},
     "trellis-only": {1, 2},
     "trellis-combined": {6, 10},
+    "ltx-text-video": {4, 5},
+    "ltx-image-video": {4, 5},
 }
 DEMO_VARIABLES = {
     "flux-combined": "demo_flux",
     "trellis-only": "demo_trellis",
     "trellis-combined": "demo_trellis",
+    "ltx-text-video": "demo_ltx",
+    "ltx-image-video": "demo_ltx",
 }
 ASR_PROVIDERS = {"whisper", "qwen3-asr"}
+VIDEO_PROVIDERS = {"ltx-text-video", "ltx-image-video"}
 
 
 def sha256_file(path: Path) -> str:
@@ -125,7 +133,7 @@ def execute_notebook(path: Path, *, code_cell_indexes: set[int] | None = None, d
     return {"scope": scope, "code_cells": code_cells}
 
 
-def invoke_via_gradio_client(provider: str, ui_url: str, audio_file: Path | None):
+def invoke_via_gradio_client(provider: str, ui_url: str, audio_file: Path | None, reference_file: Path | None = None):
     """Submit a real prediction request through Gradio's HTTP/event API."""
     from gradio_client import Client, handle_file
 
@@ -137,6 +145,22 @@ def invoke_via_gradio_client(provider: str, ui_url: str, audio_file: Path | None
             handle_file(str(audio_file)),
             "OEC synthetic reference image: generate a clean, watertight 3D asset",
             512, 512, 100000, False,
+            fn_index=0
+        )
+    if provider == "ltx-text-video":
+        return client.predict(
+            "text_to_video",
+            "A miniature brass robot walks across a studio table; smooth camera movement",
+            None, 1, 12, 42, False, False, "768x512",
+            fn_index=0
+        )
+    if provider == "ltx-image-video":
+        if reference_file is None or not reference_file.is_file():
+            raise ValueError("ltx-image-video requires a synthetic reference image")
+        return client.predict(
+            "image_to_video",
+            "A small brass robot slowly turns toward the camera; preserve the reference subject",
+            handle_file(str(reference_file)), 1, 12, 42, False, False, "768x512",
             fn_index=0
         )
     if provider == "flux":
@@ -213,6 +237,7 @@ def main() -> int:
         "media_api_url": (
             os.environ.get("OEC_TRELLIS_API_URL") if provider in MODEL3D_PROVIDERS
             else os.environ.get("OEC_FLUX_API_URL") if provider == "flux-combined"
+            else os.environ.get("OEC_LTX_SERVICE_URL", os.environ.get("OEC_MEDIA_API_URL")) if provider in VIDEO_PROVIDERS
             else os.environ.get("OEC_MEDIA_API_URL")
         ),
         "started_unix": time.time(),
@@ -233,6 +258,8 @@ def main() -> int:
             raise FileNotFoundError(f"notebook missing: {notebook_path}")
         if provider == "flux-combined" and not os.environ.get("OEC_FLUX_API_URL"):
             os.environ["OEC_FLUX_API_URL"] = os.environ.get("OEC_MEDIA_API_URL", "http://127.0.0.1:7867")
+        if provider in VIDEO_PROVIDERS and not os.environ.get("OEC_LTX_SERVICE_URL"):
+            os.environ["OEC_LTX_SERVICE_URL"] = os.environ.get("OEC_MEDIA_API_URL", "http://127.0.0.1:7869")
         if provider in MODEL3D_PROVIDERS and not os.environ.get("OEC_TRELLIS_API_URL"):
             os.environ["OEC_TRELLIS_API_URL"] = os.environ.get("OEC_MEDIA_API_URL", "http://127.0.0.1:7868")
         executed = execute_notebook(
@@ -266,7 +293,7 @@ def main() -> int:
 
         # Generate a small local input only for image-conditioned model callbacks.
         callback_input = args.audio_file.expanduser().resolve() if args.audio_file else None
-        if provider in MODEL3D_PROVIDERS:
+        if provider in MODEL3D_PROVIDERS or provider == "ltx-image-video":
             from PIL import Image, ImageDraw
             callback_input = report_dir / f"{provider}-reference.png"
             image = Image.new("RGB", (256, 256), (245, 241, 232))
@@ -276,7 +303,11 @@ def main() -> int:
             image.save(callback_input, format="PNG")
             result["input_image_path"] = str(callback_input)
         # Exercise the actual Gradio HTTP/event API, not a direct Python callback call.
-        raw_output = invoke_via_gradio_client(provider, ui_url, callback_input)
+        raw_output = invoke_via_gradio_client(
+            provider, ui_url,
+            callback_input if provider in ASR_PROVIDERS else args.audio_file,
+            reference_file=callback_input if provider in MODEL3D_PROVIDERS or provider == "ltx-image-video" else None,
+        )
         expected_outputs = 3 if provider == "flux-combined" else 2
         if not isinstance(raw_output, (tuple, list)) or len(raw_output) != expected_outputs:
             actual_shape = len(raw_output) if isinstance(raw_output, (tuple, list)) else type(raw_output).__name__
@@ -391,6 +422,48 @@ def main() -> int:
             result["artifact_bytes"] = destination.stat().st_size
             result["artifact_sha256"] = sha256_file(destination)
             result["image_validation"] = {"format": "PNG", "width": width, "height": height}
+            result_root = Path("/tmp/oec-notebook-results").resolve()
+            if result_root in source.parents and source.name.startswith("job_"):
+                source.unlink(missing_ok=True)
+        elif provider in VIDEO_PROVIDERS:
+            source = _output_path(output)
+            if not source.is_file() or source.is_symlink() or source.stat().st_size <= 1024:
+                raise RuntimeError(f"LTX callback did not return a non-empty MP4: {source}")
+            header = source.read_bytes()[:16]
+            if len(header) < 12 or header[4:8] != b"ftyp":
+                raise RuntimeError("LTX callback result does not have an MP4 ftyp header")
+            probe = shutil.which("ffprobe")
+            if not probe:
+                raise RuntimeError("ffprobe is required to validate LTX-generated MP4 output")
+            completed = subprocess.run(
+                [probe, "-v", "error", "-count_frames", "-select_streams", "v:0",
+                 "-show_entries", "stream=codec_name,width,height,nb_read_frames,r_frame_rate,duration",
+                 "-show_entries", "format=duration,format_name", "-of", "json", str(source)],
+                text=True, capture_output=True, timeout=60, check=False,
+            )
+            if completed.returncode:
+                raise RuntimeError(f"ffprobe rejected LTX MP4: {completed.stderr[-1200:]}")
+            mp4_report = json.loads(completed.stdout)
+            streams = mp4_report.get("streams") or []
+            if not streams:
+                raise RuntimeError("LTX MP4 has no video stream")
+            stream = streams[0]
+            width, height = int(stream.get("width") or 0), int(stream.get("height") or 0)
+            frames = int(stream.get("nb_read_frames") or 0)
+            duration = float((mp4_report.get("format") or {}).get("duration") or stream.get("duration") or 0.0)
+            if width <= 0 or height <= 0 or frames < 5 or duration <= 0:
+                raise RuntimeError(f"LTX MP4 metadata is invalid: {stream}")
+            destination = report_dir / f"{provider}-gradio-callback-artifact.mp4"
+            if source.resolve() != destination.resolve():
+                shutil.copy2(source, destination)
+            result["artifact_path"] = str(destination)
+            result["artifact_bytes"] = destination.stat().st_size
+            result["artifact_sha256"] = sha256_file(destination)
+            result["video_validation"] = {
+                "format": (mp4_report.get("format") or {}).get("format_name"),
+                "codec": stream.get("codec_name"), "width": width, "height": height,
+                "frames": frames, "fps": stream.get("r_frame_rate"), "duration_seconds": duration,
+            }
             result_root = Path("/tmp/oec-notebook-results").resolve()
             if result_root in source.parents and source.name.startswith("job_"):
                 source.unlink(missing_ok=True)
