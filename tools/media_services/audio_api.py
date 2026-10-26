@@ -49,6 +49,41 @@ def _has_model_weights(folder: Path) -> bool:
     return False
 
 
+def _configure_ace_step_checkpoint_root(handler: Any, checkpoint_root: Path, *, allow_download: bool) -> Path:
+    """Force upstream ACE-Step file resolution into OEC's managed model cache.
+
+    The pinned upstream handler derives its checkpoint directory from its source
+    checkout, rather than honoring initialize_service(project_root=...). Keep the
+    model weights in the StorageManager-managed models root and never silently
+    download into the source checkout when running cache-only.
+    """
+    target = Path(checkpoint_root).expanduser().resolve()
+    original_downloader = handler._ensure_model_downloaded
+
+    def managed_checkpoint_dir() -> str:
+        return str(target)
+
+    def ensure_in_managed_root(model_name: str, requested_root: str) -> str:
+        requested = Path(requested_root).expanduser().resolve()
+        if requested != target:
+            raise RuntimeError(
+                f"ACE-Step requested checkpoint write outside OEC model root: {requested}; expected {target}"
+            )
+        if not allow_download:
+            raise RuntimeError(
+                "OEC cache-only policy blocked ACE-Step fallback download; "
+                "prepare complete checkpoints through tools/prepare_media_models.py under StorageManager"
+            )
+        return original_downloader(model_name, str(target))
+
+    # Functions assigned on an instance are deliberately plain callables: the
+    # upstream call sites invoke these as self._get_checkpoint_dir() and
+    # self._ensure_model_downloaded(name, dir), without an implicit self arg.
+    handler._get_checkpoint_dir = managed_checkpoint_dir
+    handler._ensure_model_downloaded = ensure_in_managed_root
+    return target
+
+
 def _network_policy(allow_download: bool) -> None:
     offline = "0" if allow_download else "1"
     os.environ["HF_HUB_OFFLINE"] = offline
@@ -202,8 +237,12 @@ class AudioProvider(MediaProvider):
         from acestep.llm_inference import LLMHandler
         from acestep.inference import GenerationParams, GenerationConfig, generate_music
         dit = AceStepHandler()
+        _configure_ace_step_checkpoint_root(
+            dit, checkpoint_root, allow_download=self.allow_download
+        )
         dit_status, dit_ok = dit.initialize_service(
-            project_root=str(ACE_STEP_SOURCE_ROOT), config_path=self.ace_config, device=device, offload_to_cpu=False
+            project_root=str(ACE_STEP_SOURCE_ROOT), config_path=self.ace_config, device=device,
+            offload_to_cpu=False, use_flash_attention=False, compile_model=False,
         )
         if not dit_ok:
             raise ModelNotReady(f"ACE-Step DiT initialization failed: {dit_status}")
