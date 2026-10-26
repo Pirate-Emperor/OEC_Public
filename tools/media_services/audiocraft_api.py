@@ -7,6 +7,7 @@ ROOT=Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
 from core_config import SYSTEM_DIRS
 from tools.media_services.common import MediaProvider,RequestError,managed_write,serve
+from tools.media_services.model_cache import RuntimeLock
 
 class AudioCraftProvider(MediaProvider):
     artifact_content_type="audio/wav"; artifact_extension="wav"; max_prompt_chars=1200
@@ -14,6 +15,8 @@ class AudioCraftProvider(MediaProvider):
         super().__init__(allow_download)
         if model not in {"audiogen","musicgen"}: raise ValueError("model must be audiogen or musicgen")
         self.name=model; self.kind=model; self.gpu_index=gpu; self.license_accepted=license_accepted; self.runtime=None; self.torch=None; self.module=None; self.snapshot=None
+        self.model_cache_key={"audiogen":"audiogen-medium","musicgen":"musicgen-medium"}[model]
+        self.runtime_lock=RuntimeLock(self.model_cache_key); self.lock_owned=False
         self.model_name={"audiogen":"facebook/audiogen-medium","musicgen":"facebook/musicgen-medium"}[model]
     def validate_request(self,payload:dict)->dict:
         task="text_to_audio" if self.kind=="audiogen" else "text_to_music"
@@ -28,6 +31,8 @@ class AudioCraftProvider(MediaProvider):
         return {"task":task,"prompt":prompt.strip(),"parameters":{"duration_seconds":duration,"seed":seed}}
     def load_runtime(self)->None:
         if not self.license_accepted: raise RuntimeError("AudioCraft license/use boundary not acknowledged; pass --accept-noncommercial-license only for permitted use")
+        self.runtime_lock.acquire()
+        self.lock_owned=True
         self.module=__import__("pipeline_audiogen" if self.kind=="audiogen" else "pipeline_musicgen",fromlist=["*"])
         self.packages=self.module._check_versions()
         self.gpu=self.module._select_gpu(self.gpu_index) if self.kind=="audiogen" else self.module._gpu(self.gpu_index)
@@ -61,6 +66,9 @@ class AudioCraftProvider(MediaProvider):
             import torch
             if torch.cuda.is_available(): torch.cuda.empty_cache()
         except ImportError: pass
+        if self.lock_owned:
+            self.runtime_lock.release()
+            self.lock_owned=False
 
 def main()->int:
     p=argparse.ArgumentParser(description=__doc__); p.add_argument("--model",choices=("audiogen","musicgen"),required=True); p.add_argument("--host",default="127.0.0.1"); p.add_argument("--port",type=int); p.add_argument("--queue-size",type=int,default=1); p.add_argument("--timeout-seconds",type=int,default=900); p.add_argument("--gpu",type=int); p.add_argument("--allow-download",action="store_true"); p.add_argument("--accept-noncommercial-license",action="store_true",help="Acknowledge AudioCraft checkpoint's non-commercial license boundary")
