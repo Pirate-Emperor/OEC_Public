@@ -126,6 +126,21 @@ jobs:
                   if force_status not in (200, 202):
                       raise SystemExit(f"Force-cancel failed for run {run_id}: HTTP {force_status}")
                   print(f"OEC_DEADLINE_FORCE_CANCEL_REQUESTED run={run_id} age_seconds={int(age.total_seconds())}")
+                  terminal = False
+                  for force_attempt in range(6):
+                      time.sleep(3)
+                      _, state = request_json(run_url)
+                      if state.get("status") not in {"in_progress", "queued", "pending", "waiting", "requested"}:
+                          print(f"OEC_DEADLINE_FORCE_CANCEL_CONFIRMED run={run_id} status={state.get('status')} conclusion={state.get('conclusion')}")
+                          terminal = True
+                          break
+                      if force_attempt in {1, 3}:
+                          retry_status, _ = request_json(force_url, method="POST")
+                          if retry_status not in (200, 202):
+                              raise SystemExit(f"Repeated force-cancel failed for run {run_id}: HTTP {retry_status}")
+                          print(f"OEC_DEADLINE_FORCE_CANCEL_RETRY run={run_id} attempt={force_attempt + 1} status={state.get('status')}")
+                  if not terminal:
+                      print(f"OEC_DEADLINE_FORCE_CANCEL_NOT_TERMINAL run={run_id} last_status={state.get('status')}")
           PY
 
   canonical-root-sync:
