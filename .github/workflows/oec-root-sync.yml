@@ -10,13 +10,8 @@ permissions:
   actions: write
   contents: read
 
-# Keep the watchdog independent from the GPU-lane lock so it can stop stale runs.
-concurrency:
-  group: oec-canonical-source-reconcile
-  # This job mutates one persistent shared checkout. Queue newer syncs instead of
-  # cancelling an active Git operation and leaving an index.lock behind.
-  cancel-in-progress: false
-
+# The deadline watchdog must be independent of a canonical sync waiting for the GPU runner.
+# The shared checkout itself is serialized on canonical-root-sync below.
 jobs:
   enforce-30-minute-cutoff:
     name: Stop stale OEC A100 media runs
@@ -137,6 +132,10 @@ jobs:
     name: Sync A100's canonical OEC checkout to GitHub
     needs: enforce-30-minute-cutoff
     if: ${{ needs.enforce-30-minute-cutoff.result == 'success' }}
+    concurrency:
+      group: oec-canonical-source-reconcile
+      # Serialize changes to the persistent canonical checkout; never cancel a live Git operation.
+      cancel-in-progress: false
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 12
     defaults:
