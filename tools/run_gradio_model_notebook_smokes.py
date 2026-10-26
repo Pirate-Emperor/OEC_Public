@@ -41,9 +41,11 @@ AUDIO_PROVIDERS = {"audiogen", "musicgen", "ace-step", "kokoro"}
 IMAGE_PROVIDERS = {"flux", "flux-combined"}
 MODEL3D_PROVIDERS = {"trellis-only", "trellis-combined"}
 NOTEBOOK_CELL_SELECTION = {
-    "flux-combined": {8, 12},
+    # Run combined notebook read-only setup/diagnostics plus the chosen model
+    # client's dependencies and UI cells. No in-kernel model is loaded.
+    "flux-combined": {1, 2, 3, 4, 8, 12},
     "trellis-only": {1, 2},
-    "trellis-combined": {6, 10},
+    "trellis-combined": {1, 2, 3, 4, 6, 10},
     # Execute every non-empty code cell in pipeline_ltx_video.ipynb, including
     # core_config checks and read-only nvidia-smi/ps cells, before the live callback.
     "ltx-text-video": {1, 2, 3, 4, 5, 6, 7},
