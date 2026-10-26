@@ -571,6 +571,8 @@ def _build_media_service_spec(
             selected_python = python_override
             instance_id = service
             script_args = ["--host", "127.0.0.1", "--port", str(selected_port)]
+            if service == "trellis-api" and allow_download:
+                script_args.append("--allow-download")
     else:
         raise ValueError(f"Unsupported media service {service!r}.")
     _assert_port_range(selected_port)
