@@ -57,6 +57,7 @@ jobs:
               ".github/workflows/oec-audiogen-notebook-smoke.yml",
               ".github/workflows/oec-musicgen-smoke.yml",
               ".github/workflows/oec-e2e-acceptance.yml",
+              ".github/workflows/oec-demo-notebook-acceptance.yml",
           }
           api = f"https://api.github.com/repos/{repository}/actions/runs"
           query = urllib.parse.urlencode({"branch": branch, "per_page": 100})
