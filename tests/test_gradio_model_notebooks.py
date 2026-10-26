@@ -119,6 +119,31 @@ class ModelNotebookTests(unittest.TestCase):
                               "import diffusers","from diffusers","from trellis2.pipelines"):
                 self.assertNotIn(forbidden, text, name)
 
+    def test_every_file_output_gradio_notebook_allows_its_result_root(self):
+        expected = {
+            "pipeline_audiocraft.ipynb": "OUTPUT_DIR",
+            "pipeline_audiogen_gradio.ipynb": "RESULT_ROOT",
+            "pipeline_musicgen_gradio.ipynb": "RESULT_ROOT",
+            "pipeline_acestep_gradio.ipynb": "RESULT_ROOT",
+            "pipeline_flux_only.ipynb": "RESULT_ROOT",
+            "pipeline_kokoro_gradio.ipynb": "RESULT_ROOT",
+            "pipeline_whisper_gradio.ipynb": "RESULT_ROOT",
+            "pipeline_qwen3_asr_gradio.ipynb": "RESULT_ROOT",
+            "pipeline_ltx_video.ipynb": "LTX_RESULT_ROOT",
+            "pipeline_trellis_3d_only.ipynb": "TRELLIS_RESULT_ROOT",
+        }
+        for name, root in expected.items():
+            nb = json.loads((ROOT / name).read_text(encoding="utf-8"))
+            code = "\\n".join("".join(c.get("source", [])) for c in nb["cells"]
+                               if c.get("cell_type") == "code")
+            self.assertIn(".launch(", code, name)
+            self.assertIn(f"allowed_paths=[str({root})]", code, name)
+        combined = json.loads((ROOT / "pipeline_trellis_3d.ipynb").read_text(encoding="utf-8"))
+        combined_code = "\\n".join("".join(c.get("source", [])) for c in combined["cells"]
+                                    if c.get("cell_type") == "code")
+        self.assertIn("allowed_paths=[str(TRELLIS_RESULT_ROOT)]", combined_code)
+        self.assertIn("allowed_paths=[str(FLUX_RESULT_ROOT)]", combined_code)
+
     def test_target_model_notebooks_have_no_stale_execution_outputs(self):
         for name in ("pipeline_audiocraft.ipynb", "pipeline_audiogen_gradio.ipynb",
                      "pipeline_musicgen_gradio.ipynb", "pipeline_acestep_gradio.ipynb",
