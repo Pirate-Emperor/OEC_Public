@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -248,8 +249,10 @@ def _run_provider(provider: str, python: Path, audio_path: Path | None, log_dir:
     command = [str(python), str(MEDIA / "audio_api.py"), "--model", provider, "--host", "127.0.0.1", "--port", str(port)]
     print(f"SMOKE_START provider={provider} environment_python={python} port={port}", flush=True)
     started = time.monotonic()
+    owner_path = _service_owner_path(provider, log_dir)
     with service_log.open("w", encoding="utf-8") as log:
         process = subprocess.Popen(command, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    _write_service_owner(provider, process.pid, command, owner_path)
     try:
         deadline = time.monotonic() + LOAD_TIMEOUT[provider]
         ready_payload: Any = None
@@ -340,7 +343,106 @@ def _run_provider(provider: str, python: Path, audio_path: Path | None, log_dir:
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=5)
+        if process.poll() is not None:
+            owner_path.unlink(missing_ok=True)
+        else:
+            print(f"SMOKE_OWNER_MARKER_PRESERVED provider={provider} pid={process.pid}", flush=True)
         print(f"SMOKE_STOP provider={provider} returncode={process.returncode}", flush=True)
+
+
+def _service_owner_path(provider: str, log_dir: Path) -> Path:
+    return log_dir / f"{provider}-service-owner.json"
+
+
+def _write_service_owner(provider: str, pid: int, command: list[str], path: Path) -> None:
+    payload = {
+        "provider": provider,
+        "pid": int(pid),
+        "host": socket.gethostname(),
+        "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
+        "created_unix": time.time(),
+        "port": PORTS[provider],
+        "expected_cmdline_prefix": [str(part) for part in command],
+    }
+    temp_path = path.with_suffix(path.suffix + ".tmp")
+    temp_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+    temp_path.chmod(0o600)
+    temp_path.replace(path)
+
+
+def _process_cmdline(pid: int) -> list[str] | None:
+    try:
+        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except (OSError, ValueError):
+        return None
+    return [part.decode("utf-8", errors="replace") for part in raw.split(b"\\0") if part]
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+def _owner_matches_running_process(owner: dict[str, Any]) -> bool:
+    pid = owner.get("pid")
+    expected = owner.get("expected_cmdline_prefix")
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1:
+        return False
+    if not isinstance(expected, list) or not expected or any(not isinstance(x, str) for x in expected):
+        return False
+    actual = _process_cmdline(pid)
+    return bool(actual and actual[:len(expected)] == expected)
+
+
+def _cleanup_owned_service(provider: str, log_dir: Path, *, grace_seconds: float = 15.0) -> dict[str, Any]:
+    """Stop only a provider process recorded by this run and matching its exact argv."""
+    path = _service_owner_path(provider, log_dir)
+    if not path.is_file() or path.is_symlink():
+        return {"provider": provider, "status": "NOT_FOUND", "message": "no owned-process marker"}
+    try:
+        owner = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {"provider": provider, "status": "BLOCKED_INVALID_MARKER", "message": str(exc)}
+    if not isinstance(owner, dict):
+        return {"provider": provider, "status": "BLOCKED_INVALID_MARKER", "message": "marker is not an object"}
+    if owner.get("provider") != provider or owner.get("host") != socket.gethostname():
+        return {"provider": provider, "status": "BLOCKED_OWNER_MISMATCH", "pid": owner.get("pid")}
+    current_run_id = os.environ.get("GITHUB_RUN_ID", "local")
+    if owner.get("run_id") != current_run_id:
+        return {"provider": provider, "status": "BLOCKED_RUN_ID_MISMATCH", "pid": owner.get("pid")}
+    pid = owner.get("pid")
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1:
+        return {"provider": provider, "status": "BLOCKED_INVALID_PID"}
+    if not _pid_alive(pid):
+        path.unlink(missing_ok=True)
+        return {"provider": provider, "status": "ALREADY_EXITED", "pid": pid}
+    if not _owner_matches_running_process(owner):
+        return {"provider": provider, "status": "BLOCKED_COMMAND_MISMATCH", "pid": pid,
+                "message": "recorded PID is alive but argv differs; process was not signalled"}
+    os.kill(pid, signal.SIGTERM)
+    deadline = time.monotonic() + max(0.1, grace_seconds)
+    while time.monotonic() < deadline:
+        if not _pid_alive(pid):
+            path.unlink(missing_ok=True)
+            return {"provider": provider, "status": "STOPPED", "pid": pid, "signal": "SIGTERM"}
+        time.sleep(0.25)
+    if not _owner_matches_running_process(owner):
+        return {"provider": provider, "status": "BLOCKED_COMMAND_CHANGED", "pid": pid,
+                "message": "argv changed while waiting; refusing SIGKILL"}
+    os.kill(pid, signal.SIGKILL)
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        if not _pid_alive(pid):
+            path.unlink(missing_ok=True)
+            return {"provider": provider, "status": "STOPPED", "pid": pid, "signal": "SIGKILL"}
+        time.sleep(0.1)
+    return {"provider": provider, "status": "STOP_FAILED", "pid": pid,
+            "message": "recorded process remained alive after SIGKILL"}
 
 
 CACHE_KEY_FOR_PROVIDER = {
@@ -379,13 +481,28 @@ def main() -> int:
                         help="Launch the model-specific Gradio UI on loopback and invoke its real callback while the isolated backend is live.")
     parser.add_argument("--purge-after", action="store_true",
                         help="After each attempted provider stops, purge that provider's exact cache through model_cache_manager.")
+    parser.add_argument("--cleanup-owned-services", action="store_true",
+                        help="Recovery mode: stop only model-service PIDs recorded by this run and matching exact argv.")
+    parser.add_argument("--log-dir", type=Path,
+                        help="Override the owner/report directory (defaults to $RUNNER_TEMP/oec-media-smoke-logs).")
     args = parser.parse_args()
     available = set(REQUIRED)
     order = tuple(item.strip() for item in args.providers.split(",") if item.strip())
     if not order or len(order) != len(set(order)) or any(item not in available for item in order):
         parser.error(f"--providers must be unique entries from: {', '.join(sorted(available))}")
-    temp_dir = Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "oec-media-smoke-logs"
+    temp_dir = (args.log_dir.expanduser().resolve() if args.log_dir else
+                Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "oec-media-smoke-logs")
     temp_dir.mkdir(parents=True, exist_ok=True)
+    if args.cleanup_owned_services:
+        cleanup_rows = [_cleanup_owned_service(provider, temp_dir) for provider in order]
+        for row in cleanup_rows:
+            print("OWNED_SERVICE_CLEANUP " + json.dumps(row, ensure_ascii=False), flush=True)
+        blocked = [row for row in cleanup_rows if row["status"].startswith("BLOCKED") or row["status"] == "STOP_FAILED"]
+        print("OWNED_SERVICE_CLEANUP_SUMMARY " + json.dumps({
+            "providers": cleanup_rows, "blocked_or_failed": len(blocked),
+            "log_directory": str(temp_dir),
+        }, ensure_ascii=False), flush=True)
+        return 1 if blocked else 0
     envs = _conda_prefixes()
     results: list[dict[str, Any]] = []
     kokoro_wav: Path | None = None
