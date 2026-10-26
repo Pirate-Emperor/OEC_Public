@@ -177,7 +177,7 @@ jobs:
           )"
           ready=0
           for _ in $(seq 1 240); do
-            if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
+            if "$HOME/Conda/envs/phase2_3d/bin/python" -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
             sleep 5
           done
           cat "$R/health-check.log"
@@ -275,7 +275,7 @@ jobs:
           )"
           ready=0
           for _ in $(seq 1 240); do
-            if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
+            if "$HOME/Conda/envs/phase2_3d/bin/python" -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
             sleep 5
           done
           cat "$R/health-check.log"
@@ -492,7 +492,7 @@ jobs:
           )"
           ready=0
           for _ in $(seq 1 240); do
-            if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
+            if "$HOME/Conda/envs/phase2_3d/bin/python" -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
             sleep 5
           done
           cat "$R/health-check.log"
@@ -596,7 +596,7 @@ jobs:
           )"
           ready=0
           for _ in $(seq 1 240); do
-            if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
+            if "$HOME/Conda/envs/phase2_3d/bin/python" -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
             sleep 5
           done
           cat "$R/health-check.log"
@@ -690,7 +690,7 @@ jobs:
           )"
           ready=0
           for _ in $(seq 1 360); do
-            if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
+            if "$HOME/Conda/envs/phase2_3d/bin/python" -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
             sleep 5
           done
           cat "$R/health-check.log"
