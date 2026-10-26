@@ -87,6 +87,22 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn("Enforce independent speech and ACE-Step acceptance", workflow)
         self.assertIn('ACE_LIVE_OUTCOME: ${{ steps.ace_step_live.outcome }}', workflow)
 
+    def test_safe_control_notebook_runner_is_side_effect_guarded(self):
+        runner = (ROOT / "tools" / "run_safe_notebook_smokes.py").read_text(encoding="utf-8")
+        ast.parse(runner, filename="tools/run_safe_notebook_smokes.py")
+        for notebook in ("Untitled.ipynb", "pipeline_demo_acceptance.ipynb", "phase1_test_compute_node.ipynb"):
+            self.assertIn(notebook, runner)
+        self.assertIn('"OEC_START_HF_UPLOAD_DAEMON"', runner)
+        self.assertIn('"OEC_TEST_ENABLE_CLOUD_UPLOAD"', runner)
+        self.assertIn('"OEC_DEPLOY_LAUNCH_BIOME"', runner)
+        self.assertIn('os.environ[key] = "0"', runner)
+        self.assertIn('"pipeline_verify_encrypted_hf.ipynb":', runner)
+        # The historical scratch notebook must not mutate global Git identity.
+        untitled = json.loads((ROOT / "Untitled.ipynb").read_text(encoding="utf-8"))
+        source = "\n".join("".join(c.get("source", [])) for c in untitled["cells"])
+        self.assertNotIn('git config --global user.name "Killer4K"', source)
+        self.assertNotIn("touch oec_deploy/.gitignore", source)
+
     def test_gradio_client_uses_typed_file_data_for_asr_inputs(self):
         source = (ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
         self.assertIn("from gradio_client import Client, handle_file", source)
