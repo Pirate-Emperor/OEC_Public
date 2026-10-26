@@ -85,10 +85,10 @@ class OwnedServiceCleanupTests(unittest.TestCase):
         self.assertFalse(self.owner_path.exists())
 
     def test_recovery_cli_does_not_scan_or_load_models(self):
-        with mock.patch.object(smoke, "_conda_prefixes", side_effect=AssertionError("cleanup must not probe environments")):
-            result = smoke.main([
-                "--providers", "ace-step", "--cleanup-owned-services", "--log-dir", str(self.root)
-            ])
+        argv = ["run_media_model_smokes.py", "--providers", "ace-step", "--cleanup-owned-services", "--log-dir", str(self.root)]
+        with mock.patch.object(smoke, "_conda_prefixes", side_effect=AssertionError("cleanup must not probe environments")), \\
+             mock.patch.object(smoke.sys, "argv", argv):
+            result = smoke.main()
         self.assertEqual(result, 0)
 
 
