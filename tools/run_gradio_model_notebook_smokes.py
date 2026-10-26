@@ -24,6 +24,8 @@ NOTEBOOKS = {
     "audiogen": ("pipeline_audiogen_gradio.ipynb", "phase1", "generate_sound_effect"),
     "flux": ("pipeline_flux_only.ipynb", "phase2_3d", "generate_flux"),
     "flux-combined": ("pipeline_trellis_3d.ipynb", "phase2_3d", "generate_concept"),
+    "trellis-only": ("pipeline_trellis_3d_only.ipynb", "phase2_3d", "generate_3d"),
+    "trellis-combined": ("pipeline_trellis_3d.ipynb", "phase2_3d", "generate_3d"),
     "musicgen": ("pipeline_musicgen_gradio.ipynb", "phase1", "generate_music"),
     "ace-step": ("pipeline_acestep_gradio.ipynb", "phase2_3d", "generate_music"),
     "kokoro": ("pipeline_kokoro_gradio.ipynb", "phase2_3d", "synthesize_speech"),
@@ -32,8 +34,17 @@ NOTEBOOKS = {
 }
 AUDIO_PROVIDERS = {"audiogen", "musicgen", "ace-step", "kokoro"}
 IMAGE_PROVIDERS = {"flux", "flux-combined"}
-NOTEBOOK_CELL_SELECTION = {"flux-combined": {8, 12}}
-DEMO_VARIABLES = {"flux-combined": "demo_flux"}
+MODEL3D_PROVIDERS = {"trellis-only", "trellis-combined"}
+NOTEBOOK_CELL_SELECTION = {
+    "flux-combined": {8, 12},
+    "trellis-only": {1, 2},
+    "trellis-combined": {6, 10},
+}
+DEMO_VARIABLES = {
+    "flux-combined": "demo_flux",
+    "trellis-only": "demo_trellis",
+    "trellis-combined": "demo_trellis",
+}
 ASR_PROVIDERS = {"whisper", "qwen3-asr"}
 
 
@@ -119,6 +130,15 @@ def invoke_via_gradio_client(provider: str, ui_url: str, audio_file: Path | None
     from gradio_client import Client, handle_file
 
     client = Client(ui_url, verbose=True)
+    if provider in MODEL3D_PROVIDERS:
+        if audio_file is None or not audio_file.is_file():
+            raise ValueError(f"{provider} requires the synthetic reference image created by the smoke harness")
+        return client.predict(
+            handle_file(str(audio_file)),
+            "OEC synthetic reference image: generate a clean, watertight 3D asset",
+            512, 512, 100000, False,
+            fn_index=0
+        )
     if provider == "flux":
         return client.predict(
             "A photorealistic amber glass sphere on a clean studio background", 42, 512, 512, 4, 1.0,
@@ -191,7 +211,8 @@ def main() -> int:
         "python_executable": sys.executable,
         "python_prefix": sys.prefix,
         "media_api_url": (
-            os.environ.get("OEC_FLUX_API_URL") if provider == "flux-combined"
+            os.environ.get("OEC_TRELLIS_API_URL") if provider in MODEL3D_PROVIDERS
+            else os.environ.get("OEC_FLUX_API_URL") if provider == "flux-combined"
             else os.environ.get("OEC_MEDIA_API_URL")
         ),
         "started_unix": time.time(),
@@ -212,6 +233,8 @@ def main() -> int:
             raise FileNotFoundError(f"notebook missing: {notebook_path}")
         if provider == "flux-combined" and not os.environ.get("OEC_FLUX_API_URL"):
             os.environ["OEC_FLUX_API_URL"] = os.environ.get("OEC_MEDIA_API_URL", "http://127.0.0.1:7867")
+        if provider in MODEL3D_PROVIDERS and not os.environ.get("OEC_TRELLIS_API_URL"):
+            os.environ["OEC_TRELLIS_API_URL"] = os.environ.get("OEC_MEDIA_API_URL", "http://127.0.0.1:7868")
         executed = execute_notebook(
             notebook_path,
             code_cell_indexes=NOTEBOOK_CELL_SELECTION.get(provider),
@@ -241,10 +264,19 @@ def main() -> int:
         result["ui_http_status"], result["ui_html_prefix"] = wait_for_ui(ui_url)
         result["ui_launch"] = "PASS"
 
+        # Generate a small local input only for image-conditioned model callbacks.
+        callback_input = args.audio_file.expanduser().resolve() if args.audio_file else None
+        if provider in MODEL3D_PROVIDERS:
+            from PIL import Image, ImageDraw
+            callback_input = report_dir / f"{provider}-reference.png"
+            image = Image.new("RGB", (256, 256), (245, 241, 232))
+            draw = ImageDraw.Draw(image)
+            draw.ellipse((64, 54, 192, 182), fill=(70, 125, 180), outline=(25, 55, 85), width=5)
+            draw.rectangle((98, 170, 158, 210), fill=(90, 95, 105))
+            image.save(callback_input, format="PNG")
+            result["input_image_path"] = str(callback_input)
         # Exercise the actual Gradio HTTP/event API, not a direct Python callback call.
-        raw_output = invoke_via_gradio_client(
-            provider, ui_url, args.audio_file.expanduser().resolve() if args.audio_file else None
-        )
+        raw_output = invoke_via_gradio_client(provider, ui_url, callback_input)
         expected_outputs = 3 if provider == "flux-combined" else 2
         if not isinstance(raw_output, (tuple, list)) or len(raw_output) != expected_outputs:
             actual_shape = len(raw_output) if isinstance(raw_output, (tuple, list)) else type(raw_output).__name__
@@ -308,6 +340,37 @@ def main() -> int:
                     source.with_suffix(".info.json").unlink(missing_ok=True)
                 except OSError:
                     pass
+        elif provider in MODEL3D_PROVIDERS:
+            source = _output_path(output)
+            if not source.is_file() or source.is_symlink() or source.stat().st_size < 1024:
+                raise RuntimeError(f"TRELLIS callback did not return a non-empty GLB: {source}")
+            data = source.read_bytes()
+            if data[:4] != b"glTF" or len(data) < 20:
+                raise RuntimeError("TRELLIS callback asset does not have a GLB binary header")
+            import struct
+            version, declared_length = struct.unpack_from("<II", data, 4)
+            json_length, chunk_type = struct.unpack_from("<II", data, 12)
+            if version != 2 or declared_length != len(data):
+                raise RuntimeError(f"invalid GLB header: version={version}, declared={declared_length}, actual={len(data)}")
+            if chunk_type != 0x4E4F534A or json_length <= 0 or 20 + json_length > len(data):
+                raise RuntimeError("invalid GLB JSON chunk header")
+            document = json.loads(data[20:20 + json_length].rstrip(b" \t\r\n\0").decode("utf-8"))
+            if not isinstance(document, dict) or "asset" not in document:
+                raise RuntimeError("GLB JSON chunk lacks the glTF asset object")
+            destination = report_dir / f"{provider}-gradio-callback-artifact.glb"
+            if source.resolve() != destination.resolve():
+                shutil.copy2(source, destination)
+            result["artifact_path"] = str(destination)
+            result["artifact_bytes"] = destination.stat().st_size
+            result["artifact_sha256"] = sha256_file(destination)
+            result["model3d_validation"] = {
+                "format": "GLB", "version": version, "declared_length": declared_length,
+                "json_chunk_bytes": json_length, "mesh_count": len(document.get("meshes", [])),
+                "node_count": len(document.get("nodes", [])),
+            }
+            result_root = Path("/tmp/oec-notebook-results").resolve()
+            if result_root in source.parents and source.name.startswith("job_"):
+                source.unlink(missing_ok=True)
         elif provider in IMAGE_PROVIDERS:
             source = _output_path(output)
             if not source.is_file() or source.stat().st_size <= 64:
