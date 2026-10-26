@@ -337,6 +337,32 @@ def _run_provider(provider: str, python: Path, audio_path: Path | None, log_dir:
         print(f"SMOKE_STOP provider={provider} returncode={process.returncode}", flush=True)
 
 
+CACHE_KEY_FOR_PROVIDER = {
+    "kokoro": "kokoro",
+    "whisper": "whisper-turbo",
+    "qwen3-asr": "qwen3-asr-0.6b",
+    "ace-step": "ace-step",
+}
+
+
+def _purge_tested_model(provider: str) -> dict[str, Any]:
+    key = CACHE_KEY_FOR_PROVIDER[provider]
+    command = [sys.executable, str(ROOT / "tools" / "model_cache_manager.py"),
+               "purge", key, "--confirm"]
+    completed = subprocess.run(
+        command, cwd=ROOT, text=True, capture_output=True, timeout=180, check=False,
+    )
+    output = completed.stdout + "\nSTDERR:\n" + completed.stderr
+    result = {
+        "model_cache_key": key,
+        "returncode": completed.returncode,
+        "status": "PASS" if completed.returncode == 0 else "BLOCKED_OR_FAILED",
+        "output_tail": output[-6000:],
+    }
+    print("MODEL_CACHE_CLEANUP " + json.dumps(result, ensure_ascii=False), flush=True)
+    return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--providers", default="kokoro,whisper,qwen3-asr,ace-step",
@@ -345,6 +371,8 @@ def main() -> int:
                         help="Treat a requested provider skip as failure for required acceptance.")
     parser.add_argument("--check-gradio-notebooks", action="store_true",
                         help="Launch the model-specific Gradio UI on loopback and invoke its real callback while the isolated backend is live.")
+    parser.add_argument("--purge-after", action="store_true",
+                        help="After each attempted provider stops, purge that provider's exact cache through model_cache_manager.")
     args = parser.parse_args()
     available = set(REQUIRED)
     order = tuple(item.strip() for item in args.providers.split(",") if item.strip())
@@ -374,6 +402,14 @@ def main() -> int:
         result, artifact = _run_provider(provider, python, kokoro_wav, temp_dir,
                                          ui_python=ui_python,
                                          check_gradio_notebooks=args.check_gradio_notebooks)
+        # _run_provider stops only its own service before returning. Clean failed
+        # attempts too so partial cache downloads cannot silently accumulate.
+        if args.purge_after and result.get("status") in {"PASS", "FAIL"}:
+            cleanup = _purge_tested_model(provider)
+            result["cache_cleanup"] = cleanup
+            if cleanup["status"] != "PASS":
+                result["status"] = "FAIL"
+                result["reason"] = (str(result.get("reason", "")) + " | cache cleanup blocked/failed").strip(" |")
         results.append(result)
         if result["status"] == "FAIL":
             errors += 1
