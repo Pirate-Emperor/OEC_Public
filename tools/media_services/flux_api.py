@@ -7,7 +7,6 @@ ROOT=Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
 from core_config import SYSTEM_DIRS
 from tools.media_services.common import MediaProvider,RequestError,serve
-from tools.prepare_flux_cache import ensure_flux_cache
 from tools.media_services.model_cache import RuntimeLock
 
 class FluxProvider(MediaProvider):
@@ -35,6 +34,8 @@ class FluxProvider(MediaProvider):
         self.gpu=module.select_idle_a100_gpu(self.gpu_index)
         self.runtime_lock.acquire()
         self.lock_owned=True
+        # Keep import-time/provider validation dependency-light; the cache helper is only needed for live model loading.
+        from tools.prepare_flux_cache import ensure_flux_cache
         self.snapshot=ensure_flux_cache(allow_download=self.allow_download)
         self.pipe,self.torch=module._load(self.snapshot,self.gpu); self.module=module
         self.model_name=module.MODEL_ID; self.model_revision=self.snapshot.name; self.device_name="cuda"; self.model_loaded=True
