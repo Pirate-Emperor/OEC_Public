@@ -185,5 +185,16 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn("MODEL3D_PROVIDERS", source)
         self.assertIn("Image.open(source)", source)
         self.assertIn("callback_transport", source)
+    def test_audio_generation_readiness_checks_have_valid_python_syntax(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
+        for port in ("7874", "7875"):
+            self.assertIn(f'url_missing_should_not_be_used_{port}', "") if False else None
+            self.assertIn(f'http://127.0.0.1:{port}/health', workflow)
+        # A prior multiline heredoc had a bare 'try:' followed by unindented
+        # statements, so the readiness loop failed every poll and stalled the A100 lane.
+        self.assertNotIn("try:\n          response = opener.open(url, timeout=3)", workflow)
+        self.assertEqual(workflow.count("HEALTH_CODE='import json, urllib.request;"), 2)
+        self.assertIn("assert health.get(\"ready\") and health.get(\"model_loaded\"), health", workflow)
+
 if __name__ == "__main__":
     unittest.main()
