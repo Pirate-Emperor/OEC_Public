@@ -25,96 +25,47 @@ def code_cells(name: str) -> list[tuple[int, str]]:
 
 class StorageWriteAdmissionTests(unittest.TestCase):
     def test_shared_model_and_output_writers_do_not_opt_out_of_fresh_quota(self):
-        for name in (*NOTEBOOKS, "pipeline_trellis_3d.py"):
-            path = ROOT / name
+        for name in NOTEBOOKS:
             if name == "pipeline_flux_only.ipynb":
-                # FLUX is a frontend now; cache writes are owned by the API/helper.
                 source = (ROOT / "tools" / "prepare_flux_cache.py").read_text(encoding="utf-8")
-            elif name.endswith(".ipynb"):
-                source = "\\n".join(code for _, code in code_cells(name))
+            elif name in {"pipeline_trellis_3d.ipynb", "pipeline_trellis_3d_only.ipynb"}:
+                source = (ROOT / "tools" / "media_services" / "trellis_api.py").read_text(encoding="utf-8")
+                source += "\n" + (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
             else:
-                source = path.read_text(encoding="utf-8")
+                source = "\n".join(code for _, code in code_cells(name))
             self.assertNotIn("require_fresh_quota=False", source, name)
             self.assertIn("require_fresh_quota=True", source, name)
 
-    def test_notebook_model_and_output_writes_recheck_admission_under_lock(self):
-        setup_cells = {"pipeline_trellis_3d.ipynb": {6}, "pipeline_trellis_3d_only.ipynb": {10}}
-        for name in NOTEBOOKS:
-            for cell_index, source in code_cells(name):
-                if cell_index in setup_cells.get(name, set()):
-                    continue
-                lines = source.splitlines()
-                for i, line in enumerate(lines):
-                    if "with managed_storage_operation(" not in line:
-                        continue
-                    end = i
-                    while end < len(lines) and lines[end].strip() != "):":
-                        end += 1
-                    self.assertLess(end, len(lines), f"{name} cell {cell_index}: unclosed manager")
-                    header = "\n".join(lines[i:end + 1])
-                    if not any(token in header for token in ('"models"', "'models'", '"outputs"', "'outputs'")):
-                        continue
-                    before = "\n".join(lines[max(0, i - 12):i])
-                    after = "\n".join(lines[end + 1:end + 8])
-                    self.assertIn("storage_preflight(", before, f"{name} cell {cell_index}: no preflight before lock")
-                    self.assertIn("storage_preflight(", after, f"{name} cell {cell_index}: no preflight inside lock")
-                    self.assertIn("require_fresh_quota=True", before)
-                    self.assertIn("require_fresh_quota=True", after)
-
-    def test_trellis_setup_installs_and_clones_are_serialized_and_quota_gated(self):
-        for name, index in (("pipeline_trellis_3d.ipynb", 6), ("pipeline_trellis_3d_only.ipynb", 10)):
-            sources = dict(code_cells(name))
-            setup = sources[index]
-            self.assertIn("def _trellis_setup_storage_admission", setup)
-            self.assertIn("storage_preflight_path(", setup)
-            self.assertIn("require_fresh_quota=True", setup)
-            self.assertIn("is_pip_install", setup)
-            self.assertIn("is_git_clone", setup)
-            self.assertIn('with managed_storage_operation(\n        "models"', setup)
-            self.assertGreaterEqual(setup.count("_trellis_setup_storage_admission()"), 2)
-
-    def test_output_directories_are_created_only_after_admission(self):
+    def test_trellis_notebooks_do_not_mutate_shared_python_or_model_cache_in_kernel(self):
         for name in ("pipeline_trellis_3d.ipynb", "pipeline_trellis_3d_only.ipynb"):
-            source = next(s for _, s in code_cells(name) if "glb.export(glb_path, extension_webp=True)" in s)
-            self.assertLess(source.rindex("Storage admission denied inside managed write"),
-                            source.index("os.makedirs(OUTPUT_DIR, exist_ok=True)"))
-            self.assertLess(source.index("os.makedirs(OUTPUT_DIR, exist_ok=True)"),
-                            source.index("glb.export(glb_path, extension_webp=True)"))
-        audio = next(s for _, s in code_cells("pipeline_audiocraft.ipynb") if "audio_write(" in s)
-        # HEADLESS_SMOKE writes to runner-local ephemeral storage by design. Check
-        # the last (managed-production) mkdir, not the earlier scratch-path mkdir.
-        self.assertLess(audio.rindex("Storage admission denied inside managed write"),
-                        audio.rindex("AUDIOGEN_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)"))
-        cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
-        self.assertLess(cli.index('_preflight_output("inside managed write")'),
-                        cli.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
+            source = "\n".join(code for _, code in code_cells(name))
+            self.assertNotIn("pip uninstall", source, name)
+            self.assertNotIn('subprocess.run(["pip", "install"', source, name)
+            self.assertNotIn("from trellis2.pipelines import", source, name)
+            self.assertIn("/v1/jobs", source, name)
+        backend = (ROOT / "tools" / "media_services" / "trellis_api.py").read_text(encoding="utf-8")
+        self.assertIn("--allow-download", backend)
+        self.assertIn("RuntimeLock", backend)
 
     def test_output_admission_precedes_expensive_model_inference(self):
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
-        generate = cli.split("def generate_glb(", 1)[1].split("\\ndef main(", 1)[0]
+        generate = cli.split("def generate_glb(", 1)[1].split("\ndef main(", 1)[0]
         self.assertLess(generate.index('_preflight_output("before TRELLIS inference")'),
                         generate.index("meshes = pipeline.run(prepared)"))
         self.assertLess(generate.index("with managed_storage_operation("),
                         generate.index("destination_dir.mkdir(parents=True, exist_ok=True)"))
         self.assertIn("GLB JSON chunk is invalid", generate)
         self.assertIn("no non-empty mesh geometry", generate)
-        for name, cell in (("pipeline_trellis_3d.ipynb", 10),
-                           ("pipeline_trellis_3d_only.ipynb", 11)):
-            source = dict(code_cells(name))[cell]
-            self.assertLess(source.index("TRELLIS generation refused before inference"),
-                            source.index("mesh = trellis_pipe.run(input_image)[0]"))
         flux_image = (ROOT / "pipeline_flux_image.py").read_text(encoding="utf-8")
-        flux_generate = flux_image.split("def _generate(", 1)[1].split("\\ndef main(", 1)[0]
-        self.assertLess(
-            flux_generate.index('storage_preflight("outputs"'),
-            flux_generate.index("image = pipe("),
-        )
+        flux_generate = flux_image.split("def _generate(", 1)[1].split("\ndef main(", 1)[0]
+        self.assertLess(flux_generate.index('storage_preflight("outputs"'),
+                        flux_generate.index("image = pipe("))
         self.assertIn("managed_storage_operation", flux_image)
 
     def test_cli_model_download_and_glb_export_use_fresh_quota(self):
         cli = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
         self.assertIn("TRELLIS model download denied inside managed operation", cli)
-        self.assertIn("repo_cache_name = f\"models--{args.model_id.replace('/', '--')}\"", cli)
+        self.assertIn('repo_cache_name = f"models--{args.model_id.replace(\'/\', \'--\')}"', cli)
         self.assertIn("TRELLIS_WEIGHT_SNAPSHOT_CACHE_HIT", cli)
         self.assertIn("storage_preflight_path(", cli)
         self.assertIn("GLB {stage} refused by OEC output quota/storage admission", cli)

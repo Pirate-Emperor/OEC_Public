@@ -10,6 +10,8 @@ NOTEBOOKS = {
     "pipeline_audiogen_gradio.ipynb": ("phase1", "audiocraft-api"),
     "pipeline_musicgen_gradio.ipynb": ("phase1", "audiocraft-api"),
     "pipeline_acestep_gradio.ipynb": ("phase2_3d", "oec-acestep-py311"),
+    "pipeline_trellis_3d_only.ipynb": ("phase2_3d", "trellis-api"),
+    "pipeline_trellis_3d.ipynb": ("phase2_3d", "trellis-api"),
     "pipeline_flux_only.ipynb": ("phase2_3d", "flux-api"),
     "pipeline_kokoro_gradio.ipynb": ("phase2_3d", "oec-audio-py311"),
     "pipeline_whisper_gradio.ipynb": ("phase2_3d", "oec-audio-py311"),
@@ -32,8 +34,8 @@ class ModelNotebookTests(unittest.TestCase):
             text = "\n".join("".join(c.get("source", [])) for c in nb["cells"])
             self.assertIn(env, text, name)
             self.assertIn(backend, text, name)
-            self.assertIn("gr.Interface(", text, name)
-            self.assertIn("demo.queue(", text, name)
+            self.assertTrue("gr.Interface(" in text or "gr.Blocks(" in text, name)
+            self.assertIn(".queue(", text, name)
             self.assertIn('server_name="127.0.0.1"', text, name)
             self.assertIn("share=False", text, name)
             self.assertNotIn("pip install", text.lower(), name)
@@ -82,16 +84,18 @@ class ModelNotebookTests(unittest.TestCase):
     def test_service_ui_does_not_import_provider_ml_packages(self):
         for name in ("pipeline_acestep_gradio.ipynb","pipeline_kokoro_gradio.ipynb",
                      "pipeline_whisper_gradio.ipynb","pipeline_qwen3_asr_gradio.ipynb",
-                     "pipeline_flux_only.ipynb"):
+                     "pipeline_flux_only.ipynb","pipeline_trellis_3d_only.ipynb","pipeline_trellis_3d.ipynb"):
             nb = json.loads((ROOT / name).read_text(encoding="utf-8"))
             text = "\n".join("".join(c.get("source", [])) for c in nb["cells"] if c.get("cell_type")=="code")
             for forbidden in ("import torch","import whisper","from kokoro","import acestep","from qwen_asr",
-                              "import diffusers","from diffusers"):
+                              "import diffusers","from diffusers","from trellis2.pipelines"):
                 self.assertNotIn(forbidden, text, name)
 
     def test_target_model_notebooks_have_no_stale_execution_outputs(self):
         for name in ("pipeline_audiocraft.ipynb", "pipeline_audiogen_gradio.ipynb",
-                     "pipeline_acestep_gradio.ipynb", "pipeline_flux_only.ipynb"):
+                     "pipeline_musicgen_gradio.ipynb", "pipeline_acestep_gradio.ipynb",
+                     "pipeline_trellis_3d_only.ipynb", "pipeline_trellis_3d.ipynb",
+                     "pipeline_flux_only.ipynb", "pipeline_wan_video.ipynb"):
             nb = json.loads((ROOT / name).read_text(encoding="utf-8"))
             for index, cell in enumerate(nb["cells"]):
                 if cell.get("cell_type") == "code":
@@ -102,6 +106,7 @@ class ModelNotebookTests(unittest.TestCase):
         source = (ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
         self.assertIn('"flux": ("pipeline_flux_only.ipynb", "phase2_3d", "generate_flux")', source)
         self.assertIn("IMAGE_PROVIDERS", source)
+        self.assertIn("MODEL3D_PROVIDERS", source)
         self.assertIn("Image.open(source)", source)
         self.assertIn("callback_transport", source)
 if __name__ == "__main__":
