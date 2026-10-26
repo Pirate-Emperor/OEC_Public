@@ -66,6 +66,8 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertIn("MODEL3D_PROVIDERS", source)
         self.assertIn("model3d_validation", source)
         self.assertIn("OEC_GRADIO_HEADLESS_SMOKE", source)
+        self.assertIn('"trellis-combined": {1, 2, 3, 4, 6, 10}', source)
+        self.assertIn('"flux-combined": {1, 2, 3, 4, 8, 12}', source)
 
     def test_managed_trellis_service_owns_storage_admission_and_runtime_lock(self):
         api = (ROOT / "tools" / "media_services" / "trellis_api.py").read_text(encoding="utf-8")
