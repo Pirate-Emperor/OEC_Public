@@ -46,6 +46,53 @@ class AudioValidationTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {}, clear=True):
             self.assertTrue(common.require_fresh_quota())
 
+    def test_ace_step_checkpoint_root_uses_managed_model_directory(self):
+        class FakeHandler:
+            def __init__(self):
+                self.download_calls = []
+            def _get_checkpoint_dir(self):
+                return "/source/checkout/checkpoints"
+            def _ensure_model_downloaded(self, model_name, checkpoint_dir):
+                self.download_calls.append((model_name, checkpoint_dir))
+                return str(Path(checkpoint_dir) / model_name)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "aireos_models" / "ace-step-1.5"
+            root.mkdir(parents=True)
+            handler = FakeHandler()
+            configured = audio_api._configure_ace_step_checkpoint_root(
+                handler, root, allow_download=False
+            )
+            self.assertEqual(configured, root.resolve())
+            self.assertEqual(Path(handler._get_checkpoint_dir()), root.resolve())
+            with self.assertRaisesRegex(RuntimeError, "cache-only policy blocked"):
+                handler._ensure_model_downloaded("acestep-v15-turbo", str(root))
+            self.assertEqual(handler.download_calls, [])
+
+    def test_ace_step_explicit_download_is_still_confined_to_managed_root(self):
+        class FakeHandler:
+            def __init__(self):
+                self.download_calls = []
+            def _get_checkpoint_dir(self):
+                return "/source/checkout/checkpoints"
+            def _ensure_model_downloaded(self, model_name, checkpoint_dir):
+                self.download_calls.append((model_name, checkpoint_dir))
+                return str(Path(checkpoint_dir) / model_name)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = (Path(tmp) / "aireos_models" / "ace-step-1.5").resolve()
+            handler = FakeHandler()
+            audio_api._configure_ace_step_checkpoint_root(handler, root, allow_download=True)
+            self.assertEqual(Path(handler._get_checkpoint_dir()), root)
+            self.assertEqual(
+                handler._ensure_model_downloaded("acestep-v15-turbo", str(root)),
+                str(root / "acestep-v15-turbo"),
+            )
+            self.assertEqual(handler.download_calls, [("acestep-v15-turbo", str(root))])
+            with self.assertRaisesRegex(RuntimeError, "outside OEC model root"):
+                handler._ensure_model_downloaded("oops", str(root.parent / "elsewhere"))
+            self.assertEqual(len(handler.download_calls), 1)
+
     def test_ace_step_request_is_bounded(self):
         provider = audio_api.AudioProvider("ace-step", require_cuda=False)
         normalized = provider.validate_request({"prompt": "calm ambient piano"})
