@@ -177,7 +177,8 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py purge audiogen-medium --confirm 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/audiogen-gradio/cache-cleanup.log"
+          R="$OEC_ACCEPTANCE_ROOT/audiogen-gradio"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/cleanup_test_model_caches.py --models audiogen-medium --report-json "$R/cache-cleanup.json" 2>&1 | tee "$R/cache-cleanup.log"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/audiogen-gradio/cache-cleanup.log"
 
       - name: Test standalone MusicGen CLI mode and decode its WAV
@@ -256,7 +257,8 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py purge musicgen-medium --confirm 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/musicgen-gradio/cache-cleanup.log"
+          R="$OEC_ACCEPTANCE_ROOT/musicgen-gradio"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/cleanup_test_model_caches.py --models musicgen-medium --report-json "$R/cache-cleanup.json" 2>&1 | tee "$R/cache-cleanup.log"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/musicgen-gradio/cache-cleanup.log"
 
       - name: Prepare speech checkpoints and isolated runtime
@@ -413,7 +415,7 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py purge trellis-2-4b --confirm 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/trellis/cache-cleanup.log"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/cleanup_test_model_caches.py --models trellis-2-4b --report-json "$OEC_ACCEPTANCE_ROOT/trellis/cache-cleanup.json" 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/trellis/cache-cleanup.log"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/trellis/cache-cleanup.log"
 
       - name: Prepare FLUX cache through StorageManager admission
@@ -503,7 +505,7 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py purge flux-klein-4b --confirm 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/flux/cache-cleanup.log"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/cleanup_test_model_caches.py --models flux-klein-4b --report-json "$OEC_ACCEPTANCE_ROOT/flux/cache-cleanup.json" 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/flux/cache-cleanup.log"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/flux/cache-cleanup.log"
 
       - name: Start LTX model server for both video notebook modes
