@@ -158,7 +158,23 @@ jobs:
         run: |
           set -euo pipefail
           R="$OEC_ACCEPTANCE_ROOT/audiogen-gradio"
-          HEALTH_CODE='import json,urllib.request; op=urllib.request.build_opener(urllib.request.ProxyHandler({})); h=json.load(op.open("http://127.0.0.1:7874/health",timeout=3)); assert h.get("ready") and h.get("model_loaded"),h; print(json.dumps(h))'
+          HEALTH_CODE="$(cat <<'PY'
+import json
+import urllib.error
+import urllib.request
+url = "http://127.0.0.1:7874/health"
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+try:
+    response = opener.open(url, timeout=3)
+except urllib.error.HTTPError as exc:
+    response = exc
+health = json.load(response)
+if health.get("error") and not health.get("loading", False):
+    raise RuntimeError("fatal model load error: " + str(health["error"]))
+assert health.get("ready") and health.get("model_loaded"), health
+print(json.dumps(health))
+PY
+)"
           ready=0
           for _ in $(seq 1 240); do
             if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
@@ -240,7 +256,23 @@ jobs:
         run: |
           set -euo pipefail
           R="$OEC_ACCEPTANCE_ROOT/musicgen-gradio"
-          HEALTH_CODE='import json,urllib.request; op=urllib.request.build_opener(urllib.request.ProxyHandler({})); h=json.load(op.open("http://127.0.0.1:7875/health",timeout=3)); assert h.get("ready") and h.get("model_loaded"),h; print(json.dumps(h))'
+          HEALTH_CODE="$(cat <<'PY'
+import json
+import urllib.error
+import urllib.request
+url = "http://127.0.0.1:7875/health"
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+try:
+    response = opener.open(url, timeout=3)
+except urllib.error.HTTPError as exc:
+    response = exc
+health = json.load(response)
+if health.get("error") and not health.get("loading", False):
+    raise RuntimeError("fatal model load error: " + str(health["error"]))
+assert health.get("ready") and health.get("model_loaded"), health
+print(json.dumps(health))
+PY
+)"
           ready=0
           for _ in $(seq 1 240); do
             if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
@@ -441,7 +473,23 @@ jobs:
         run: |
           set -euo pipefail
           R="$OEC_ACCEPTANCE_ROOT/trellis"
-          HEALTH_CODE='import json,urllib.request; op=urllib.request.build_opener(urllib.request.ProxyHandler({})); h=json.load(op.open("http://127.0.0.1:7868/health",timeout=3)); assert h.get("ready") and h.get("model_loaded"),h; print(json.dumps(h))'
+          HEALTH_CODE="$(cat <<'PY'
+import json
+import urllib.error
+import urllib.request
+url = "http://127.0.0.1:7868/health"
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+try:
+    response = opener.open(url, timeout=3)
+except urllib.error.HTTPError as exc:
+    response = exc
+health = json.load(response)
+if health.get("error") and not health.get("loading", False):
+    raise RuntimeError("fatal model load error: " + str(health["error"]))
+assert health.get("ready") and health.get("model_loaded"), health
+print(json.dumps(health))
+PY
+)"
           ready=0
           for _ in $(seq 1 240); do
             if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
@@ -529,7 +577,23 @@ jobs:
         run: |
           set -euo pipefail
           R="$OEC_ACCEPTANCE_ROOT/flux"
-          HEALTH_CODE='import json,urllib.request; op=urllib.request.build_opener(urllib.request.ProxyHandler({})); h=json.load(op.open("http://127.0.0.1:7867/health",timeout=3)); assert h.get("ready") and h.get("model_loaded"),h; print(json.dumps(h))'
+          HEALTH_CODE="$(cat <<'PY'
+import json
+import urllib.error
+import urllib.request
+url = "http://127.0.0.1:7867/health"
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+try:
+    response = opener.open(url, timeout=3)
+except urllib.error.HTTPError as exc:
+    response = exc
+health = json.load(response)
+if health.get("error") and not health.get("loading", False):
+    raise RuntimeError("fatal model load error: " + str(health["error"]))
+assert health.get("ready") and health.get("model_loaded"), health
+print(json.dumps(health))
+PY
+)"
           ready=0
           for _ in $(seq 1 240); do
             if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
@@ -607,7 +671,23 @@ jobs:
         run: |
           set -euo pipefail
           R="$OEC_ACCEPTANCE_ROOT/ltx"
-          HEALTH_CODE='import json,urllib.request; op=urllib.request.build_opener(urllib.request.ProxyHandler({})); h=json.load(op.open("http://127.0.0.1:7869/health",timeout=4)); assert h.get("ready") and h.get("model_loaded"),h; print(json.dumps(h))'
+          HEALTH_CODE="$(cat <<'PY'
+import json
+import urllib.error
+import urllib.request
+url = "http://127.0.0.1:7869/health"
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+try:
+    response = opener.open(url, timeout=4)
+except urllib.error.HTTPError as exc:
+    response = exc
+health = json.load(response)
+if health.get("error") and not health.get("loading", False):
+    raise RuntimeError("fatal model load error: " + str(health["error"]))
+assert health.get("ready") and health.get("model_loaded"), health
+print(json.dumps(health))
+PY
+)"
           ready=0
           for _ in $(seq 1 360); do
             if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
