@@ -304,15 +304,25 @@ jobs:
         run: |
           set -euo pipefail
           R="$OEC_ACCEPTANCE_ROOT/speech"
+          mkdir -p "$R"
+          set +e
           timeout --signal=INT --kill-after=30s 3600s "$CONDA_EXE" run --no-capture-output -n phase2_3d \
             python tools/run_media_model_smokes.py --providers kokoro,whisper,qwen3-asr \
             --check-gradio-notebooks --purge-after --require-pass 2>&1 | tee "$R/speech-gradio-acceptance.log"
+          smoke_rc=${PIPESTATUS[0]}
+          set -e
           for report in kokoro whisper qwen3-asr; do
-            find "$RUNNER_TEMP/oec-media-smoke-logs" -maxdepth 1 -type f -name "\${report}-gradio-notebook-smoke.json" -exec cp {} "$R/" \;
+            for suffix in service smoke; do
+              src="$RUNNER_TEMP/oec-media-smoke-logs/$report-$suffix.log"
+              if [[ -f "$src" ]]; then cp "$src" "$R/"; fi
+            done
+            src="$RUNNER_TEMP/oec-media-smoke-logs/$report-gradio-notebook-smoke.json"
+            if [[ -f "$src" ]]; then cp "$src" "$R/"; fi
           done
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/cleanup_test_model_caches.py \
             --models kokoro,whisper-turbo,qwen3-asr-0.6b --report-json "$R/cache-cleanup.json" 2>&1 | tee "$R/cache-cleanup.log"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee "$R/cache-status-after.log"
+          exit "$smoke_rc"
 
       - name: Recover timed-out speech backends and purge their caches safely
         id: speech_purge_recovery
@@ -365,10 +375,18 @@ jobs:
           set -euo pipefail
           R="$OEC_ACCEPTANCE_ROOT/ace-step"
           mkdir -p "$R"
+          set +e
           timeout --signal=INT --kill-after=30s 3600s "$CONDA_EXE" run --no-capture-output -n phase2_3d \
             python tools/run_media_model_smokes.py --providers ace-step --check-gradio-notebooks --purge-after --require-pass 2>&1 | tee "$R/ace-step-gradio-acceptance.log"
-          test -f "$RUNNER_TEMP/oec-media-smoke-logs/ace-step-gradio-notebook-smoke.json"
-          cp "$RUNNER_TEMP/oec-media-smoke-logs/ace-step-gradio-notebook-smoke.json" "$R/ace-step-gradio-notebook-smoke.json"
+          smoke_rc=${PIPESTATUS[0]}
+          set -e
+          for log_name in ace-step-service.log ace-step-smoke.log; do
+            src="$RUNNER_TEMP/oec-media-smoke-logs/$log_name"
+            if [[ -f "$src" ]]; then cp "$src" "$R/"; fi
+          done
+          report="$RUNNER_TEMP/oec-media-smoke-logs/ace-step-gradio-notebook-smoke.json"
+          if [[ -f "$report" ]]; then cp "$report" "$R/"; fi
+          exit "$smoke_rc"
 
       - name: Recover interrupted ACE-Step backend before cache cleanup
         id: ace_process_recovery
