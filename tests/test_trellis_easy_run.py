@@ -84,8 +84,15 @@ class TrellisEasyRunTests(unittest.TestCase):
         self.assertNotIn('"pip", "install"', source)
         self.assertNotIn("storage_preflight_path(", source)
         backend = (ROOT / "tools" / "media_services" / "trellis_api.py").read_text(encoding="utf-8")
-        self.assertIn("storage_preflight", backend)
+        self.assertIn("RuntimeLock", backend)
+        self.assertIn("trellis._imports_and_probe(args)", backend)
+        self.assertIn("trellis._load_pipeline(args, runtime)", backend)
         self.assertIn("--allow-download", backend)
+        # The sidecar delegates quota admission to the actual model loader;
+        # this is the owner that performs cache writes and inference.
+        pipeline = (ROOT / "pipeline_trellis_3d.py").read_text(encoding="utf-8")
+        self.assertIn("storage_preflight(", pipeline)
+        self.assertIn("managed_storage_operation(", pipeline)
 
     def test_notebook_gradio_ports_match_tunnel_instructions(self):
         combined = (ROOT / "pipeline_trellis_3d.ipynb").read_text(encoding="utf-8")
