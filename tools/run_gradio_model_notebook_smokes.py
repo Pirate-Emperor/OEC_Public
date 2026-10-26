@@ -192,7 +192,7 @@ def main() -> int:
         "python_prefix": sys.prefix,
         "media_api_url": (
             os.environ.get("OEC_FLUX_API_URL") if provider == "flux-combined"
-            else os.environ.get("OEC_MEDIA_API_URL") if provider != "musicgen" else None
+            else os.environ.get("OEC_MEDIA_API_URL")
         ),
         "started_unix": time.time(),
         "status": "FAIL",
@@ -229,8 +229,15 @@ def main() -> int:
         # The real notebook Interface must bind locally and serve HTML. No share URL is allowed.
         port = free_port()
         ui_url = f"http://127.0.0.1:{port}/"
-        demo.queue(max_size=1).launch(server_name="127.0.0.1", server_port=port, share=False, inline=False,
-                                      prevent_thread_lock=True, show_error=True)
+        allowed_paths = sorted({
+            str(Path("/tmp/oec-notebook-results").resolve()),
+            str((Path(tempfile.gettempdir()) / "oec-notebook-results").resolve()),
+            str(report_dir.resolve()),
+        })
+        demo.queue(max_size=1).launch(
+            server_name="127.0.0.1", server_port=port, share=False, inline=False,
+            prevent_thread_lock=True, show_error=True, allowed_paths=allowed_paths,
+        )
         result["ui_http_status"], result["ui_html_prefix"] = wait_for_ui(ui_url)
         result["ui_launch"] = "PASS"
 

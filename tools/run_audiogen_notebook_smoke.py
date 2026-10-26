@@ -132,6 +132,11 @@ def main() -> int:
     os.environ["OEC_AUDIOGEN_HEADLESS_SMOKE"] = "1"
     os.environ["OEC_AUDIOGEN_OUTPUT_DIR"] = str(output_root)
     os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
+    # Gradio's local reachability probe must not go through a runner HTTP proxy.
+    loopback_hosts = ("localhost", "127.0.0.1", "::1")
+    for key in ("NO_PROXY", "no_proxy"):
+        values = [value.strip() for value in os.environ.get(key, "").split(",") if value.strip()]
+        os.environ[key] = ",".join(dict.fromkeys([*values, *loopback_hosts]))
     os.environ.setdefault(
         "OEC_AUDIOGEN_SMOKE_PROMPT",
         "A short cinematic metallic sci-fi impact with a low bass resonance",
