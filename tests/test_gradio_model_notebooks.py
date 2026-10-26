@@ -16,6 +16,7 @@ NOTEBOOKS = {
     "pipeline_kokoro_gradio.ipynb": ("phase2_3d", "oec-audio-py311"),
     "pipeline_whisper_gradio.ipynb": ("phase2_3d", "oec-audio-py311"),
     "pipeline_qwen3_asr_gradio.ipynb": ("phase2_3d", "oec-audio-py311"),
+    "pipeline_ltx_video.ipynb": ("phase1_ltx", "ltx-api"),
 }
 class ModelNotebookTests(unittest.TestCase):
     def test_json_and_code_cells_compile(self):
@@ -84,7 +85,8 @@ class ModelNotebookTests(unittest.TestCase):
     def test_service_ui_does_not_import_provider_ml_packages(self):
         for name in ("pipeline_acestep_gradio.ipynb","pipeline_kokoro_gradio.ipynb",
                      "pipeline_whisper_gradio.ipynb","pipeline_qwen3_asr_gradio.ipynb",
-                     "pipeline_flux_only.ipynb","pipeline_trellis_3d_only.ipynb","pipeline_trellis_3d.ipynb"):
+                     "pipeline_flux_only.ipynb","pipeline_trellis_3d_only.ipynb","pipeline_trellis_3d.ipynb",
+                     "pipeline_ltx_video.ipynb"):
             nb = json.loads((ROOT / name).read_text(encoding="utf-8"))
             text = "\n".join("".join(c.get("source", [])) for c in nb["cells"] if c.get("cell_type")=="code")
             for forbidden in ("import torch","import whisper","from kokoro","import acestep","from qwen_asr",
@@ -95,12 +97,35 @@ class ModelNotebookTests(unittest.TestCase):
         for name in ("pipeline_audiocraft.ipynb", "pipeline_audiogen_gradio.ipynb",
                      "pipeline_musicgen_gradio.ipynb", "pipeline_acestep_gradio.ipynb",
                      "pipeline_trellis_3d_only.ipynb", "pipeline_trellis_3d.ipynb",
-                     "pipeline_flux_only.ipynb", "pipeline_wan_video.ipynb"):
+                     "pipeline_flux_only.ipynb", "pipeline_wan_video.ipynb",
+                     "pipeline_ltx_video.ipynb"):
             nb = json.loads((ROOT / name).read_text(encoding="utf-8"))
             for index, cell in enumerate(nb["cells"]):
                 if cell.get("cell_type") == "code":
                     self.assertIsNone(cell.get("execution_count"), f"{name}:cell-{index}")
                     self.assertEqual(cell.get("outputs", []), [], f"{name}:cell-{index}")
+
+    def test_ltx_gradio_smoke_covers_both_video_modes_and_decodes_mp4(self):
+        source = (ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
+        self.assertIn('"ltx-text-video": ("pipeline_ltx_video.ipynb", "phase1_ltx", "generate_video")', source)
+        self.assertIn('"ltx-image-video": ("pipeline_ltx_video.ipynb", "phase1_ltx", "generate_video")', source)
+        self.assertIn("VIDEO_PROVIDERS", source)
+        self.assertIn("ffprobe rejected LTX MP4", source)
+        self.assertIn('result["video_validation"]', source)
+        notebook = json.loads((ROOT / "pipeline_ltx_video.ipynb").read_text(encoding="utf-8"))
+        all_source = "\n".join("".join(c.get("source", [])) for c in notebook["cells"])
+        self.assertIn("text_to_video", all_source)
+        self.assertIn("image_to_video", all_source)
+        self.assertIn("ltx-api", all_source)
+        self.assertNotIn("import torch", all_source)
+        self.assertNotIn("from worker_ltx_video", all_source)
+
+    def test_post_acceptance_cache_cleanup_is_lock_aware(self):
+        source = (ROOT / "tools" / "cleanup_test_model_caches.py").read_text(encoding="utf-8")
+        self.assertIn("cache_status, model_targets, read_lock", source)
+        self.assertIn('"BLOCKED_BY_RUNTIME_LOCK"', source)
+        self.assertIn('"purge", key, "--confirm"', source)
+        self.assertIn('not final["present"]', source)
 
     def test_flux_gradio_smoke_validates_image_outputs(self):
         source = (ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
