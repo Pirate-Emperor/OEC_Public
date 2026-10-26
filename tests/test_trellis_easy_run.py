@@ -61,7 +61,11 @@ class TrellisEasyRunTests(unittest.TestCase):
             self.assertEqual(notebook["nbformat"], 4, filename)
             sources = cell_sources(notebook_path)
             joined = "\n".join(sources)
-            self.assertEqual(joined.count("trellis_pipe = load_trellis_pipeline()"), 1, filename)
+            # TRELLIS weights must be loaded by trellis-api, not twice inside Jupyter.
+            self.assertNotIn("load_trellis_pipeline()", joined, filename)
+            self.assertIn("trellis-api", joined, filename)
+            self.assertIn("/v1/jobs", joined, filename)
+            self.assertNotIn("from trellis2.pipelines import", joined, filename)
             for index, cell in enumerate(notebook["cells"]):
                 if cell.get("cell_type") != "code":
                     continue
@@ -72,10 +76,16 @@ class TrellisEasyRunTests(unittest.TestCase):
 
     def test_trellis_only_setup_has_storage_manager_gate_before_installs(self):
         cells = cell_sources(ROOT / "pipeline_trellis_3d_only.ipynb")
-        setup = next((cell for cell in cells if "IRONCLAD PYTORCH" in cell), "")
-        self.assertIn("storage_preflight_path", setup)
-        self.assertIn("require_fresh_quota=True", setup)
-        self.assertLess(setup.index("storage_preflight_path"), setup.index('"pip", "install"'))
+        source = "\n".join(cells)
+        # The notebook is a read-only client; all downloads/installs are owned by
+        # the API loader which requires explicit --allow-download and quota admission.
+        self.assertIn("trellis-api", source)
+        self.assertIn("OEC_TRELLIS_API_URL", source)
+        self.assertNotIn('"pip", "install"', source)
+        self.assertNotIn("storage_preflight_path(", source)
+        backend = (ROOT / "tools" / "media_services" / "trellis_api.py").read_text(encoding="utf-8")
+        self.assertIn("storage_preflight", backend)
+        self.assertIn("--allow-download", backend)
 
     def test_notebook_gradio_ports_match_tunnel_instructions(self):
         combined = (ROOT / "pipeline_trellis_3d.ipynb").read_text(encoding="utf-8")
@@ -83,6 +93,8 @@ class TrellisEasyRunTests(unittest.TestCase):
         self.assertIn("server_port=7862", combined)
         self.assertIn("server_port=7863", combined)
         self.assertIn("server_port=7862", only)
+        self.assertIn("trellis-api", combined)
+        self.assertIn("trellis-api", only)
         self.assertIn("inline=False", combined)
         self.assertIn("inline=False", only)
 
