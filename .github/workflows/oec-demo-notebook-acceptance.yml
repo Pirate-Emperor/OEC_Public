@@ -49,6 +49,7 @@ on:
       - "tests/test_storage_write_admission.py"
       - "tests/test_trellis_notebook_static.py"
       - ".github/workflows/oec-demo-notebook-acceptance.yml"
+      - ".github/workflows/oec-root-sync.yml"
   workflow_dispatch:
 
 permissions:

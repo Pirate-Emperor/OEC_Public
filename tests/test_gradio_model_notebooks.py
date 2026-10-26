@@ -194,5 +194,13 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn("assert health.get(\"ready\") and health.get(\"model_loaded\"), health", workflow)
         self.assertIn("ProxyHandler({})", workflow)
 
+    def test_superseded_acceptance_run_is_cancelled_before_new_head_retest(self):
+        root_sync = (ROOT / ".github" / "workflows" / "oec-root-sync.yml").read_text(encoding="utf-8")
+        acceptance = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
+        self.assertIn('run.get("head_sha") != current_sha', root_sync)
+        self.assertIn('run.get("path") == acceptance_path', root_sync)
+        self.assertIn('OEC_DEADLINE_CANCEL_SUPERSEDED', root_sync)
+        self.assertIn('".github/workflows/oec-root-sync.yml"', acceptance)
+
 if __name__ == "__main__":
     unittest.main()

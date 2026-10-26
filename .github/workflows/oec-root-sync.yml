@@ -43,6 +43,8 @@ jobs:
           this_run = int(os.environ["GITHUB_RUN_ID"])
           token = os.environ["GITHUB_TOKEN"]
           cutoff = datetime.timedelta(minutes=30)
+          current_sha = os.environ["GITHUB_SHA"]
+          acceptance_path = ".github/workflows/oec-demo-notebook-acceptance.yml"
           allowed_paths = {
               ".github/workflows/oec-live-acceptance-suite.yml",
               ".github/workflows/oec-model-service-release.yml",
@@ -103,9 +105,22 @@ jobs:
                   continue
               start = datetime.datetime.fromisoformat(started.replace("Z", "+00:00"))
               age = now - start
-              if age <= cutoff:
+              # An acceptance run from an older source commit is no longer useful
+              # as current-head evidence. Cancel only this repository's allow-listed
+              # notebook acceptance workflow when a newer commit supersedes it.
+              superseded_acceptance = (
+                  run.get("path") == acceptance_path
+                  and run.get("head_sha") != current_sha
+              )
+              if not superseded_acceptance and age <= cutoff:
                   print(f"OEC_DEADLINE_OK run={run_id} age_seconds={int(age.total_seconds())} status={run['status']}")
                   continue
+              if superseded_acceptance:
+                  print(
+                      f"OEC_DEADLINE_CANCEL_SUPERSEDED run={run_id} "
+                      f"run_sha={run.get('head_sha')} current_sha={current_sha} status={run.get('status')}",
+                      flush=True,
+                  )
               url = f"https://api.github.com/repos/{repository}/actions/runs/{run_id}/cancel"
               status, _ = request_json(url, method="POST")
               if status not in (200, 202):
