@@ -506,6 +506,110 @@ jobs:
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py purge flux-klein-4b --confirm 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/flux/cache-cleanup.log"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/flux/cache-cleanup.log"
 
+      - name: Start LTX model server for both video notebook modes
+        id: ltx_start
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/ltx"
+          mkdir -p "$R"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-before.log"
+          GPU="$("$CONDA_EXE" run --no-capture-output -n phase2_3d python -c 'from oec_gpu_admission import select_idle_a100_gpu; print(select_idle_a100_gpu(caller="LTX_NOTEBOOK_ACCEPTANCE")["index"])' | tail -n 1)"
+          echo "LTX_PHYSICAL_GPU=$GPU" | tee "$R/gpu.txt"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py start ltx-api --gpu "$GPU" --port 7869 --allow-download 2>&1 | tee "$R/service-start.log"
+
+      - name: Wait for LTX model server readiness
+        id: ltx_health
+        if: always() && steps.ltx_start.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/ltx"
+          HEALTH_CODE='import json,urllib.request; op=urllib.request.build_opener(urllib.request.ProxyHandler({})); h=json.load(op.open("http://127.0.0.1:7869/health",timeout=4)); assert h.get("ready") and h.get("model_loaded"),h; print(json.dumps(h))'
+          ready=0
+          for _ in $(seq 1 360); do
+            if "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
+            sleep 5
+          done
+          cat "$R/health-check.log"
+          test "$ready" -eq 1
+
+      - name: Generate and decode LTX text-to-video MP4 through Gradio HTTP
+        id: ltx_text_video
+        if: always() && steps.ltx_health.outcome == 'success'
+        continue-on-error: true
+        env:
+          OEC_MEDIA_API_URL: "http://127.0.0.1:7869"
+          OEC_LTX_SERVICE_URL: "http://127.0.0.1:7869"
+          OEC_GRADIO_HEADLESS_SMOKE: "1"
+          GRADIO_ANALYTICS_ENABLED: "False"
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/ltx"
+          timeout --signal=INT --kill-after=30s 2400s "$CONDA_EXE" run --no-capture-output -n phase1_ltx \
+            python tools/run_gradio_model_notebook_smokes.py --provider ltx-text-video --report-dir "$R" 2>&1 | tee "$R/text-to-video-gradio.log"
+
+      - name: Generate and decode LTX image-to-video MP4 through Gradio HTTP
+        id: ltx_image_video
+        if: always() && steps.ltx_health.outcome == 'success'
+        continue-on-error: true
+        env:
+          OEC_MEDIA_API_URL: "http://127.0.0.1:7869"
+          OEC_LTX_SERVICE_URL: "http://127.0.0.1:7869"
+          OEC_GRADIO_HEADLESS_SMOKE: "1"
+          GRADIO_ANALYTICS_ENABLED: "False"
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/ltx"
+          timeout --signal=INT --kill-after=30s 2400s "$CONDA_EXE" run --no-capture-output -n phase1_ltx \
+            python tools/run_gradio_model_notebook_smokes.py --provider ltx-image-video --report-dir "$R" 2>&1 | tee "$R/image-to-video-gradio.log"
+
+      - name: Stop LTX service and purge model plus Gemma caches
+        id: ltx_purge
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set +e
+          R="$OEC_ACCEPTANCE_ROOT/ltx"
+          mkdir -p "$R"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py logs ltx-api --tail 180 >"$R/service-final.log" 2>&1
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py stop ltx-api --grace-seconds 30 >>"$R/service-final.log" 2>&1
+          set -e
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/cleanup_test_model_caches.py \
+            --models ltx-2.3,gemma-3-12b --report-json "$R/cache-cleanup.json" 2>&1 | tee "$R/cache-cleanup.log"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-after-cleanup.log"
+
+      - name: Execute all Wan notebook cells and decode generated video
+        id: wan_notebook
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        env:
+          OEC_WAN_ALLOW_DOWNLOAD: "1"
+          OEC_WAN_NUM_FRAMES: "9"
+          GRADIO_ANALYTICS_ENABLED: "False"
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/wan"
+          mkdir -p "$R"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-before.log"
+          timeout --signal=INT --kill-after=30s 3600s "$CONDA_EXE" run --no-capture-output -n phase1 \
+            env OEC_WAN_SMOKE_DIR="$R" OEC_WAN_ALLOW_DOWNLOAD="$OEC_WAN_ALLOW_DOWNLOAD" OEC_WAN_NUM_FRAMES="$OEC_WAN_NUM_FRAMES" \
+            python tools/run_wan_notebook_smoke.py 2>&1 | tee "$R/wan-notebook-execution.log"
+          test -s "$R/wan-notebook-generated.mp4"
+
+      - name: Purge Wan weights only after notebook process has exited
+        id: wan_purge
+        if: always() && steps.preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/wan"
+          mkdir -p "$R"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/cleanup_test_model_caches.py \
+            --models wan-t2v-14b --report-json "$R/cache-cleanup.json" 2>&1 | tee "$R/cache-cleanup.log"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-after-cleanup.log"
+
       - name: Capture final OEC storage and GPU state
         if: always()
         run: |
@@ -550,6 +654,16 @@ jobs:
           FLUX_GRADIO_OUTCOME: ${{ steps.flux_gradio.outcome }}
           FLUX_COMBINED_GRADIO_OUTCOME: ${{ steps.flux_combined_gradio.outcome }}
           FLUX_PURGE_OUTCOME: ${{ steps.flux_purge.outcome }}
+          MUSICGEN_CLI_OUTCOME: ${{ steps.musicgen_cli.outcome }}
+          SPEECH_PREPARE_OUTCOME: ${{ steps.speech_prepare.outcome }}
+          SPEECH_GRADIO_OUTCOME: ${{ steps.speech_gradio.outcome }}
+          LTX_START_OUTCOME: ${{ steps.ltx_start.outcome }}
+          LTX_HEALTH_OUTCOME: ${{ steps.ltx_health.outcome }}
+          LTX_TEXT_VIDEO_OUTCOME: ${{ steps.ltx_text_video.outcome }}
+          LTX_IMAGE_VIDEO_OUTCOME: ${{ steps.ltx_image_video.outcome }}
+          LTX_PURGE_OUTCOME: ${{ steps.ltx_purge.outcome }}
+          WAN_NOTEBOOK_OUTCOME: ${{ steps.wan_notebook.outcome }}
+          WAN_PURGE_OUTCOME: ${{ steps.wan_purge.outcome }}
         run: |
           set -euo pipefail
           printf 'CONTRACTS_OUTCOME=%s\n' "$CONTRACTS_OUTCOME"
@@ -576,6 +690,16 @@ jobs:
           printf 'FLUX_GRADIO_OUTCOME=%s\n' "$FLUX_GRADIO_OUTCOME"
           printf 'FLUX_COMBINED_GRADIO_OUTCOME=%s\n' "$FLUX_COMBINED_GRADIO_OUTCOME"
           printf 'FLUX_PURGE_OUTCOME=%s\n' "$FLUX_PURGE_OUTCOME"
-          for outcome in "$CONTRACTS_OUTCOME" "$AUDIOGEN_NOTEBOOK_OUTCOME" "$AUDIOGEN_START_OUTCOME" "$AUDIOGEN_HEALTH_OUTCOME" "$AUDIOGEN_GRADIO_OUTCOME" "$AUDIOGEN_PURGE_OUTCOME" "$MUSICGEN_START_OUTCOME" "$MUSICGEN_HEALTH_OUTCOME" "$MUSICGEN_GRADIO_OUTCOME" "$MUSICGEN_PURGE_OUTCOME" "$ACE_PREPARE_OUTCOME" "$ACE_GRADIO_OUTCOME" "$TRELLIS_PREPARE_OUTCOME" "$TRELLIS_START_OUTCOME" "$TRELLIS_HEALTH_OUTCOME" "$TRELLIS_ONLY_GRADIO_OUTCOME" "$TRELLIS_COMBINED_GRADIO_OUTCOME" "$TRELLIS_PURGE_OUTCOME" "$FLUX_CACHE_OUTCOME" "$FLUX_START_OUTCOME" "$FLUX_HEALTH_OUTCOME" "$FLUX_GRADIO_OUTCOME" "$FLUX_COMBINED_GRADIO_OUTCOME" "$FLUX_PURGE_OUTCOME"; do
+          printf 'MUSICGEN_CLI_OUTCOME=%s\n' "$MUSICGEN_CLI_OUTCOME"
+          printf 'SPEECH_PREPARE_OUTCOME=%s\n' "$SPEECH_PREPARE_OUTCOME"
+          printf 'SPEECH_GRADIO_OUTCOME=%s\n' "$SPEECH_GRADIO_OUTCOME"
+          printf 'LTX_START_OUTCOME=%s\n' "$LTX_START_OUTCOME"
+          printf 'LTX_HEALTH_OUTCOME=%s\n' "$LTX_HEALTH_OUTCOME"
+          printf 'LTX_TEXT_VIDEO_OUTCOME=%s\n' "$LTX_TEXT_VIDEO_OUTCOME"
+          printf 'LTX_IMAGE_VIDEO_OUTCOME=%s\n' "$LTX_IMAGE_VIDEO_OUTCOME"
+          printf 'LTX_PURGE_OUTCOME=%s\n' "$LTX_PURGE_OUTCOME"
+          printf 'WAN_NOTEBOOK_OUTCOME=%s\n' "$WAN_NOTEBOOK_OUTCOME"
+          printf 'WAN_PURGE_OUTCOME=%s\n' "$WAN_PURGE_OUTCOME"
+          for outcome in "$CONTRACTS_OUTCOME" "$AUDIOGEN_NOTEBOOK_OUTCOME" "$AUDIOGEN_START_OUTCOME" "$AUDIOGEN_HEALTH_OUTCOME" "$AUDIOGEN_GRADIO_OUTCOME" "$AUDIOGEN_PURGE_OUTCOME" "$MUSICGEN_START_OUTCOME" "$MUSICGEN_HEALTH_OUTCOME" "$MUSICGEN_GRADIO_OUTCOME" "$MUSICGEN_PURGE_OUTCOME" "$ACE_PREPARE_OUTCOME" "$ACE_GRADIO_OUTCOME" "$TRELLIS_PREPARE_OUTCOME" "$TRELLIS_START_OUTCOME" "$TRELLIS_HEALTH_OUTCOME" "$TRELLIS_ONLY_GRADIO_OUTCOME" "$TRELLIS_COMBINED_GRADIO_OUTCOME" "$TRELLIS_PURGE_OUTCOME" "$FLUX_CACHE_OUTCOME" "$FLUX_START_OUTCOME" "$FLUX_HEALTH_OUTCOME" "$FLUX_GRADIO_OUTCOME" "$FLUX_COMBINED_GRADIO_OUTCOME" "$FLUX_PURGE_OUTCOME" "$MUSICGEN_CLI_OUTCOME" "$SPEECH_PREPARE_OUTCOME" "$SPEECH_GRADIO_OUTCOME" "$LTX_START_OUTCOME" "$LTX_HEALTH_OUTCOME" "$LTX_TEXT_VIDEO_OUTCOME" "$LTX_IMAGE_VIDEO_OUTCOME" "$LTX_PURGE_OUTCOME" "$WAN_NOTEBOOK_OUTCOME" "$WAN_PURGE_OUTCOME"; do
             test "$outcome" = "success"
           done
