@@ -24,6 +24,10 @@ def model_targets() -> dict[str, list[Path]]:
         "musicgen-medium": [MODELS_ROOT / "hub" / "models--facebook--musicgen-medium"],
         "kokoro": [MODELS_ROOT / "hub" / "models--hexgrad--Kokoro-82M"],
         "qwen3-asr-0.6b": [MODELS_ROOT / "hub" / "models--Qwen--Qwen3-ASR-0.6B"],
+        "wan-t2v-14b": [
+            MODELS_ROOT / "hub" / "models--Wan-AI--Wan2.1-T2V-14B-Diffusers",
+            MODELS_ROOT / "hub" / "models--Wan-AI--Wan2.1-T2V-14B",
+        ],
     }
     for size in WHISPER_SIZES:
         targets[f"whisper-{size}"] = [MODELS_ROOT / "whisper" / size]
