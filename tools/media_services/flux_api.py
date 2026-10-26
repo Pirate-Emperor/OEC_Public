@@ -8,11 +8,13 @@ if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
 from core_config import SYSTEM_DIRS
 from tools.media_services.common import MediaProvider,RequestError,serve
 from tools.prepare_flux_cache import ensure_flux_cache
+from tools.media_services.model_cache import RuntimeLock
 
 class FluxProvider(MediaProvider):
     name="flux"; artifact_content_type="image/png"; artifact_extension="png"; max_prompt_chars=800
     def __init__(self,gpu:int|None=None,allow_download:bool=False):
         super().__init__(allow_download); self.gpu_index=gpu; self.module=None; self.torch=None; self.pipe=None; self.snapshot=None; self.gpu=None
+        self.runtime_lock=RuntimeLock("flux-klein-4b"); self.lock_owned=False
     def validate_request(self,payload:dict)->dict:
         if payload.get("task")!="text_to_image": raise RequestError("task must be 'text_to_image'")
         prompt=payload.get("prompt","")
@@ -31,6 +33,8 @@ class FluxProvider(MediaProvider):
         import pipeline_flux_image as module
         module._check_versions()
         self.gpu=module.select_idle_a100_gpu(self.gpu_index)
+        self.runtime_lock.acquire()
+        self.lock_owned=True
         self.snapshot=ensure_flux_cache(allow_download=self.allow_download)
         self.pipe,self.torch=module._load(self.snapshot,self.gpu); self.module=module
         self.model_name=module.MODEL_ID; self.model_revision=self.snapshot.name; self.device_name="cuda"; self.model_loaded=True
@@ -44,6 +48,9 @@ class FluxProvider(MediaProvider):
             import torch
             if torch.cuda.is_available(): torch.cuda.empty_cache()
         except ImportError: pass
+        if self.lock_owned:
+            self.runtime_lock.release()
+            self.lock_owned=False
 
 def main()->int:
     p=argparse.ArgumentParser(description=__doc__); p.add_argument("--host",default="127.0.0.1"); p.add_argument("--port",type=int,default=7867); p.add_argument("--queue-size",type=int,default=1); p.add_argument("--timeout-seconds",type=int,default=900); p.add_argument("--gpu",type=int); p.add_argument("--allow-download",action="store_true",help="allow FLUX cache fill after fresh StorageManager admission")
