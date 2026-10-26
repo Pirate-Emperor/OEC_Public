@@ -8,7 +8,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOKS = {
     "pipeline_audiogen_gradio.ipynb": ("phase1", "audiocraft-api"),
-    "pipeline_musicgen_gradio.ipynb": ("phase1", "pipeline_musicgen.py"),
+    "pipeline_musicgen_gradio.ipynb": ("phase1", "audiocraft-api"),
     "pipeline_acestep_gradio.ipynb": ("phase2_3d", "oec-acestep-py311"),
     "pipeline_flux_only.ipynb": ("phase2_3d", "flux-api"),
     "pipeline_kokoro_gradio.ipynb": ("phase2_3d", "oec-audio-py311"),
@@ -38,8 +38,10 @@ class ModelNotebookTests(unittest.TestCase):
             self.assertIn("share=False", text, name)
             self.assertNotIn("pip install", text.lower(), name)
             if name == "pipeline_musicgen_gradio.ipynb":
-                self.assertIn('Path("/tmp") / f"oec-', text, name)
-                self.assertNotIn('Path(tempfile.gettempdir()) / f"oec-', text, name)
+                self.assertIn('Path("/tmp") / "oec-notebook-results"', text, name)
+                self.assertIn("/v1/jobs", text, name)
+                self.assertIn("audiocraft-api", text, name)
+                self.assertNotIn("subprocess.Popen", text, name)
             if name == "pipeline_audiogen_gradio.ipynb":
                 self.assertIn("/v1/jobs", text, name)
                 self.assertIn("audiocraft-api", text, name)
