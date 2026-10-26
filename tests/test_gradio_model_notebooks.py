@@ -224,6 +224,7 @@ class ModelNotebookTests(unittest.TestCase):
         acceptance = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
         self.assertIn('run.get("head_sha") != current_sha', root_sync)
         self.assertIn('run.get("path") == acceptance_path', root_sync)
+        self.assertIn('branches/{urllib.parse.quote(branch, safe=\'\')}', root_sync)
         self.assertIn('OEC_DEADLINE_CANCEL_SUPERSEDED', root_sync)
         self.assertIn('".github/workflows/oec-root-sync.yml"', acceptance)
 

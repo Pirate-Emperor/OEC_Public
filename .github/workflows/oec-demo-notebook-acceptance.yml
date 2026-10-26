@@ -1,5 +1,5 @@
 name: OEC targeted model notebook acceptance
-run-name: "AudioGen, ACE-Step and FLUX notebook acceptance"
+run-name: "OEC all-notebook and model-demo acceptance"
 
 on:
   push:
