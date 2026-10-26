@@ -121,9 +121,13 @@ def execute_notebook(path: Path, *, code_cell_indexes: set[int] | None = None, d
     document = json.loads(path.read_text(encoding="utf-8"))
     if document.get("nbformat") != 4 or not isinstance(document.get("cells"), list):
         raise ValueError(f"invalid notebook structure: {path}")
-    scope = {"__name__": "__main__", "__file__": str(path)}
-    code_cells = 0
     shell = InteractiveShell()
+    scope = {
+        "__name__": "__main__",
+        "__file__": str(path),
+        "get_ipython": lambda: shell,
+    }
+    code_cells = 0
     for index, cell in enumerate(document["cells"]):
         if cell.get("cell_type") != "code":
             continue
