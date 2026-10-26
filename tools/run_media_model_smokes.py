@@ -260,6 +260,10 @@ def _run_provider(provider: str, python: Path, audio_path: Path | None, log_dir:
             ready_payload = payload
             if ready and payload.get("ready") and payload.get("model_loaded"):
                 break
+            if isinstance(payload, dict) and payload.get("error") and not payload.get("loading", True):
+                raise RuntimeError(
+                    f"service reported a fatal model-loader error: {payload.get('error')}; see {service_log}"
+                )
             time.sleep(4)
         else:
             raise TimeoutError(f"service did not become ready in {LOAD_TIMEOUT[provider]} seconds: {ready_payload}")
@@ -321,7 +325,9 @@ def _run_provider(provider: str, python: Path, audio_path: Path | None, log_dir:
     except Exception as exc:
         print(f"SMOKE_FAILURE provider={provider}: {type(exc).__name__}: {exc}", flush=True)
         try:
-            print(f"--- tail {service_log} ---\n" + "\n".join(service_log.read_text(encoding="utf-8", errors="replace").splitlines()[-100:]), flush=True)
+            lines = service_log.read_text(encoding="utf-8", errors="replace").splitlines()
+            useful = [line for line in lines if "GET /health HTTP" not in line and "GET /healthz HTTP" not in line]
+            print(f"--- model-loader diagnostics from {service_log} ---\n" + "\n".join((useful[-180:] or lines[:80])), flush=True)
         except OSError:
             pass
         return {"provider": provider, "status": "FAIL", "reason": f"{type(exc).__name__}: {exc}",
