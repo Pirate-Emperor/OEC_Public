@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from common import MediaProvider, RequestError, managed_write, safe_child, serve, storage_check, validate_mp4
+from tools.media_services.model_cache import RuntimeLock
 
 LOG = logging.getLogger("oec.media_service.ltx")
 MODEL_ID = "Lightricks/LTX-2.3"
@@ -57,6 +58,10 @@ class LtxProvider(MediaProvider):
         self.module = None
         self.pipeline = None
         self.gpu_id = "0"  # logical device index inside the scheduler-provided visibility mask
+        self.ltx_lock = RuntimeLock("ltx-2.3")
+        self.gemma_lock = RuntimeLock("gemma-3-12b")
+        self.ltx_lock_owned = False
+        self.gemma_lock_owned = False
 
     def validate_request(self, payload: dict[str, Any]) -> dict[str, Any]:
         task = payload.get("task")
@@ -103,6 +108,16 @@ class LtxProvider(MediaProvider):
                 "expects_image": expects_image}
 
     def load_runtime(self) -> None:
+        # Cache cleanup must never race LTX or its Gemma text encoder.
+        self.ltx_lock.acquire()
+        self.ltx_lock_owned = True
+        try:
+            self.gemma_lock.acquire()
+            self.gemma_lock_owned = True
+        except Exception:
+            self.ltx_lock.release()
+            self.ltx_lock_owned = False
+            raise
         # StorageManager only defines the models and outputs targets. Sidecar
         # job inputs, state and results are all contained under the managed
         # outputs/media_services tree; "inputs" and "cache" are not configured
@@ -194,6 +209,28 @@ class LtxProvider(MediaProvider):
             "worker_metadata": saved_metadata, "video_validation": validation,
             "generation_seconds": round(time.monotonic() - start, 3),
         }
+
+
+    def close(self) -> None:
+        pipeline = self.pipeline
+        self.pipeline = None
+        self.module = None
+        self.model_loaded = False
+        import gc
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
+        del pipeline
+        if self.gemma_lock_owned:
+            self.gemma_lock.release()
+            self.gemma_lock_owned = False
+        if self.ltx_lock_owned:
+            self.ltx_lock.release()
+            self.ltx_lock_owned = False
 
 
 def main() -> int:
