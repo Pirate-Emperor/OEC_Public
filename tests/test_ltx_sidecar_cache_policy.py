@@ -50,6 +50,7 @@ class LtxCachePolicyTests(unittest.TestCase):
         with (
             mock.patch("ltx_api.storage_check", return_value=(True, "ok")),
             mock.patch("ltx_api.managed_write", return_value=contextlib.nullcontext()),
+            mock.patch("ltx_api.RuntimeLock", side_effect=lambda _key: mock.Mock()),
             mock.patch.dict(sys.modules, {"worker_ltx_video": fake_ltx}),
             mock.patch("ltx_api.purge_loaded_ltx_caches", return_value={"ltx": True, "gemma": True}) as purge,
         ):
@@ -67,6 +68,7 @@ class LtxCachePolicyTests(unittest.TestCase):
         with (
             mock.patch("ltx_api.storage_check", return_value=(True, "ok")),
             mock.patch("ltx_api.managed_write", return_value=contextlib.nullcontext()),
+            mock.patch("ltx_api.RuntimeLock", side_effect=lambda _key: mock.Mock()),
             mock.patch.dict(sys.modules, {"worker_ltx_video": fake_ltx}),
             mock.patch("ltx_api.purge_loaded_ltx_caches") as purge,
         ):
