@@ -24,6 +24,8 @@ LOG = logging.getLogger("oec.media_service.trellis")
 MODEL_ID = "microsoft/TRELLIS.2-4B"
 
 
+from tools.media_services.model_cache import RuntimeLock
+
 class TrellisProvider(MediaProvider):
     name = "trellis"
     artifact_content_type = "model/gltf-binary"
@@ -37,6 +39,8 @@ class TrellisProvider(MediaProvider):
         self.module = None
         self.runtime: dict[str, Any] | None = None
         self.pipeline = None
+        self.runtime_lock = RuntimeLock("trellis-2-4b")
+        self.lock_owned = False
 
     def validate_request(self, payload: dict[str, Any]) -> dict[str, Any]:
         if payload.get("task") != "image_to_3d":
@@ -72,6 +76,8 @@ class TrellisProvider(MediaProvider):
                                "decimation_target": decimation_target, "remesh": remesh}, "expects_image": True}
 
     def load_runtime(self) -> None:
+        self.runtime_lock.acquire()
+        self.lock_owned = True
         import pipeline_trellis_3d as trellis
         self.module = trellis
         argv = ["--mode", "generate", "--attention-backend", self.attention_backend]
@@ -133,6 +139,24 @@ class TrellisProvider(MediaProvider):
             "geometry_validation": geometry, "remesh_enabled": params["remesh"],
             "generation_seconds": round(time.monotonic() - start, 3),
         }
+
+    def close(self) -> None:
+        torch_module = self.runtime.get("torch") if self.runtime else None
+        self.pipeline = None
+        self.runtime = None
+        self.module = None
+        self.model_loaded = False
+        import gc
+        gc.collect()
+        try:
+            if torch_module is not None and torch_module.cuda.is_available():
+                torch_module.cuda.empty_cache()
+        except Exception:
+            pass
+        if self.lock_owned:
+            self.runtime_lock.release()
+            self.lock_owned = False
+
 
 
 def main() -> int:
