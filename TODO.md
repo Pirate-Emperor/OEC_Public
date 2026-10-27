@@ -1,26 +1,23 @@
-## Current media-model acceptance status — 2026-10-27
+## Current media-model acceptance status — 2026-10-27 22:35 IST
 
-Candidate branch: `fix/media-stack-supervision-20261019`; most recent guard-tested commit: `7777345250580603195a7d4853f3785012af0076`.
+Branch: `fix/media-stack-supervision-20261019`; inspected head before this update: `7a4cf8cf0f0281d49d971daae894cce5dc7ebbda`.
 
-### Verified outcomes
-- [x] **Real FLUX → TRELLIS generation produced a PNG and a validated/reopened GLB** in [self-hosted run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341). Overall acceptance did not pass because a runtime cache lock prevented cleanup.
-- [x] **AudioCraft/MusicGen CLI produced a valid WAV** in [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443). This remains partial evidence, not a full current-head acceptance.
-- [x] **Static/storage guard passed** on the self-hosted runner in [run 40540348947](https://github.com/xflexwork/OEC/actions/runs/40540348947) after correcting the cleanup-test import and aligning its assertions with the bounded-lock cleanup workflow.
-- [x] **Host/lock-owner mismatch confirmed:** acceptance run [40539715094](https://github.com/xflexwork/OEC/actions/runs/40539715094) executed as `RUNNER=oec-1, HOST=scn28-mn`; the legacy StorageManager recovery guard is intentionally restricted to `oec-1/scn30-mn` and refused recovery.
+### Verified evidence
+- [x] Static/storage guard passed on the inspected head: [run 40541720533](https://github.com/xflexwork/OEC/actions/runs/40541720533).
+- [x] Real FLUX → TRELLIS generation produced a PNG and a valid/reopened GLB in [run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341). This is prior-candidate evidence, not exact-head whole-suite acceptance.
+- [x] MusicGen CLI produced and decoded a valid WAV in [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443); the managed-service/Gradio path also passed on an earlier candidate.
+- [x] Confirmed why latest exact-head preflight blocked: [run 40541720625](https://github.com/xflexwork/OEC/actions/runs/40541720625) ran as `oec-1/scn28-mn`, but protected legacy pause-lock recovery only permits `oec-1/scn30-mn`.
 
-### Open acceptance items
-- [ ] **Find the registered local runner actually attached to `scn30-mn`:** the next self-hosted preflight runs the read-only `tools/runner_control.py list` and stores its host/runner metadata in the acceptance artifact. Do not relax host/PID/lease safeguards to make `scn28-mn` eligible.
-- [ ] **Exact-head full Gradio acceptance:** the last full acceptance run failed in preflight; corresponding Gradio callbacks did not execute and must not be counted as passes.
-- [ ] Recover only same-host, exact-command OEC service-owner markers; recover StorageManager pause locks only after proving the local PID is dead, lock age is sufficient, no unresolved lease manifest exists, and reserve size is unchanged.
-- [ ] **FLUX cache integrity:** validate real transformer, text encoder and VAE weights before accepting a snapshot as a cache hit; download missing data only after live StorageManager admission.
-- [ ] **Wan:** prior Torch import failed because the HPC SDK `libgomp.so.1` lacked `__pgi_nvomp_async_val_to_queue_num`; isolate only the smoke process from the injected library path.
-- [ ] **LTX:** still needs both text-to-video and image-to-video Gradio callbacks to produce valid decoded MP4s.
-- [ ] **Canonical root sync:** remains blocked by the approved-origin safeguard; do not weaken canonical repository identity checks.
+### Open blockers
+- [ ] Exact-head full Gradio acceptance: run 40541720625 failed during preflight, before model callbacks. Do not count skipped callbacks as passes.
+- [ ] Models pause lock path `/nlsasfs/home/lmedge/rahkus/aireos_models/.storage_pause.lock` recorded PID `2036305`. The artifact does not prove a safe host/PID/lease state; no recovery or reserve mutation is claimed.
+- [ ] Runner inventory used recursive `Path.rglob(".runner")` and timed out traversing `actions-runner/externals/node_modules`. This update changes it to scan only `gpu/<runner>/actions-runner/.runner` and adds a no-recursion regression test; CI confirmation is pending.
+- [ ] Rerun the exact-head acceptance on the correct registered runner. Current-head audio/video generations remain unverified.
+- [ ] Fix/verify FLUX cache component completeness, isolate Wan's injected `libgomp` compatibility issue inside the smoke process, and validate both LTX text-to-video and image-to-video MP4 Gradio callbacks.
+- [ ] Canonical root sync remains blocked by the approved-origin safeguard. Do not weaken the repository identity check.
 
-### Execution policy
-- Prioritize the self-hosted A100 runner for model inference, FLUX→TRELLIS and storage regression tests. Keep only the short independent deadline watchdog on `ubuntu-latest` so it can cancel stale jobs while the A100 is occupied.
-- Use existing Conda environments only; no shared-environment package installs/updates. Purge model-owned caches only after verified process shutdown and an unlocked model runtime lock.
-- **Overall status: not yet accepted.** The next step is to inspect local runner host metadata and map inference to the lock owner; do not claim any skipped Gradio callback as a pass.
+**Overall: NOT YET ACCEPTED.** Existing Conda environments are preserved. No shared environment install/update was made. Model caches must remain intact while runtime locks are active or their owner is uncertain.
+
 
 ---
 

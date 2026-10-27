@@ -1,14 +1,18 @@
 # OEC project continuation checklist
 
-## Current verified state — 2026-10-23
+## Current verified state — 2026-10-27 22:35 IST
 
-- **Current-head live PASS:** [FLUX.2 Klein → TRELLIS.2](https://github.com/CalamityStriker/OEC/actions/runs/39646903815), candidate `ae6c90b891ec80338c9c96446d735b03e1985d8a`; 193,544-byte GLB re-opened (2,886 vertices / 4,752 faces), artifact 12368677410.
-- **Current-head contract PASS:** [Asset Factory](https://github.com/CalamityStriker/OEC/actions/runs/39646903793), suites 8 + 5 + 16.
-- **Current-head static/storage PASS:** [run 39646903775](https://github.com/CalamityStriker/OEC/actions/runs/39646903775), 154 tests across 19 invocations and four notebook JSON checks.
-- **Canonical A100 sync BLOCKED:** [run 39646903801](https://github.com/CalamityStriker/OEC/actions/runs/39646903801); active OEC inference/queue process detected, so canonical `$HOME/OEC` is not proven synced.
-- **Historical live acceptance:** [run 39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568), 8/8 on older SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`; this is historical real inference and raw byte read-back, not current-head testing or private-key decryption.
-- **Runbook:** `docs/DEMO_PRESENTATION_QUICKSTART_2026-10-23.md`; compact Jupyter index `pipeline_demo_acceptance.ipynb`; encrypted remote ciphertext/private-key round-trip `pipeline_verify_encrypted_hf.ipynb`.
-- **Still incomplete:** exact-head audio/video retests; common `/v1/jobs` integration for standalone FLUX/AudioGen/MusicGen; OEC-Play full integration; current-head encrypted read-back/decrypt; canonical A100 sync.
+Branch: `fix/media-stack-supervision-20261019`; inspected head before this update: `7a4cf8cf0f0281d49d971daae894cce5dc7ebbda`.
+
+- **PASS — static/storage guard:** [run 40541720533](https://github.com/xflexwork/OEC/actions/runs/40541720533).
+- **PASS — real FLUX → TRELLIS composite inference (prior candidate):** [run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341) generated a PNG and valid GLB and successfully reopened mesh geometry. TRELLIS cache cleanup was blocked by a runtime lock, so cleanup is not marked pass.
+- **PASS — MusicGen WAV (prior candidate):** [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443). This is historical provider evidence, not current-head full acceptance.
+- **BLOCKED — current-head full Gradio acceptance:** [run 40541720625](https://github.com/xflexwork/OEC/actions/runs/40541720625) stopped in preflight before model callbacks. Current runner identity is `oec-1/scn28-mn`; legacy lock recovery intentionally requires `oec-1/scn30-mn`.
+- **Runner inventory fix added in this update:** recursive scanning of `actions-runner/externals/node_modules` timed out after 45 seconds. The candidate switches to the configured direct-child layout and adds a regression test that forbids recursive traversal; CI confirmation is pending.
+- **Safety:** do not override the host allowlist, signal unverified processes, recover the pause lock without same-host PID/lease proof, or purge a model cache under a live/unknown runtime lock. Existing Conda environments remain untouched.
+- **Still incomplete:** exact-head Gradio acceptance across the model set; correct registered runner/lock-owner mapping; FLUX cache-integrity validation; Wan library-path compatibility; LTX text/video and image/video MP4 generation; approved-origin canonical sync.
+
+**Overall status: NOT YET ACCEPTED.** Earlier FLUX → TRELLIS and MusicGen artifacts are valid evidence but do not make the current candidate green.
 
 ---
 ## Historical verified state — 2026-10-21 (superseded by current snapshot)

@@ -1206,9 +1206,29 @@ def list_runners(_: argparse.Namespace) -> None:
 
     auth = _github_auth_token()
     found = []
-    for runner_file in root.rglob(".runner"):
-        if runner_file.is_file() and runner_file.parent.name == "actions-runner":
-            found.append(runner_file.parent)
+    # Each managed runner lives at gpu/<name>/actions-runner/.runner, matching
+    # runner_dir_from_name(). Do not recursively walk the runner's _work or
+    # externals trees: these may contain millions of files on shared NFS.
+    try:
+        entries = sorted(root.iterdir(), key=lambda item: item.name)
+    except OSError as exc:
+        print(f"Could not enumerate runner root {root}: {type(exc).__name__}: {exc}")
+        return
+    for entry in entries:
+        try:
+            if entry.is_symlink() or not entry.is_dir():
+                continue
+            runner = entry / "actions-runner"
+            if runner.is_symlink() or not runner.is_dir():
+                continue
+            marker = runner / ".runner"
+            if marker.is_symlink() or not marker.is_file():
+                continue
+            found.append(runner)
+        except OSError:
+            # Shared runner storage can change while an agent is being updated.
+            # Skip inaccessible entries, but continue reporting other candidates.
+            continue
 
     if not found:
         print(f"No configured runners under {root}")

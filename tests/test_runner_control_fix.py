@@ -145,6 +145,34 @@ class RunnerControlFixTests(unittest.TestCase):
             self.assertIn("HOST=scn17-mn", text)
             self.assertNotIn("STOPPED", text)
 
+    def test_list_scans_only_direct_runner_directories_without_recursive_walk(self):
+        with tempfile.TemporaryDirectory() as td:
+            gpu = Path(td) / "gpu"
+            runner = gpu / "oec_1" / "actions-runner"
+            runner.mkdir(parents=True)
+            (runner / ".runner").write_text(json.dumps({
+                "name": "oec-1",
+                "gitHubUrl": "https://github.com/xflexwork/OEC",
+            }))
+            nested = runner / "externals.2.337.0" / "node24" / "lib" / "node_modules" / "example" / "actions-runner"
+            nested.mkdir(parents=True)
+            (nested / ".runner").write_text("{}")
+            unrelated = gpu / "archive" / "nested" / "actions-runner"
+            unrelated.mkdir(parents=True)
+            (unrelated / ".runner").write_text("{}")
+            with mock.patch.dict(os.environ, {"OEC_ROOT": td}, clear=True):
+                with mock.patch.object(rc, "_github_auth_token", return_value=None):
+                    with mock.patch.object(rc, "listener_pids", return_value=[]):
+                        with mock.patch.object(rc, "_host_location_text", return_value="HOST=scn28-mn"):
+                            with mock.patch.object(Path, "rglob", side_effect=AssertionError("recursive scan is forbidden")):
+                                output = io.StringIO()
+                                with contextlib.redirect_stdout(output):
+                                    rc.list_runners(argparse.Namespace())
+            rendered = output.getvalue()
+            self.assertIn(str(runner), rendered)
+            self.assertNotIn(str(nested), rendered)
+            self.assertNotIn(str(unrelated), rendered)
+
     def test_runner_host_info_falls_back_to_diagnostic_log(self):
         with tempfile.TemporaryDirectory() as td:
             runner = Path(td) / "actions-runner"
