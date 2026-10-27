@@ -196,7 +196,7 @@ jobs:
           echo "OEC_ACCEPTANCE_ROOT=$OEC_ACCEPTANCE_ROOT" >> "$GITHUB_ENV"
           echo "LOCAL_RUNNER_INVENTORY_BEGIN" | tee "$OEC_ACCEPTANCE_ROOT/local-runner-inventory.log"
           set +e
-          timeout --signal=INT --kill-after=5s 45s "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/runner_control.py list 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/local-runner-inventory.log"
+          timeout --signal=INT --kill-after=5s 45s "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/runner_control.py list --no-github 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/local-runner-inventory.log"
           runner_list_rc=${PIPESTATUS[0]}
           set -e
           echo "LOCAL_RUNNER_INVENTORY_RC=$runner_list_rc" | tee -a "$OEC_ACCEPTANCE_ROOT/local-runner-inventory.log"

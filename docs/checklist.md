@@ -1,18 +1,18 @@
 # OEC project continuation checklist
 
-## Current verified state — 2026-10-27 22:35 IST
+## Current verified state — 2026-10-27 22:42 IST
 
-Branch: `fix/media-stack-supervision-20261019`; inspected head before this update: `7a4cf8cf0f0281d49d971daae894cce5dc7ebbda`.
+Branch: `fix/media-stack-supervision-20261019`; pre-follow-up head `9929a739ac84112743c531be1a8ac1b78481d11a`.
 
-- **PASS — static/storage guard:** [run 40541720533](https://github.com/xflexwork/OEC/actions/runs/40541720533).
-- **PASS — real FLUX → TRELLIS composite inference (prior candidate):** [run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341) generated a PNG and valid GLB and successfully reopened mesh geometry. TRELLIS cache cleanup was blocked by a runtime lock, so cleanup is not marked pass.
-- **PASS — MusicGen WAV (prior candidate):** [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443). This is historical provider evidence, not current-head full acceptance.
-- **BLOCKED — current-head full Gradio acceptance:** [run 40541720625](https://github.com/xflexwork/OEC/actions/runs/40541720625) stopped in preflight before model callbacks. Current runner identity is `oec-1/scn28-mn`; legacy lock recovery intentionally requires `oec-1/scn30-mn`.
-- **Runner inventory fix added in this update:** recursive scanning of `actions-runner/externals/node_modules` timed out after 45 seconds. The candidate switches to the configured direct-child layout and adds a regression test that forbids recursive traversal; CI confirmation is pending.
-- **Safety:** do not override the host allowlist, signal unverified processes, recover the pause lock without same-host PID/lease proof, or purge a model cache under a live/unknown runtime lock. Existing Conda environments remain untouched.
-- **Still incomplete:** exact-head Gradio acceptance across the model set; correct registered runner/lock-owner mapping; FLUX cache-integrity validation; Wan library-path compatibility; LTX text/video and image/video MP4 generation; approved-origin canonical sync.
+- **PASS — prior FLUX → TRELLIS composite inference:** [run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341) generated and reopened a valid GLB, but TRELLIS cache cleanup remained blocked by a runtime lock.
+- **PASS — prior MusicGen WAV:** [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443). Not exact-head acceptance.
+- **PASS — parent static/storage guard:** [run 40541720533](https://github.com/xflexwork/OEC/actions/runs/40541720533). The new runner-inventory regression is awaiting CI.
+- **BLOCKED — full exact-head Gradio acceptance:** [run 40548073199](https://github.com/xflexwork/OEC/actions/runs/40548073199) failed during preflight before model callbacks. Runner `oec-1` is on `scn28-mn`; legacy pause-lock recovery only accepts `oec-1/scn30-mn`.
+- **Runner discovery:** local inventory reports `oec_1` and `oec_2` on `scn28-mn`; other saved host records refer to `scn1-mn`, `scn23-mn`, and `scn29-mn`. No active local runner on `scn30-mn` has been identified. The source change now scans the bounded runner structure and asks for local-only inventory to avoid stale registration-URL requests.
+- **Safety:** the models pause lock has not been recovered; no PID signal/reserve change or cache deletion was performed. Keep the host/PID/lease guards.
+- **Still incomplete:** exact-head live Gradio tests for all models, correct runner/lock-owner mapping, FLUX cache integrity, Wan library-path compatibility, LTX text-to-video and image-to-video, and approved-origin canonical sync.
 
-**Overall status: NOT YET ACCEPTED.** Earlier FLUX → TRELLIS and MusicGen artifacts are valid evidence but do not make the current candidate green.
+**Overall status: NOT YET ACCEPTED.**
 
 ---
 ## Historical verified state — 2026-10-21 (superseded by current snapshot)

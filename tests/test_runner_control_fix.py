@@ -161,15 +161,18 @@ class RunnerControlFixTests(unittest.TestCase):
             unrelated.mkdir(parents=True)
             (unrelated / ".runner").write_text("{}")
             with mock.patch.dict(os.environ, {"OEC_ROOT": td}, clear=True):
-                with mock.patch.object(rc, "_github_auth_token", return_value=None):
-                    with mock.patch.object(rc, "listener_pids", return_value=[]):
-                        with mock.patch.object(rc, "_host_location_text", return_value="HOST=scn28-mn"):
-                            with mock.patch.object(Path, "rglob", side_effect=AssertionError("recursive scan is forbidden")):
-                                output = io.StringIO()
-                                with contextlib.redirect_stdout(output):
-                                    rc.list_runners(argparse.Namespace())
+                with mock.patch.object(rc, "_github_auth_token", side_effect=AssertionError("local-only inventory must not request a token")):
+                    with mock.patch.object(rc, "_github_runner_record", side_effect=AssertionError("local-only inventory must not call the API")):
+                        with mock.patch.object(rc, "listener_pids", return_value=[]):
+                            with mock.patch.object(rc, "_host_location_text", return_value="HOST=scn28-mn"):
+                                with mock.patch.object(Path, "rglob", side_effect=AssertionError("recursive scan is forbidden")):
+                                    output = io.StringIO()
+                                    with contextlib.redirect_stdout(output):
+                                        rc.list_runners(argparse.Namespace(no_github=True))
             rendered = output.getvalue()
             self.assertIn(str(runner), rendered)
+            self.assertIn("GITHUB=skipped (--no-github)", rendered)
+            self.assertIn("HOST=scn28-mn", rendered)
             self.assertNotIn(str(nested), rendered)
             self.assertNotIn(str(unrelated), rendered)
 

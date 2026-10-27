@@ -1,22 +1,22 @@
-## Current media-model acceptance status — 2026-10-27 22:35 IST
+## Current media-model acceptance status — 2026-10-27 22:42 IST
 
-Branch: `fix/media-stack-supervision-20261019`; inspected head before this update: `7a4cf8cf0f0281d49d971daae894cce5dc7ebbda`.
+Branch: `fix/media-stack-supervision-20261019`; inspected head before this follow-up: `9929a739ac84112743c531be1a8ac1b78481d11a`.
 
 ### Verified evidence
-- [x] Static/storage guard passed on the inspected head: [run 40541720533](https://github.com/xflexwork/OEC/actions/runs/40541720533).
-- [x] Real FLUX → TRELLIS generation produced a PNG and a valid/reopened GLB in [run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341). This is prior-candidate evidence, not exact-head whole-suite acceptance.
-- [x] MusicGen CLI produced and decoded a valid WAV in [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443); the managed-service/Gradio path also passed on an earlier candidate.
-- [x] Confirmed why latest exact-head preflight blocked: [run 40541720625](https://github.com/xflexwork/OEC/actions/runs/40541720625) ran as `oec-1/scn28-mn`, but protected legacy pause-lock recovery only permits `oec-1/scn30-mn`.
+- [x] Static/storage guard last passed on parent head `7a4cf8cf`: [run 40541720533](https://github.com/xflexwork/OEC/actions/runs/40541720533). The newest runner-inventory regression is awaiting its guard run.
+- [x] Earlier FLUX → TRELLIS generation produced a PNG and valid/reopened GLB: [run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341). Its TRELLIS cache cleanup remained blocked by a runtime lock.
+- [x] Earlier MusicGen CLI produced and decoded a valid WAV: [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443).
+- [x] Latest local inventory found active `oec_1` and `oec_2` agents on `scn28-mn`; saved registration URLs pointed to `Killer4K-N/OEC` and returned 404. Other local entries carried last-host metadata for `scn1-mn`, `scn23-mn`, or `scn29-mn`; none evidenced an active `scn30-mn` agent.
 
 ### Open blockers
-- [ ] Exact-head full Gradio acceptance: run 40541720625 failed during preflight, before model callbacks. Do not count skipped callbacks as passes.
-- [ ] Models pause lock path `/nlsasfs/home/lmedge/rahkus/aireos_models/.storage_pause.lock` recorded PID `2036305`. The artifact does not prove a safe host/PID/lease state; no recovery or reserve mutation is claimed.
-- [ ] Runner inventory used recursive `Path.rglob(".runner")` and timed out traversing `actions-runner/externals/node_modules`. This update changes it to scan only `gpu/<runner>/actions-runner/.runner` and adds a no-recursion regression test; CI confirmation is pending.
-- [ ] Rerun the exact-head acceptance on the correct registered runner. Current-head audio/video generations remain unverified.
-- [ ] Fix/verify FLUX cache component completeness, isolate Wan's injected `libgomp` compatibility issue inside the smoke process, and validate both LTX text-to-video and image-to-video MP4 Gradio callbacks.
-- [ ] Canonical root sync remains blocked by the approved-origin safeguard. Do not weaken the repository identity check.
+- [ ] Full exact-head Gradio acceptance failed in preflight before model callbacks: [run 40548073199](https://github.com/xflexwork/OEC/actions/runs/40548073199). It ran as `oec-1/scn28-mn`; legacy lock recovery is restricted to `oec-1/scn30-mn`.
+- [ ] Models pause lock `/nlsasfs/home/lmedge/rahkus/aireos_models/.storage_pause.lock` records PID `2036305`. Recovery is not authorized until host, process-death, lease-manifest and reserve-integrity conditions can all be proved.
+- [ ] Inventory now uses a bounded scan; this follow-up adds explicit `--no-github` so local discovery does not hang on stale repository API URLs. CI confirmation pending.
+- [ ] Restore/identify the approved `scn30-mn` runner mapping without weakening the allowlist. Exact-head audio/video generation remains unverified.
+- [ ] Validate FLUX transformer/text-encoder/VAE completeness; isolate Wan's injected `libgomp` issue inside the smoke process; exercise both LTX video modes end-to-end.
+- [ ] Canonical root sync remains blocked by its approved-origin guard.
 
-**Overall: NOT YET ACCEPTED.** Existing Conda environments are preserved. No shared environment install/update was made. Model caches must remain intact while runtime locks are active or their owner is uncertain.
+**Overall: NOT YET ACCEPTED.** No Conda environment was modified. Do not purge a model cache with a live or unknown runtime lock.
 
 
 ---

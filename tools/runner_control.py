@@ -1198,13 +1198,14 @@ def status_runner(args: argparse.Namespace) -> None:
 
 
 
-def list_runners(_: argparse.Namespace) -> None:
+def list_runners(args: argparse.Namespace) -> None:
     root = gpu_root()
     if not root.exists():
         print(f"No GPU runner directory: {root}")
         return
 
-    auth = _github_auth_token()
+    skip_github = bool(getattr(args, "no_github", False))
+    auth = None if skip_github else _github_auth_token()
     found = []
     # Each managed runner lives at gpu/<name>/actions-runner/.runner, matching
     # runner_dir_from_name(). Do not recursively walk the runner's _work or
@@ -1243,9 +1244,9 @@ def list_runners(_: argparse.Namespace) -> None:
         )
         if not auth:
             host_text = _host_location_text(runner, pids)
+            github_text = "skipped (--no-github)" if skip_github else "unknown (no GitHub API credential)"
             print(
-                f"{runner} | PROCESS={process_state} | GITHUB=unknown "
-                f"(no GitHub API credential){host_text}"
+                f"{runner} | PROCESS={process_state} | GITHUB={github_text}{host_text}"
             )
             continue
         try:
@@ -1559,6 +1560,10 @@ The setup/registration token is not a removal token.""",
         ),
         epilog="Example:\n  python ~/OEC/tools/runner_control.py list",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    list_parser.add_argument(
+        "--no-github", action="store_true",
+        help="Only inspect local runner process/host metadata; do not call the remote GitHub API.",
     )
     list_parser.set_defaults(func=list_runners)
 
