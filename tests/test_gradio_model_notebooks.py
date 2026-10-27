@@ -173,9 +173,9 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn("pipeline_flux_trellis.py pipeline_trellis_3d.py tools/run_flux_pipeline_smoke.py", workflow)
     def test_flux_trellis_cache_cleanup_waits_for_runtime_lock_before_purge(self):
         workflow = (ROOT / ".github" / "workflows" / "oec-flux-pipeline-smoke.yml").read_text(encoding="utf-8")
-        self.assertIn("TRELLIS_CACHE_LOCK_STATE=$lock_state", workflow)
-        self.assertIn("TRELLIS_CACHE_LOCK_WAIT=TIMEOUT; preserving named cache", workflow)
-        self.assertIn('read_lock("trellis-2-4b")', workflow)
+        self.assertIn("MODEL_CACHE_LOCK model=$model state=$lock_state", workflow)
+        self.assertIn("MODEL_CACHE_LOCK_WAIT_TIMEOUT model=$model; preserving named cache", workflow)
+        self.assertIn("read_lock('$model')", workflow)
         self.assertIn("tools/oec_service_manager.py stop trellis-api", workflow)
         self.assertIn("TRELLIS_PORT_7868_FREE", workflow)
         self.assertIn("--models flux-klein-4b,trellis-2-4b", workflow)
