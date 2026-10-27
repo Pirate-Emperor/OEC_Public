@@ -136,7 +136,7 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn('git diff --name-only "$before_sha" "$GITHUB_SHA"', workflow)
         self.assertIn("steps.scope.outputs.musicgen == 'true'", workflow)
         self.assertIn("steps.scope.outputs.wan == 'true'", workflow)
-        self.assertIn("run_scope[trellis]=true ;;", workflow)
+        self.assertIn("run_scope[musicgen]=true; run_scope[trellis]=true; run_scope[wan]=true ;;", workflow)
         self.assertIn('require_success MUSICGEN_GRADIO_OUTCOME', workflow)
         self.assertIn('require_success WAN_NOTEBOOK_OUTCOME', workflow)
 

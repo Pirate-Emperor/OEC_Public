@@ -130,8 +130,8 @@ jobs:
                 tools/media_services/common.py|tools/media_services/model_cache.py|tools/oec_service_manager.py|oec_gpu_admission.py|storage_manager.py|storage_policy.py|tools/prepare_media_models.py|tools/prepare_media_runtime.py)
                   full=true ;;
                 tests/test_gradio_model_notebooks.py)
-                  # This file includes a live TRELLIS callback input regression guard.
-                  run_scope[trellis]=true ;;
+                  # This change validates the MusicGen API, TRELLIS image callback, and Wan import shim.
+                  run_scope[musicgen]=true; run_scope[trellis]=true; run_scope[wan]=true ;;
                 .github/workflows/oec-demo-notebook-acceptance.yml|.github/workflows/oec-root-sync.yml|tests/*|docs/*|README*|TODO.md|result.md|*.md)
                   : ;;
                 *)
