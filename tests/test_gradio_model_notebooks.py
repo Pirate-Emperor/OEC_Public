@@ -130,6 +130,9 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertNotIn('cp "$OUT.info.json" "$R/musicgen-direct.info.json"', workflow)
 
     def test_acceptance_workflow_scopes_expensive_smokes_to_changed_models(self):
+        self.assertIn('before_sha="$(python3 -c', workflow)
+        self.assertIn("git diff --name-only \"$before_sha\" \"$GITHUB_SHA\"", workflow)
+        self.assertIn("run_scope[trellis]=true ;;", workflow)
         workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
         self.assertIn("Select model acceptance scope from changed source paths", workflow)
         self.assertIn('git diff --name-only "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA"', workflow)
