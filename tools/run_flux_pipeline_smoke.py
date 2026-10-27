@@ -29,6 +29,8 @@ def main() -> int:
     parser.add_argument("--width", type=int, default=512)
     parser.add_argument("--height", type=int, default=512)
     parser.add_argument("--steps", type=int, default=4)
+    parser.add_argument("--allow-download", action="store_true",
+                        help="Permit missing model snapshots only through StorageManager-gated child paths.")
     args = parser.parse_args()
 
     runner_temp = Path(os.environ.get("RUNNER_TEMP", "/tmp")).expanduser().resolve()
@@ -46,6 +48,8 @@ def main() -> int:
     ]
     if args.gpu is not None:
         command.extend(["--gpu", str(args.gpu)])
+    if args.allow_download:
+        command.append("--allow-download")
     print("FLUX_PIPELINE_SMOKE_COMMAND=" + json.dumps(command), flush=True)
     completed = subprocess.run(command, cwd=ROOT, text=True, capture_output=True, timeout=5400, check=False)
     combined_log = completed.stdout + ("\n" + completed.stderr if completed.stderr else "")

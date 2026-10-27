@@ -7,9 +7,10 @@ import pipeline_flux_trellis as combined
 
 class FluxTrellisPipelineTests(unittest.TestCase):
     def test_service_manager_flux_route_arguments(self):
-        a=combined.build_parser().parse_args(["--work-dir","/tmp/oec-test-work","--source-mode","flux","--seed","42"])
+        a=combined.build_parser().parse_args(["--work-dir","/tmp/oec-test-work","--source-mode","flux","--seed","42","--allow-download"])
         self.assertEqual(a.source_mode,"flux")
         self.assertEqual(a.seed,42)
+        self.assertTrue(a.allow_download)
 
     def test_service_manager_existing_images_route_arguments(self):
         a=combined.build_parser().parse_args(["--work-dir","/tmp/oec-test-work","--source-mode","images",

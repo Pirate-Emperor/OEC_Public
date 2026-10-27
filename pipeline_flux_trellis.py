@@ -19,6 +19,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--source-mode", choices=("flux", "images"), default="flux")
     p.add_argument("--image-dir", type=Path)
     p.add_argument("--recursive", action="store_true")
+    p.add_argument("--allow-download", action="store_true",
+                   help="Allow missing model downloads only through StorageManager-gated child paths.")
     p.add_argument("--gpu", type=int, default=None)
     p.add_argument("--prompt", default="A photorealistic amber glass sphere on a clean studio surface")
     p.add_argument("--seed", type=int, default=42)
@@ -125,9 +127,11 @@ def _make_trellis(image: Path, output: Path, gpu: int, args: argparse.Namespace)
     if not script.is_file():
         raise FileNotFoundError(f"TRELLIS CLI missing: {script}")
     command = [sys.executable, str(script), "--mode", "generate", "--input", str(image),
-               "--output", str(output), "--gpu", str(gpu), "--offline",
+               "--output", str(output), "--gpu", str(gpu),
                "--max-image-size", str(args.max_image_size),
                "--decimation-target", str(args.decimation_target), "--texture-size", str(args.texture_size)]
+    if not args.allow_download:
+        command.append("--offline")
     _run_child(command, timeout=2400)
     if not output.is_file():
         raise RuntimeError(f"TRELLIS did not produce the expected GLB: {output}")
@@ -156,6 +160,8 @@ def main(argv: list[str] | None = None) -> int:
     out_root = Path(SYSTEM_DIRS["outputs"]).expanduser().resolve() / "media_services" / "flux-trellis" / "jobs" / tag
     sources: list[dict[str, Any]] = []
     if a.source_mode == "flux":
+        if a.allow_download:
+            _run_child([sys.executable, str(ROOT / "tools" / "prepare_flux_cache.py"), "--allow-download"], timeout=1800)
         image = work / "flux-source.png"
         command = [sys.executable, str(ROOT / "pipeline_flux_image.py"), "--mode", "generate",
                    "--offline", "--scratch-output", "--gpu", str(gpu), "--output", str(image),

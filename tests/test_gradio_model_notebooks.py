@@ -257,6 +257,19 @@ class ModelNotebookTests(unittest.TestCase):
         start_block = workflow[start_step_start:workflow.index("\n      - name:", start_step_start + 1)]
         self.assertIn("steps.musicgen_recovery.outcome == 'success'", notebook_block)
         self.assertIn("steps.musicgen_recovery.outcome == 'success'", start_block)
+    def test_trellis_managed_service_is_recovered_before_start_without_killing_unknown_ports(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
+        recovery = workflow.index("id: trellis_orphan_recovery")
+        prepare = workflow.index("id: trellis_prepare")
+        start = workflow.index("id: trellis_start")
+        self.assertLess(recovery, prepare)
+        self.assertLess(prepare, start)
+        block = workflow[recovery:workflow.index("\n      - name:", recovery + 1)]
+        self.assertIn("python tools/oec_service_manager.py stop trellis-api", block)
+        self.assertIn("connect_ex", block)
+        self.assertIn("7868", block)
+        self.assertIn("steps.trellis_orphan_recovery.outcome == 'success'", workflow[prepare:start])
+
     def test_non_model_notebooks_guard_optional_final_cells_and_keep_status_explicit(self):
         login = json.loads((ROOT / "phase1_test_login_node.ipynb").read_text(encoding="utf-8"))
         login_source = "".join(login["cells"][6].get("source", []))

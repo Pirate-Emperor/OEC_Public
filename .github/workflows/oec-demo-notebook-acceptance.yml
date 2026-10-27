@@ -122,8 +122,10 @@ jobs:
                   run_scope[trellis]=true; run_scope[flux]=true ;;
                 pipeline_trellis_3d.py|pipeline_trellis_3d_only.ipynb|tools/media_services/trellis_api.py)
                   run_scope[trellis]=true ;;
-                pipeline_flux_only.ipynb|pipeline_flux_trellis.py|pipeline_flux_image.py|tools/media_services/flux_api.py|tools/prepare_flux_cache.py)
+                pipeline_flux_only.ipynb|pipeline_flux_image.py|tools/media_services/flux_api.py|tools/prepare_flux_cache.py)
                   run_scope[flux]=true ;;
+                pipeline_flux_trellis.py|tools/run_flux_pipeline_smoke.py|.github/workflows/oec-flux-pipeline-smoke.yml)
+                  run_scope[flux]=true; run_scope[trellis]=true ;;
                 tools/run_gradio_model_notebook_smokes.py)
                   run_scope[trellis]=true; run_scope[flux]=true ;;
                 pipeline_ltx_video.ipynb|tools/media_services/ltx_api.py|worker_ltx_video.py|tools/wait_for_media_service.py)
@@ -138,7 +140,7 @@ jobs:
                   : ;;
                 .github/workflows/oec-demo-notebook-acceptance.yml)
                   # Exercise all model paths whose launch/compatibility checks are changed here.
-                  run_scope[audiogen]=true; run_scope[trellis]=true; run_scope[ltx]=true; run_scope[wan]=true ;;
+                  run_scope[audiogen]=true; run_scope[trellis]=true; run_scope[flux]=true; run_scope[ltx]=true; run_scope[wan]=true ;;
                 .github/workflows/oec-root-sync.yml|tests/*|docs/*|README*|TODO.md|result.md|*.md)
                   : ;;
                 *)
@@ -546,9 +548,25 @@ jobs:
             --models ace-step --report-json "$R/cache-cleanup.json" 2>&1 | tee "$R/cache-cleanup.log"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$R/storage-after-cleanup.log"
 
+      - name: Recover a managed TRELLIS service left by a cancelled acceptance
+        id: trellis_orphan_recovery
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.trellis == 'true'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/trellis"
+          mkdir -p "$R"
+          set +e
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/oec_service_manager.py stop trellis-api --grace-seconds 25 >"$R/prior-service-stop.log" 2>&1
+          stop_rc=$?
+          set -e
+          cat "$R/prior-service-stop.log"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python -c 'import socket,sys; s=socket.socket(); s.settimeout(1); rc=s.connect_ex(("127.0.0.1",7868)); s.close(); print(f"TRELLIS_PORT_7868_FREE={rc != 0}"); sys.exit(1 if rc == 0 else 0)'
+          echo "TRELLIS_PRIOR_SERVICE_STOP_RC=$stop_rc" | tee -a "$R/prior-service-stop.log"
+
       - name: Verify storage admission before TRELLIS cache/model startup
         id: trellis_prepare
-        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.trellis == 'true'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.trellis == 'true' && steps.trellis_orphan_recovery.outcome == 'success'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -867,6 +885,7 @@ jobs:
           ACE_PREPARE_OUTCOME: ${{ steps.ace_prepare.outcome }}
           ACE_GRADIO_OUTCOME: ${{ steps.ace_gradio.outcome }}
           ACE_PURGE_OUTCOME: ${{ steps.ace_purge.outcome }}
+          TRELLIS_RECOVERY_OUTCOME: ${{ steps.trellis_orphan_recovery.outcome }}
           TRELLIS_PREPARE_OUTCOME: ${{ steps.trellis_prepare.outcome }}
           TRELLIS_START_OUTCOME: ${{ steps.trellis_start.outcome }}
           TRELLIS_HEALTH_OUTCOME: ${{ steps.trellis_health.outcome }}
@@ -911,6 +930,7 @@ jobs:
           printf 'ACE_PREPARE_OUTCOME=%s\n' "$ACE_PREPARE_OUTCOME"
           printf 'ACE_GRADIO_OUTCOME=%s\n' "$ACE_GRADIO_OUTCOME"
           printf 'ACE_PURGE_OUTCOME=%s\n' "$ACE_PURGE_OUTCOME"
+          printf 'TRELLIS_RECOVERY_OUTCOME=%s\n' "$TRELLIS_RECOVERY_OUTCOME"
           printf 'TRELLIS_PREPARE_OUTCOME=%s\n' "$TRELLIS_PREPARE_OUTCOME"
           printf 'TRELLIS_START_OUTCOME=%s\n' "$TRELLIS_START_OUTCOME"
           printf 'TRELLIS_HEALTH_OUTCOME=%s\n' "$TRELLIS_HEALTH_OUTCOME"
@@ -971,6 +991,7 @@ jobs:
             require_success ACE_PURGE_OUTCOME "$ACE_PURGE_OUTCOME"
           fi
           if [[ "$RUN_SCOPE_TRELLIS" == "true" ]]; then
+            require_success TRELLIS_RECOVERY_OUTCOME "$TRELLIS_RECOVERY_OUTCOME"
             require_success TRELLIS_PREPARE_OUTCOME "$TRELLIS_PREPARE_OUTCOME"
             require_success TRELLIS_START_OUTCOME "$TRELLIS_START_OUTCOME"
             require_success TRELLIS_HEALTH_OUTCOME "$TRELLIS_HEALTH_OUTCOME"
