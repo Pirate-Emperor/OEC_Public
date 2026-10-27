@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 from tools import check_media_service_readiness as readiness
 from tools import recover_failed_musicgen_acceptance_service as musicgen_recovery
+from tools import recover_orphaned_acceptance_services as orphan_recovery
 
 
 class ReadinessContractTests(unittest.TestCase):
@@ -26,6 +27,59 @@ class ReadinessContractTests(unittest.TestCase):
     @staticmethod
     def cache_ready(name, spec, paths):
         return {"checkpoint_presence": "PRESENT", "some_real_weights_detected": True}
+
+    def test_orphan_recovery_requires_exact_prior_acceptance_provenance(self):
+        state = {
+            "instance_id": "trellis-api", "host": orphan_recovery.manager.HOST,
+            "provider": "trellis", "port": 7868,
+            "script_path": str((orphan_recovery.manager.REPO_ROOT / "tools" / "media_services" / "trellis_api.py").resolve()),
+        }
+        previous = {"GITHUB_WORKFLOW": orphan_recovery.ACCEPTANCE_WORKFLOW, "GITHUB_RUN_ID": "123-old", "GITHUB_SHA": "abc-old"}
+        self.assertTrue(orphan_recovery.is_previous_acceptance_service(state, previous, "456-current"))
+        self.assertFalse(orphan_recovery.is_previous_acceptance_service(state, previous, "123-old"))
+        self.assertFalse(orphan_recovery.is_previous_acceptance_service(
+            state, {**previous, "GITHUB_WORKFLOW": "other workflow"}, "456-current"
+        ))
+        self.assertFalse(orphan_recovery.is_previous_acceptance_service(
+            {**state, "port": 7869}, previous, "456-current"
+        ))
+
+    def test_orphan_recovery_stops_only_verified_prior_acceptance_process(self):
+        state = {
+            "instance_id": "trellis-api", "host": orphan_recovery.manager.HOST,
+            "provider": "trellis", "port": 7868,
+            "script_path": str((orphan_recovery.manager.REPO_ROOT / "tools" / "media_services" / "trellis_api.py").resolve()),
+            "pid": 123,
+        }
+        prior_env = {"GITHUB_WORKFLOW": orphan_recovery.ACCEPTANCE_WORKFLOW,
+                     "GITHUB_RUN_ID": "123-old", "GITHUB_SHA": "abc-old"}
+        with mock.patch.object(orphan_recovery.manager, "_all_states", return_value=[state]), \
+             mock.patch.object(orphan_recovery.manager, "_matching_members", side_effect=[[{"pid": 123}], []]), \
+             mock.patch.object(orphan_recovery.manager, "_read_state", return_value=state), \
+             mock.patch.object(orphan_recovery.manager, "_state_path", return_value=Path(self.temp.name) / "trellis.json"), \
+             mock.patch.object(orphan_recovery.manager, "_probe_loopback_health", return_value={"reachable": False}), \
+             mock.patch.object(orphan_recovery.manager, "stop_service") as stop:
+            actions = orphan_recovery.recover_orphaned_acceptance_services(
+                current_run_id="456-current", process_env_reader=lambda pid: prior_env
+            )
+        self.assertEqual(actions, ["trellis-api: STOPPED_PRIOR_ACCEPTANCE_SERVICE"])
+        stop.assert_called_once_with("trellis-api", grace_seconds=25.0)
+
+    def test_orphan_recovery_refuses_unidentified_managed_service(self):
+        state = {
+            "instance_id": "trellis-api", "host": orphan_recovery.manager.HOST,
+            "provider": "trellis", "port": 7868,
+            "script_path": str((orphan_recovery.manager.REPO_ROOT / "tools" / "media_services" / "trellis_api.py").resolve()),
+            "pid": 123,
+        }
+        with mock.patch.object(orphan_recovery.manager, "_all_states", return_value=[state]), \
+             mock.patch.object(orphan_recovery.manager, "_matching_members", return_value=[{"pid": 123}]), \
+             mock.patch.object(orphan_recovery.manager, "stop_service") as stop:
+            with self.assertRaisesRegex(RuntimeError, "not proven to belong"):
+                orphan_recovery.recover_orphaned_acceptance_services(
+                    current_run_id="456-current", process_env_reader=lambda pid: {"GITHUB_RUN_ID": "untrusted"}
+                )
+        stop.assert_not_called()
 
     def test_wait_helper_classifies_ready_loading_and_fatal_503_bodies(self):
         from tools.wait_for_media_service import classify_health

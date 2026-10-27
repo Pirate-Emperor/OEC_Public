@@ -122,6 +122,8 @@ class ModelNotebookTests(unittest.TestCase):
         recovery = (ROOT / "tools" / "recover_failed_musicgen_acceptance_service.py").read_text(encoding="utf-8")
         waiter = (ROOT / "tools" / "wait_for_media_service.py").read_text(encoding="utf-8")
         self.assertIn("recover_failed_musicgen_acceptance_service.py", workflow)
+        self.assertIn("recover_orphaned_acceptance_services.py", workflow)
+        self.assertIn('process_env.get("GITHUB_WORKFLOW") == ACCEPTANCE_WORKFLOW', (ROOT / "tools" / "recover_orphaned_acceptance_services.py").read_text(encoding="utf-8"))
         self.assertIn("KNOWN_FAILURE = \"pipeline_musicgen' has no attribute '_check_versions'\"", recovery)
         self.assertIn('manager.stop_service(SERVICE, grace_seconds=25.0)', recovery)
         self.assertIn('if health.get("error") and not health.get("loading")', waiter)
