@@ -27,8 +27,20 @@ if not (REPO_ROOT / "core_config.py").is_file():
 import audio_api
 import common
 import model_cache
+from tools.media_services import audiocraft_api
 
 class AudioValidationTests(unittest.TestCase):
+    def test_audiocraft_uses_the_version_checker_for_each_model(self):
+        for kind, checker_name in (("audiogen", "_check_versions"), ("musicgen", "_versions")):
+            with self.subTest(kind=kind):
+                provider = object.__new__(audiocraft_api.AudioCraftProvider)
+                provider.kind = kind
+                provider.module = mock.Mock(spec=[checker_name])
+                checker = getattr(provider.module, checker_name)
+                checker.return_value = {"torch": "2.1.0"}
+                self.assertEqual(provider._check_runtime_versions(), {"torch": "2.1.0"})
+                checker.assert_called_once_with()
+
     def test_model_loader_health_error_preserves_a_sanitized_root_cause(self):
         error = common._format_runtime_load_error(
             RuntimeError("ACE-Step DiT initialization failed: missing model config")

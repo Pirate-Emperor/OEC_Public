@@ -117,6 +117,18 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn("handle_file(str(reference_file))", model3d)
         self.assertNotIn("if audio_file is None", model3d)
 
+    def test_wan_diffusers_xpu_shim_exposes_empty_cache(self):
+        notebook = json.loads((ROOT / "pipeline_wan_video.ipynb").read_text(encoding="utf-8"))
+        source = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+        self.assertIn("torch.xpu = SimpleNamespace(is_available=lambda: False, empty_cache=lambda: None)", source)
+
+    def test_musicgen_acceptance_copies_the_actual_metadata_sidecar(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
+        self.assertIn('METADATA="${OUT%.wav}.info.json"', workflow)
+        self.assertIn('cp "$METADATA" "$R/musicgen-direct.info.json"', workflow)
+        self.assertIn('rm -f "$OUT" "$METADATA"', workflow)
+        self.assertNotIn('cp "$OUT.info.json" "$R/musicgen-direct.info.json"', workflow)
+
     def test_service_ui_does_not_import_provider_ml_packages(self):
         for name in ("pipeline_acestep_gradio.ipynb","pipeline_kokoro_gradio.ipynb",
                      "pipeline_whisper_gradio.ipynb","pipeline_qwen3_asr_gradio.ipynb",

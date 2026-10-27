@@ -29,12 +29,21 @@ class AudioCraftProvider(MediaProvider):
         if isinstance(duration,bool) or not isinstance(duration,int) or not 1<=duration<=10: raise RequestError("duration_seconds must be an integer from 1 to 10")
         if isinstance(seed,bool) or not isinstance(seed,int) or not 0<=seed<=2**31-1: raise RequestError("seed must be a non-negative 32-bit integer")
         return {"task":task,"prompt":prompt.strip(),"parameters":{"duration_seconds":duration,"seed":seed}}
+    def _check_runtime_versions(self) -> dict[str,str]:
+        checker_name = "_check_versions" if self.kind == "audiogen" else "_versions"
+        checker = getattr(self.module, checker_name, None)
+        if not callable(checker):
+            raise RuntimeError(
+                f"{self.kind} runtime module is missing the required {checker_name} package check"
+            )
+        return checker()
+
     def load_runtime(self)->None:
         if not self.license_accepted: raise RuntimeError("AudioCraft license/use boundary not acknowledged; pass --accept-noncommercial-license only for permitted use")
         self.runtime_lock.acquire()
         self.lock_owned=True
         self.module=__import__("pipeline_audiogen" if self.kind=="audiogen" else "pipeline_musicgen",fromlist=["*"])
-        self.packages=self.module._check_versions()
+        self.packages=self._check_runtime_versions()
         self.gpu=self.module._select_gpu(self.gpu_index) if self.kind=="audiogen" else self.module._gpu(self.gpu_index)
         os.environ["CUDA_VISIBLE_DEVICES"]=self.gpu["index"]; os.environ["AUDIOCRAFT_CACHE_DIR"]=str(Path(SYSTEM_DIRS["models"]).expanduser().resolve())
         self.snapshot=self.module._snapshot(self.allow_download)
