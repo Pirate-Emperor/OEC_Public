@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
+import runpy
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from IPython.core.interactiveshell import InteractiveShell
 
@@ -69,6 +71,23 @@ class TrellisNotebookStaticTests(unittest.TestCase):
         self.assertIn('"trellis-combined": {1, 2, 3, 4, 6, 10}', source)
         self.assertIn('"flux-combined": {1, 2, 3, 4, 8, 12}', source)
 
+    def test_trellis_download_retries_transient_connection_errors(self):
+        namespace = runpy.run_path(str(ROOT / "pipeline_trellis_3d.py"), run_name="oec_trellis_retry_test")
+        attempts = []
+
+        def flaky_snapshot_download(**kwargs):
+            attempts.append(kwargs)
+            if len(attempts) == 1:
+                raise ConnectionError("simulated interrupted transfer")
+            return "/tmp/trellis-snapshot"
+
+        with mock.patch("time.sleep") as sleep:
+            result = namespace["_snapshot_download_with_retries"](
+                flaky_snapshot_download, repo_id="microsoft/TRELLIS.2-4B", cache_dir="/tmp/model-cache"
+            )
+        self.assertEqual(result, "/tmp/trellis-snapshot")
+        self.assertEqual(len(attempts), 2)
+        sleep.assert_called_once_with(5)
     def test_managed_trellis_service_owns_storage_admission_and_runtime_lock(self):
         api = (ROOT / "tools" / "media_services" / "trellis_api.py").read_text(encoding="utf-8")
         cache = (ROOT / "tools" / "media_services" / "model_cache.py").read_text(encoding="utf-8")

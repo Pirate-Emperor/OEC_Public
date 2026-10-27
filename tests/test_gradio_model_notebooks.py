@@ -127,10 +127,10 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn('if health.get("error") and not health.get("loading")', waiter)
         self.assertIn('tools/wait_for_media_service.py --url http://127.0.0.1:7869/health', workflow)
 
-    def test_wan_diffusers_xpu_shim_exposes_empty_cache(self):
+    def test_wan_diffusers_xpu_shim_exposes_required_unavailable_backend_methods(self):
         notebook = json.loads((ROOT / "pipeline_wan_video.ipynb").read_text(encoding="utf-8"))
         source = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
-        self.assertIn("torch.xpu = SimpleNamespace(is_available=lambda: False, empty_cache=lambda: None)", source)
+        self.assertIn("torch.xpu = SimpleNamespace(is_available=lambda: False, device_count=lambda: 0, empty_cache=lambda: None)", source)
 
     def test_musicgen_acceptance_copies_the_actual_metadata_sidecar(self):
         workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
@@ -235,6 +235,7 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertNotIn('HEALTH_CODE="$(cat <<\'PY\'', workflow)
         self.assertEqual(workflow.count("HEALTH_CODE='import json, urllib.request;"), 4)
         self.assertIn("tools/wait_for_media_service.py --url http://127.0.0.1:7869/health", workflow)
+        self.assertIn("start ltx-api --gpu \"$GPU\" --port 7869 --allow-download --purge-ltx-cache-after-load", workflow)
         self.assertIn("assert health.get(\"ready\") and health.get(\"model_loaded\"), health", workflow)
         self.assertIn("ProxyHandler({})", workflow)
 

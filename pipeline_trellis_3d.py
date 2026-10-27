@@ -12,11 +12,39 @@ import argparse
 import gc
 import os
 import sys
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+
+
+
+def _snapshot_download_with_retries(snapshot_download: Any, *, max_attempts: int = 3, **kwargs: Any) -> Any:
+    """Retry interrupted model transfers; huggingface_hub resumes cached partial files."""
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be at least 1")
+    retryable_errors: tuple[type[BaseException], ...] = (TimeoutError, ConnectionError)
+    try:
+        import requests
+        retryable_errors += (requests.exceptions.RequestException,)
+    except ImportError:
+        pass
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return snapshot_download(**kwargs)
+        except retryable_errors as exc:
+            if attempt >= max_attempts:
+                raise
+            delay = min(5 * attempt, 15)
+            print(
+                f"TRELLIS_DOWNLOAD_RETRY attempt={attempt}/{max_attempts} "
+                f"error={type(exc).__name__} retry_after_seconds={delay}",
+                flush=True,
+            )
+            time.sleep(delay)
+    raise RuntimeError("TRELLIS snapshot download retry loop exited unexpectedly")
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -215,7 +243,8 @@ def _resolve_snapshot(args: argparse.Namespace, runtime: dict[str, Any]) -> Path
         )
         if not ok:
             raise RuntimeError(f"TRELLIS model download denied inside managed operation: {reason}")
-        snapshot = runtime["snapshot_download"](
+        snapshot = _snapshot_download_with_retries(
+            runtime["snapshot_download"],
             repo_id=args.model_id,
             cache_dir=str(runtime["cache_dir"]),
         )
