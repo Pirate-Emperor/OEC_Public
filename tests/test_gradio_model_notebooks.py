@@ -233,10 +233,25 @@ class ModelNotebookTests(unittest.TestCase):
         for port in ("7874", "7875", "7868", "7867", "7869"):
             self.assertIn(f'http://127.0.0.1:{port}/health', workflow)
         self.assertNotIn('HEALTH_CODE="$(cat <<\'PY\'', workflow)
-        self.assertEqual(workflow.count("HEALTH_CODE='import json, urllib.request;"), 5)
+        self.assertEqual(workflow.count("HEALTH_CODE='import json, urllib.request;"), 4)
+        self.assertIn("tools/wait_for_media_service.py --url http://127.0.0.1:7869/health", workflow)
         self.assertIn("assert health.get(\"ready\") and health.get(\"model_loaded\"), health", workflow)
         self.assertIn("ProxyHandler({})", workflow)
 
+    def test_musicgen_recovery_precedes_audiogen_gpu_admission(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
+        recovery = workflow.index("- name: Recover a known-failed MusicGen service left by a cancelled acceptance run")
+        audiocraft_notebook = workflow.index("id: audiogen_full_notebook")
+        audiogen_start = workflow.index("id: audiogen_start")
+        self.assertLess(recovery, audiocraft_notebook)
+        self.assertLess(recovery, audiogen_start)
+        recovery_block = workflow[recovery:workflow.index("\n      - name:", recovery + 1)]
+        self.assertIn("steps.scope.outputs.audiogen == 'true'", recovery_block)
+        self.assertIn("steps.scope.outputs.musicgen == 'true'", recovery_block)
+        notebook_block = workflow[audiocraft_notebook:workflow.index("\n      - name:", audiocraft_notebook)]
+        start_block = workflow[audiogen_start:workflow.index("\n      - name:", audiogen_start)]
+        self.assertIn("steps.musicgen_recovery.outcome == 'success'", notebook_block)
+        self.assertIn("steps.musicgen_recovery.outcome == 'success'", start_block)
     def test_non_model_notebooks_guard_optional_final_cells_and_keep_status_explicit(self):
         login = json.loads((ROOT / "phase1_test_login_node.ipynb").read_text(encoding="utf-8"))
         login_source = "".join(login["cells"][6].get("source", []))

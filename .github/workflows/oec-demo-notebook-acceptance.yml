@@ -129,15 +129,17 @@ jobs:
                 pipeline_ltx_video.ipynb|tools/media_services/ltx_api.py|worker_ltx_video.py|tools/wait_for_media_service.py)
                   run_scope[ltx]=true ;;
                 tests/test_media_service_readiness.py)
-                  run_scope[musicgen]=true; run_scope[ltx]=true ;;
+                  run_scope[ltx]=true ;;
                 pipeline_wan_video.ipynb|tools/run_wan_notebook_smoke.py)
                   run_scope[wan]=true ;;
                 tools/media_services/common.py|tools/media_services/model_cache.py|tools/oec_service_manager.py|oec_gpu_admission.py|storage_manager.py|storage_policy.py|tools/prepare_media_models.py|tools/prepare_media_runtime.py)
                   full=true ;;
                 tests/test_gradio_model_notebooks.py)
-                  # This change validates the MusicGen API, TRELLIS image callback, and Wan import shim.
-                  run_scope[musicgen]=true; run_scope[trellis]=true; run_scope[wan]=true ;;
-                .github/workflows/oec-demo-notebook-acceptance.yml|.github/workflows/oec-root-sync.yml|tests/*|docs/*|README*|TODO.md|result.md|*.md)
+                  : ;;
+                .github/workflows/oec-demo-notebook-acceptance.yml)
+                  # Acceptance workflow edits exercise the affected Gradio/server paths.
+                  run_scope[audiogen]=true; run_scope[ltx]=true ;;
+                .github/workflows/oec-root-sync.yml|tests/*|docs/*|README*|TODO.md|result.md|*.md)
                   : ;;
                 *)
                   full=true ;;
@@ -243,8 +245,17 @@ jobs:
           timeout --signal=INT --kill-after=20s 300s "$CONDA_EXE" run --no-capture-output -n base \
             python tools/run_safe_notebook_smokes.py --notebooks pipeline_verify_encrypted_hf.ipynb 2>&1 | tee "$R/notebook-execution.log"
 
+      - name: Recover a known-failed MusicGen service left by a cancelled acceptance run
+        id: musicgen_recovery
+        if: always() && steps.preflight.outcome == 'success' && (steps.scope.outputs.musicgen == 'true' || steps.scope.outputs.audiogen == 'true')
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/musicgen-gradio"
+          mkdir -p "$R"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/recover_failed_musicgen_acceptance_service.py 2>&1 | tee "$R/service-recovery.log"
+
       - name: Execute AudioCraft notebook top-to-bottom and generate a WAV
-        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.audiocraft_notebook == 'true'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.audiocraft_notebook == 'true' && steps.musicgen_recovery.outcome == 'success'
         id: audiogen_full_notebook
         continue-on-error: true
         run: |
@@ -258,7 +269,7 @@ jobs:
             python tools/run_audiogen_notebook_smoke.py 2>&1 | tee "$OEC_AUDIOGEN_SMOKE_DIR/notebook-execution.log"
 
       - name: Start the AudioGen server on an admitted idle A100
-        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.audiogen == 'true'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.audiogen == 'true' && steps.musicgen_recovery.outcome == 'success'
         id: audiogen_start
         continue-on-error: true
         run: |
@@ -320,14 +331,7 @@ jobs:
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/cleanup_test_model_caches.py --models audiogen-medium --report-json "$R/cache-cleanup.json" 2>&1 | tee "$R/cache-cleanup.log"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/audiogen-gradio/cache-cleanup.log"
 
-      - name: Recover a known-failed MusicGen service left by a cancelled acceptance run
-        id: musicgen_recovery
-        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.musicgen == 'true'
-        run: |
-          set -euo pipefail
-          R="$OEC_ACCEPTANCE_ROOT/musicgen-gradio"
-          mkdir -p "$R"
-          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/recover_failed_musicgen_acceptance_service.py 2>&1 | tee "$R/service-recovery.log"
+
 
       - name: Test standalone MusicGen CLI mode and decode its WAV
         id: musicgen_cli
@@ -875,6 +879,7 @@ jobs:
           FLUX_GRADIO_OUTCOME: ${{ steps.flux_gradio.outcome }}
           FLUX_COMBINED_GRADIO_OUTCOME: ${{ steps.flux_combined_gradio.outcome }}
           FLUX_PURGE_OUTCOME: ${{ steps.flux_purge.outcome }}
+          MUSICGEN_RECOVERY_OUTCOME: ${{ steps.musicgen_recovery.outcome }}
           MUSICGEN_CLI_OUTCOME: ${{ steps.musicgen_cli.outcome }}
           SPEECH_PREPARE_OUTCOME: ${{ steps.speech_prepare.outcome }}
           SPEECH_GRADIO_OUTCOME: ${{ steps.speech_gradio.outcome }}
@@ -898,6 +903,7 @@ jobs:
           printf 'AUDIOGEN_HEALTH_OUTCOME=%s\n' "$AUDIOGEN_HEALTH_OUTCOME"
           printf 'AUDIOGEN_GRADIO_OUTCOME=%s\n' "$AUDIOGEN_GRADIO_OUTCOME"
           printf 'AUDIOGEN_PURGE_OUTCOME=%s\n' "$AUDIOGEN_PURGE_OUTCOME"
+          printf 'MUSICGEN_RECOVERY_OUTCOME=%s\n' "$MUSICGEN_RECOVERY_OUTCOME"
           printf 'MUSICGEN_START_OUTCOME=%s\n' "$MUSICGEN_START_OUTCOME"
           printf 'MUSICGEN_HEALTH_OUTCOME=%s\n' "$MUSICGEN_HEALTH_OUTCOME"
           printf 'MUSICGEN_GRADIO_OUTCOME=%s\n' "$MUSICGEN_GRADIO_OUTCOME"
@@ -939,6 +945,7 @@ jobs:
           if [[ "$RUN_SCOPE_CONTROLS" == "true" ]]; then require_success SAFE_CONTROL_NOTEBOOKS_OUTCOME "$SAFE_CONTROL_NOTEBOOKS_OUTCOME"; fi
           if [[ "$RUN_SCOPE_DEPLOYMENT" == "true" ]]; then require_success DEPLOYMENT_NOTEBOOK_OUTCOME "$DEPLOYMENT_NOTEBOOK_OUTCOME"; fi
           if [[ "$RUN_SCOPE_AUDIOCRAFT_NOTEBOOK" == "true" ]]; then require_success AUDIOGEN_NOTEBOOK_OUTCOME "$AUDIOGEN_NOTEBOOK_OUTCOME"; fi
+          if [[ "$RUN_SCOPE_AUDIOGEN" == "true" || "$RUN_SCOPE_MUSICGEN" == "true" ]]; then require_success MUSICGEN_RECOVERY_OUTCOME "$MUSICGEN_RECOVERY_OUTCOME"; fi
           if [[ "$RUN_SCOPE_AUDIOGEN" == "true" ]]; then
             require_success AUDIOGEN_START_OUTCOME "$AUDIOGEN_START_OUTCOME"
             require_success AUDIOGEN_HEALTH_OUTCOME "$AUDIOGEN_HEALTH_OUTCOME"
