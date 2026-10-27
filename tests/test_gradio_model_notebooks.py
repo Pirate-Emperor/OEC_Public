@@ -185,6 +185,12 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn("--cleanup-owned-services --recover-orphan-services", workflow)
         self.assertIn("--wait-for-unlocked-seconds 180", workflow)
         self.assertIn("--wait-for-unlocked-seconds 90", workflow)
+    def test_root_watchdog_reports_registered_runner_inventory_best_effort(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-root-sync.yml").read_text(encoding="utf-8")
+        self.assertIn("OEC_RUNNER_INVENTORY ", workflow)
+        self.assertIn("OEC_RUNNER_INVENTORY_UNAVAILABLE", workflow)
+        self.assertIn('f"https://api.github.com/repos/{repository}/actions/runners?per_page=100"', workflow)
+
     def test_acceptance_runs_on_lock_owner_a100_and_recovers_locks_before_model_loads(self):
         workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
         preflight_start = workflow.index("id: preflight")

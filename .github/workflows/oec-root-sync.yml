@@ -95,6 +95,23 @@ jobs:
                   f"GitHub Actions API request failed after 3 attempts ({method}, {type(last_error).__name__})"
               ) from last_error
 
+          try:
+              _, runner_payload = request_json(
+                  f"https://api.github.com/repos/{repository}/actions/runners?per_page=100"
+              )
+              safe_runners = [
+                  {
+                      "name": item.get("name"),
+                      "status": item.get("status"),
+                      "busy": item.get("busy"),
+                      "labels": sorted(label.get("name", "") for label in item.get("labels", []) if label.get("name")),
+                  }
+                  for item in runner_payload.get("runners", [])
+              ]
+              print("OEC_RUNNER_INVENTORY " + json.dumps(safe_runners, sort_keys=True), flush=True)
+          except Exception as exc:
+              print("OEC_RUNNER_INVENTORY_UNAVAILABLE " + type(exc).__name__, flush=True)
+
           _, payload = request_json(f"{api}?{query}")
           now = datetime.datetime.now(datetime.timezone.utc)
           for run in payload.get("workflow_runs", []):
