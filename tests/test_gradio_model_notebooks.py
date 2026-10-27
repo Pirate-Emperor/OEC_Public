@@ -146,7 +146,9 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn('git diff --name-only "$before_sha" "$GITHUB_SHA"', workflow)
         self.assertIn("steps.scope.outputs.musicgen == 'true'", workflow)
         self.assertIn("steps.scope.outputs.wan == 'true'", workflow)
-        self.assertIn("run_scope[musicgen]=true; run_scope[trellis]=true; run_scope[wan]=true ;;", workflow)
+        self.assertIn("pipeline_trellis_3d.py|pipeline_trellis_3d_only.ipynb|tools/media_services/trellis_api.py)", workflow)
+        self.assertIn("run_scope[audiogen]=true; run_scope[trellis]=true; run_scope[ltx]=true; run_scope[wan]=true ;;", workflow)
+        self.assertIn("tests/test_media_service_readiness.py)\n                  run_scope[musicgen]=true; run_scope[ltx]=true ;;", workflow)
         self.assertIn('require_success MUSICGEN_GRADIO_OUTCOME', workflow)
         self.assertIn('require_success WAN_NOTEBOOK_OUTCOME', workflow)
 
@@ -249,8 +251,10 @@ class ModelNotebookTests(unittest.TestCase):
         recovery_block = workflow[recovery:workflow.index("\n      - name:", recovery + 1)]
         self.assertIn("steps.scope.outputs.audiogen == 'true'", recovery_block)
         self.assertIn("steps.scope.outputs.musicgen == 'true'", recovery_block)
-        notebook_block = workflow[audiocraft_notebook:workflow.index("\n      - name:", audiocraft_notebook)]
-        start_block = workflow[audiogen_start:workflow.index("\n      - name:", audiogen_start)]
+        notebook_step_start = workflow.rfind("\n      - name:", 0, audiocraft_notebook)
+        start_step_start = workflow.rfind("\n      - name:", 0, audiogen_start)
+        notebook_block = workflow[notebook_step_start:workflow.index("\n      - name:", notebook_step_start + 1)]
+        start_block = workflow[start_step_start:workflow.index("\n      - name:", start_step_start + 1)]
         self.assertIn("steps.musicgen_recovery.outcome == 'success'", notebook_block)
         self.assertIn("steps.musicgen_recovery.outcome == 'success'", start_block)
     def test_non_model_notebooks_guard_optional_final_cells_and_keep_status_explicit(self):
