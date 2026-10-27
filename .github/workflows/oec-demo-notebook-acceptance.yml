@@ -71,7 +71,7 @@ concurrency:
 jobs:
   acceptance:
     name: Run full notebooks and real model-server Gradio callbacks
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 300
     defaults:
       run:
@@ -167,16 +167,31 @@ jobs:
         id: preflight
         run: |
           set -euo pipefail
-          CONDA_EXE="$HOME/Conda/condabin/conda"
+          ACCOUNT_HOME="$(getent passwd "$(id -un)" | cut -d: -f6 || true)"
+          if [[ -z "$ACCOUNT_HOME" ]]; then ACCOUNT_HOME="$HOME"; fi
+          CONDA_EXE=""
+          for candidate in "$HOME/Conda/condabin/conda" "$ACCOUNT_HOME/Conda/condabin/conda"; do
+            if [[ -x "$candidate" ]]; then CONDA_EXE="$candidate"; break; fi
+          done
           OEC_ACCEPTANCE_ROOT="$RUNNER_TEMP/oec-demo-notebook-acceptance-$GITHUB_RUN_ID"
+          mkdir -p "$OEC_ACCEPTANCE_ROOT"
+          printf 'RUNNER=%s\nHOST=%s\nUSER=%s\nHOME=%s\nACCOUNT_HOME=%s\nCOMMIT=%s\n' "$RUNNER_NAME" "$(hostname)" "$(id -un)" "$HOME" "$ACCOUNT_HOME" "$GITHUB_SHA" | tee "$OEC_ACCEPTANCE_ROOT/runner.txt"
+          test "$RUNNER_NAME" = "oec-2"
+          test -n "$CONDA_EXE" && test -x "$CONDA_EXE"
+          STORAGE_CONFIG=""
+          for candidate in "$HOME/OEC/storage_config.json" "$ACCOUNT_HOME/OEC/storage_config.json"; do
+            if [[ -f "$candidate" && ! -L "$candidate" ]]; then STORAGE_CONFIG="$candidate"; break; fi
+          done
+          if [[ -z "$STORAGE_CONFIG" ]]; then
+            printf 'STORAGE_CONFIG_CANDIDATE path=%s exists=%s\n' "$HOME/OEC/storage_config.json" "$([[ -f "$HOME/OEC/storage_config.json" && ! -L "$HOME/OEC/storage_config.json" ]] && echo true || echo false)" | tee -a "$OEC_ACCEPTANCE_ROOT/runner.txt"
+            printf 'STORAGE_CONFIG_CANDIDATE path=%s exists=%s\n' "$ACCOUNT_HOME/OEC/storage_config.json" "$([[ -f "$ACCOUNT_HOME/OEC/storage_config.json" && ! -L "$ACCOUNT_HOME/OEC/storage_config.json" ]] && echo true || echo false)" | tee -a "$OEC_ACCEPTANCE_ROOT/runner.txt"
+            echo "::error::Trusted host StorageManager configuration is missing; model loads are denied."
+            exit 2
+          fi
+          install -m 600 "$STORAGE_CONFIG" "$GITHUB_WORKSPACE/storage_config.json"
+          printf 'STORAGE_CONFIG_SOURCE=%s\n' "$STORAGE_CONFIG" | tee -a "$OEC_ACCEPTANCE_ROOT/runner.txt"
           echo "CONDA_EXE=$CONDA_EXE" >> "$GITHUB_ENV"
           echo "OEC_ACCEPTANCE_ROOT=$OEC_ACCEPTANCE_ROOT" >> "$GITHUB_ENV"
-          test "$RUNNER_NAME" = "oec-2"
-          test -x "$CONDA_EXE"
-          test -f "$HOME/OEC/storage_config.json"
-          install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
-          mkdir -p "$OEC_ACCEPTANCE_ROOT"
-          printf 'RUNNER=%s\nHOST=%s\nCOMMIT=%s\n' "$RUNNER_NAME" "$(hostname)" "$GITHUB_SHA" | tee "$OEC_ACCEPTANCE_ROOT/runner.txt"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$OEC_ACCEPTANCE_ROOT/storage-before.log"
           nvidia-smi | tee "$OEC_ACCEPTANCE_ROOT/nvidia-smi-before.txt"
 

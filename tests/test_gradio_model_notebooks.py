@@ -152,6 +152,15 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn('require_success MUSICGEN_GRADIO_OUTCOME', workflow)
         self.assertIn('require_success WAN_NOTEBOOK_OUTCOME', workflow)
 
+    def test_acceptance_uses_a_consistent_runner_and_trusted_account_home_config(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
+        self.assertIn("runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]", workflow)
+        self.assertIn('test "$RUNNER_NAME" = "oec-2"', workflow)
+        self.assertIn('ACCOUNT_HOME="$(getent passwd "$(id -un)" | cut -d: -f6 || true)"', workflow)
+        self.assertIn('"$ACCOUNT_HOME/OEC/storage_config.json"', workflow)
+        self.assertIn("STORAGE_CONFIG_SOURCE=%s\\n", workflow)
+        self.assertIn("Trusted host StorageManager configuration is missing; model loads are denied.", workflow)
+
     def test_flux_trellis_cli_is_triggered_and_compiled_by_acceptance(self):
         workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
         for path in (
@@ -165,8 +174,10 @@ class ModelNotebookTests(unittest.TestCase):
     def test_flux_trellis_cache_cleanup_waits_for_runtime_lock_before_purge(self):
         workflow = (ROOT / ".github" / "workflows" / "oec-flux-pipeline-smoke.yml").read_text(encoding="utf-8")
         self.assertIn("TRELLIS_CACHE_LOCK_STATE=$lock_state", workflow)
-        self.assertIn("TRELLIS_CACHE_LOCK_WAIT=TIMEOUT", workflow)
+        self.assertIn("TRELLIS_CACHE_LOCK_WAIT=TIMEOUT; preserving named cache", workflow)
         self.assertIn('read_lock("trellis-2-4b")', workflow)
+        self.assertIn("tools/oec_service_manager.py stop trellis-api", workflow)
+        self.assertIn("TRELLIS_PORT_7868_FREE", workflow)
         self.assertIn("--models flux-klein-4b,trellis-2-4b", workflow)
 
     def test_recovery_steps_can_clean_verified_prior_run_services_and_wait_for_model_locks(self):
