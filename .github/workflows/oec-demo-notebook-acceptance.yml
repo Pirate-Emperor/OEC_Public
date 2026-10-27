@@ -74,6 +74,77 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      - name: Select model acceptance scope from changed source paths
+        id: scope
+        run: |
+          set -euo pipefail
+          scopes=(controls deployment encrypted_hf audiocraft_notebook audiogen musicgen speech ace_step trellis flux ltx wan)
+          declare -A run_scope
+          for scope_name in "${scopes[@]}"; do run_scope["$scope_name"]=false; done
+          full=false
+          changed_paths=""
+
+          if [[ "$GITHUB_EVENT_NAME" != "push" || -z "${GITHUB_EVENT_BEFORE:-}" || "${GITHUB_EVENT_BEFORE:-}" =~ ^0+$ ]]; then
+            full=true
+          elif ! git cat-file -e "${GITHUB_EVENT_BEFORE}^{commit}" 2>/dev/null; then
+            full=true
+          else
+            changed_paths="$(git diff --name-only "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA")"
+            if [[ -z "$changed_paths" ]]; then full=true; fi
+            while IFS= read -r path; do
+              [[ -n "$path" ]] || continue
+              case "$path" in
+                pipeline_audiocraft.ipynb)
+                  run_scope[audiocraft_notebook]=true; run_scope[audiogen]=true ;;
+                pipeline_audiogen.py|pipeline_audiogen_gradio.ipynb|tools/run_audiogen_notebook_smoke.py)
+                  run_scope[audiogen]=true ;;
+                pipeline_musicgen.py|pipeline_musicgen_gradio.ipynb|tools/media_services/audiocraft_api.py)
+                  run_scope[musicgen]=true ;;
+                Untitled.ipynb|pipeline_demo_acceptance.ipynb|phase1_test_compute_node.ipynb|phase1_test_login_node.ipynb)
+                  run_scope[controls]=true ;;
+                oec_deply_install.ipynb|tools/run_safe_notebook_smokes.py)
+                  run_scope[deployment]=true ;;
+                pipeline_verify_encrypted_hf.ipynb)
+                  run_scope[encrypted_hf]=true ;;
+                tools/run_media_model_smokes.py)
+                  run_scope[speech]=true; run_scope[ace_step]=true ;;
+                pipeline_kokoro_gradio.ipynb|pipeline_whisper_gradio.ipynb|pipeline_qwen3_asr_gradio.ipynb)
+                  run_scope[speech]=true ;;
+                pipeline_acestep_gradio.ipynb|tools/media_services/audio_api.py|tools/prepare_ace_step_runtime.py)
+                  run_scope[ace_step]=true ;;
+                pipeline_trellis_3d.ipynb)
+                  run_scope[trellis]=true; run_scope[flux]=true ;;
+                pipeline_trellis_3d_only.ipynb|tools/media_services/trellis_api.py)
+                  run_scope[trellis]=true ;;
+                pipeline_flux_only.ipynb|pipeline_flux_trellis.py|pipeline_flux_image.py|tools/media_services/flux_api.py|tools/prepare_flux_cache.py)
+                  run_scope[flux]=true ;;
+                tools/run_gradio_model_notebook_smokes.py)
+                  run_scope[trellis]=true; run_scope[flux]=true ;;
+                pipeline_ltx_video.ipynb|tools/media_services/ltx_api.py|worker_ltx_video.py)
+                  run_scope[ltx]=true ;;
+                pipeline_wan_video.ipynb|tools/run_wan_notebook_smoke.py)
+                  run_scope[wan]=true ;;
+                tools/media_services/common.py|tools/media_services/model_cache.py|tools/oec_service_manager.py|oec_gpu_admission.py|storage_manager.py|storage_policy.py|tools/prepare_media_models.py|tools/prepare_media_runtime.py)
+                  full=true ;;
+                .github/workflows/oec-demo-notebook-acceptance.yml|.github/workflows/oec-root-sync.yml|tests/*|docs/*|README*|TODO.md|result.md|*.md)
+                  : ;;
+                *)
+                  full=true ;;
+              esac
+            done <<< "$changed_paths"
+          fi
+
+          if [[ "$full" == true ]]; then
+            for scope_name in "${scopes[@]}"; do run_scope["$scope_name"]=true; done
+          fi
+          echo "ACCEPTANCE_SCOPE_FULL=$full"
+          for scope_name in "${scopes[@]}"; do
+            printf '%s=%s\n' "$scope_name" "${run_scope[$scope_name]}" >> "$GITHUB_OUTPUT"
+            printf 'RUN_SCOPE_%s=%s\n' "${scope_name^^}" "${run_scope[$scope_name]}"
+          done
+          printf 'CHANGED_PATHS_BEGIN\n%s\nCHANGED_PATHS_END\n' "${changed_paths:-workflow_dispatch/full-run}"
 
       - name: Validate assigned runner and load live StorageManager configuration
         id: preflight
@@ -119,7 +190,7 @@ jobs:
 
       - name: Execute safe control notebooks in their declared Conda environments
         id: safe_control_notebooks
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.controls == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -137,7 +208,7 @@ jobs:
 
       - name: Execute deployment diagnostics in the oec_deploy environment
         id: deployment_notebook
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.deployment == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -151,7 +222,7 @@ jobs:
 
       - name: Assess encrypted Hugging Face read-back notebook without credentials
         id: encrypted_hf_preflight
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.encrypted_hf == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -162,6 +233,7 @@ jobs:
             python tools/run_safe_notebook_smokes.py --notebooks pipeline_verify_encrypted_hf.ipynb 2>&1 | tee "$R/notebook-execution.log"
 
       - name: Execute AudioCraft notebook top-to-bottom and generate a WAV
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.audiocraft_notebook == 'true'
         id: audiogen_full_notebook
         continue-on-error: true
         run: |
@@ -175,6 +247,7 @@ jobs:
             python tools/run_audiogen_notebook_smoke.py 2>&1 | tee "$OEC_AUDIOGEN_SMOKE_DIR/notebook-execution.log"
 
       - name: Start the AudioGen server on an admitted idle A100
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.audiogen == 'true'
         id: audiogen_start
         continue-on-error: true
         run: |
@@ -188,7 +261,7 @@ jobs:
 
       - name: Wait for AudioGen model server readiness
         id: audiogen_health
-        if: always() && steps.audiogen_start.outcome == 'success'
+        if: always() && steps.audiogen_start.outcome == 'success' && steps.scope.outputs.audiogen == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -204,7 +277,7 @@ jobs:
 
       - name: Launch AudioGen Gradio UI and submit a real server inference
         id: audiogen_gradio
-        if: always() && steps.audiogen_health.outcome == 'success'
+        if: always() && steps.audiogen_health.outcome == 'success' && steps.scope.outputs.audiogen == 'true'
         continue-on-error: true
         env:
           OEC_MEDIA_API_URL: "http://127.0.0.1:7874"
@@ -218,7 +291,7 @@ jobs:
             python tools/run_gradio_model_notebook_smokes.py --provider audiogen --report-dir "$R" 2>&1 | tee "$R/gradio-callback.log"
 
       - name: Stop the managed AudioGen service
-        if: always()
+        if: always() && steps.scope.outputs.audiogen == 'true'
         run: |
           set +e
           mkdir -p "$OEC_ACCEPTANCE_ROOT/audiogen-gradio"
@@ -228,7 +301,7 @@ jobs:
 
       - name: Purge AudioGen cache after the service is stopped
         id: audiogen_purge
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.audiogen == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -238,7 +311,7 @@ jobs:
 
       - name: Test standalone MusicGen CLI mode and decode its WAV
         id: musicgen_cli
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.musicgen == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -258,7 +331,7 @@ jobs:
 
       - name: Start the MusicGen server on an admitted idle A100
         id: musicgen_start
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.musicgen == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -271,7 +344,7 @@ jobs:
 
       - name: Wait for MusicGen model server readiness
         id: musicgen_health
-        if: always() && steps.musicgen_start.outcome == 'success'
+        if: always() && steps.musicgen_start.outcome == 'success' && steps.scope.outputs.musicgen == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -287,7 +360,7 @@ jobs:
 
       - name: Launch MusicGen Gradio UI and generate real music
         id: musicgen_gradio
-        if: always() && steps.musicgen_health.outcome == 'success'
+        if: always() && steps.musicgen_health.outcome == 'success' && steps.scope.outputs.musicgen == 'true'
         continue-on-error: true
         env:
           OEC_MEDIA_API_URL: "http://127.0.0.1:7875"
@@ -300,7 +373,7 @@ jobs:
             python tools/run_gradio_model_notebook_smokes.py --provider musicgen --report-dir "$R" 2>&1 | tee "$R/gradio-callback.log"
 
       - name: Stop the managed MusicGen service
-        if: always()
+        if: always() && steps.scope.outputs.musicgen == 'true'
         run: |
           set +e
           R="$OEC_ACCEPTANCE_ROOT/musicgen-gradio"
@@ -311,7 +384,7 @@ jobs:
 
       - name: Purge MusicGen cache after the service is stopped
         id: musicgen_purge
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.musicgen == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -321,7 +394,7 @@ jobs:
 
       - name: Prepare speech checkpoints and isolated runtime
         id: speech_prepare
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.speech == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -335,7 +408,7 @@ jobs:
 
       - name: Run Kokoro, Whisper and Qwen3-ASR Gradio modes and purge each tested cache
         id: speech_gradio
-        if: always() && steps.speech_prepare.outcome == 'success'
+        if: always() && steps.speech_prepare.outcome == 'success' && steps.scope.outputs.speech == 'true'
         continue-on-error: true
         env:
           GRADIO_ANALYTICS_ENABLED: "False"
@@ -364,7 +437,7 @@ jobs:
 
       - name: Recover timed-out speech backends and purge their caches safely
         id: speech_purge_recovery
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.speech == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -378,7 +451,7 @@ jobs:
 
       - name: Prepare ACE-Step checkpoints and isolated runtime
         id: ace_prepare
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.ace_step == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -405,7 +478,7 @@ jobs:
 
       - name: Run ACE-Step isolated server and Gradio callback acceptance
         id: ace_gradio
-        if: always() && steps.ace_prepare.outcome == 'success'
+        if: always() && steps.ace_prepare.outcome == 'success' && steps.scope.outputs.ace_step == 'true'
         continue-on-error: true
         env:
           GRADIO_ANALYTICS_ENABLED: "False"
@@ -428,7 +501,7 @@ jobs:
 
       - name: Recover interrupted ACE-Step backend before cache cleanup
         id: ace_process_recovery
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.ace_step == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -439,7 +512,7 @@ jobs:
 
       - name: Assert ACE-Step model cache cleanup after inference
         id: ace_purge
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.ace_step == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -451,7 +524,7 @@ jobs:
 
       - name: Verify storage admission before TRELLIS cache/model startup
         id: trellis_prepare
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.trellis == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -461,7 +534,7 @@ jobs:
 
       - name: Start TRELLIS model server on an admitted idle A100
         id: trellis_start
-        if: always() && steps.trellis_prepare.outcome == 'success'
+        if: always() && steps.trellis_prepare.outcome == 'success' && steps.scope.outputs.trellis == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -472,7 +545,7 @@ jobs:
 
       - name: Wait for TRELLIS model server readiness
         id: trellis_health
-        if: always() && steps.trellis_start.outcome == 'success'
+        if: always() && steps.trellis_start.outcome == 'success' && steps.scope.outputs.trellis == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -488,7 +561,7 @@ jobs:
 
       - name: Exercise standalone TRELLIS notebook Gradio callback and validate GLB
         id: trellis_only_gradio
-        if: always() && steps.trellis_health.outcome == 'success'
+        if: always() && steps.trellis_health.outcome == 'success' && steps.scope.outputs.trellis == 'true'
         continue-on-error: true
         env:
           OEC_MEDIA_API_URL: "http://127.0.0.1:7868"
@@ -502,7 +575,7 @@ jobs:
 
       - name: Exercise combined TRELLIS/FLUX notebook TRELLIS callback and validate GLB
         id: trellis_combined_gradio
-        if: always() && steps.trellis_health.outcome == 'success'
+        if: always() && steps.trellis_health.outcome == 'success' && steps.scope.outputs.trellis == 'true'
         continue-on-error: true
         env:
           OEC_MEDIA_API_URL: "http://127.0.0.1:7868"
@@ -515,7 +588,7 @@ jobs:
           timeout --signal=INT --kill-after=30s 2400s "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/run_gradio_model_notebook_smokes.py --provider trellis-combined --report-dir "$R" 2>&1 | tee "$R/trellis-combined-gradio-callback.log"
 
       - name: Stop managed TRELLIS service and save diagnostics
-        if: always()
+        if: always() && steps.scope.outputs.trellis == 'true'
         run: |
           set +e
           R="$OEC_ACCEPTANCE_ROOT/trellis"
@@ -526,7 +599,7 @@ jobs:
 
       - name: Purge TRELLIS model cache after verified service shutdown
         id: trellis_purge
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.trellis == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -535,7 +608,7 @@ jobs:
 
       - name: Prepare FLUX cache through StorageManager admission
         id: flux_cache_prepare
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.flux == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -547,7 +620,7 @@ jobs:
 
       - name: Start the FLUX model server on an admitted idle A100
         id: flux_start
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.flux == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -560,7 +633,7 @@ jobs:
 
       - name: Wait for FLUX model server readiness
         id: flux_health
-        if: always() && steps.flux_start.outcome == 'success'
+        if: always() && steps.flux_start.outcome == 'success' && steps.scope.outputs.flux == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -576,7 +649,7 @@ jobs:
 
       - name: Launch FLUX Gradio UI and generate a real PNG through the model server
         id: flux_gradio
-        if: always() && steps.flux_health.outcome == 'success'
+        if: always() && steps.flux_health.outcome == 'success' && steps.scope.outputs.flux == 'true'
         continue-on-error: true
         env:
           OEC_MEDIA_API_URL: "http://127.0.0.1:7867"
@@ -591,7 +664,7 @@ jobs:
 
       - name: Launch combined notebook FLUX Gradio cell against the live server
         id: flux_combined_gradio
-        if: always() && steps.flux_health.outcome == 'success'
+        if: always() && steps.flux_health.outcome == 'success' && steps.scope.outputs.flux == 'true'
         continue-on-error: true
         env:
           OEC_FLUX_API_URL: "http://127.0.0.1:7867"
@@ -604,7 +677,7 @@ jobs:
           timeout --signal=INT --kill-after=30s 2400s "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/run_gradio_model_notebook_smokes.py --provider flux-combined --report-dir "$R" 2>&1 | tee "$R/flux-combined-gradio-callback.log"
 
       - name: Stop the managed FLUX service and record final storage status
-        if: always()
+        if: always() && steps.scope.outputs.flux == 'true'
         run: |
           set +e
           R="$OEC_ACCEPTANCE_ROOT/flux"
@@ -616,7 +689,7 @@ jobs:
 
       - name: Purge FLUX cache after the model service is stopped
         id: flux_purge
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.flux == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -625,7 +698,7 @@ jobs:
 
       - name: Start LTX model server for both video notebook modes
         id: ltx_start
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.ltx == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -638,7 +711,7 @@ jobs:
 
       - name: Wait for LTX model server readiness
         id: ltx_health
-        if: always() && steps.ltx_start.outcome == 'success'
+        if: always() && steps.ltx_start.outcome == 'success' && steps.scope.outputs.ltx == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -654,7 +727,7 @@ jobs:
 
       - name: Generate and decode LTX text-to-video MP4 through Gradio HTTP
         id: ltx_text_video
-        if: always() && steps.ltx_health.outcome == 'success'
+        if: always() && steps.ltx_health.outcome == 'success' && steps.scope.outputs.ltx == 'true'
         continue-on-error: true
         env:
           OEC_MEDIA_API_URL: "http://127.0.0.1:7869"
@@ -669,7 +742,7 @@ jobs:
 
       - name: Generate and decode LTX image-to-video MP4 through Gradio HTTP
         id: ltx_image_video
-        if: always() && steps.ltx_health.outcome == 'success'
+        if: always() && steps.ltx_health.outcome == 'success' && steps.scope.outputs.ltx == 'true'
         continue-on-error: true
         env:
           OEC_MEDIA_API_URL: "http://127.0.0.1:7869"
@@ -684,7 +757,7 @@ jobs:
 
       - name: Stop LTX service and purge model plus Gemma caches
         id: ltx_purge
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.ltx == 'true'
         continue-on-error: true
         run: |
           set +e
@@ -699,7 +772,7 @@ jobs:
 
       - name: Execute all Wan notebook cells and decode generated video
         id: wan_notebook
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.wan == 'true'
         continue-on-error: true
         env:
           OEC_WAN_ALLOW_DOWNLOAD: "1"
@@ -717,7 +790,7 @@ jobs:
 
       - name: Purge Wan weights only after notebook process has exited
         id: wan_purge
-        if: always() && steps.preflight.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.wan == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -747,6 +820,18 @@ jobs:
       - name: Require every model acceptance stage to pass
         if: always()
         env:
+          RUN_SCOPE_CONTROLS: ${{ steps.scope.outputs.controls }}
+          RUN_SCOPE_DEPLOYMENT: ${{ steps.scope.outputs.deployment }}
+          RUN_SCOPE_ENCRYPTED_HF: ${{ steps.scope.outputs.encrypted_hf }}
+          RUN_SCOPE_AUDIOCRAFT_NOTEBOOK: ${{ steps.scope.outputs.audiocraft_notebook }}
+          RUN_SCOPE_AUDIOGEN: ${{ steps.scope.outputs.audiogen }}
+          RUN_SCOPE_MUSICGEN: ${{ steps.scope.outputs.musicgen }}
+          RUN_SCOPE_SPEECH: ${{ steps.scope.outputs.speech }}
+          RUN_SCOPE_ACE_STEP: ${{ steps.scope.outputs.ace_step }}
+          RUN_SCOPE_TRELLIS: ${{ steps.scope.outputs.trellis }}
+          RUN_SCOPE_FLUX: ${{ steps.scope.outputs.flux }}
+          RUN_SCOPE_LTX: ${{ steps.scope.outputs.ltx }}
+          RUN_SCOPE_WAN: ${{ steps.scope.outputs.wan }}
           CONTRACTS_OUTCOME: ${{ steps.contracts.outcome }}
           SAFE_CONTROL_NOTEBOOKS_OUTCOME: ${{ steps.safe_control_notebooks.outcome }}
           DEPLOYMENT_NOTEBOOK_OUTCOME: ${{ steps.deployment_notebook.outcome }}
@@ -829,6 +914,64 @@ jobs:
           printf 'LTX_PURGE_OUTCOME=%s\n' "$LTX_PURGE_OUTCOME"
           printf 'WAN_NOTEBOOK_OUTCOME=%s\n' "$WAN_NOTEBOOK_OUTCOME"
           printf 'WAN_PURGE_OUTCOME=%s\n' "$WAN_PURGE_OUTCOME"
-          for outcome in "$CONTRACTS_OUTCOME" "$SAFE_CONTROL_NOTEBOOKS_OUTCOME" "$DEPLOYMENT_NOTEBOOK_OUTCOME" "$AUDIOGEN_NOTEBOOK_OUTCOME" "$AUDIOGEN_START_OUTCOME" "$AUDIOGEN_HEALTH_OUTCOME" "$AUDIOGEN_GRADIO_OUTCOME" "$AUDIOGEN_PURGE_OUTCOME" "$MUSICGEN_START_OUTCOME" "$MUSICGEN_HEALTH_OUTCOME" "$MUSICGEN_GRADIO_OUTCOME" "$MUSICGEN_PURGE_OUTCOME" "$ACE_PREPARE_OUTCOME" "$ACE_GRADIO_OUTCOME" "$ACE_PURGE_OUTCOME" "$TRELLIS_PREPARE_OUTCOME" "$TRELLIS_START_OUTCOME" "$TRELLIS_HEALTH_OUTCOME" "$TRELLIS_ONLY_GRADIO_OUTCOME" "$TRELLIS_COMBINED_GRADIO_OUTCOME" "$TRELLIS_PURGE_OUTCOME" "$FLUX_CACHE_OUTCOME" "$FLUX_START_OUTCOME" "$FLUX_HEALTH_OUTCOME" "$FLUX_GRADIO_OUTCOME" "$FLUX_COMBINED_GRADIO_OUTCOME" "$FLUX_PURGE_OUTCOME" "$MUSICGEN_CLI_OUTCOME" "$SPEECH_PREPARE_OUTCOME" "$SPEECH_GRADIO_OUTCOME" "$SPEECH_PURGE_RECOVERY_OUTCOME" "$ACE_PROCESS_RECOVERY_OUTCOME" "$LTX_START_OUTCOME" "$LTX_HEALTH_OUTCOME" "$LTX_TEXT_VIDEO_OUTCOME" "$LTX_IMAGE_VIDEO_OUTCOME" "$LTX_PURGE_OUTCOME" "$WAN_NOTEBOOK_OUTCOME" "$WAN_PURGE_OUTCOME"; do
+          require_success() {
+            local name="$1"
+            local outcome="$2"
+            printf '%s=%s\n' "$name" "$outcome"
             test "$outcome" = "success"
-          done
+          }
+          require_success CONTRACTS_OUTCOME "$CONTRACTS_OUTCOME"
+          if [[ "$RUN_SCOPE_CONTROLS" == "true" ]]; then require_success SAFE_CONTROL_NOTEBOOKS_OUTCOME "$SAFE_CONTROL_NOTEBOOKS_OUTCOME"; fi
+          if [[ "$RUN_SCOPE_DEPLOYMENT" == "true" ]]; then require_success DEPLOYMENT_NOTEBOOK_OUTCOME "$DEPLOYMENT_NOTEBOOK_OUTCOME"; fi
+          if [[ "$RUN_SCOPE_AUDIOCRAFT_NOTEBOOK" == "true" ]]; then require_success AUDIOGEN_NOTEBOOK_OUTCOME "$AUDIOGEN_NOTEBOOK_OUTCOME"; fi
+          if [[ "$RUN_SCOPE_AUDIOGEN" == "true" ]]; then
+            require_success AUDIOGEN_START_OUTCOME "$AUDIOGEN_START_OUTCOME"
+            require_success AUDIOGEN_HEALTH_OUTCOME "$AUDIOGEN_HEALTH_OUTCOME"
+            require_success AUDIOGEN_GRADIO_OUTCOME "$AUDIOGEN_GRADIO_OUTCOME"
+            require_success AUDIOGEN_PURGE_OUTCOME "$AUDIOGEN_PURGE_OUTCOME"
+          fi
+          if [[ "$RUN_SCOPE_MUSICGEN" == "true" ]]; then
+            require_success MUSICGEN_CLI_OUTCOME "$MUSICGEN_CLI_OUTCOME"
+            require_success MUSICGEN_START_OUTCOME "$MUSICGEN_START_OUTCOME"
+            require_success MUSICGEN_HEALTH_OUTCOME "$MUSICGEN_HEALTH_OUTCOME"
+            require_success MUSICGEN_GRADIO_OUTCOME "$MUSICGEN_GRADIO_OUTCOME"
+            require_success MUSICGEN_PURGE_OUTCOME "$MUSICGEN_PURGE_OUTCOME"
+          fi
+          if [[ "$RUN_SCOPE_SPEECH" == "true" ]]; then
+            require_success SPEECH_PREPARE_OUTCOME "$SPEECH_PREPARE_OUTCOME"
+            require_success SPEECH_GRADIO_OUTCOME "$SPEECH_GRADIO_OUTCOME"
+            require_success SPEECH_PURGE_RECOVERY_OUTCOME "$SPEECH_PURGE_RECOVERY_OUTCOME"
+          fi
+          if [[ "$RUN_SCOPE_ACE_STEP" == "true" ]]; then
+            require_success ACE_PREPARE_OUTCOME "$ACE_PREPARE_OUTCOME"
+            require_success ACE_GRADIO_OUTCOME "$ACE_GRADIO_OUTCOME"
+            require_success ACE_PROCESS_RECOVERY_OUTCOME "$ACE_PROCESS_RECOVERY_OUTCOME"
+            require_success ACE_PURGE_OUTCOME "$ACE_PURGE_OUTCOME"
+          fi
+          if [[ "$RUN_SCOPE_TRELLIS" == "true" ]]; then
+            require_success TRELLIS_PREPARE_OUTCOME "$TRELLIS_PREPARE_OUTCOME"
+            require_success TRELLIS_START_OUTCOME "$TRELLIS_START_OUTCOME"
+            require_success TRELLIS_HEALTH_OUTCOME "$TRELLIS_HEALTH_OUTCOME"
+            require_success TRELLIS_ONLY_GRADIO_OUTCOME "$TRELLIS_ONLY_GRADIO_OUTCOME"
+            require_success TRELLIS_COMBINED_GRADIO_OUTCOME "$TRELLIS_COMBINED_GRADIO_OUTCOME"
+            require_success TRELLIS_PURGE_OUTCOME "$TRELLIS_PURGE_OUTCOME"
+          fi
+          if [[ "$RUN_SCOPE_FLUX" == "true" ]]; then
+            require_success FLUX_CACHE_OUTCOME "$FLUX_CACHE_OUTCOME"
+            require_success FLUX_START_OUTCOME "$FLUX_START_OUTCOME"
+            require_success FLUX_HEALTH_OUTCOME "$FLUX_HEALTH_OUTCOME"
+            require_success FLUX_GRADIO_OUTCOME "$FLUX_GRADIO_OUTCOME"
+            require_success FLUX_COMBINED_GRADIO_OUTCOME "$FLUX_COMBINED_GRADIO_OUTCOME"
+            require_success FLUX_PURGE_OUTCOME "$FLUX_PURGE_OUTCOME"
+          fi
+          if [[ "$RUN_SCOPE_LTX" == "true" ]]; then
+            require_success LTX_START_OUTCOME "$LTX_START_OUTCOME"
+            require_success LTX_HEALTH_OUTCOME "$LTX_HEALTH_OUTCOME"
+            require_success LTX_TEXT_VIDEO_OUTCOME "$LTX_TEXT_VIDEO_OUTCOME"
+            require_success LTX_IMAGE_VIDEO_OUTCOME "$LTX_IMAGE_VIDEO_OUTCOME"
+            require_success LTX_PURGE_OUTCOME "$LTX_PURGE_OUTCOME"
+          fi
+          if [[ "$RUN_SCOPE_WAN" == "true" ]]; then
+            require_success WAN_NOTEBOOK_OUTCOME "$WAN_NOTEBOOK_OUTCOME"
+            require_success WAN_PURGE_OUTCOME "$WAN_PURGE_OUTCOME"
+          fi
