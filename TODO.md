@@ -1,39 +1,29 @@
 ## Current media-model acceptance status — 2026-10-27
 
-Candidate branch: `fix/media-stack-supervision-20261019`; latest tested commit before this diagnostic fix: `fd14a8ae831c94edb96711c8e0ea8b4783fb18a3`.
+Candidate branch: `fix/media-stack-supervision-20261019`; most recent guard-tested commit: `7777345250580603195a7d4853f3785012af0076`.
 
 ### Verified outcomes
-- [x] **Real FLUX → TRELLIS asset path produced a PNG and a validated/reopened GLB** in [self-hosted run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341). That workflow did not pass overall: TRELLIS cache cleanup was blocked by a live/unknown runtime lock.
-- [x] **AudioCraft/MusicGen CLI generated a valid WAV** in [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443). This is partial evidence only; it is not a current-head full acceptance.
-- [x] Notebook structural audit and most static contract suites passed on the latest runs; the most recent guard exposed a single missing `subprocess` import in a cleanup test, now being corrected.
-- [x] **Host/lock-owner mismatch confirmed:** acceptance run [40539715094](https://github.com/xflexwork/OEC/actions/runs/40539715094) executed as `RUNNER=oec-1, HOST=scn28-mn`; the legacy StorageManager recovery guard is restricted to `oec-1/scn30-mn` and refused recovery.
+- [x] **Real FLUX → TRELLIS generation produced a PNG and a validated/reopened GLB** in [self-hosted run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341). Overall acceptance did not pass because a runtime cache lock prevented cleanup.
+- [x] **AudioCraft/MusicGen CLI produced a valid WAV** in [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443). This remains partial evidence, not a full current-head acceptance.
+- [x] **Static/storage guard passed** on the self-hosted runner in [run 40540348947](https://github.com/xflexwork/OEC/actions/runs/40540348947) after correcting the cleanup-test import and aligning its assertions with the bounded-lock cleanup workflow.
+- [x] **Host/lock-owner mismatch confirmed:** acceptance run [40539715094](https://github.com/xflexwork/OEC/actions/runs/40539715094) executed as `RUNNER=oec-1, HOST=scn28-mn`; the legacy StorageManager recovery guard is intentionally restricted to `oec-1/scn30-mn` and refused recovery.
 
 ### Open acceptance items
-- [ ] **Correct A100 host/runner mapping:** determine whether a registered local runner targets `scn30-mn`. Do not relax the lock recovery host/PID/lease safeguards to make `scn28-mn` appear eligible.
-- [ ] **Exact-head full Gradio acceptance:** the latest acceptance stopped in preflight with `OEC_DEAD_LOCK_RECOVERY=BLOCKED`; consequently the model generation callbacks were not run and must not be counted as passes.
-- [ ] Recover only same-host, exact-command service-owner markers; recover legacy StorageManager locks only after proving the local PID is dead, lock is aged, and no unresolved lease manifest exists.
-- [ ] **FLUX cache integrity:** validate real transformer, text encoder and VAE weights before accepting a discovered snapshot as a cache hit; download missing data only after StorageManager quota admission.
-- [ ] **Wan:** Python/Torch import previously failed because the HPC SDK `libgomp.so.1` lacked `__pgi_nvomp_async_val_to_queue_num`; test with the HPC library path removed only in the smoke process.
-- [ ] **LTX:** still needs both text-to-video and image-to-video Gradio HTTP callbacks to produce valid decoded MP4s.
-- [ ] **Canonical sync:** remains blocked by the approved-origin guard; do not weaken the canonical repository identity check.
+- [ ] **Find the registered local runner actually attached to `scn30-mn`:** the next self-hosted preflight runs the read-only `tools/runner_control.py list` and stores its host/runner metadata in the acceptance artifact. Do not relax host/PID/lease safeguards to make `scn28-mn` eligible.
+- [ ] **Exact-head full Gradio acceptance:** the last full acceptance run failed in preflight; corresponding Gradio callbacks did not execute and must not be counted as passes.
+- [ ] Recover only same-host, exact-command OEC service-owner markers; recover StorageManager pause locks only after proving the local PID is dead, lock age is sufficient, no unresolved lease manifest exists, and reserve size is unchanged.
+- [ ] **FLUX cache integrity:** validate real transformer, text encoder and VAE weights before accepting a snapshot as a cache hit; download missing data only after live StorageManager admission.
+- [ ] **Wan:** prior Torch import failed because the HPC SDK `libgomp.so.1` lacked `__pgi_nvomp_async_val_to_queue_num`; isolate only the smoke process from the injected library path.
+- [ ] **LTX:** still needs both text-to-video and image-to-video Gradio callbacks to produce valid decoded MP4s.
+- [ ] **Canonical root sync:** remains blocked by the approved-origin safeguard; do not weaken canonical repository identity checks.
 
 ### Execution policy
-- Run model inference, FLUX→TRELLIS, and storage regressions on the self-hosted A100. The short independent deadline watchdog remains on `ubuntu-latest` so it can cancel stale runs when the GPU runner is occupied.
-- Use existing Conda environments only; no shared-environment package installation/update. Purge model-owned caches only after verified service shutdown and an unlocked model-runtime lock.
-- **Overall status: not yet accepted.** The next run must show the correct lock-owning runner, successful Gradio submissions, validated assets, clean shutdown, and cache cleanup.
+- Prioritize the self-hosted A100 runner for model inference, FLUX→TRELLIS and storage regression tests. Keep only the short independent deadline watchdog on `ubuntu-latest` so it can cancel stale jobs while the A100 is occupied.
+- Use existing Conda environments only; no shared-environment package installs/updates. Purge model-owned caches only after verified process shutdown and an unlocked model runtime lock.
+- **Overall status: not yet accepted.** The next step is to inspect local runner host metadata and map inference to the lock owner; do not claim any skipped Gradio callback as a pass.
 
 ---
 
-
-- [ ] **LTX text-to-video and image-to-video:** complete the explicit guarded-download/load path, then verify both decoded MP4 outputs through Gradio.
-- [ ] **Canonical root sync:** still blocked by the approved-origin safeguard. Do not weaken canonical repository identity checks.
-
-### Execution policy
-- Run model inference, FLUX→TRELLIS, and storage regressions on self-hosted A100 `oec-1`, matching the shared model-storage lock owner. Keep only the brief independent deadline watchdog on `ubuntu-latest` so it can stop stale jobs while the GPU runner is occupied.
-- Use existing Conda environments only; no shared-environment package install/update. Purge an exact model cache only after its service has stopped and runtime lock is unlocked.
-- **Overall status: not yet accepted.** The next exact-head run must pass storage recovery, real Gradio submissions, asset validation, process shutdown, and cache cleanup.
-
----
 
 
 ---

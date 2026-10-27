@@ -192,6 +192,13 @@ jobs:
           printf 'STORAGE_CONFIG_SOURCE=%s\n' "$STORAGE_CONFIG" | tee -a "$OEC_ACCEPTANCE_ROOT/runner.txt"
           echo "CONDA_EXE=$CONDA_EXE" >> "$GITHUB_ENV"
           echo "OEC_ACCEPTANCE_ROOT=$OEC_ACCEPTANCE_ROOT" >> "$GITHUB_ENV"
+          echo "LOCAL_RUNNER_INVENTORY_BEGIN" | tee "$OEC_ACCEPTANCE_ROOT/local-runner-inventory.log"
+          set +e
+          timeout --signal=INT --kill-after=5s 45s "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/runner_control.py list 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/local-runner-inventory.log"
+          runner_list_rc=${PIPESTATUS[0]}
+          set -e
+          echo "LOCAL_RUNNER_INVENTORY_RC=$runner_list_rc" | tee -a "$OEC_ACCEPTANCE_ROOT/local-runner-inventory.log"
+          echo "LOCAL_RUNNER_INVENTORY_END" | tee -a "$OEC_ACCEPTANCE_ROOT/local-runner-inventory.log"
           echo "STORAGE_PAUSE_LOCK_DIAGNOSTICS_BEGIN" | tee "$OEC_ACCEPTANCE_ROOT/storage-lock-diagnostics.log"
           for area in models outputs; do
             lock_dir="$("$CONDA_EXE" run --no-capture-output -n phase2_3d python -c 'import sys; from core_config import SYSTEM_DIRS; print(SYSTEM_DIRS[sys.argv[1]])' "$area" | tail -n 1)"
