@@ -117,6 +117,16 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn("handle_file(str(reference_file))", model3d)
         self.assertNotIn("if audio_file is None", model3d)
 
+    def test_live_acceptance_health_and_recovery_helpers_are_scoped(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
+        recovery = (ROOT / "tools" / "recover_failed_musicgen_acceptance_service.py").read_text(encoding="utf-8")
+        waiter = (ROOT / "tools" / "wait_for_media_service.py").read_text(encoding="utf-8")
+        self.assertIn("recover_failed_musicgen_acceptance_service.py", workflow)
+        self.assertIn("KNOWN_FAILURE = \"pipeline_musicgen' has no attribute '_check_versions'\"", recovery)
+        self.assertIn('manager.stop_service(SERVICE, grace_seconds=25.0)', recovery)
+        self.assertIn('if health.get("error") and not health.get("loading")', waiter)
+        self.assertIn('tools/wait_for_media_service.py --url http://127.0.0.1:7869/health', workflow)
+
     def test_wan_diffusers_xpu_shim_exposes_empty_cache(self):
         notebook = json.loads((ROOT / "pipeline_wan_video.ipynb").read_text(encoding="utf-8"))
         source = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])

@@ -46,7 +46,6 @@ on:
       - "tests/test_audiocraft_notebook_static.py"
       - "tests/test_gradio_model_notebooks.py"
       - "tests/test_media_service_readiness.py"
-      - "tests/test_media_service_readiness.py"
       - "tests/test_audio_service_validation.py"
       - "tests/test_flux_image_pipeline.py"
       - "tests/test_oec_service_manager_media.py"
