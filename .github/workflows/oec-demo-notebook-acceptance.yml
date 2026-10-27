@@ -26,6 +26,7 @@ on:
       - "pipeline_flux_image.py"
       - "tools/run_audiogen_notebook_smoke.py"
       - "tools/run_gradio_model_notebook_smokes.py"
+      - "tools/wait_for_media_service.py"
       - "tools/run_media_model_smokes.py"
       - "tools/audit_notebook_suite.py"
       - "tools/run_wan_notebook_smoke.py"
@@ -43,6 +44,7 @@ on:
       - "tools/oec_service_manager.py"
       - "tests/test_audiocraft_notebook_static.py"
       - "tests/test_gradio_model_notebooks.py"
+      - "tests/test_media_service_readiness.py"
       - "tests/test_audio_service_validation.py"
       - "tests/test_flux_image_pipeline.py"
       - "tests/test_oec_service_manager_media.py"
@@ -123,7 +125,7 @@ jobs:
                   run_scope[flux]=true ;;
                 tools/run_gradio_model_notebook_smokes.py)
                   run_scope[trellis]=true; run_scope[flux]=true ;;
-                pipeline_ltx_video.ipynb|tools/media_services/ltx_api.py|worker_ltx_video.py)
+                pipeline_ltx_video.ipynb|tools/media_services/ltx_api.py|worker_ltx_video.py|tools/wait_for_media_service.py|tests/test_media_service_readiness.py)
                   run_scope[ltx]=true ;;
                 pipeline_wan_video.ipynb|tools/run_wan_notebook_smoke.py)
                   run_scope[wan]=true ;;
@@ -720,14 +722,9 @@ jobs:
         run: |
           set -euo pipefail
           R="$OEC_ACCEPTANCE_ROOT/ltx"
-          HEALTH_CODE='import json, urllib.request; opener=urllib.request.build_opener(urllib.request.ProxyHandler({})); health=json.load(opener.open("http://127.0.0.1:7869/health", timeout=4)); assert not health.get("error") or health.get("loading", False), "fatal model load error: " + str(health.get("error")); assert health.get("ready") and health.get("model_loaded"), health; print(json.dumps(health))'
-          ready=0
-          for _ in $(seq 1 360); do
-            if "$HOME/Conda/envs/phase2_3d/bin/python" -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
-            sleep 5
-          done
-          cat "$R/health-check.log"
-          test "$ready" -eq 1
+          timeout --signal=INT --kill-after=10s 1810s "$CONDA_EXE" run --no-capture-output -n phase2_3d \
+            python tools/wait_for_media_service.py --url http://127.0.0.1:7869/health \
+            --timeout-seconds 1800 --interval-seconds 5 2>&1 | tee "$R/health-check.log"
 
       - name: Generate and decode LTX text-to-video MP4 through Gradio HTTP
         id: ltx_text_video

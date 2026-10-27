@@ -26,6 +26,23 @@ class ReadinessContractTests(unittest.TestCase):
     def cache_ready(name, spec, paths):
         return {"checkpoint_presence": "PRESENT", "some_real_weights_detected": True}
 
+    def test_wait_helper_classifies_ready_loading_and_fatal_503_bodies(self):
+        from tools.wait_for_media_service import classify_health
+
+        self.assertEqual(
+            classify_health(200, {"ready": True, "model_loaded": True, "loading": False, "error": None}),
+            "READY",
+        )
+        self.assertEqual(
+            classify_health(503, {"ready": False, "model_loaded": False, "loading": True, "error": None}),
+            "WAITING",
+        )
+        self.assertEqual(
+            classify_health(503, {"ready": False, "model_loaded": False, "loading": False,
+                                   "error": "RuntimeError: missing model config"}),
+            "FATAL",
+        )
+
     def test_api_requires_http_200_ready_and_model_loaded(self):
         row = readiness.assess_service("ltx", paths=self.paths,
             probe=lambda port: {"reachable": True, "http_status": 200, "ready": True, "model_loaded": True},
