@@ -27,6 +27,7 @@ on:
       - "tools/run_audiogen_notebook_smoke.py"
       - "tools/run_gradio_model_notebook_smokes.py"
       - "tools/wait_for_media_service.py"
+      - "tools/recover_failed_musicgen_acceptance_service.py"
       - "tools/run_media_model_smokes.py"
       - "tools/audit_notebook_suite.py"
       - "tools/run_wan_notebook_smoke.py"
@@ -44,6 +45,7 @@ on:
       - "tools/oec_service_manager.py"
       - "tests/test_audiocraft_notebook_static.py"
       - "tests/test_gradio_model_notebooks.py"
+      - "tests/test_media_service_readiness.py"
       - "tests/test_media_service_readiness.py"
       - "tests/test_audio_service_validation.py"
       - "tests/test_flux_image_pipeline.py"
@@ -103,7 +105,7 @@ jobs:
                   run_scope[audiocraft_notebook]=true; run_scope[audiogen]=true ;;
                 pipeline_audiogen.py|pipeline_audiogen_gradio.ipynb|tools/run_audiogen_notebook_smoke.py)
                   run_scope[audiogen]=true ;;
-                pipeline_musicgen.py|pipeline_musicgen_gradio.ipynb|tools/media_services/audiocraft_api.py)
+                pipeline_musicgen.py|pipeline_musicgen_gradio.ipynb|tools/media_services/audiocraft_api.py|tools/recover_failed_musicgen_acceptance_service.py)
                   run_scope[musicgen]=true ;;
                 Untitled.ipynb|pipeline_demo_acceptance.ipynb|phase1_test_compute_node.ipynb|phase1_test_login_node.ipynb)
                   run_scope[controls]=true ;;
@@ -125,8 +127,10 @@ jobs:
                   run_scope[flux]=true ;;
                 tools/run_gradio_model_notebook_smokes.py)
                   run_scope[trellis]=true; run_scope[flux]=true ;;
-                pipeline_ltx_video.ipynb|tools/media_services/ltx_api.py|worker_ltx_video.py|tools/wait_for_media_service.py|tests/test_media_service_readiness.py)
+                pipeline_ltx_video.ipynb|tools/media_services/ltx_api.py|worker_ltx_video.py|tools/wait_for_media_service.py)
                   run_scope[ltx]=true ;;
+                tests/test_media_service_readiness.py)
+                  run_scope[musicgen]=true; run_scope[ltx]=true ;;
                 pipeline_wan_video.ipynb|tools/run_wan_notebook_smoke.py)
                   run_scope[wan]=true ;;
                 tools/media_services/common.py|tools/media_services/model_cache.py|tools/oec_service_manager.py|oec_gpu_admission.py|storage_manager.py|storage_policy.py|tools/prepare_media_models.py|tools/prepare_media_runtime.py)
@@ -181,10 +185,12 @@ jobs:
             tools/media_services/flux_api.py tools/media_services/trellis_api.py tools/media_services/ltx_api.py \
             tools/media_services/model_cache.py tools/prepare_flux_cache.py tools/cleanup_test_model_caches.py tools/run_safe_notebook_smokes.py tools/audit_notebook_suite.py \
             tools/run_wan_notebook_smoke.py tools/run_gradio_model_notebook_smokes.py tools/run_media_model_smokes.py \
+            tools/wait_for_media_service.py tools/recover_failed_musicgen_acceptance_service.py \
             tests/test_gradio_model_notebooks.py tests/test_audio_service_validation.py tests/test_flux_image_pipeline.py \
             tests/test_oec_service_manager_media.py tests/test_media_smoke_process_cleanup.py tests/test_prepare_flux_cache.py \
             tests/test_storage_write_admission.py tests/test_trellis_notebook_static.py
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_gradio_model_notebooks.py' -v
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_media_service_readiness.py' -v
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_audio_service_validation.py' -v
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_flux_image_pipeline.py' -v
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m unittest discover -s tests -p 'test_oec_service_manager_media.py' -v
@@ -315,9 +321,18 @@ jobs:
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/cleanup_test_model_caches.py --models audiogen-medium --report-json "$R/cache-cleanup.json" 2>&1 | tee "$R/cache-cleanup.log"
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/model_cache_manager.py status 2>&1 | tee -a "$OEC_ACCEPTANCE_ROOT/audiogen-gradio/cache-cleanup.log"
 
+      - name: Recover a known-failed MusicGen service left by a cancelled acceptance run
+        id: musicgen_recovery
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.musicgen == 'true'
+        run: |
+          set -euo pipefail
+          R="$OEC_ACCEPTANCE_ROOT/musicgen-gradio"
+          mkdir -p "$R"
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python tools/recover_failed_musicgen_acceptance_service.py 2>&1 | tee "$R/service-recovery.log"
+
       - name: Test standalone MusicGen CLI mode and decode its WAV
         id: musicgen_cli
-        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.musicgen == 'true'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.musicgen == 'true' && steps.musicgen_recovery.outcome == 'success'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -337,7 +352,7 @@ jobs:
 
       - name: Start the MusicGen server on an admitted idle A100
         id: musicgen_start
-        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.musicgen == 'true'
+        if: always() && steps.preflight.outcome == 'success' && steps.scope.outputs.musicgen == 'true' && steps.musicgen_recovery.outcome == 'success'
         continue-on-error: true
         run: |
           set -euo pipefail

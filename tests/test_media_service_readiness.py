@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 from tools import check_media_service_readiness as readiness
+from tools import recover_failed_musicgen_acceptance_service as musicgen_recovery
 
 
 class ReadinessContractTests(unittest.TestCase):
@@ -25,6 +26,59 @@ class ReadinessContractTests(unittest.TestCase):
     @staticmethod
     def cache_ready(name, spec, paths):
         return {"checkpoint_presence": "PRESENT", "some_real_weights_detected": True}
+
+    def test_wait_helper_classifies_ready_loading_and_fatal_503_bodies(self):
+        from tools.wait_for_media_service import classify_health
+
+        self.assertEqual(
+            classify_health(200, {"ready": True, "model_loaded": True, "loading": False, "error": None}),
+            "READY",
+        )
+        self.assertEqual(
+            classify_health(503, {"ready": False, "model_loaded": False, "loading": True, "error": None}),
+            "WAITING",
+        )
+        self.assertEqual(
+            classify_health(503, {"ready": False, "model_loaded": False, "loading": False,
+                                   "error": "RuntimeError: missing model config"}),
+            "FATAL",
+        )
+
+    @staticmethod
+    def _managed_musicgen_state():
+        return {
+            "instance_id": "audiocraft-api",
+            "host": musicgen_recovery.manager.HOST,
+            "provider": "musicgen",
+            "port": 7875,
+            "script_path": str((musicgen_recovery.manager.REPO_ROOT / "tools" / "media_services" / "audiocraft_api.py").resolve()),
+        }
+
+    def test_musicgen_recovery_stops_only_the_exact_known_fatal_loader_bug(self):
+        state = self._managed_musicgen_state()
+        fatal = {"reachable": True, "http_status": 503, "ready": False, "model_loaded": False,
+                 "loading": False, "error": "AttributeError: module 'pipeline_musicgen' has no attribute '_check_versions'"}
+        with mock.patch.object(musicgen_recovery.manager, "_read_state", return_value=state), \
+             mock.patch.object(musicgen_recovery.manager, "_state_path", return_value=Path(self.temp.name) / "service.json"), \
+             mock.patch.object(musicgen_recovery.manager, "_is_running", side_effect=[True, False]), \
+             mock.patch.object(musicgen_recovery.manager, "_probe_loopback_health", side_effect=[fatal, {"reachable": False}]), \
+             mock.patch.object(musicgen_recovery.manager, "stop_service") as stop:
+            result = musicgen_recovery.recover_known_stale_musicgen_service()
+        self.assertEqual(result, "MUSICGEN_RECOVERY=STOPPED_KNOWN_FAILED_SERVICE")
+        stop.assert_called_once_with("audiocraft-api", grace_seconds=25.0)
+
+    def test_musicgen_recovery_refuses_unknown_or_ready_service(self):
+        state = self._managed_musicgen_state()
+        healthy = {"reachable": True, "http_status": 200, "ready": True, "model_loaded": True,
+                   "loading": False, "error": None}
+        with mock.patch.object(musicgen_recovery.manager, "_read_state", return_value=state), \
+             mock.patch.object(musicgen_recovery.manager, "_state_path", return_value=Path(self.temp.name) / "service.json"), \
+             mock.patch.object(musicgen_recovery.manager, "_is_running", return_value=True), \
+             mock.patch.object(musicgen_recovery.manager, "_probe_loopback_health", return_value=healthy), \
+             mock.patch.object(musicgen_recovery.manager, "stop_service") as stop:
+            with self.assertRaisesRegex(RuntimeError, "Refusing recovery"):
+                musicgen_recovery.recover_known_stale_musicgen_service()
+        stop.assert_not_called()
 
     def test_wait_helper_classifies_ready_loading_and_fatal_503_bodies(self):
         from tools.wait_for_media_service import classify_health
