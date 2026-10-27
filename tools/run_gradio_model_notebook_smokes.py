@@ -151,10 +151,10 @@ def invoke_via_gradio_client(provider: str, ui_url: str, audio_file: Path | None
 
     client = Client(ui_url, verbose=True)
     if provider in MODEL3D_PROVIDERS:
-        if audio_file is None or not audio_file.is_file():
+        if reference_file is None or not reference_file.is_file():
             raise ValueError(f"{provider} requires the synthetic reference image created by the smoke harness")
         return client.predict(
-            handle_file(str(audio_file)),
+            handle_file(str(reference_file)),
             "OEC synthetic reference image: generate a clean, watertight 3D asset",
             512, 512, 100000, False,
             fn_index=0

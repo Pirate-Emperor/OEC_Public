@@ -108,6 +108,15 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn("from gradio_client import Client, handle_file", source)
         self.assertIn("handle_file(str(audio_file))", source)
 
+    def test_trellis_smoke_uses_generated_reference_image(self):
+        source = (ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
+        model3d = source.split("    if provider in MODEL3D_PROVIDERS:", 1)[1].split(
+            '    if provider == "ltx-text-video":', 1
+        )[0]
+        self.assertIn("reference_file is None or not reference_file.is_file()", model3d)
+        self.assertIn("handle_file(str(reference_file))", model3d)
+        self.assertNotIn("if audio_file is None", model3d)
+
     def test_service_ui_does_not_import_provider_ml_packages(self):
         for name in ("pipeline_acestep_gradio.ipynb","pipeline_kokoro_gradio.ipynb",
                      "pipeline_whisper_gradio.ipynb","pipeline_qwen3_asr_gradio.ipynb",
