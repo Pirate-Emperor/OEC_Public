@@ -1,22 +1,21 @@
-## Current media-model acceptance status — 2026-10-27 22:42 IST
+## Current media-model acceptance status — 2026-10-27 22:55 IST
 
-Branch: `fix/media-stack-supervision-20261019`; inspected head before this follow-up: `9929a739ac84112743c531be1a8ac1b78481d11a`.
+Branch: `fix/media-stack-supervision-20261019`; exact tested candidate: `56999e9a21394766e8f2845ce5709e0184648f16`.
 
 ### Verified evidence
-- [x] Static/storage guard last passed on parent head `7a4cf8cf`: [run 40541720533](https://github.com/xflexwork/OEC/actions/runs/40541720533). The newest runner-inventory regression is awaiting its guard run.
-- [x] Earlier FLUX → TRELLIS generation produced a PNG and valid/reopened GLB: [run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341). Its TRELLIS cache cleanup remained blocked by a runtime lock.
-- [x] Earlier MusicGen CLI produced and decoded a valid WAV: [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443).
-- [x] Latest local inventory found active `oec_1` and `oec_2` agents on `scn28-mn`; saved registration URLs pointed to `Killer4K-N/OEC` and returned 404. Other local entries carried last-host metadata for `scn1-mn`, `scn23-mn`, or `scn29-mn`; none evidenced an active `scn30-mn` agent.
+- [x] **Static/storage guard PASS on exact tested candidate:** [run 40549436812](https://github.com/xflexwork/OEC/actions/runs/40549436812), including runner-control unit tests. The runner-inventory regression and local-only mode are covered in CI.
+- [x] **Local runner inventory now completes without remote API calls or recursive walking:** latest artifact [run 40549436814, artifact 12754626961](https://github.com/xflexwork/OEC/actions/runs/40549436814) reports `LOCAL_RUNNER_INVENTORY_RC=0`. On the assigned host it found `oec_1`, `oec_2`, `oec_3`, `oec_deploy` and `oec_train_2` running on `scn28-mn`; no active local `scn30-mn` runner was identified.
+- [x] **Prior FLUX → TRELLIS composite inference PASS (earlier candidate):** [run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341) generated a PNG and a valid/reopened GLB. Its TRELLIS cache purge was blocked by a runtime lock, so the overall run was not green.
+- [x] **Prior MusicGen WAV PASS (earlier candidate):** [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443). This is historical model evidence, not exact-head whole-suite acceptance.
 
-### Open blockers
-- [ ] Full exact-head Gradio acceptance failed in preflight before model callbacks: [run 40548073199](https://github.com/xflexwork/OEC/actions/runs/40548073199). It ran as `oec-1/scn28-mn`; legacy lock recovery is restricted to `oec-1/scn30-mn`.
-- [ ] Models pause lock `/nlsasfs/home/lmedge/rahkus/aireos_models/.storage_pause.lock` records PID `2036305`. Recovery is not authorized until host, process-death, lease-manifest and reserve-integrity conditions can all be proved.
-- [ ] Inventory now uses a bounded scan; this follow-up adds explicit `--no-github` so local discovery does not hang on stale repository API URLs. CI confirmation pending.
-- [ ] Restore/identify the approved `scn30-mn` runner mapping without weakening the allowlist. Exact-head audio/video generation remains unverified.
-- [ ] Validate FLUX transformer/text-encoder/VAE completeness; isolate Wan's injected `libgomp` issue inside the smoke process; exercise both LTX video modes end-to-end.
-- [ ] Canonical root sync remains blocked by its approved-origin guard.
+### Exact-head acceptance and remaining blockers
+- [ ] **Full model/Gradio acceptance remains BLOCKED before inference:** [run 40549436814](https://github.com/xflexwork/OEC/actions/runs/40549436814) failed preflight at legacy storage-lock recovery. It ran as `RUNNER=oec-1, HOST=scn28-mn`, while recovery is explicitly restricted to `oec-1/scn30-mn`. All model callbacks were skipped. Managed service-stop steps succeeded; cache purge steps were skipped.
+- [ ] Models pause lock is `/nlsasfs/home/lmedge/rahkus/aireos_models/.storage_pause.lock`, reporting PID `2036305`. The inventory artifact did not prove the lock owner dead on the authorized host; no recovery or reserve mutation is claimed.
+- [ ] Restore/identify the approved `scn30-mn` runner registration and its correct repo mapping; do not weaken the host/PID/lease guard. Local .runner URLs for current `scn28-mn` agents point to the older `Killer4K-N/OEC` registration and GitHub returns 404.
+- [ ] Exact-head audio/video Gradio generation remains unverified. Earlier FLUX → TRELLIS and MusicGen results are not a substitute for a whole-suite pass.
+- [ ] Remaining technical checks: FLUX component-cache integrity; Wan's injected `libgomp` compatibility; LTX text-to-video and image-to-video MP4 generation; approved-origin canonical root sync. The root-sync job [40549436773](https://github.com/xflexwork/OEC/actions/runs/40549436773) still fails its approved-origin check.
 
-**Overall: NOT YET ACCEPTED.** No Conda environment was modified. Do not purge a model cache with a live or unknown runtime lock.
+**Overall: NOT YET ACCEPTED.** No Conda packages/environments were changed. No unsafe model-cache purge or pause-lock recovery was performed.
 
 
 ---

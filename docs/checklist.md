@@ -1,18 +1,17 @@
 # OEC project continuation checklist
 
-## Current verified state — 2026-10-27 22:42 IST
+## Current verified state — 2026-10-27 22:55 IST
 
-Branch: `fix/media-stack-supervision-20261019`; pre-follow-up head `9929a739ac84112743c531be1a8ac1b78481d11a`.
+Exact tested candidate: `56999e9a21394766e8f2845ce5709e0184648f16`, branch `fix/media-stack-supervision-20261019`.
 
-- **PASS — prior FLUX → TRELLIS composite inference:** [run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341) generated and reopened a valid GLB, but TRELLIS cache cleanup remained blocked by a runtime lock.
-- **PASS — prior MusicGen WAV:** [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443). Not exact-head acceptance.
-- **PASS — parent static/storage guard:** [run 40541720533](https://github.com/xflexwork/OEC/actions/runs/40541720533). The new runner-inventory regression is awaiting CI.
-- **BLOCKED — full exact-head Gradio acceptance:** [run 40548073199](https://github.com/xflexwork/OEC/actions/runs/40548073199) failed during preflight before model callbacks. Runner `oec-1` is on `scn28-mn`; legacy pause-lock recovery only accepts `oec-1/scn30-mn`.
-- **Runner discovery:** local inventory reports `oec_1` and `oec_2` on `scn28-mn`; other saved host records refer to `scn1-mn`, `scn23-mn`, and `scn29-mn`. No active local runner on `scn30-mn` has been identified. The source change now scans the bounded runner structure and asks for local-only inventory to avoid stale registration-URL requests.
-- **Safety:** the models pause lock has not been recovered; no PID signal/reserve change or cache deletion was performed. Keep the host/PID/lease guards.
-- **Still incomplete:** exact-head live Gradio tests for all models, correct runner/lock-owner mapping, FLUX cache integrity, Wan library-path compatibility, LTX text-to-video and image-to-video, and approved-origin canonical sync.
+- **PASS — static/storage guard on exact candidate:** [run 40549436812](https://github.com/xflexwork/OEC/actions/runs/40549436812), including runner-inventory no-recursion and local-only tests.
+- **PASS — local inventory diagnostic:** [acceptance run 40549436814, artifact 12754626961](https://github.com/xflexwork/OEC/actions/runs/40549436814) recorded `LOCAL_RUNNER_INVENTORY_RC=0`; agents `oec_1`, `oec_2`, `oec_3`, `oec_deploy`, `oec_train_2` are locally running on `scn28-mn`. No active agent on `scn30-mn` appeared in local inventory.
+- **Historical inference PASS:** FLUX → TRELLIS produced a PNG and valid/reopened GLB in [run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341); cache cleanup remained blocked by runtime lock. MusicGen CLI produced a valid WAV in [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443).
+- **BLOCKED — exact-head model acceptance:** [run 40549436814](https://github.com/xflexwork/OEC/actions/runs/40549436814) failed at preflight before inference. The host was `oec-1/scn28-mn`, but protected legacy lock recovery requires `oec-1/scn30-mn`. Callbacks were skipped, service stops succeeded, cache purges were skipped.
+- **Protected lock:** `/nlsasfs/home/lmedge/rahkus/aireos_models/.storage_pause.lock` contains PID `2036305`. Host/PID/lease safety cannot be proven, so do not recover it or mutate reserve/cache state.
+- **Other open tasks:** correct runner registration/approved-host mapping; current-head Gradio generation for all providers; FLUX component weights; Wan's HPC libgomp issue; both LTX video modes; canonical root sync (still blocked by approved-origin guard).
 
-**Overall status: NOT YET ACCEPTED.**
+**Overall status: NOT YET ACCEPTED.** Existing Conda environments remain untouched, and no unsafe cache cleanup has been performed.
 
 ---
 ## Historical verified state — 2026-10-21 (superseded by current snapshot)
