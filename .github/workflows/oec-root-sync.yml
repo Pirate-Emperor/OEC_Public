@@ -44,6 +44,11 @@ jobs:
           token = os.environ["GITHUB_TOKEN"]
           cutoff = datetime.timedelta(minutes=30)
           acceptance_path = ".github/workflows/oec-demo-notebook-acceptance.yml"
+          superseded_paths = {
+              acceptance_path,
+              ".github/workflows/oec-flux-pipeline-smoke.yml",
+              ".github/workflows/storage-admission-guard-tests.yml",
+          }
           allowed_paths = {
               ".github/workflows/oec-live-acceptance-suite.yml",
               ".github/workflows/oec-model-service-release.yml",
@@ -54,6 +59,7 @@ jobs:
               ".github/workflows/oec-musicgen-smoke.yml",
               ".github/workflows/oec-e2e-acceptance.yml",
               ".github/workflows/oec-demo-notebook-acceptance.yml",
+              ".github/workflows/storage-admission-guard-tests.yml",
           }
           api = f"https://api.github.com/repos/{repository}/actions/runs"
           query = urllib.parse.urlencode({"branch": branch, "per_page": 100})
@@ -104,28 +110,27 @@ jobs:
                   continue
               start = datetime.datetime.fromisoformat(started.replace("Z", "+00:00"))
               age = now - start
-              # An acceptance run from an older source commit is no longer useful
-              # as current-head evidence. Cancel only this repository's allow-listed
-              # notebook acceptance workflow when a newer commit supersedes it.
-              superseded_acceptance = False
+              # Expensive media/guard runs from older source SHAs are not valid
+              # current-head evidence; cancel them as soon as a replacement is pushed.
+              superseded_media_run = False
               current_sha = None
-              if run.get("path") == acceptance_path:
-                  # Compare against the live branch head, not this watchdog run's
-                  # own SHA; otherwise an older watchdog can cancel a newer test run.
+              if run.get("path") in superseded_paths:
+                  # Compare against the live branch head, not this watchdog run's own SHA.
                   _, branch_state = request_json(
                       f"https://api.github.com/repos/{repository}/branches/{urllib.parse.quote(branch, safe='')}"
                   )
                   current_sha = (branch_state.get("commit") or {}).get("sha")
-                  superseded_acceptance = bool(
+                  superseded_media_run = bool(
                       current_sha and run.get("head_sha") != current_sha
                   )
-              if not superseded_acceptance and age <= cutoff:
+              if not superseded_media_run and age <= cutoff:
                   print(f"OEC_DEADLINE_OK run={run_id} age_seconds={int(age.total_seconds())} status={run['status']}")
                   continue
-              if superseded_acceptance:
+              if superseded_media_run:
                   print(
                       f"OEC_DEADLINE_CANCEL_SUPERSEDED run={run_id} "
-                      f"run_sha={run.get('head_sha')} current_sha={current_sha} status={run.get('status')}",
+                      f"path={run.get('path')} run_sha={run.get('head_sha')} "
+                      f"current_sha={current_sha} status={run.get('status')}",
                       flush=True,
                   )
               url = f"https://api.github.com/repos/{repository}/actions/runs/{run_id}/cancel"

@@ -285,6 +285,16 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertNotIn("HEALTH_CODE=", workflow)
         self.assertIn("start ltx-api --gpu \"$GPU\" --port 7869 --allow-download --purge-ltx-cache-after-load", workflow)
 
+    def test_flux_pipeline_preflight_uses_lock_owner_home_and_bounded_cleanup(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-flux-pipeline-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn('HOST_SHORT="$(hostname -s)"', workflow)
+        self.assertIn('test "$HOST_SHORT" = "scn30-mn"', workflow)
+        self.assertIn('ACCOUNT_HOME="$(getent passwd', workflow)
+        self.assertIn('tools/recover_dead_storage_locks.py models', workflow)
+        self.assertIn('timeout --signal=INT --kill-after=10s 45s', workflow)
+        self.assertIn('timeout --signal=INT --kill-after=2s 12s', workflow)
+        self.assertIn('MODEL_CACHE_LOCK_WAIT_TIMEOUT', workflow)
+
     def test_model_acceptance_uses_same_host_runner_as_flux_trellis_pipeline(self):
         workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
         combined = (ROOT / ".github" / "workflows" / "oec-flux-pipeline-smoke.yml").read_text(encoding="utf-8")
@@ -350,7 +360,9 @@ class ModelNotebookTests(unittest.TestCase):
         root_sync = (ROOT / ".github" / "workflows" / "oec-root-sync.yml").read_text(encoding="utf-8")
         acceptance = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
         self.assertIn('run.get("head_sha") != current_sha', root_sync)
-        self.assertIn('run.get("path") == acceptance_path', root_sync)
+        self.assertIn('run.get("path") in superseded_paths', root_sync)
+        self.assertIn('".github/workflows/oec-flux-pipeline-smoke.yml"', root_sync)
+        self.assertIn('".github/workflows/storage-admission-guard-tests.yml"', root_sync)
         self.assertIn('branches/{urllib.parse.quote(branch, safe=\'\')}', root_sync)
         self.assertIn('OEC_DEADLINE_CANCEL_SUPERSEDED', root_sync)
         self.assertIn('".github/workflows/oec-root-sync.yml"', acceptance)
