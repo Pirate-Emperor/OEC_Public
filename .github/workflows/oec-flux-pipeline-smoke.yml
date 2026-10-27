@@ -58,6 +58,13 @@ jobs:
             exit 2
           }
           install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
+          RECOVERY_DIR="$RUNNER_TEMP/oec-flux-pipeline-smoke-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/preflight-recovery"
+          mkdir -p "$RECOVERY_DIR"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python tools/run_media_model_smokes.py \
+            --providers kokoro,whisper,qwen3-asr,ace-step --cleanup-owned-services --recover-orphan-services \
+            --log-dir "$RECOVERY_DIR" 2>&1 | tee "$RECOVERY_DIR/owner-recovery.log"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python tools/recover_dead_storage_locks.py models 2>&1 | tee "$RECOVERY_DIR/models-lock-recovery.log"
+          "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python tools/recover_dead_storage_locks.py outputs 2>&1 | tee "$RECOVERY_DIR/outputs-lock-recovery.log"
           "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python -c 'import sys, torch, diffusers, huggingface_hub, transformers; print("ENV=phase2_3d"); print("PYTHON="+sys.version.split()[0]); print("TORCH="+torch.__version__); print("CUDA="+str(torch.version.cuda)); print("DIFFUSERS="+diffusers.__version__); print("HUGGINGFACE_HUB="+huggingface_hub.__version__); print("TRANSFORMERS="+transformers.__version__); assert torch.cuda.is_available()'
           nvidia-smi
           echo "GPU_PROCESS_OWNERSHIP_SNAPSHOT_BEGIN"

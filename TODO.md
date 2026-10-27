@@ -1,17 +1,28 @@
-## Current demo state — 2026-10-23
+## Current media-model acceptance status — 2026-10-27
 
-Candidate: `fix/media-stack-supervision-20261019` / `ae6c90b891ec80338c9c96446d735b03e1985d8a`.
+Candidate branch: `fix/media-stack-supervision-20261019`; last observed base SHA: `69a1a1917e1973054428c4775417a36254b4787c`.
 
-- Exact-head live inference PASS: [FLUX → TRELLIS run 39646903815](https://github.com/CalamityStriker/OEC/actions/runs/39646903815), artifact 12368677410; GLB structurally re-opened.
-- Exact-head Asset Factory contracts PASS: [run 39646903793](https://github.com/CalamityStriker/OEC/actions/runs/39646903793).
-- Exact-head static/storage PASS: [run 39646903775](https://github.com/CalamityStriker/OEC/actions/runs/39646903775); 154 tests across 19 invocations.
-- Canonical root sync BLOCKED by active-process guard: [run 39646903801](https://github.com/CalamityStriker/OEC/actions/runs/39646903801).
-- Historical full model suite: [run 39435100568](https://github.com/CalamityStriker/OEC/actions/runs/39435100568), 8/8 on older SHA `0c53f6a46328bc4ba6ce4d0942556e3077ea6d74`.
-- Runbook: [docs/DEMO_PRESENTATION_QUICKSTART_2026-10-23.md](docs/DEMO_PRESENTATION_QUICKSTART_2026-10-23.md); full guide: [docs/DEMO_EXECUTION_PLAN.md](docs/DEMO_EXECUTION_PLAN.md).
+### Verified outcomes
+- [x] **Real FLUX → TRELLIS generation produced a PNG and a validated/reopened GLB** in [self-hosted run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341). The workflow overall did not pass because post-run cache cleanup was blocked by a runtime lock.
+- [x] **AudioCraft/MusicGen CLI generated a valid WAV** in [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443). This is partial evidence, not a full current-head acceptance.
+- [x] Notebook structural audit was clean in [run 40525748851](https://github.com/xflexwork/OEC/actions/runs/40525748851); source notebooks have clean saved outputs.
+- [x] The full-run artifact [12747065224](https://github.com/xflexwork/OEC/actions/runs/40525748851/artifacts/12747065224) confirmed the runner mismatch: full acceptance used `oec-2/scn28-mn`, while shared storage/runtime locks belong to `oec-1/scn30-mn`.
 
-**Outstanding:** exact-head live re-run for all audio/video providers; shared `/v1/jobs` for standalone FLUX/AudioGen/MusicGen; persistent OEC-Deploy/OEC-Play end-to-end integration; encrypt-before-upload plus private-key read-back on current source; canonical A100 root sync.
+### Open acceptance items
+- [ ] **Exact-head full Gradio acceptance:** [40525748851](https://github.com/xflexwork/OEC/actions/runs/40525748851) failed. Multiple model health gates reported an active managed operation, so corresponding Gradio callbacks were skipped; skipped callbacks are not passes.
+- [ ] Recover only same-host, exact-command OEC service-owner markers; recover StorageManager pause locks only after verifying the local PID is dead and no unresolved lease manifest exists. Never clear a live or foreign/unknown lock.
+- [ ] **FLUX cache integrity:** snapshot resolution previously succeeded even though transformer weights were absent. Validate transformer/text encoder/VAE weights before recording a cache hit; download only after live StorageManager admission.
+- [ ] **Wan:** Torch import failed because the HPC SDK `libgomp.so.1` lacked `__pgi_nvomp_async_val_to_queue_num`. Isolate that notebook test process from the injected library path without modifying Conda.
+- [ ] **LTX text-to-video and image-to-video:** complete the explicit guarded-download/load path, then verify both decoded MP4 outputs through Gradio.
+- [ ] **Canonical root sync:** still blocked by the approved-origin safeguard. Do not weaken canonical repository identity checks.
 
-**Before presenting:** verify local branch/SHA and run read-only StorageManager/GPU checks. Never sync over active inference or upload test plaintext to a public dataset. The research model demos remain useful historical evidence; label their tested SHA.
+### Execution policy
+- Run model inference, FLUX→TRELLIS, and storage regressions on self-hosted A100 `oec-1`, matching the shared model-storage lock owner. Keep only the brief independent deadline watchdog on `ubuntu-latest` so it can stop stale jobs while the GPU runner is occupied.
+- Use existing Conda environments only; no shared-environment package install/update. Purge an exact model cache only after its service has stopped and runtime lock is unlocked.
+- **Overall status: not yet accepted.** The next exact-head run must pass storage recovery, real Gradio submissions, asset validation, process shutdown, and cache cleanup.
+
+---
+
 
 ---
 ## Full OEC demo-execution guide and current verification — 2026-10-21

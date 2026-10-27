@@ -483,6 +483,54 @@ def _purge_tested_model(provider: str) -> dict[str, Any]:
     return result
 
 
+
+
+def _cleanup_owned_services_for_provider(
+    provider: str, log_dir: Path, *, allow_foreign_run: bool = False
+) -> list[dict[str, Any]]:
+    """Clean this run and verified prior-run service markers on the same host.
+
+    Prior acceptance markers persist below RUNNER_TEMP/oec-demo-notebook-acceptance-*.
+    The cleanup routine still validates a live PID and exact argv before SIGTERM.
+    Foreign-host markers are diagnostic-only and are never used to signal a PID.
+    """
+    current_dir = log_dir.expanduser().resolve()
+    directories = [current_dir]
+    search_root = Path(os.environ.get("RUNNER_TEMP", "/tmp")).expanduser().resolve()
+    if allow_foreign_run and search_root.is_dir():
+        marker_name = f"{provider}-service-owner.json"
+        pattern = f"oec-demo-notebook-acceptance-*/**/{marker_name}"
+        for marker in sorted(search_root.glob(pattern)):
+            if marker.is_symlink() or not marker.is_file():
+                continue
+            try:
+                owner = json.loads(marker.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                print(f"SMOKE_OWNER_SCAN_BLOCKED_INVALID_MARKER path={marker}", flush=True)
+                continue
+            if not isinstance(owner, dict) or owner.get("provider") != provider:
+                continue
+            if owner.get("host") != socket.gethostname():
+                print("SMOKE_OWNER_SCAN_SKIP_FOREIGN_HOST " + json.dumps(
+                    {"provider": provider, "host": owner.get("host"), "path": str(marker)},
+                    sort_keys=True), flush=True)
+                continue
+            parent = marker.parent.resolve()
+            try:
+                parent.relative_to(search_root)
+            except ValueError:
+                continue
+            if parent not in directories:
+                directories.append(parent)
+
+    rows: list[dict[str, Any]] = []
+    for directory in directories:
+        row = _cleanup_owned_service(
+            provider, directory, allow_foreign_run=allow_foreign_run
+        )
+        if row.get("status") != "NOT_FOUND" or directory == current_dir:
+            rows.append(row)
+    return rows
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--providers", default="kokoro,whisper,qwen3-asr,ace-step",
@@ -510,10 +558,13 @@ def main() -> int:
     if args.recover_orphan_services and not args.cleanup_owned_services:
         parser.error("--recover-orphan-services requires --cleanup-owned-services")
     if args.cleanup_owned_services:
-        cleanup_rows = [
-            _cleanup_owned_service(provider, temp_dir, allow_foreign_run=args.recover_orphan_services)
-            for provider in order
-        ]
+        cleanup_rows = []
+        for provider in order:
+            cleanup_rows.extend(
+                _cleanup_owned_services_for_provider(
+                    provider, temp_dir, allow_foreign_run=args.recover_orphan_services
+                )
+            )
         for row in cleanup_rows:
             print("OWNED_SERVICE_CLEANUP " + json.dumps(row, ensure_ascii=False), flush=True)
         blocked = [row for row in cleanup_rows if row["status"].startswith("BLOCKED") or row["status"] == "STOP_FAILED"]

@@ -154,8 +154,8 @@ class ModelNotebookTests(unittest.TestCase):
 
     def test_acceptance_uses_a_consistent_runner_and_trusted_account_home_config(self):
         workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
-        self.assertIn("runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]", workflow)
-        self.assertIn('test "$RUNNER_NAME" = "oec-2"', workflow)
+        self.assertIn("runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]", workflow)
+        self.assertIn('test "$RUNNER_NAME" = "oec-1"', workflow)
         self.assertIn('ACCOUNT_HOME="$(getent passwd "$(id -un)" | cut -d: -f6 || true)"', workflow)
         self.assertIn('"$ACCOUNT_HOME/OEC/storage_config.json"', workflow)
         self.assertIn("STORAGE_CONFIG_SOURCE=%s\\n", workflow)
@@ -185,6 +185,21 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn("--cleanup-owned-services --recover-orphan-services", workflow)
         self.assertIn("--wait-for-unlocked-seconds 180", workflow)
         self.assertIn("--wait-for-unlocked-seconds 90", workflow)
+    def test_acceptance_runs_on_lock_owner_a100_and_recovers_locks_before_model_loads(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
+        preflight_start = workflow.index("id: preflight")
+        contracts_start = workflow.index("id: contracts")
+        preflight = workflow[preflight_start:contracts_start]
+        self.assertIn("runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]", workflow)
+        self.assertIn('test "$RUNNER_NAME" = "oec-1"', preflight)
+        self.assertIn("--cleanup-owned-services --recover-orphan-services", preflight)
+        self.assertIn("tools/recover_dead_storage_locks.py models", preflight)
+        self.assertIn("tools/recover_dead_storage_locks.py outputs", preflight)
+
+    def test_wan_notebook_smoke_unsets_incompatible_hpc_libgomp_path(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
+        self.assertIn("env -u LD_LIBRARY_PATH OEC_WAN_SMOKE_DIR=", workflow)
+
     def test_service_ui_does_not_import_provider_ml_packages(self):
         for name in ("pipeline_acestep_gradio.ipynb","pipeline_kokoro_gradio.ipynb",
                      "pipeline_whisper_gradio.ipynb","pipeline_qwen3_asr_gradio.ipynb",

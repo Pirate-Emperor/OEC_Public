@@ -21,20 +21,67 @@ from storage_manager import managed_storage_operation, storage_preflight
 from storage_policy import BYTES_PER_GB, estimate_hf_repo_bytes
 
 MODEL_ID = "black-forest-labs/FLUX.2-klein-4B"
+WEIGHT_SUFFIXES = {".safetensors", ".bin", ".gguf"}
+REQUIRED_COMPONENTS = ("transformer", "text_encoder", "vae")
+
+
+def _missing_weight_components(snapshot: Path) -> list[str]:
+    """Return Diffusers components that lack any real, non-empty weight file."""
+    if not snapshot.is_dir():
+        return ["snapshot_directory"]
+    missing: list[str] = []
+    for name in REQUIRED_COMPONENTS:
+        component = snapshot / name
+        found = False
+        if component.is_dir() and not component.is_symlink():
+            try:
+                for candidate in component.rglob("*"):
+                    if candidate.suffix.lower() not in WEIGHT_SUFFIXES:
+                        continue
+                    try:
+                        if candidate.is_file() and candidate.stat().st_size > 0:
+                            found = True
+                            break
+                    except OSError:
+                        continue
+            except OSError:
+                found = False
+        if not found:
+            missing.append(name)
+    return missing
+
 
 def ensure_flux_cache(*, allow_download: bool = False) -> Path:
-    """Return a local snapshot; only fetch missing files when explicitly authorized."""
+    """Return a complete local snapshot; only fetch missing weights after admission."""
     cache_dir = Path(SYSTEM_DIRS["models"]).expanduser().resolve()
+    local_snapshot: Path | None = None
+    cache_miss: Exception | None = None
     try:
-        snapshot = snapshot_download(repo_id=MODEL_ID, cache_dir=str(cache_dir), local_files_only=True)
-        print(f"FLUX_CACHE=HIT snapshot={snapshot}", flush=True)
-        return Path(snapshot)
-    except LocalEntryNotFoundError:
+        local_snapshot = Path(snapshot_download(
+            repo_id=MODEL_ID, cache_dir=str(cache_dir), local_files_only=True
+        ))
+    except LocalEntryNotFoundError as exc:
+        cache_miss = exc
+
+    if local_snapshot is not None:
+        missing = _missing_weight_components(local_snapshot)
+        if not missing:
+            print(f"FLUX_CACHE=HIT snapshot={local_snapshot}", flush=True)
+            return local_snapshot
+        print(
+            f"FLUX_CACHE=INCOMPLETE snapshot={local_snapshot} missing_components={','.join(missing)}",
+            flush=True,
+        )
         if not allow_download:
             raise RuntimeError(
-                f"FLUX cache miss for {MODEL_ID}; cache-only mode refuses to fetch model files. "
+                f"FLUX cache is incomplete for {MODEL_ID}; missing component weights: {', '.join(missing)}. "
                 "Run this helper with --allow-download after verifying fresh StorageManager admission."
             )
+    elif not allow_download:
+        raise RuntimeError(
+            f"FLUX cache miss for {MODEL_ID}; cache-only mode refuses to fetch model files. "
+            "Run this helper with --allow-download after verifying fresh StorageManager admission."
+        ) from cache_miss
     os.environ["HF_HUB_OFFLINE"] = "0"
     os.environ["TRANSFORMERS_OFFLINE"] = "0"
     safety_gb = max(0.0, float(os.environ.get("OEC_FLUX_DOWNLOAD_SAFETY_GB", "2.0")))
@@ -51,9 +98,16 @@ def ensure_flux_cache(*, allow_download: bool = False) -> Path:
                                        require_fresh_quota=True, minimum_free_gb=minimum_free_gb)
         if not ok:
             raise RuntimeError(f"StorageManager denied FLUX cache fill inside managed operation: {reason}")
-        snapshot = snapshot_download(repo_id=MODEL_ID, cache_dir=str(cache_dir), local_files_only=False)
+        snapshot = Path(snapshot_download(
+            repo_id=MODEL_ID, cache_dir=str(cache_dir), local_files_only=False
+        ))
+        missing = _missing_weight_components(snapshot)
+        if missing:
+            raise RuntimeError(
+                f"FLUX snapshot remained incomplete after StorageManager-admitted download: {', '.join(missing)}"
+            )
     print(f"FLUX_DOWNLOAD=PASS snapshot={snapshot}", flush=True)
-    return Path(snapshot)
+    return snapshot
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
