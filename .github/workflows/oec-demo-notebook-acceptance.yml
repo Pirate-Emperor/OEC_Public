@@ -24,7 +24,10 @@ on:
       - "phase1_test_compute_node.ipynb"
       - "pipeline_audiogen.py"
       - "pipeline_flux_image.py"
+      - "pipeline_flux_trellis.py"
+      - "pipeline_trellis_3d.py"
       - "tools/run_audiogen_notebook_smoke.py"
+      - "tools/run_flux_pipeline_smoke.py"
       - "tools/run_gradio_model_notebook_smokes.py"
       - "tools/wait_for_media_service.py"
       - "tools/recover_failed_musicgen_acceptance_service.py"
@@ -54,6 +57,7 @@ on:
       - "tests/test_storage_write_admission.py"
       - "tests/test_trellis_notebook_static.py"
       - ".github/workflows/oec-demo-notebook-acceptance.yml"
+      - ".github/workflows/oec-flux-pipeline-smoke.yml"
       - ".github/workflows/oec-root-sync.yml"
   workflow_dispatch:
 
@@ -186,6 +190,7 @@ jobs:
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python -m py_compile \
             tools/oec_service_manager.py tools/media_services/audio_api.py tools/media_services/audiocraft_api.py \
             tools/media_services/flux_api.py tools/media_services/trellis_api.py tools/media_services/ltx_api.py \
+            pipeline_flux_trellis.py pipeline_trellis_3d.py tools/run_flux_pipeline_smoke.py \
             tools/media_services/model_cache.py tools/prepare_flux_cache.py tools/cleanup_test_model_caches.py tools/run_safe_notebook_smokes.py tools/audit_notebook_suite.py \
             tools/run_wan_notebook_smoke.py tools/run_gradio_model_notebook_smokes.py tools/run_media_model_smokes.py \
             tools/wait_for_media_service.py tools/recover_failed_musicgen_acceptance_service.py \

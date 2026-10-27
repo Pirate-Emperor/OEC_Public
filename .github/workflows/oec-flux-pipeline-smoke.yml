@@ -114,6 +114,13 @@ jobs:
           set -euo pipefail
           REPORT_DIR="$RUNNER_TEMP/oec-flux-pipeline-smoke-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           mkdir -p "$REPORT_DIR"
+          for attempt in $(seq 1 36); do
+            lock_state="$( "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python -c 'from tools.media_services.model_cache import read_lock; lock=read_lock("trellis-2-4b"); print(lock.get("state", "unknown") if lock else "unlocked")' )"
+            echo "TRELLIS_CACHE_LOCK_STATE=$lock_state"
+            if [[ "$lock_state" == "unlocked" || "$lock_state" == "stale" ]]; then break; fi
+            if [[ "$attempt" -eq 36 ]]; then echo "TRELLIS_CACHE_LOCK_WAIT=TIMEOUT"; fi
+            sleep 5
+          done
           "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python tools/cleanup_test_model_caches.py \
             --models flux-klein-4b,trellis-2-4b --report-json "$REPORT_DIR/cache-cleanup.json" 2>&1 | tee "$REPORT_DIR/cache-cleanup.log"
           "$HOME/Conda/condabin/conda" run --no-capture-output -n phase2_3d python storage_manager.py --status 2>&1 | tee "$REPORT_DIR/storage-after-cleanup.log"
