@@ -19,8 +19,6 @@ from pathlib import Path
 from typing import Any
 
 
-
-
 def _snapshot_download_with_retries(snapshot_download: Any, *, max_attempts: int = 3, **kwargs: Any) -> Any:
     """Retry interrupted model transfers; huggingface_hub resumes cached partial files."""
     if max_attempts < 1:
@@ -45,6 +43,7 @@ def _snapshot_download_with_retries(snapshot_download: Any, *, max_attempts: int
             )
             time.sleep(delay)
     raise RuntimeError("TRELLIS snapshot download retry loop exited unexpectedly")
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(

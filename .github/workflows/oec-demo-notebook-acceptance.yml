@@ -129,7 +129,7 @@ jobs:
                 pipeline_ltx_video.ipynb|tools/media_services/ltx_api.py|worker_ltx_video.py|tools/wait_for_media_service.py)
                   run_scope[ltx]=true ;;
                 tests/test_media_service_readiness.py)
-                  run_scope[ltx]=true ;;
+                  run_scope[musicgen]=true; run_scope[ltx]=true ;;
                 pipeline_wan_video.ipynb|tools/run_wan_notebook_smoke.py)
                   run_scope[wan]=true ;;
                 tools/media_services/common.py|tools/media_services/model_cache.py|tools/oec_service_manager.py|oec_gpu_admission.py|storage_manager.py|storage_policy.py|tools/prepare_media_models.py|tools/prepare_media_runtime.py)
