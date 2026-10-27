@@ -255,13 +255,17 @@ class ModelNotebookTests(unittest.TestCase):
     def test_model_readiness_probes_are_valid_and_cover_all_server_notebooks(self):
         workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
         for port in ("7874", "7875", "7868", "7867", "7869"):
-            self.assertIn(f'http://127.0.0.1:{port}/health', workflow)
-        self.assertNotIn('HEALTH_CODE="$(cat <<\'PY\'', workflow)
-        self.assertEqual(workflow.count("HEALTH_CODE='import json, urllib.request;"), 4)
-        self.assertIn("tools/wait_for_media_service.py --url http://127.0.0.1:7869/health", workflow)
+            self.assertIn(f"tools/wait_for_media_service.py --url http://127.0.0.1:{port}/health", workflow)
+        self.assertNotIn("HEALTH_CODE=", workflow)
         self.assertIn("start ltx-api --gpu \"$GPU\" --port 7869 --allow-download --purge-ltx-cache-after-load", workflow)
-        self.assertIn("assert health.get(\"ready\") and health.get(\"model_loaded\"), health", workflow)
-        self.assertIn("ProxyHandler({})", workflow)
+
+    def test_model_acceptance_uses_same_host_runner_as_flux_trellis_pipeline(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
+        combined = (ROOT / ".github" / "workflows" / "oec-flux-pipeline-smoke.yml").read_text(encoding="utf-8")
+        expected_runner = "runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]"
+        self.assertIn(expected_runner, workflow)
+        self.assertIn(expected_runner, combined)
+        self.assertNotIn("a100, oec-2]", workflow)
 
     def test_musicgen_recovery_precedes_audiogen_gpu_admission(self):
         workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")

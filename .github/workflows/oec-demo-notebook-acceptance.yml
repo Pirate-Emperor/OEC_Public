@@ -71,7 +71,7 @@ concurrency:
 jobs:
   acceptance:
     name: Run full notebooks and real model-server Gradio callbacks
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
     timeout-minutes: 300
     defaults:
       run:
@@ -295,15 +295,9 @@ jobs:
         run: |
           set -euo pipefail
           R="$OEC_ACCEPTANCE_ROOT/audiogen-gradio"
-          HEALTH_CODE='import json, urllib.request; opener=urllib.request.build_opener(urllib.request.ProxyHandler({})); health=json.load(opener.open("http://127.0.0.1:7874/health", timeout=3)); assert not health.get("error") or health.get("loading", False), "fatal model load error: " + str(health.get("error")); assert health.get("ready") and health.get("model_loaded"), health; print(json.dumps(health))'
-          ready=0
-          for _ in $(seq 1 240); do
-            if "$HOME/Conda/envs/phase2_3d/bin/python" -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
-            sleep 5
-          done
-          cat "$R/health-check.log"
-          test "$ready" -eq 1
-
+          timeout --signal=INT --kill-after=10s 1210s "$CONDA_EXE" run --no-capture-output -n phase2_3d \
+            python tools/wait_for_media_service.py --url http://127.0.0.1:7874/health \
+            --timeout-seconds 1200 --interval-seconds 5 2>&1 | tee "$R/health-check.log"
       - name: Launch AudioGen Gradio UI and submit a real server inference
         id: audiogen_gradio
         if: always() && steps.audiogen_health.outcome == 'success' && steps.scope.outputs.audiogen == 'true'
@@ -380,15 +374,9 @@ jobs:
         run: |
           set -euo pipefail
           R="$OEC_ACCEPTANCE_ROOT/musicgen-gradio"
-          HEALTH_CODE='import json, urllib.request; opener=urllib.request.build_opener(urllib.request.ProxyHandler({})); health=json.load(opener.open("http://127.0.0.1:7875/health", timeout=3)); assert not health.get("error") or health.get("loading", False), "fatal model load error: " + str(health.get("error")); assert health.get("ready") and health.get("model_loaded"), health; print(json.dumps(health))'
-          ready=0
-          for _ in $(seq 1 240); do
-            if "$HOME/Conda/envs/phase2_3d/bin/python" -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
-            sleep 5
-          done
-          cat "$R/health-check.log"
-          test "$ready" -eq 1
-
+          timeout --signal=INT --kill-after=10s 1210s "$CONDA_EXE" run --no-capture-output -n phase2_3d \
+            python tools/wait_for_media_service.py --url http://127.0.0.1:7875/health \
+            --timeout-seconds 1200 --interval-seconds 5 2>&1 | tee "$R/health-check.log"
       - name: Launch MusicGen Gradio UI and generate real music
         id: musicgen_gradio
         if: always() && steps.musicgen_health.outcome == 'success' && steps.scope.outputs.musicgen == 'true'
@@ -597,15 +585,9 @@ jobs:
         run: |
           set -euo pipefail
           R="$OEC_ACCEPTANCE_ROOT/trellis"
-          HEALTH_CODE='import json, urllib.request; opener=urllib.request.build_opener(urllib.request.ProxyHandler({})); health=json.load(opener.open("http://127.0.0.1:7868/health", timeout=4)); assert not health.get("error") or health.get("loading", False), "fatal model load error: " + str(health.get("error")); assert health.get("ready") and health.get("model_loaded"), health; print(json.dumps(health))'
-          ready=0
-          for _ in $(seq 1 240); do
-            if "$HOME/Conda/envs/phase2_3d/bin/python" -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
-            sleep 5
-          done
-          cat "$R/health-check.log"
-          test "$ready" -eq 1
-
+          timeout --signal=INT --kill-after=10s 1210s "$CONDA_EXE" run --no-capture-output -n phase2_3d \
+            python tools/wait_for_media_service.py --url http://127.0.0.1:7868/health \
+            --timeout-seconds 1200 --interval-seconds 5 2>&1 | tee "$R/health-check.log"
       - name: Exercise standalone TRELLIS notebook Gradio callback and validate GLB
         id: trellis_only_gradio
         if: always() && steps.trellis_health.outcome == 'success' && steps.scope.outputs.trellis == 'true'
@@ -685,15 +667,9 @@ jobs:
         run: |
           set -euo pipefail
           R="$OEC_ACCEPTANCE_ROOT/flux"
-          HEALTH_CODE='import json, urllib.request; opener=urllib.request.build_opener(urllib.request.ProxyHandler({})); health=json.load(opener.open("http://127.0.0.1:7867/health", timeout=4)); assert not health.get("error") or health.get("loading", False), "fatal model load error: " + str(health.get("error")); assert health.get("ready") and health.get("model_loaded"), health; print(json.dumps(health))'
-          ready=0
-          for _ in $(seq 1 240); do
-            if "$HOME/Conda/envs/phase2_3d/bin/python" -c "$HEALTH_CODE" >"$R/health-check.log" 2>&1; then ready=1; break; fi
-            sleep 5
-          done
-          cat "$R/health-check.log"
-          test "$ready" -eq 1
-
+          timeout --signal=INT --kill-after=10s 1210s "$CONDA_EXE" run --no-capture-output -n phase2_3d \
+            python tools/wait_for_media_service.py --url http://127.0.0.1:7867/health \
+            --timeout-seconds 1200 --interval-seconds 5 2>&1 | tee "$R/health-check.log"
       - name: Launch FLUX Gradio UI and generate a real PNG through the model server
         id: flux_gradio
         if: always() && steps.flux_health.outcome == 'success' && steps.scope.outputs.flux == 'true'
