@@ -23,7 +23,9 @@ if str(ROOT) not in sys.path:
 from tools.media_services.model_cache import cache_status, model_targets, read_lock
 
 
-def purge_one(key: str) -> dict[str, Any]:
+def purge_one(
+    key: str, *, wait_for_unlocked_seconds: float = 0.0, poll_interval_seconds: float = 5.0
+) -> dict[str, Any]:
     initial = next(row for row in cache_status() if row["model"] == key)
     result: dict[str, Any] = {
         "model": key,
@@ -38,7 +40,21 @@ def purge_one(key: str) -> dict[str, Any]:
         result["message"] = "model-owned cache was already absent"
         return result
 
+    wait_started = time.monotonic()
+    deadline = wait_started + max(0.0, float(wait_for_unlocked_seconds))
     lock = read_lock(key)
+    while lock is not None and lock.get("state") != "stale" and time.monotonic() < deadline:
+        remaining = max(0.0, deadline - time.monotonic())
+        delay = min(max(0.01, float(poll_interval_seconds)), remaining)
+        print("MODEL_CACHE_CLEANUP_WAIT " + json.dumps({
+            "model": key, "lock_state": lock.get("state"), "host": lock.get("host"),
+            "pid": lock.get("pid"), "wait_remaining_seconds": round(remaining, 2),
+        }), flush=True)
+        if delay <= 0:
+            break
+        time.sleep(delay)
+        lock = read_lock(key)
+    result["lock_wait_seconds"] = round(time.monotonic() - wait_started, 3)
     if lock is not None and lock.get("state") not in {"stale"}:
         result.update({
             "status": "BLOCKED_BY_RUNTIME_LOCK",
@@ -76,7 +92,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Comma-separated keys from model_cache_manager status (for example flux-klein-4b,trellis-2-4b).",
     )
     parser.add_argument("--report-json", type=Path, help="Optional path for a JSON cleanup report.")
+    parser.add_argument("--wait-for-unlocked-seconds", type=float, default=0.0,
+                        help="Wait up to 900 seconds for runtime locks to clear before failing closed.")
     args = parser.parse_args(argv)
+    if not 0.0 <= args.wait_for_unlocked_seconds <= 900.0:
+        parser.error("--wait-for-unlocked-seconds must be between 0 and 900")
     selected = tuple(item.strip() for item in args.models.split(",") if item.strip())
     valid = set(model_targets())
     if not selected or len(selected) != len(set(selected)) or any(key not in valid for key in selected):
@@ -87,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
     for key in selected:
         print(f"MODEL_CACHE_CLEANUP_START={key}", flush=True)
         try:
-            row = purge_one(key)
+            row = purge_one(key, wait_for_unlocked_seconds=args.wait_for_unlocked_seconds)
         except Exception as exc:
             row = {"model": key, "status": "ERROR", "error": f"{type(exc).__name__}: {exc}"}
         results.append(row)
@@ -108,6 +128,7 @@ def main(argv: list[str] | None = None) -> int:
         "safety": {
             "uses_existing_model_cache_manager": True,
             "remote_or_unknown_locks_are_preserved": True,
+            "bounded_lock_wait_is_opt_in": True,
             "reserve_source_checkout_and_outputs_untouched": True,
         },
     }

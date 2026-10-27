@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+from tools import cleanup_test_model_caches as cache_cleanup
 from tools import run_media_model_smokes as smoke
 
 
@@ -84,13 +85,67 @@ class OwnedServiceCleanupTests(unittest.TestCase):
         kill.assert_called_once_with(43210, smoke.signal.SIGTERM)
         self.assertFalse(self.owner_path.exists())
 
+    def test_explicit_orphan_recovery_stops_prior_run_only_when_command_matches(self):
+        self.write_owner(run_id="previous-run")
+        with mock.patch.dict(os.environ, {"GITHUB_RUN_ID": "test-run"}), \
+             mock.patch.object(smoke, "_pid_alive", side_effect=[True, False]), \
+             mock.patch.object(smoke, "_owner_matches_running_process", return_value=True), \
+             mock.patch.object(smoke.os, "kill") as kill:
+            result = smoke._cleanup_owned_service(self.provider, self.root, allow_foreign_run=True)
+        self.assertEqual(result["status"], "STOPPED")
+        self.assertTrue(result["recovered_prior_run"])
+        self.assertEqual(result["owner_run_id"], "previous-run")
+        kill.assert_called_once_with(43210, smoke.signal.SIGTERM)
+        self.assertFalse(self.owner_path.exists())
+
+    def test_explicit_orphan_recovery_still_refuses_foreign_host(self):
+        self.write_owner(run_id="previous-run", host="different-node")
+        with mock.patch.dict(os.environ, {"GITHUB_RUN_ID": "test-run"}), \
+             mock.patch.object(smoke.os, "kill") as kill:
+            result = smoke._cleanup_owned_service(self.provider, self.root, allow_foreign_run=True)
+        self.assertEqual(result["status"], "BLOCKED_OWNER_MISMATCH")
+        kill.assert_not_called()
+
     def test_recovery_cli_does_not_scan_or_load_models(self):
-        argv = ["run_media_model_smokes.py", "--providers", "ace-step", "--cleanup-owned-services", "--log-dir", str(self.root)]
+        argv = ["run_media_model_smokes.py", "--providers", "ace-step", "--cleanup-owned-services", "--recover-orphan-services", "--log-dir", str(self.root)]
         with mock.patch.object(smoke, "_conda_prefixes", side_effect=AssertionError("cleanup must not probe environments")), \
              mock.patch.object(smoke.sys, "argv", argv):
             result = smoke.main()
         self.assertEqual(result, 0)
 
+
+
+
+class ModelCacheCleanupWaitTests(unittest.TestCase):
+    def setUp(self):
+        self.initial = {"model": "trellis-2-4b", "cache_paths": ["/tmp/cache"], "disk_bytes": 12, "present": True, "runtime_lock": "active"}
+        self.final = {"model": "trellis-2-4b", "cache_paths": ["/tmp/cache"], "disk_bytes": 0, "present": False, "runtime_lock": "unlocked"}
+        self.lock = {"state": "active", "host": "node-a", "pid": 1234}
+
+    def test_waits_for_lock_release_then_purges_through_manager(self):
+        with mock.patch.object(cache_cleanup, "cache_status", side_effect=[[self.initial], [self.final]]), \
+             mock.patch.object(cache_cleanup, "read_lock", side_effect=[self.lock, None]), \
+             mock.patch.object(cache_cleanup.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "ok", "")) as run, \
+             mock.patch.object(cache_cleanup.time, "sleep") as sleep:
+            result = cache_cleanup.purge_one("trellis-2-4b", wait_for_unlocked_seconds=2, poll_interval_seconds=0.01)
+        self.assertEqual(result["status"], "PURGED")
+        run.assert_called_once()
+        sleep.assert_called_once()
+
+    def test_zero_wait_preserves_cache_while_lock_is_live(self):
+        with mock.patch.object(cache_cleanup, "cache_status", return_value=[self.initial]), \
+             mock.patch.object(cache_cleanup, "read_lock", return_value=self.lock), \
+             mock.patch.object(cache_cleanup.subprocess, "run") as run, \
+             mock.patch.object(cache_cleanup.time, "sleep") as sleep:
+            result = cache_cleanup.purge_one("trellis-2-4b")
+        self.assertEqual(result["status"], "BLOCKED_BY_RUNTIME_LOCK")
+        run.assert_not_called()
+        sleep.assert_not_called()
+
+    def test_cli_rejects_wait_longer_than_900_seconds(self):
+        with self.assertRaises(SystemExit) as raised:
+            cache_cleanup.main(["--models", "trellis-2-4b", "--wait-for-unlocked-seconds", "901"])
+        self.assertEqual(raised.exception.code, 2)
 
 if __name__ == "__main__":
     unittest.main()

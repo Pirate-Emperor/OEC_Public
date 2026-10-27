@@ -147,7 +147,7 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn("steps.scope.outputs.musicgen == 'true'", workflow)
         self.assertIn("steps.scope.outputs.wan == 'true'", workflow)
         self.assertIn("pipeline_trellis_3d.py|pipeline_trellis_3d_only.ipynb|tools/media_services/trellis_api.py)", workflow)
-        self.assertIn("run_scope[audiogen]=true; run_scope[trellis]=true; run_scope[flux]=true; run_scope[ltx]=true; run_scope[wan]=true ;;", workflow)
+        self.assertIn("run_scope[audiocraft_notebook]=true; run_scope[audiogen]=true; run_scope[musicgen]=true; run_scope[speech]=true; run_scope[ace_step]=true; run_scope[trellis]=true; run_scope[flux]=true; run_scope[ltx]=true; run_scope[wan]=true ;;", workflow)
         self.assertIn("tests/test_media_service_readiness.py)\n                  run_scope[musicgen]=true; run_scope[ltx]=true ;;", workflow)
         self.assertIn('require_success MUSICGEN_GRADIO_OUTCOME', workflow)
         self.assertIn('require_success WAN_NOTEBOOK_OUTCOME', workflow)
@@ -169,6 +169,11 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn('read_lock("trellis-2-4b")', workflow)
         self.assertIn("--models flux-klein-4b,trellis-2-4b", workflow)
 
+    def test_recovery_steps_can_clean_verified_prior_run_services_and_wait_for_model_locks(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
+        self.assertIn("--cleanup-owned-services --recover-orphan-services", workflow)
+        self.assertIn("--wait-for-unlocked-seconds 180", workflow)
+        self.assertIn("--wait-for-unlocked-seconds 90", workflow)
     def test_service_ui_does_not_import_provider_ml_packages(self):
         for name in ("pipeline_acestep_gradio.ipynb","pipeline_kokoro_gradio.ipynb",
                      "pipeline_whisper_gradio.ipynb","pipeline_qwen3_asr_gradio.ipynb",

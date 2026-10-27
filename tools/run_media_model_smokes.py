@@ -399,8 +399,14 @@ def _owner_matches_running_process(owner: dict[str, Any]) -> bool:
     return bool(actual and actual[:len(expected)] == expected)
 
 
-def _cleanup_owned_service(provider: str, log_dir: Path, *, grace_seconds: float = 15.0) -> dict[str, Any]:
-    """Stop only a provider process recorded by this run and matching its exact argv."""
+def _cleanup_owned_service(
+    provider: str, log_dir: Path, *, grace_seconds: float = 15.0,
+    allow_foreign_run: bool = False,
+) -> dict[str, Any]:
+    """Stop a recorded provider only when host and exact argv prove ownership.
+
+    Prior-run markers are accepted only during explicit orphan recovery.
+    """
     path = _service_owner_path(provider, log_dir)
     if not path.is_file() or path.is_symlink():
         return {"provider": provider, "status": "NOT_FOUND", "message": "no owned-process marker"}
@@ -413,7 +419,9 @@ def _cleanup_owned_service(provider: str, log_dir: Path, *, grace_seconds: float
     if owner.get("provider") != provider or owner.get("host") != socket.gethostname():
         return {"provider": provider, "status": "BLOCKED_OWNER_MISMATCH", "pid": owner.get("pid")}
     current_run_id = os.environ.get("GITHUB_RUN_ID", "local")
-    if owner.get("run_id") != current_run_id:
+    owner_run_id = owner.get("run_id")
+    recovered_prior_run = owner_run_id != current_run_id
+    if recovered_prior_run and not allow_foreign_run:
         return {"provider": provider, "status": "BLOCKED_RUN_ID_MISMATCH", "pid": owner.get("pid")}
     pid = owner.get("pid")
     if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1:
@@ -429,7 +437,9 @@ def _cleanup_owned_service(provider: str, log_dir: Path, *, grace_seconds: float
     while time.monotonic() < deadline:
         if not _pid_alive(pid):
             path.unlink(missing_ok=True)
-            return {"provider": provider, "status": "STOPPED", "pid": pid, "signal": "SIGTERM"}
+            return {"provider": provider, "status": "STOPPED", "pid": pid, "signal": "SIGTERM",
+                    "recovered_prior_run": recovered_prior_run, "owner_run_id": owner_run_id,
+                    "recovery_run_id": current_run_id}
         time.sleep(0.25)
     if not _owner_matches_running_process(owner):
         return {"provider": provider, "status": "BLOCKED_COMMAND_CHANGED", "pid": pid,
@@ -439,7 +449,9 @@ def _cleanup_owned_service(provider: str, log_dir: Path, *, grace_seconds: float
     while time.monotonic() < deadline:
         if not _pid_alive(pid):
             path.unlink(missing_ok=True)
-            return {"provider": provider, "status": "STOPPED", "pid": pid, "signal": "SIGKILL"}
+            return {"provider": provider, "status": "STOPPED", "pid": pid, "signal": "SIGKILL",
+                    "recovered_prior_run": recovered_prior_run, "owner_run_id": owner_run_id,
+                    "recovery_run_id": current_run_id}
         time.sleep(0.1)
     return {"provider": provider, "status": "STOP_FAILED", "pid": pid,
             "message": "recorded process remained alive after SIGKILL"}
@@ -483,6 +495,8 @@ def main() -> int:
                         help="After each attempted provider stops, purge that provider's exact cache through model_cache_manager.")
     parser.add_argument("--cleanup-owned-services", action="store_true",
                         help="Recovery mode: stop only model-service PIDs recorded by this run and matching exact argv.")
+    parser.add_argument("--recover-orphan-services", action="store_true",
+                        help="Explicitly recover a prior-run owner marker only when host, PID and exact argv still match.")
     parser.add_argument("--log-dir", type=Path,
                         help="Override the owner/report directory (defaults to $RUNNER_TEMP/oec-media-smoke-logs).")
     args = parser.parse_args()
@@ -493,8 +507,13 @@ def main() -> int:
     temp_dir = (args.log_dir.expanduser().resolve() if args.log_dir else
                 Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "oec-media-smoke-logs")
     temp_dir.mkdir(parents=True, exist_ok=True)
+    if args.recover_orphan_services and not args.cleanup_owned_services:
+        parser.error("--recover-orphan-services requires --cleanup-owned-services")
     if args.cleanup_owned_services:
-        cleanup_rows = [_cleanup_owned_service(provider, temp_dir) for provider in order]
+        cleanup_rows = [
+            _cleanup_owned_service(provider, temp_dir, allow_foreign_run=args.recover_orphan_services)
+            for provider in order
+        ]
         for row in cleanup_rows:
             print("OWNED_SERVICE_CLEANUP " + json.dumps(row, ensure_ascii=False), flush=True)
         blocked = [row for row in cleanup_rows if row["status"].startswith("BLOCKED") or row["status"] == "STOP_FAILED"]
