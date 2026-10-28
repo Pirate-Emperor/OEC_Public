@@ -2,8 +2,12 @@
 from __future__ import annotations
 import ast
 import json
+import re
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
+
+from tools.wan_xpu_compat import ensure_torch_xpu_compat
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOKS = {
@@ -127,10 +131,55 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn('if health.get("error") and not health.get("loading")', waiter)
         self.assertIn('tools/wait_for_media_service.py --url http://127.0.0.1:7869/health', workflow)
 
-    def test_wan_diffusers_xpu_shim_exposes_required_unavailable_backend_methods(self):
+    def test_wan_xpu_compat_repairs_an_incomplete_unavailable_xpu_stub(self):
+        xpu = SimpleNamespace(is_available=lambda: False, device_count=lambda: 0)
+        torch_module = SimpleNamespace(xpu=xpu)
+        self.assertIs(ensure_torch_xpu_compat(torch_module), xpu)
+        self.assertIsNone(xpu.empty_cache())
+        self.assertEqual(xpu.device_count(), 0)
+
+    def test_wan_xpu_compat_creates_an_unavailable_xpu_namespace_when_missing(self):
+        torch_module = SimpleNamespace()
+        xpu = ensure_torch_xpu_compat(torch_module)
+        self.assertIs(torch_module.xpu, xpu)
+        self.assertFalse(xpu.is_available())
+        self.assertEqual(xpu.device_count(), 0)
+        self.assertIsNone(xpu.empty_cache())
+
+    def test_wan_xpu_compat_does_not_mask_a_broken_live_xpu_backend(self):
+        xpu = SimpleNamespace(is_available=lambda: True, device_count=lambda: 1)
+        with self.assertRaisesRegex(RuntimeError, "available backend"):
+            ensure_torch_xpu_compat(SimpleNamespace(xpu=xpu))
+
+    def test_wan_notebook_exposes_gradio_ui_and_keeps_headless_asset_smoke(self):
         notebook = json.loads((ROOT / "pipeline_wan_video.ipynb").read_text(encoding="utf-8"))
-        source = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
-        self.assertIn("torch.xpu = SimpleNamespace(is_available=lambda: False, device_count=lambda: 0, empty_cache=lambda: None)", source)
+        source = "\\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+        self.assertIn("demo = gr.Interface(", source)
+        self.assertIn("demo.queue(max_size=1).launch(", source)
+        self.assertIn("server_port=7909", source)
+        self.assertIn("if SMOKE_MODE:", source)
+        self.assertIn("WAN_OUTPUT_PATH = worker.generate(", source)
+        self.assertIn('allow_flagging="never"', source)
+        self.assertEqual(notebook["metadata"]["kernelspec"]["name"], "conda-env-phase2_3d-py")
+
+    def test_model_notebook_gradio_ports_are_unique_and_separate_from_model_apis(self):
+        notebook_names = (
+            "pipeline_audiocraft.ipynb", "pipeline_audiogen_gradio.ipynb",
+            "pipeline_musicgen_gradio.ipynb", "pipeline_acestep_gradio.ipynb",
+            "pipeline_kokoro_gradio.ipynb", "pipeline_whisper_gradio.ipynb",
+            "pipeline_qwen3_asr_gradio.ipynb", "pipeline_flux_only.ipynb",
+            "pipeline_trellis_3d_only.ipynb", "pipeline_trellis_3d.ipynb",
+            "pipeline_ltx_video.ipynb", "pipeline_wan_video.ipynb",
+        )
+        ui_ports = []
+        api_ports = set()
+        for name in notebook_names:
+            notebook = json.loads((ROOT / name).read_text(encoding="utf-8"))
+            source = "\\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+            ui_ports.extend(int(port) for port in re.findall(r"server_port\s*=\s*([0-9]+)", source))
+            api_ports.update(int(port) for port in re.findall(r"http://127[.]0[.]0[.]1:([0-9]+)", source))
+        self.assertEqual(len(ui_ports), len(set(ui_ports)), f"Gradio UI port collision: {ui_ports}")
+        self.assertFalse(set(ui_ports) & api_ports, f"Gradio UI/API port collision: {set(ui_ports) & api_ports}")
 
     def test_musicgen_acceptance_copies_the_actual_metadata_sidecar(self):
         workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
