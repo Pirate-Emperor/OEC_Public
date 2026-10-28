@@ -1,4 +1,3 @@
-
 ## Current media-model acceptance status — 2026-10-28 IST
 
 Branch: `fix/media-stack-supervision-20261019`; current head `875b843715d806d5d9cfe3b16285eb59630ca6bf`. Code is the same as tested SHA `56999e9a21394766e8f2845ce5709e0184648f16`; the later commit only refreshed `TODO.md` and `docs/checklist.md`.
