@@ -1,31 +1,40 @@
 ## Current verified state — media models and StorageManager — 2026-10-28 IST
 
-Branch: fix/media-stack-supervision-20261019. Code head verified by current-head guard/background workflows: 0d68ab61a535a39d961ab52b0dbd518c2a2f74b4 (before this documentation-only commit).
+Branch: fix/media-stack-supervision-20261019. Current code head checked by the latest background and storage-guard runs: 1dd2018fc650551ba41f286843a74fc471d49395 (this status update is documentation-only).
 
-### Completed and evidence-backed
-- [x] **StorageManager background service is running.** Current-head workflow [40656971189](https://github.com/xflexwork/OEC/actions/runs/40656971189) completed SUCCESS on runner oec-2, host scn28-mn (same compute node as oec-1). It reported STORAGE_MANAGER_BACKGROUND=ACTIVE backend=detached pid=4034934 and STORAGE_MANAGER_BACKGROUND_VERIFIED=true after the verification delay. Log: /nlsasfs/home/lmedge/rahkus/.local/state/oec-storage-manager/monitor-0d68ab61a535a39d961ab52b0dbd518c2a2f74b4.log. The PID is the last verified start; future idempotent workflow runs may replace it, so use the newest run's log for the current PID.
-- [x] The service uses the pre-existing phase2_3d Conda environment. No package installations, environment removals, or environment replacements occurred.
-- [x] The storage-admission/static regression workflow passed on the same code head: [40656971220](https://github.com/xflexwork/OEC/actions/runs/40656971220), conclusion SUCCESS.
-- [x] The regression test test_expired_legacy_pause_lock_is_preserved_for_host_verified_recovery passed: an aged legacy pause lock is preserved rather than auto-deleted by age.
-- [x] Live StorageManager status at latest service start: models NORMAL, 57.02 GB of 230 GB, reserve 28.11 GB with 5 GiB target; outputs NORMAL, 314.90 MB of 1 GB, reserve 512 MB with 0.5 GiB target. Live Lustre quota sample: 1.89 TB used, soft 2.00 TB, hard 2.10 TB, hard headroom about 219.77 GB and write headroom about 117.37 GB. These are timestamped snapshots, not permanent capacity guarantees.
-- [x] Historical model PASS evidence is retained: AudioGen live Gradio WAV [40497104972](https://github.com/xflexwork/OEC/actions/runs/40497104972); MusicGen CLI and Gradio WAV [40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443); standalone and combined TRELLIS Gradio callbacks with valid GLB [40498778247](https://github.com/xflexwork/OEC/actions/runs/40498778247); FLUX PNG to TRELLIS GLB pipeline [40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341). These historical model passes are not a full current-head acceptance pass.
+### PASS / completed
+- [x] **Persistent StorageManager monitor PASS at current head.** [Workflow 40658495301](https://github.com/xflexwork/OEC/actions/runs/40658495301) completed SUCCESS on runner oec-2, host scn28-mn, the same compute node as oec-1. It reported `STORAGE_MANAGER_BACKGROUND=ACTIVE backend=detached pid=4057203`, `STORAGE_MANAGER_SOURCE_SHA=1dd2018fc650551ba41f286843a74fc471d49395`, and `STORAGE_MANAGER_BACKGROUND_VERIFIED=true` after the delay. Log: `/nlsasfs/home/lmedge/rahkus/.local/state/oec-storage-manager/monitor-1dd2018fc650551ba41f286843a74fc471d49395.log`.
+- [x] **Current-head static/storage regression suite PASS.** [Run 40658495285](https://github.com/xflexwork/OEC/actions/runs/40658495285) completed SUCCESS on the exact same SHA. The test for preserving an expired legacy pause lock passed.
+- [x] The manager uses existing Conda environment `phase2_3d`; no package install/removal or environment replacement occurred.
+- [x] Current manager-start live quota snapshot (2026-10-28 08:40:52Z): source live Lustre quota, used 1.89 TB, soft 2.00 TB, hard 2.10 TB, hard headroom 219.77 GB, write headroom 117.37 GB, grace inactive. Models: NORMAL, 57.02 GB / 230 GB, 28.11 GB reserve (5 GiB target). Outputs: NORMAL, 314.90 MB / 1 GB, 512 MB reserve (0.5 GiB target). This snapshot is time-specific, not a standing authorization.
+- [x] **Model cache inventory completed read-only on current head.** `MEDIA_MODEL_CACHE_INVENTORY_RC=0`; it did not download or purge model files. Summary is recorded below.
+- [x] Historical verified outputs are retained: AudioGen Gradio WAV [40497104972](https://github.com/xflexwork/OEC/actions/runs/40497104972); MusicGen CLI and Gradio WAV [40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443); standalone and combined TRELLIS Gradio GLBs [40498778247](https://github.com/xflexwork/OEC/actions/runs/40498778247); composite FLUX PNG → TRELLIS GLB [40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341). Do not rerun these just to duplicate successful assets unless the executable source changed.
 
-### Current blockers / not yet accepted
-- [ ] **Overall model acceptance remains NOT YET ACCEPTED.** The standard full acceptance workflow calls the host/PID/lease recovery helper, but the required recovery host scn30-mn is unavailable to the current runner labels on scn28-mn. Do not bypass this boundary.
-- [ ] **Legacy model-storage pause lock stays preserved.** The recorded legacy lock has PID 2036305 and lacks enough host identity to prove that PID is dead on the shared filesystem. The background manager honors the lock; it has not cleared it or downloaded into the protected models directory.
-- [ ] Model cache inventory previously reported a remote-or-unknown runtime lock on scn30-mn, PID 770804. The exact cache remains protected until the approved host or owner verifies the lock.
-- [ ] Read-only setup audit [40655747439](https://github.com/xflexwork/OEC/actions/runs/40655747439) failed on existing environment imports (HPC libgomp undefined symbol in phase1; Qwen2-VL import probes timed out). No install was attempted.
-- [ ] Not yet verified on current source: standalone FLUX Gradio; LTX text-to-video and image-to-video MP4 callbacks; Wan notebook MP4 generation; current-head Kokoro, Whisper, Qwen3-ASR and ACE-Step. Run only once a safe cache-only path or authorized StorageManager download admission is available.
-- [ ] Deployment Torch/NCCL import failure remains open. Encrypted-HF readback remains BLOCKED until real repository/manifest/hash/key/decryptor inputs are configured.
-- [ ] Canonical root sync remains blocked by the explicit approved-origin guard because this fork's origin is not CalamityStriker/OEC. Do not bypass without the canonical repository owner's approval.
+### Current cache/lock inventory (read-only)
+- [ ] **FLUX Klein:** both configured model cache locations absent; no runtime lock. Its Python pipeline and notebook blobs match the earlier code snapshot byte-for-byte, and a historical real image-generation callback passed. Do not repeat FLUX solely for the same output; current cache misses mean a fresh run needs an authorized download.
+- [ ] **TRELLIS.2:** both configured HF cache locations absent; no runtime lock in this inventory. Standalone and combined notebook callbacks already generated valid GLBs historically. Do not reload just to duplicate them; new inference needs cache restoration under approved storage admission.
+- [ ] **LTX 2.3:** model cache absent, no runtime lock. Notebook and API source match the prior baseline byte-for-byte, but T2V and I2V MP4 callbacks have not been proved successful. Both need model weights, so are blocked by the unresolved model-storage pause lock.
+- [ ] **Wan T2V 14B:** all configured model cache locations absent and no runtime lock. The notebook source changed since the older snapshot to add the XPU compatibility fix; this remains the next video-model generation test, but requires safe model-download admission.
+- [ ] **ACE-Step:** cache present, but runtime lock is `remote-or-unknown`, host `scn30-mn`, PID `774590`; preserve it.
+- [ ] **Kokoro:** cache present, but runtime lock is `remote-or-unknown`, host `scn30-mn`, PID `767977`; preserve it.
+- [ ] **Qwen3-ASR 0.6B:** cache present, but runtime lock is `remote-or-unknown`, host `scn30-mn`, PID `771488`; preserve it.
+- [ ] **Whisper turbo:** cache present, about 1.62 GB, but runtime lock is `remote-or-unknown`, host `scn30-mn`, PID `770804`; preserve it.
+- [ ] **AudioGen and MusicGen:** caches absent after prior successful tests; their locks appear stale on `scn28-mn` (AudioGen PID `2232520`, MusicGen PID `2234178`). A future managed start may recover a stale lock after proving same-host PID death, but the caches are absent and current storage policy blocks model downloads while the legacy pause lock remains.
 
-**Current status: StorageManager service PASS; static/storage regression suite PASS; complete model acceptance NOT YET ACCEPTED.**
+### Remaining blocker
+- [ ] **Legacy model-storage pause lock:** previously recorded at `/nlsasfs/home/lmedge/rahkus/aireos_models/.storage_pause.lock`, legacy PID `2036305`. It does not encode trustworthy host identity; age alone is not proof of remote PID death. The authorized recovery script is restricted to `oec-1/scn30-mn`, while current oec-1/oec-2 runners are on `scn28-mn`. Preserve the lock; do not clear it, resize reserves, or download models through the protected directory from this host.
+- [ ] **No exact-head full model acceptance yet.** Existing model-output passes are historical candidate-level evidence, not a claim that every pipeline is currently accepted.
+- [ ] **Existing environment defects:** read-only audit [40655747439](https://github.com/xflexwork/OEC/actions/runs/40655747439) recorded an HPC `libgomp.so.1` undefined-symbol error in the existing `phase1` Torch import and Qwen2-VL import timeouts in `phase1_ltx` and `phase2_3d`. No installation was attempted.
+- [ ] **Canonical sync still blocked** by the explicit approved-origin check: this fork origin is not `CalamityStriker/OEC`; no bypass made.
+- [ ] Deployment Torch/NCCL import remains broken; encrypted-HF read-back remains blocked until real repository/manifest/hash/key/decryptor inputs are configured.
 
-### Next work
-1. Do not repeat AudioGen, MusicGen, or TRELLIS runs just to reproduce already validated assets; reuse their historical evidence unless their model code changes.
-2. Continue with the remaining unverified Gradio assets in order: standalone FLUX PNG, LTX text-to-video MP4, LTX image-to-video MP4, then Wan MP4. Before each model download, require an available cache or a fresh successful StorageManager admission; the unresolved legacy pause lock currently prevents the latter.
-3. Continue speech/ACE-Step after owner-safe runtime-lock recovery is available. Preserve remote/unknown cache locks and report blocked checks as BLOCKED, not PASS.
-4. Each model PASS requires real Gradio callback inference, valid decoded/reopened asset, confirmed service shutdown, and cache purge or already-absent confirmation.
+**Overall: StorageManager PASS; current-head static/storage guards PASS; all-model acceptance NOT YET ACCEPTED.**
+
+### Next actions
+1. Obtain an approved `scn30-mn` host-local verification/recovery for the legacy pause lock and remote model locks. That is the bottleneck preventing new model downloads; do not weaken the safety policy.
+2. Once that is resolved, continue with Wan MP4 generation (source changed), then LTX text-to-video and image-to-video MP4. Use existing cache if available or an approved fresh StorageManager write lease; validate output with ffprobe and stop the service before cache cleanup.
+3. Preserve prior successful AudioGen, MusicGen, and TRELLIS evidence; do not rerun those without a relevant source change.
+4. Record each model's Gradio UI launch, generated asset validation, managed service stop, cache cleanup, and final storage status.
 
 ---
 ## Historical verified state — 2026-10-21 (superseded by current snapshot)
