@@ -201,7 +201,7 @@ jobs:
       group: oec-canonical-source-reconcile
       # Serialize changes to the persistent canonical checkout; never cancel a live Git operation.
       cancel-in-progress: false
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train-2]
     timeout-minutes: 12
     defaults:
       run:
@@ -214,9 +214,10 @@ jobs:
       - name: Reconcile persistent root without discarding local work
         env:
           OEC_SYNC_BRANCH: fix/media-stack-supervision-20261019
-          GITHUB_TOKEN: \${{ github.token }}
+          OEC_SOURCE_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-2"
+          test "$RUNNER_NAME" = "oec-train-2"
           bash -n tools/reconcile_a100_oec_root.sh tools/sync_feature_branch_a100.sh
           timeout --signal=INT --kill-after=15s 600s bash tools/reconcile_a100_oec_root.sh

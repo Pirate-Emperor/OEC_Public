@@ -20,7 +20,7 @@ permissions:
 jobs:
   static-write-guard-regressions:
     name: Static notebook, CLI and storage-admission regressions
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train]
     timeout-minutes: 15
     steps:
       - name: Checkout isolated candidate branch

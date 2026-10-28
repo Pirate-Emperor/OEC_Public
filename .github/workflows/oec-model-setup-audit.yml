@@ -28,7 +28,7 @@ concurrency:
 jobs:
   read-only-model-setup-audit:
     name: StorageManager + cache + env audit + aggregate preflight
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train]
     timeout-minutes: 30
     defaults:
       run:
@@ -42,8 +42,8 @@ jobs:
       - name: Confirm assigned runner and existing Python environment
         run: |
           set -euo pipefail
-          test "${RUNNER_NAME:-unknown}" = "oec-1" || {
-            echo "::error::Expected assigned oec-1 A100 runner; no setup attempted."
+          test "${RUNNER_NAME:-unknown}" = "oec-train" || {
+            echo "::error::Expected assigned oec-train A100 runner; no setup attempted."
             exit 2
           }
           if [[ -f "$HOME/Conda/bin/activate" ]]; then

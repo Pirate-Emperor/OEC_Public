@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   musicgen-inference:
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train-2]
     timeout-minutes: 60
     defaults:
       run:
@@ -35,7 +35,7 @@ jobs:
       - name: Validate AudioCraft phase1 environment and A100
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-2"
+          test "$RUNNER_NAME" = "oec-train-2"
           test -f "$HOME/OEC/storage_config.json"
           install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
           "$HOME/Conda/condabin/conda" run --no-capture-output -n phase1 python -c 'import torch, torchaudio, audiocraft, soundfile; print("ENV=phase1"); print("TORCH="+torch.__version__); print("TORCHAUDIO="+torchaudio.__version__); print("AUDIOCRAFT="+__import__("importlib.metadata",fromlist=["version"]).version("audiocraft")); print("CUDA="+str(torch.version.cuda)); assert torch.cuda.is_available()'

@@ -1,11 +1,44 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-28T16:41:27+05:30",
+  "last_updated": "2026-10-28T16:45:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Tested candidate 9e01a6492f9058e6c70ecd8908fc3711a99f0acd on fix/media-stack-supervision-20261019: UI-only launch PASS for 13 configured cases (40671622051); static/storage regression PASS (40671622040). Full model acceptance 40671622024 stopped before inference in runner/StorageManager validation; no new model assets accepted. A100 root sync 40678285024 passed the approved-origin guard and live storage preflight, then failed when the persistent checkout attempted a GitHub fetch without usable credentials. The follow-up commit supplies the Actions read-only GITHUB_TOKEN ephemerally to Git processes; the token is not written to disk. Root sync still requires a new run confirming exact canonical checkout SHA and final status.",
+  "latest_summary": "On branch fix/media-stack-supervision-20261019, current reviewed candidate 0eb3562689e50ca2756fb4980913b4874ef15970 had two A100 sync failures after the origin-allowlist change: run 40678285024 reached live storage preflight but failed Git authentication; run 40678737412 failed because an earlier credential patch escaped shell variable expansion. Current patch fixes token quoting, fetches branch explicitly from xflexwork/OEC with ephemeral GITHUB_TOKEN Git config, and aligns model/sync runner selectors with oec-train/oec-train-2. Current-source Gradio callback asset acceptance remains unproved: run 40671622024 stopped before inference. Successful UI-only and historical asset evidence is not current-candidate callback proof.",
   "experiments": [
+    {
+      "id": "EXP-2026-10-28-ROOT-SYNC-AND-RUNNER-IDENTITY-CORRECTION",
+      "date": "2026-10-28",
+      "category": "A100 root-sync authentication and accepted runner routing",
+      "approach": "Reviewed consecutive canonical sync logs and the workflow's actual runner selectors. Run 40678285024 passed origin and storage admission but failed fetching the configured legacy remote without credentials. The following attempt 40678737412 then hit a literal escaped shell variable from the credential hotfix. Changed the root sync to pass the read-only Actions token through process-only Git config and fetch the explicit xflexwork/OEC branch URL; aligned the applicable model workflows and conservative recovery helper to the user-specified oec-train/oec-train-2 runner names.",
+      "reason": "Ensure the local canonical A100 checkout syncs from the requested repository on the intended runner, and make a full generation attempt use the designated model runner instead of the mismatched historical label.",
+      "parameters": {
+        "branch": "fix/media-stack-supervision-20261019",
+        "reviewed_parent": "0eb3562689e50ca2756fb4980913b4874ef15970",
+        "previous_root_sync_runs": [
+          40678285024,
+          40678737412
+        ],
+        "source_repository": "xflexwork/OEC",
+        "designated_runners": [
+          "oec-train",
+          "oec-train-2"
+        ]
+      },
+      "results": {
+        "run_40678285024": "FAIL: origin guard and live storage admission passed, but Git fetch lacked an authenticating credential.",
+        "run_40678737412": "FAIL: credential patch used escaped shell variable syntax and rejected GIT_CONFIG_COUNT before fetching.",
+        "new_sync_code": "Uses read-only GITHUB_TOKEN through process-only Git config, explicitly fetches xflexwork/OEC into refs/remotes/oec-sync/<branch>, leaves the persistent checkout's remotes unchanged.",
+        "runner_routing": "Main Gradio acceptance targets oec-train; canonical A100 synchronization targets oec-train-2; recovery still requires the exact designated hostname scn30-mn and dead local owner/no lease checks.",
+        "generated_assets": "No new output accepted from these sync runs; callback validation remains pending on the corrected current candidate."
+      },
+      "interpretation": "These are corrective code changes, not passes. Root sync is only complete after Actions confirms the exact remote target SHA on the canonical A100 checkout and final status; model acceptance requires real generated files from the current candidate.",
+      "limitations": [
+        "GitHub Actions runner availability/host identity is verified only by the next actual workflow run.",
+        "The Actions token is scoped to the current repository; private submodules outside that scope may still refuse fetch.",
+        "The original locked-state safeguards and non-destructive recovery behavior remain required."
+      ]
+    },
     {
       "id": "EXP-2026-10-28-A100-SYNC-EPHEMERAL-GIT-AUTH",
       "date": "2026-10-28",
@@ -5986,6 +6019,6 @@
       ]
     }
   ],
-  "updated_at": "2026-10-28T16:41:27+05:30",
+  "updated_at": "2026-10-28T16:45:00+05:30",
   "updated_date": "2026-10-28"
 }

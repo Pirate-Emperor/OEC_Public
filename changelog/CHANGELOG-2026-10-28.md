@@ -28,3 +28,11 @@ Candidate before tracker/sync correction: `f9b3f095e7f711d88a996ad3842d140a312e6
 - [Run 40678285024](https://github.com/xflexwork/OEC/actions/runs/40678285024) passed the repo-origin guard and live storage preflight but failed at Git fetch due missing authentication for the persistent checkout. No canonical SHA confirmation was emitted.
 - Root-sync workflow now passes its repository-scoped read-only token to the script as an ephemeral Git extraheader inherited by nested Git processes; it is never written to the persistent checkout.
 - Re-run must prove canonical A100 SHA equals the new branch SHA and report final clean status. This sync result does not substitute for current-candidate Gradio output generation/validation.
+
+
+## Corrective follow-up — runner selectors and root-sync authentication
+
+- Run 40678737412 failed before fetch because a prior auth patch emitted escaped Bash variable expansion. This is explicitly recorded; the code has been corrected.
+- Reconciliation now authenticates from the read-only workflow token without persisting credentials and fetches the explicit `xflexwork/OEC` target branch, rather than assuming the canonical checkout's legacy origin is the feature source.
+- Main model acceptance now uses the specified `oec-train` runner; root-sync and other relevant A100 workflows use `oec-train-2`. Legacy lock recovery is still confined to `oec-train/scn30-mn`, with owner PID, lock age and lease checks intact.
+- Run evidence is still required before marking sync or current-candidate asset generation as PASS.

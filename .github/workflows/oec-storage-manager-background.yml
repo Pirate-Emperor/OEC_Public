@@ -23,8 +23,8 @@ concurrency:
 
 jobs:
   ensure-background-monitor:
-    name: Ensure StorageManager stays running on the compute node shared with oec-1
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    name: Ensure StorageManager stays running on the compute node shared with oec-train
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train-2]
     timeout-minutes: 10
     defaults:
       run:
@@ -39,9 +39,9 @@ jobs:
         id: manager
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-2" || { echo "::error::Expected co-located oec-2 runner, got $RUNNER_NAME"; exit 2; }
+          test "$RUNNER_NAME" = "oec-train-2" || { echo "::error::Expected co-located oec-train-2 runner, got $RUNNER_NAME"; exit 2; }
           HOST="$(hostname -s)"
-          test "$HOST" = "scn28-mn" || { echo "::error::Expected the compute node currently hosting oec-1 (scn28-mn), got $HOST"; exit 2; }
+          test "$HOST" = "scn28-mn" || { echo "::error::Expected the compute node for oec-train-2 (scn28-mn), got $HOST"; exit 2; }
           ACCOUNT_HOME="$(getent passwd "$(id -u)" | cut -d: -f6)"
           CONDA_EXE=""
           for candidate in "$HOME/Conda/condabin/conda" "$ACCOUNT_HOME/Conda/condabin/conda"; do

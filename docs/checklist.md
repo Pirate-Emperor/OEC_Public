@@ -1,13 +1,14 @@
-## CURRENT STATUS — 2026-10-28 16:41 IST (tested candidate 9e01a6492f90)
+## CURRENT STATUS — 2026-10-28 16:45 IST
 
-**This block supersedes older “current status” and SHA claims in the historical notes below.** Branch: `fix/media-stack-supervision-20261019`; root-sync candidate tested: `9e01a6492f9058e6c70ecd8908fc3711a99f0acd`.
+**Latest reviewed source before this correction:** `0eb3562689e50ca2756fb4980913b4874ef15970`. Branch: `fix/media-stack-supervision-20261019`.
 
-- [x] Gradio UI launch smoke: [run 40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051) **PASS_UI_ONLY** for all 13 configured cases. Interface launch/HTTP responses were verified; callbacks and generated assets were not proven.
-- [x] Static/storage/notebook regression: [run 40671622040](https://github.com/xflexwork/OEC/actions/runs/40671622040) **PASS**, including 37 Gradio/notebook tests and selected notebook JSON checks.
-- [ ] **Real Gradio callback + asset acceptance: NOT PASSED on this candidate.** [run 40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) failed before inference during assigned-runner/StorageManager configuration validation; the AudioGen, MusicGen, speech, ACE-Step, TRELLIS, FLUX, LTX T2V/I2V and Wan generation steps were skipped. No new asset from this run is accepted.
-- [ ] **A100 canonical sync: NOT YET VERIFIED.** [run 40678285024](https://github.com/xflexwork/OEC/actions/runs/40678285024) passed the origin allow-list and live storage preflight, then failed at a Git fetch because the persistent checkout lacked a usable GitHub credential. The follow-up change supplies the workflow's read-only `GITHUB_TOKEN` through process-only Git config, without persisting it in the checkout.
-- [ ] Only mark synchronization PASS after an Actions log proves the canonical A100 checkout SHA equals the branch SHA and final checkout status is clean. Only mark generation PASS after actual Gradio callback outputs pass file/format validation (WAV decode; transcription result; PNG decode; GLB parse/reopen; MP4 decode).
-- No Conda environment was recreated, no packages were installed/removed, and no protected model cache or storage lock was deleted.
+- [x] **UI-only launch:** [run 40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051) passed all 13 configured cases. This is not proof of callback execution or file generation.
+- [x] **Static/storage regression:** [run 40671622040](https://github.com/xflexwork/OEC/actions/runs/40671622040) passed on `f9b3f095`, including 37 notebook/Gradio tests. New sync/runner-contract tests are added in the next candidate and need their own CI result.
+- [ ] **Current-source callback + generated asset validation:** still NOT accepted. [Run 40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) stopped before inference at preflight, so model callback steps were skipped and no new current-source asset was accepted.
+- [ ] **A100 repository sync:** still NOT verified. [Run 40678285024](https://github.com/xflexwork/OEC/actions/runs/40678285024) reached the origin guard and storage preflight but failed authenticating Git. [Run 40678737412](https://github.com/xflexwork/OEC/actions/runs/40678737412) then failed because the first credential patch literally escaped Bash variable expansion. Both failures are recorded; the correction below fixes the quoting and fetches the explicit source repository `xflexwork/OEC`.
+- [ ] **Runner selection corrected:** the configured model acceptance and A100 sync jobs previously targeted `oec-1/oec-2`; these are now being aligned to the requested `oec-train/oec-train-2` names, and the conservative lock-recovery identity is updated to `oec-train/scn30-mn`. The host check remains in place and must pass at runtime; it is not being weakened.
+- [ ] **Required final evidence:** canonical A100 checkout SHA must equal the branch SHA and report final status; each actual Gradio callback must produce a non-empty file or transcription result that passes relevant media/parser validation (WAV decode, PNG decode, GLB parse/reopen, MP4 decode/playability). No UI-only run can satisfy this.
+- Existing Conda environments and protected model cache/locks are preserved. No environment recreation, dependency installation/removal, or lock/cache bypass is part of this update.
 
 ---
 

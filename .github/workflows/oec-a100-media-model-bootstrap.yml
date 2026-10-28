@@ -39,13 +39,13 @@ permissions:
   contents: read
 
 concurrency:
-  # Shared oec-2 GPU and StorageManager state: serialize all media jobs.
+  # Shared oec-train-2 GPU and StorageManager state: serialize all media jobs.
   group: oec-media-gpu-storage-serial
   cancel-in-progress: false
 
 jobs:
   inspect-download-smoke:
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train-2]
     timeout-minutes: 90
     defaults:
       run:
@@ -89,7 +89,7 @@ jobs:
           fi
           echo "OEC_PYTHON=$selected" >> "$GITHUB_ENV"
           "$selected" --version
-          test "${RUNNER_NAME:-unknown}" = "oec-2" || { echo "::error::Expected oec-2 A100 runner, got ${RUNNER_NAME:-unknown}"; exit 52; }
+          test "${RUNNER_NAME:-unknown}" = "oec-train-2" || { echo "::error::Expected oec-train-2 A100 runner, got ${RUNNER_NAME:-unknown}"; exit 52; }
           echo "Runner host: $(hostname)"
           echo "Runner name: $RUNNER_NAME"
           echo "Python: $selected"

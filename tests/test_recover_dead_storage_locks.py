@@ -27,7 +27,7 @@ class RecoverDeadStorageLocksTests(unittest.TestCase):
         return recover_area(
             "outputs",
             system_dirs=self.system_dirs,
-            runner_name="oec-1",
+            runner_name="oec-train",
             hostname="scn30-mn",
             now=2000.0,
             pid_is_alive=lambda pid: False,
@@ -55,14 +55,14 @@ class RecoverDeadStorageLocksTests(unittest.TestCase):
 
     def test_live_owner_is_never_resumed(self):
         with self.assertRaisesRegex(RuntimeError, "alive"):
-            recover_area("outputs", system_dirs=self.system_dirs, runner_name="oec-1",
+            recover_area("outputs", system_dirs=self.system_dirs, runner_name="oec-train",
                          hostname="scn30-mn", now=2000.0,
                          pid_is_alive=lambda pid: True, resume=self._resume)
         self.assertTrue(self.lock.exists())
 
     def test_unknown_runner_or_host_is_never_resumed(self):
         with self.assertRaisesRegex(RuntimeError, "restricted"):
-            recover_area("outputs", system_dirs=self.system_dirs, runner_name="oec-2",
+            recover_area("outputs", system_dirs=self.system_dirs, runner_name="oec-train-2",
                          hostname="worker2", now=2000.0,
                          pid_is_alive=lambda pid: False, resume=self._resume)
         self.assertTrue(self.lock.exists())

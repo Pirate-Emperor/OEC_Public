@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Conservatively recover a dead local OEC storage lock on the dedicated oec-1 runner.
+"""Conservatively recover a dead local OEC storage lock on the dedicated oec-train runner.
 
 Legacy pause-locks do not contain host metadata. Recovery is therefore limited to
-the known oec-1 / scn30-mn A100 workflow host, with a dead local PID, no lease
+the known oec-train / scn30-mn A100 workflow host, with a dead local PID, no lease
 manifest, an aged lock, and StorageManager's own --resume command. This script
 never removes or resizes a reserve file and never clears a lease manifest.
 """
@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 from core_config import SYSTEM_DIRS  # noqa: E402
 from storage_reserve_probe import inspect_managed_reserve  # noqa: E402
 
-EXPECTED_RUNNER = "oec-1"
+EXPECTED_RUNNER = "oec-train"
 EXPECTED_HOST = "scn30-mn"
 MINIMUM_LOCK_AGE_SECONDS = 300
 

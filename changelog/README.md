@@ -1,3 +1,10 @@
+## 2026-10-28 — A100 runner routing, sync authentication, and Gradio asset acceptance
+
+- Root-sync failures are recorded: [40678285024](https://github.com/xflexwork/OEC/actions/runs/40678285024) lacked Git authentication; [40678737412](https://github.com/xflexwork/OEC/actions/runs/40678737412) rejected the incorrectly escaped credential variable.
+- The source-sync implementation now fetches explicitly from `xflexwork/OEC` and passes the repository-scoped Actions token via process-only Git configuration. It does not rewrite the persistent checkout remote or store credentials.
+- Model/sync workflows and the conservative lock-recovery helper are aligned to the specified `oec-train` / `oec-train-2` runner names; the designated `scn30-mn` hostname check and lease/PID safeguards remain.
+- The current branch still requires post-fix evidence: A100 canonical SHA equality and real Gradio callback-generated assets validated by decoder/parser checks.
+
 ## 2026-10-28 follow-up — root-sync Git authentication
 
 - [Root-sync run 40678285024](https://github.com/xflexwork/OEC/actions/runs/40678285024) passed origin approval and live storage preflight but failed at the authenticated fetch (Git could not read a password for the GitHub remote).

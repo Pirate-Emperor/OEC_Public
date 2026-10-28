@@ -13,7 +13,7 @@ concurrency:
 jobs:
   canonical-root-sync:
     name: Reconcile the single canonical checkout
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train-2]
     timeout-minutes: 12
     defaults:
       run:
@@ -28,6 +28,8 @@ jobs:
           OEC_SYNC_BRANCH: fix/media-stack-supervision-20261019
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-2"
+          test "$RUNNER_NAME" = "oec-train-2"
+          GITHUB_TOKEN: ${{ github.token }}
+          OEC_SOURCE_REPOSITORY: ${{ github.repository }}
           bash -n tools/reconcile_a100_oec_root.sh tools/sync_feature_branch_a100.sh
           timeout --signal=INT --kill-after=15s 600s bash tools/reconcile_a100_oec_root.sh

@@ -16,8 +16,8 @@ concurrency:
 
 jobs:
   sync-source:
-    name: Sync current source safely to oec-2
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    name: Sync current source safely to oec-train-2
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train-2]
     timeout-minutes: 10
     defaults:
       run:
@@ -27,10 +27,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Require oec-2 and non-destructive source synchronization
+      - name: Require oec-train-2 and non-destructive source synchronization
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OEC_SOURCE_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-2"
+          test "$RUNNER_NAME" = "oec-train-2"
           test -x "$HOME/Conda/condabin/conda"
           test -f "$HOME/OEC/storage_config.json"
           install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
@@ -46,10 +49,10 @@ jobs:
           printf 'OEC_LIVE_ACTUAL_SHA=%s\n' "$actual"
 
   recover-storage-locks:
-    name: Authorized legacy storage-lock recovery (oec-1 only)
+    name: Authorized legacy storage-lock recovery (oec-train only)
     needs: sync-source
     if: ${{ always() && needs.sync-source.result == 'success' }}
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train]
     timeout-minutes: 15
     defaults:
       run:
@@ -62,8 +65,8 @@ jobs:
       - name: Run only authorized conservative legacy lock recovery
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-1" || {
-            echo "::error::Legacy recovery is permitted only on oec-1."
+          test "$RUNNER_NAME" = "oec-train" || {
+            echo "::error::Legacy recovery is permitted only on oec-train."
             exit 2
           }
           test -x "$HOME/Conda/condabin/conda"
@@ -80,7 +83,7 @@ jobs:
     name: Real Kokoro, Whisper, Qwen3-ASR and ACE-Step inference + Gradio callbacks
     needs: [sync-source, recover-storage-locks]
     if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train-2]
     env:
       OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
     timeout-minutes: 180
@@ -95,7 +98,7 @@ jobs:
       - name: Validate runner and live StorageManager config
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-2"
+          test "$RUNNER_NAME" = "oec-train-2"
           test -x "$HOME/Conda/condabin/conda"
           test -f "$HOME/OEC/storage_config.json"
           install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
@@ -210,7 +213,7 @@ jobs:
     name: AudioGen actual inference and Gradio callback
     needs: [prepare-media-services, sync-source, recover-storage-locks]
     if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train-2]
     env:
       OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
     timeout-minutes: 60
@@ -225,7 +228,7 @@ jobs:
       - name: Validate runner/config and AudioCraft environment
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-2"
+          test "$RUNNER_NAME" = "oec-train-2"
           test -x "$HOME/Conda/condabin/conda"
           test -f "$HOME/OEC/storage_config.json"
           install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
@@ -258,7 +261,7 @@ jobs:
     name: MusicGen actual inference and Gradio callback
     needs: [audiogen-notebook, sync-source, recover-storage-locks]
     if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train-2]
     env:
       OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
     timeout-minutes: 60
@@ -273,7 +276,7 @@ jobs:
       - name: Validate runner/config and MusicGen environment
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-2"
+          test "$RUNNER_NAME" = "oec-train-2"
           test -x "$HOME/Conda/condabin/conda"
           test -f "$HOME/OEC/storage_config.json"
           install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
@@ -313,7 +316,7 @@ jobs:
     name: LTX and TRELLIS real sidecar inference
     needs: [musicgen-notebook, sync-source, recover-storage-locks]
     if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train-2]
     env:
       OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
     timeout-minutes: 150
@@ -328,7 +331,7 @@ jobs:
       - name: Validate runner/config and compile visual adapters
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-2"
+          test "$RUNNER_NAME" = "oec-train-2"
           test -x "$HOME/Conda/condabin/conda"
           test -f "$HOME/OEC/storage_config.json"
           install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
@@ -359,7 +362,7 @@ jobs:
     name: FLUX PNG to TRELLIS GLB actual inference
     needs: [visual-sidecars, sync-source, recover-storage-locks]
     if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train-2]
     env:
       OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
     timeout-minutes: 150
@@ -374,7 +377,7 @@ jobs:
       - name: Validate phase2_3d and run component contracts
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-2"
+          test "$RUNNER_NAME" = "oec-train-2"
           test -x "$HOME/Conda/condabin/conda"
           test -f "$HOME/OEC/storage_config.json"
           install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
@@ -406,7 +409,7 @@ jobs:
     name: LTX -> Qwen2-VL QA -> HF resumable upload -> remote hash read-back
     needs: [flux-trellis, sync-source, recover-storage-locks]
     if: ${{ always() && needs.sync-source.result == 'success' && needs.recover-storage-locks.result == 'success' }}
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train-2]
     env:
       OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
     timeout-minutes: 180
@@ -421,7 +424,7 @@ jobs:
       - name: Validate runner/config and compile end-to-end harness
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-2"
+          test "$RUNNER_NAME" = "oec-train-2"
           test -x "$HOME/Conda/condabin/conda"
           test -f "$HOME/OEC/storage_config.json"
           install -m 600 "$HOME/OEC/storage_config.json" "$GITHUB_WORKSPACE/storage_config.json"
@@ -430,7 +433,7 @@ jobs:
           "$HOME/Conda/condabin/conda" run --no-capture-output -n oec_deploy python storage_manager.py --status
       - name: Run the joined Brain/LTX/Qwen2-VL/HF chunk/read-back acceptance
         env:
-          OEC_EXPECTED_RUNNER: oec-2
+          OEC_EXPECTED_RUNNER: oec-train-2
         run: |
           set -euo pipefail
           R="$RUNNER_TEMP/oec-live-acceptance-$GITHUB_RUN_ID/e2e"

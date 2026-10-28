@@ -22,14 +22,14 @@ permissions:
   contents: read
 
 concurrency:
-  # Serialize with all other oec-2 model/storage workflows.
+  # Serialize with all other oec-train-2 model/storage workflows.
   group: oec-media-gpu-storage-serial
   cancel-in-progress: false
 
 jobs:
   live-qa-upload-e2e:
     name: LTX -> Qwen2-VL QA -> HF chunk upload -> read-after-write
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train-2]
     timeout-minutes: 180
     defaults:
       run:
@@ -43,8 +43,8 @@ jobs:
       - name: Confirm assigned runner and existing environments
         run: |
           set -euo pipefail
-          test "${RUNNER_NAME:-unknown}" = "oec-2" || {
-            echo "::error::This live pipeline must run on oec-2."
+          test "${RUNNER_NAME:-unknown}" = "oec-train-2" || {
+            echo "::error::This live pipeline must run on oec-train-2."
             exit 2
           }
           test -x "$HOME/Conda/condabin/conda"
@@ -61,7 +61,7 @@ jobs:
       - name: Run guarded live LTX -> QA -> resumable upload -> remote verification
         id: e2e
         env:
-          OEC_EXPECTED_RUNNER: oec-2
+          OEC_EXPECTED_RUNNER: oec-train-2
           OEC_ALLOW_OEC_PLAY_IDLE_GPU_SHARING: "1"
           OEC_E2E_REPORT_DIR: ${{ runner.temp }}/oec-e2e-acceptance-${{ github.run_id }}
         run: |
