@@ -99,7 +99,7 @@ class TrellisEasyRunTests(unittest.TestCase):
         only = (ROOT / "pipeline_trellis_3d_only.ipynb").read_text(encoding="utf-8")
         self.assertIn("server_port=7862", combined)
         self.assertIn("server_port=7863", combined)
-        self.assertIn("server_port=7862", only)
+        self.assertIn("server_port=7910", only)
         self.assertIn("trellis-api", combined)
         self.assertIn("trellis-api", only)
         self.assertIn("inline=False", combined)

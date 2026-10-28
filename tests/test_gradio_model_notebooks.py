@@ -181,6 +181,14 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertEqual(len(ui_ports), len(set(ui_ports)), f"Gradio UI port collision: {ui_ports}")
         self.assertFalse(set(ui_ports) & api_ports, f"Gradio UI/API port collision: {set(ui_ports) & api_ports}")
 
+    def test_acestep_ui_startup_does_not_import_soundfile_from_the_frontend_env(self):
+        notebook = json.loads((ROOT / "pipeline_acestep_gradio.ipynb").read_text(encoding="utf-8"))
+        source = "\\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+        self.assertNotIn("import soundfile", source)
+        self.assertIn("def validate_audio_stream(", source)
+        self.assertIn("wave.open(", source)
+        self.assertIn('header[:4] != b"fLaC"', source)
+
     def test_gradio_ui_only_runner_supports_wan_without_loading_weights(self):
         runner = (ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
         notebook = json.loads((ROOT / "pipeline_wan_video.ipynb").read_text(encoding="utf-8"))

@@ -67,10 +67,12 @@ jobs:
             local env_name="$1" provider="$2" report_dir="$ROOT_REPORT/$2"
             mkdir -p "$report_dir"
             echo "UI_ONLY_CASE_START provider=$provider env=$env_name"
+            set +e
             timeout --signal=INT --kill-after=5s 120s "$CONDA_EXE" run --no-capture-output -n "$env_name" \
               python tools/run_gradio_model_notebook_smokes.py --provider "$provider" --ui-only --report-dir "$report_dir" \
               2>&1 | tee "$report_dir/ui-launch.log"
             local rc=${PIPESTATUS[0]}
+            set -e
             echo "UI_ONLY_CASE_END provider=$provider rc=$rc"
             if [[ "$rc" -ne 0 ]]; then failures=$((failures + 1)); fi
           }
