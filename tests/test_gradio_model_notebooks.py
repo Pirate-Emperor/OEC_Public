@@ -305,6 +305,10 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn('timeout --signal=INT --kill-after=10s 45s', workflow)
         self.assertIn('timeout --signal=INT --kill-after=2s 12s', workflow)
         self.assertIn('MODEL_CACHE_LOCK_WAIT_TIMEOUT', workflow)
+        self.assertIn("id: preflight", workflow)
+        self.assertIn('PREFLIGHT_OUTCOME="${{ steps.preflight.outcome }}"', workflow)
+        self.assertIn("CACHE_PURGE_SKIPPED reason=preflight_failed inference_not_started=true caches_preserved=true", workflow)
+        self.assertIn('lock_state="$(tail -n 1 "$probe_out" | tr -d', workflow)
 
     def test_model_acceptance_uses_same_host_runner_as_flux_trellis_pipeline(self):
         workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
