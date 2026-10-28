@@ -159,7 +159,8 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn("server_port=7909", source)
         self.assertIn("if SMOKE_MODE:", source)
         self.assertIn("WAN_OUTPUT_PATH = worker.generate(", source)
-        self.assertIn('allow_flagging="never"', source)
+        self.assertIn('flagging_mode="never"', source)
+        self.assertNotIn("allow_flagging=", source)
         self.assertEqual(notebook["metadata"]["kernelspec"]["name"], "conda-env-phase2_3d-py")
 
     def test_model_notebook_gradio_ports_are_unique_and_separate_from_model_apis(self):
