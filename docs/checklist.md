@@ -1,17 +1,32 @@
-# OEC project continuation checklist
 
-## Current verified state — 2026-10-27 22:55 IST
+## Current verified state — 2026-10-28 IST
 
-Exact tested candidate: `56999e9a21394766e8f2845ce5709e0184648f16`, branch `fix/media-stack-supervision-20261019`.
+Branch: `fix/media-stack-supervision-20261019`. Current head: `875b843715d806d5d9cfe3b16285eb59630ca6bf`. The only difference between the latest tested code candidate `56999e9a21394766e8f2845ce5709e0184648f16` and this head is the two status-document updates; the executable source/workflow tree is otherwise identical.
 
-- **PASS — static/storage guard on exact candidate:** [run 40549436812](https://github.com/xflexwork/OEC/actions/runs/40549436812), including runner-inventory no-recursion and local-only tests.
-- **PASS — local inventory diagnostic:** [acceptance run 40549436814, artifact 12754626961](https://github.com/xflexwork/OEC/actions/runs/40549436814) recorded `LOCAL_RUNNER_INVENTORY_RC=0`; agents `oec_1`, `oec_2`, `oec_3`, `oec_deploy`, `oec_train_2` are locally running on `scn28-mn`. No active agent on `scn30-mn` appeared in local inventory.
-- **Historical inference PASS:** FLUX → TRELLIS produced a PNG and valid/reopened GLB in [run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341); cache cleanup remained blocked by runtime lock. MusicGen CLI produced a valid WAV in [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443).
-- **BLOCKED — exact-head model acceptance:** [run 40549436814](https://github.com/xflexwork/OEC/actions/runs/40549436814) failed at preflight before inference. The host was `oec-1/scn28-mn`, but protected legacy lock recovery requires `oec-1/scn30-mn`. Callbacks were skipped, service stops succeeded, cache purges were skipped.
-- **Protected lock:** `/nlsasfs/home/lmedge/rahkus/aireos_models/.storage_pause.lock` contains PID `2036305`. Host/PID/lease safety cannot be proven, so do not recover it or mutate reserve/cache state.
-- **Other open tasks:** correct runner registration/approved-host mapping; current-head Gradio generation for all providers; FLUX component weights; Wan's HPC libgomp issue; both LTX video modes; canonical root sync (still blocked by approved-origin guard).
+### Verified evidence
 
-**Overall status: NOT YET ACCEPTED.** Existing Conda environments remain untouched, and no unsafe cache cleanup has been performed.
+- [x] **Static/storage regression guard PASS** on code candidate `56999e9a`: [run 40549436812](https://github.com/xflexwork/OEC/actions/runs/40549436812). Runner-control inventory/recovery contracts pass.
+- [x] **Local runner inventory completed** in [acceptance run 40549436814, artifact 12754626961](https://github.com/xflexwork/OEC/actions/runs/40549436814). It found the active OEC-labelled agents on `scn28-mn`; no active local `scn30-mn` agent was identified.
+- [x] **Historical MusicGen inference PASS:** [run 40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443) generated and validated a WAV through the CLI and Gradio callback; the model cache cleanup passed.
+- [x] **Historical AudioGen Gradio inference PASS:** [run 40497104972](https://github.com/xflexwork/OEC/actions/runs/40497104972) generated output through the real callback and stopped/purged the tested service/cache before the overall run was superseded.
+- [x] **Historical FLUX/TRELLIS output PASS:** [composite run 40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341) generated a PNG and a structurally reopened GLB. Standalone and combined TRELLIS notebook Gradio callbacks also passed in [run 40498778247](https://github.com/xflexwork/OEC/actions/runs/40498778247). These are prior-candidate evidence only; neither workflow ended as a full green exact-head suite. FLUX cache purge reclaimed about 22.1 GB; TRELLIS cache purge was blocked by a runtime lock and the cache was preserved.
+
+### Current blockers
+
+- [ ] **Exact-head whole-suite acceptance: BLOCKED before inference.** [run 40549436814](https://github.com/xflexwork/OEC/actions/runs/40549436814), tested code SHA `56999e9a`, failed in preflight at legacy model-storage lock recovery. It ran as `RUNNER=oec-1, HOST=scn28-mn`, but recovery is explicitly restricted to `oec-1/scn30-mn`. Model inference callbacks were skipped.
+- [ ] **Protected legacy pause lock:** last observed at `/nlsasfs/home/lmedge/rahkus/aireos_models/.storage_pause.lock`, containing PID `2036305` and a lock timestamp. The process was not visible from `scn28-mn`; that is not proof it is dead on `scn30-mn`. Do not resume the lock, change reserves, or purge locked model caches from the wrong host.
+- [ ] **A100 runner registration/host mapping:** route the acceptance/recovery job to the approved `scn30-mn` host or obtain a trusted host-local owner check. Do not weaken the host/PID/lease safety restrictions to force the run through.
+- [ ] **Other live checks remain open:** exact-current-source FLUX standalone Gradio; both LTX text-to-video/image-to-video MP4 callbacks; Wan notebook generation after its XPU compatibility fix; and current-head Kokoro, Whisper, Qwen3-ASR, ACE-Step, AudioGen and MusicGen revalidation.
+- [ ] **Deployment/encrypted-HF diagnostics:** prior deployment environment had a Torch/NCCL unresolved-symbol import failure; encrypted-HF read-back correctly reports blocked until real repository/manifest/hash/key/decryptor inputs are configured. Do not fake either as a pass.
+- [ ] **Canonical checkout sync:** [run 40551124248](https://github.com/xflexwork/OEC/actions/runs/40551124248) was blocked because the local origin did not identify the approved `CalamityStriker/OEC` repository. Do not bypass this origin guard without approval of the canonical remote.
+
+**Overall: NOT YET ACCEPTED.** Existing Conda environments were not changed. No protected storage lock was recovered and no cache with a live/unknown runtime lock was force-purged.
+
+### Next actions
+
+1. Establish the correct approved runner on `scn30-mn` (or have its owner verify the legacy lock/lease state).
+2. Rerun acceptance on the current head; for each provider, require a live Gradio callback and a valid decoded output asset, then stop the service and verify model-specific cache cleanup.
+3. Keep cache cleanup fail-closed when runtime locks remain; record each model’s PASS/BLOCKED/FAIL and the before/after storage status.
 
 ---
 ## Historical verified state — 2026-10-21 (superseded by current snapshot)
