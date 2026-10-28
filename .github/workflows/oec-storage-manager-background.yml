@@ -10,6 +10,8 @@ on:
       - "storage_policy.py"
       - "core_config.py"
       - "tests/test_storage_manager.py"
+      - "TODO.md"
+      - "docs/checklist.md"
   workflow_dispatch:
 
 permissions:
