@@ -130,3 +130,10 @@ The candidate tested is `f9b3f095e7f711d88a996ad3842d140a312e6586` on `fix/media
 - **A100 synchronization:** NOT VERIFIED. [Root-sync run 40671622088](https://github.com/xflexwork/OEC/actions/runs/40671622088) failed before reconciliation at the canonical-origin identity check. The root-sync guard is being corrected to permit the exact active source repository `xflexwork/OEC` in addition to the existing `CalamityStriker/OEC` entry. This is not marked sync PASS until a follow-up run confirms the canonical A100 SHA equals the branch SHA and reports the final checkout status.
 
 For final acceptance, each actual Gradio submit must return a real, non-empty output that passes format-specific validation: decode WAV; validate transcription result; decode PNG; reopen/parse GLB; decode and check playable MP4. A served UI and HTTP 200 are necessary but insufficient. No Conda environment recreation, package install/removal, or protected-cache/lock deletion was performed.
+
+
+## 2026-10-28 follow-up A100 sync attempt — 9e01a6492f9058e6c70ecd8908fc3711a99f0acd
+
+[Root-sync run 40678285024](https://github.com/xflexwork/OEC/actions/runs/40678285024) passed the configured origin allow-list and the fresh live storage preflight (123.41 GB available; 1.34 GB required) but then exited 128 on a GitHub fetch: Git could not read a password for the GitHub remote. The canonical checkout SHA was not verified. The next commit passes the workflow-scoped read-only Actions token to Git through ephemeral process configuration, so neither credentials nor remote rewrites are persisted. A fresh root-sync run must prove canonical SHA equality and final clean status before the local A100 sync is marked complete.
+
+Gradio status remains unchanged: UI launch passed all 13 cases in [run 40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051), static/storage tests passed in [run 40671622040](https://github.com/xflexwork/OEC/actions/runs/40671622040), but [full current-source acceptance 40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) stopped before inference. No current-source generated asset is accepted from that attempt.

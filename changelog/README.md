@@ -1,3 +1,9 @@
+## 2026-10-28 follow-up — root-sync Git authentication
+
+- [Root-sync run 40678285024](https://github.com/xflexwork/OEC/actions/runs/40678285024) passed origin approval and live storage preflight but failed at the authenticated fetch (Git could not read a password for the GitHub remote).
+- Updated the root-sync workflow to expose its read-only Actions token to Git only through process-level configuration; no token is stored in the persistent checkout.
+- Canonical A100 sync remains unverified until the next run confirms exact branch SHA and final status. Current Gradio generation remains unaccepted because the full acceptance attempt stopped before inference.
+
 ## 2026-10-28 — Gradio callback asset acceptance and A100 source-sync status
 
 - Candidate `f9b3f095e7f711d88a996ad3842d140a312e6586` on `fix/media-stack-supervision-20261019`: [Gradio UI launch run 40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051) passed all 13 UI-only cases; [static/storage tests 40671622040](https://github.com/xflexwork/OEC/actions/runs/40671622040) passed.

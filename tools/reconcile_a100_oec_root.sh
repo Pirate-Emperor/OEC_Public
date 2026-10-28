@@ -49,6 +49,25 @@ command -v flock >/dev/null 2>&1 || fail "flock is required to serialize persist
 flock -n 9 || fail "another reconciliation process currently owns the persistent OEC sync lock" 29
 printf 'OEC_SYNC_MUTEX=ACQUIRED path=%s\\n' "$SYNC_LOCK"
 
+# The GitHub Actions checkout token does not automatically authenticate Git commands
+# launched against the persistent $HOME/OEC checkout or its nested submodules. Pass a
+# repository-scoped token through Git's process configuration only; never write it to
+# the persistent checkout's .git/config or the user's global .gitconfig.
+if [[ -n "\${GITHUB_TOKEN:-}" ]]; then
+  git_config_count="\${GIT_CONFIG_COUNT:-0}"
+  [[ "$git_config_count" =~ ^[0-9]+$ ]] || fail "GIT_CONFIG_COUNT is not a non-negative integer" 29
+  git_auth_header="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\\n')"
+  git_auth_key_name="GIT_CONFIG_KEY_$git_config_count"
+  git_auth_value_name="GIT_CONFIG_VALUE_$git_config_count"
+  export "$git_auth_key_name=http.https://github.com/.extraheader"
+  export "$git_auth_value_name=$git_auth_header"
+  export GIT_CONFIG_COUNT="$((git_config_count + 1))"
+  unset git_auth_header git_auth_key_name git_auth_value_name git_config_count
+  printf 'OEC_SYNC_GIT_AUTH=ephemeral_actions_token\\n'
+else
+  printf 'OEC_SYNC_GIT_AUTH=runner_existing_credentials\\n'
+fi
+
 origin="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
 case "$origin" in
   *github.com/CalamityStriker/OEC.git|*github.com/CalamityStriker/OEC|*github.com:CalamityStriker/OEC.git|*github.com:CalamityStriker/OEC) ;;

@@ -1,14 +1,13 @@
-## CURRENT STATUS — 2026-10-28 16:41 IST (candidate f9b3f095e7f7)
+## CURRENT STATUS — 2026-10-28 16:41 IST (tested candidate 9e01a6492f90)
 
-**This block supersedes older “current status” and SHA claims in the historical notes below.** Branch: `fix/media-stack-supervision-20261019`; exact candidate SHA: `f9b3f095e7f711d88a996ad3842d140a312e6586`.
+**This block supersedes older “current status” and SHA claims in the historical notes below.** Branch: `fix/media-stack-supervision-20261019`; root-sync candidate tested: `9e01a6492f9058e6c70ecd8908fc3711a99f0acd`.
 
-- [x] Gradio UI launch smoke: [run 40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051) **PASS_UI_ONLY** for all 13 configured cases. HTTP/interface launch was verified; these results do not prove callback inference or generated assets.
-- [x] Static/storage/notebook regression checks: [run 40671622040](https://github.com/xflexwork/OEC/actions/runs/40671622040) **PASS**, including 37 notebook/Gradio tests and the selected notebook JSON checks.
-- [ ] **Real Gradio callback + generated-asset acceptance: NOT PASSED on this candidate.** [run 40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) failed at “Validate assigned runner and load live StorageManager configuration” before inference. The AudioGen, MusicGen, speech, ACE-Step, TRELLIS, FLUX, LTX T2V/I2V and Wan generation steps were skipped. That run produced no newly accepted model assets for this candidate. Older verified files remain historical evidence only.
-- [ ] **Canonical A100 sync: NOT YET VERIFIED.** [run 40671622088](https://github.com/xflexwork/OEC/actions/runs/40671622088) failed before reconciliation because the A100 root-sync script did not approve the root checkout’s configured Git origin. This commit adds the exact active task repository `xflexwork/OEC` to the explicit origin allow-list while preserving the existing `CalamityStriker/OEC` entry and the script’s non-destructive recovery checks. Sync is only PASS after a new workflow proves canonical SHA equals the branch SHA and reports final status.
-- [ ] After sync verification, run real Gradio callbacks and require model-specific files plus integrity/decoder/parser checks: WAV decode; transcription text; image decode; GLB parse/reopen; and MP4 decode/playability. Do not mark PASS for HTTP 200 alone.
-
-No Conda environment was recreated, no package was installed/removed, and no protected model cache or storage lock was deleted. Exact-head callback acceptance and A100 sync are still open until a workflow produces and verifies the required evidence.
+- [x] Gradio UI launch smoke: [run 40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051) **PASS_UI_ONLY** for all 13 configured cases. Interface launch/HTTP responses were verified; callbacks and generated assets were not proven.
+- [x] Static/storage/notebook regression: [run 40671622040](https://github.com/xflexwork/OEC/actions/runs/40671622040) **PASS**, including 37 Gradio/notebook tests and selected notebook JSON checks.
+- [ ] **Real Gradio callback + asset acceptance: NOT PASSED on this candidate.** [run 40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) failed before inference during assigned-runner/StorageManager configuration validation; the AudioGen, MusicGen, speech, ACE-Step, TRELLIS, FLUX, LTX T2V/I2V and Wan generation steps were skipped. No new asset from this run is accepted.
+- [ ] **A100 canonical sync: NOT YET VERIFIED.** [run 40678285024](https://github.com/xflexwork/OEC/actions/runs/40678285024) passed the origin allow-list and live storage preflight, then failed at a Git fetch because the persistent checkout lacked a usable GitHub credential. The follow-up change supplies the workflow's read-only `GITHUB_TOKEN` through process-only Git config, without persisting it in the checkout.
+- [ ] Only mark synchronization PASS after an Actions log proves the canonical A100 checkout SHA equals the branch SHA and final checkout status is clean. Only mark generation PASS after actual Gradio callback outputs pass file/format validation (WAV decode; transcription result; PNG decode; GLB parse/reopen; MP4 decode).
+- No Conda environment was recreated, no packages were installed/removed, and no protected model cache or storage lock was deleted.
 
 ---
 

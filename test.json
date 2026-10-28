@@ -4,8 +4,34 @@
   "last_updated": "2026-10-28T16:41:27+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Exact branch candidate f9b3f095e7f711d88a996ad3842d140a312e6586: Gradio UI launch smoke PASS_UI_ONLY for 13 configured cases in run 40671622051; static/storage regression suite PASS in run 40671622040. Full model acceptance run 40671622024 failed before inference in assigned-runner/StorageManager configuration validation; all model callback generation steps were skipped and no new current-candidate asset was accepted. A100 root sync run 40671622088 failed at the canonical-origin identity guard, before reconciliation. The guard is now being updated to explicitly allow the active xflexwork/OEC task repo while retaining the existing CalamityStriker/OEC origin; post-commit root-sync evidence must confirm the canonical A100 SHA matches the branch before sync is marked PASS. Historical AudioGen/MusicGen/TRELLIS/FLUX files are prior-source evidence, not proof for this candidate.",
+  "latest_summary": "Tested candidate 9e01a6492f9058e6c70ecd8908fc3711a99f0acd on fix/media-stack-supervision-20261019: UI-only launch PASS for 13 configured cases (40671622051); static/storage regression PASS (40671622040). Full model acceptance 40671622024 stopped before inference in runner/StorageManager validation; no new model assets accepted. A100 root sync 40678285024 passed the approved-origin guard and live storage preflight, then failed when the persistent checkout attempted a GitHub fetch without usable credentials. The follow-up commit supplies the Actions read-only GITHUB_TOKEN ephemerally to Git processes; the token is not written to disk. Root sync still requires a new run confirming exact canonical checkout SHA and final status.",
   "experiments": [
+    {
+      "id": "EXP-2026-10-28-A100-SYNC-EPHEMERAL-GIT-AUTH",
+      "date": "2026-10-28",
+      "category": "A100 canonical root synchronization and authenticated Git fetch",
+      "approach": "After the origin guard was updated to recognize xflexwork/OEC, reran the push-triggered root-sync workflow. The live storage preflight passed, but the persistent root fetch exited 128 because Git could not read a password for a GitHub URL. The next change passes the workflow-scoped read-only GITHUB_TOKEN via process-only Git config to cover root and recursive submodule Git processes; it is not stored in repository config.",
+      "reason": "Complete the intended branch-to-A100 source reconciliation without changing persistent remotes or embedding a credential.",
+      "parameters": {
+        "branch": "fix/media-stack-supervision-20261019",
+        "source_sha": "9e01a6492f9058e6c70ecd8908fc3711a99f0acd",
+        "root_sync_run": 40678285024,
+        "repo_origin_allow_list": "CalamityStriker/OEC and xflexwork/OEC"
+      },
+      "results": {
+        "origin_guard": "PASS on this run; reconciliation proceeded beyond the origin identity check.",
+        "storage_preflight": "PASS using fresh live Lustre quota; available 123,410,235,392 bytes for required 1,342,177,280 bytes.",
+        "git_fetch": "FAIL exit code 128: could not read Password for GitHub; persistent checkout fetch did not authenticate.",
+        "canonical_a100_sync": "NOT PASS / not verified; run stopped before final canonical SHA/status confirmation.",
+        "credential_fix": "Follow-up commit adds the Actions read-only token to the root-sync step and exposes it only to the script's child processes using GIT_CONFIG_COUNT/KEY/VALUE; no credential is persisted."
+      },
+      "interpretation": "The origin guard and storage preflight now pass, but exact A100 repository sync is not complete until a new run confirms the target SHA and final checkout state.",
+      "limitations": [
+        "No new Gradio generation callback ran as part of this sync attempt.",
+        "The token has only the workflow's repository permissions; private submodule access still depends on those permissions.",
+        "The existing non-destructive checkout recovery and active-process/storage checks remain in force."
+      ]
+    },
     {
       "id": "EXP-2026-10-28-CURRENT-HEAD-GRADIO-ASSET-AND-A100-SYNC",
       "date": "2026-10-28",

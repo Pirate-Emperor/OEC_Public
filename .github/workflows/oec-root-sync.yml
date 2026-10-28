@@ -214,6 +214,7 @@ jobs:
       - name: Reconcile persistent root without discarding local work
         env:
           OEC_SYNC_BRANCH: fix/media-stack-supervision-20261019
+          GITHUB_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
           test "$RUNNER_NAME" = "oec-2"
