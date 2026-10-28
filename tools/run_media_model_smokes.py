@@ -490,15 +490,29 @@ def _cleanup_owned_services_for_provider(
 ) -> list[dict[str, Any]]:
     """Clean this run and verified prior-run service markers on the same host.
 
-    Prior acceptance markers persist below RUNNER_TEMP/oec-demo-notebook-acceptance-*.
-    The cleanup routine still validates a live PID and exact argv before SIGTERM.
-    Foreign-host markers are diagnostic-only and are never used to signal a PID.
+    Service markers can persist in RUNNER_TEMP/oec-media-smoke-logs or below
+    RUNNER_TEMP/oec-demo-notebook-acceptance-*. The cleanup routine validates a
+    live PID and exact argv before SIGTERM. Foreign-host markers are diagnostic-only
+    and are never used to signal a PID.
     """
     current_dir = log_dir.expanduser().resolve()
     directories = [current_dir]
     search_root = Path(os.environ.get("RUNNER_TEMP", "/tmp")).expanduser().resolve()
     if allow_foreign_run and search_root.is_dir():
         marker_name = f"{provider}-service-owner.json"
+        # The default runner mode writes markers outside acceptance-run folders.
+        # Search this known direct child as well, but never recursively walk all
+        # of RUNNER_TEMP or follow symlinks into unrelated data.
+        default_smoke_dir = search_root / "oec-media-smoke-logs"
+        if default_smoke_dir.is_dir() and not default_smoke_dir.is_symlink():
+            resolved = default_smoke_dir.resolve()
+            try:
+                resolved.relative_to(search_root)
+            except ValueError:
+                pass
+            else:
+                if resolved not in directories:
+                    directories.append(resolved)
         pattern = f"oec-demo-notebook-acceptance-*/**/{marker_name}"
         for marker in sorted(search_root.glob(pattern)):
             if marker.is_symlink() or not marker.is_file():

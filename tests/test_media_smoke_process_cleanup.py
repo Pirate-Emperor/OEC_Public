@@ -144,6 +144,26 @@ class OwnedServiceCleanupTests(unittest.TestCase):
         self.assertEqual([row["status"] for row in rows], ["NOT_FOUND"])
         self.assertTrue(marker.exists())
         kill.assert_not_called()
+    def test_orphan_recovery_scans_default_media_smoke_log_directory(self):
+        runner_temp = self.root / "runner-temp"
+        marker_dir = runner_temp / "oec-media-smoke-logs"
+        marker_dir.mkdir(parents=True)
+        recovery_dir = runner_temp / "oec-demo-notebook-acceptance-current" / "preflight-recovery"
+        recovery_dir.mkdir(parents=True)
+        owner = self.write_owner(run_id="prior-run")
+        marker_path = smoke._service_owner_path(self.provider, marker_dir)
+        marker_path.write_text(json.dumps(owner), encoding="utf-8")
+        with mock.patch.dict(os.environ, {"RUNNER_TEMP": str(runner_temp), "GITHUB_RUN_ID": "current-run"}), \
+             mock.patch.object(smoke, "_pid_alive", side_effect=[True, False]), \
+             mock.patch.object(smoke, "_owner_matches_running_process", return_value=True), \
+             mock.patch.object(smoke.os, "kill") as kill:
+            rows = smoke._cleanup_owned_services_for_provider(self.provider, recovery_dir, allow_foreign_run=True)
+        recovered = [row for row in rows if row["status"] == "STOPPED"]
+        self.assertEqual(len(recovered), 1)
+        self.assertTrue(recovered[0]["recovered_prior_run"])
+        self.assertEqual(recovered[0]["owner_run_id"], "prior-run")
+        kill.assert_called_once_with(43210, smoke.signal.SIGTERM)
+        self.assertFalse(marker_path.exists())
     def test_recovery_cli_does_not_scan_or_load_models(self):
         argv = ["run_media_model_smokes.py", "--providers", "ace-step", "--cleanup-owned-services", "--recover-orphan-services", "--log-dir", str(self.root)]
         with mock.patch.object(smoke, "_conda_prefixes", side_effect=AssertionError("cleanup must not probe environments")), \
