@@ -10,8 +10,8 @@ on:
       - "storage_policy.py"
       - "core_config.py"
       - "tests/test_storage_manager.py"
-      - "TODO.md"
-      - "docs/checklist.md"
+      - "tools/media_services/model_cache.py"
+      - "tools/model_cache_manager.py"
   workflow_dispatch:
 
 permissions:
@@ -79,6 +79,24 @@ jobs:
 
           # Record current quota/reserve state without mutating it before launch.
           "$CONDA_EXE" run --no-capture-output -n phase2_3d python "$RELEASE/storage_manager.py" --status 2>&1 | tee "$STATE_ROOT/status-before-$GITHUB_SHA.log"
+
+          # Read-only model-cache inventory is diagnostic only; it never loads or purges weights.
+          set +e
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python - <<'PY' 2>&1 | tee "$STATE_ROOT/model-cache-locks-$GITHUB_SHA.log"
+          import json
+          from tools.media_services.model_cache import model_targets, read_lock
+          payload = {}
+          for key, paths in model_targets().items():
+              lock = read_lock(key)
+              payload[key] = {
+                  "paths": [{"path": str(p), "present": p.exists() and not p.is_symlink()} for p in paths],
+                  "runtime_lock": lock,
+              }
+          print("MEDIA_MODEL_CACHE_INVENTORY=" + json.dumps(payload, sort_keys=True), flush=True)
+          PY
+          inventory_rc=${PIPESTATUS[0]}
+          set -e
+          printf "MEDIA_MODEL_CACHE_INVENTORY_RC=%s\n" "$inventory_rc" | tee -a "$STATE_ROOT/last-start.txt"
 
           BACKEND=""
           if command -v systemctl >/dev/null 2>&1 && command -v systemd-run >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
