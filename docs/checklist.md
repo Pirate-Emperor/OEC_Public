@@ -1,29 +1,31 @@
 ## Current verified state — media models and StorageManager — 2026-10-28 IST
 
-Branch: fix/media-stack-supervision-20261019; code head before this checklist update: 377aef5b61dd9369663501daf69a4a4b47da073c.
+Branch: fix/media-stack-supervision-20261019. Code head verified by current-head guard/background workflows: 0d68ab61a535a39d961ab52b0dbd518c2a2f74b4 (before this documentation-only commit).
 
-### Verified evidence
-- [x] Static/storage safety tests passed on an earlier candidate: [40549436812](https://github.com/xflexwork/OEC/actions/runs/40549436812). The new stale-pause-lock regression test is running in [40656492610](https://github.com/xflexwork/OEC/actions/runs/40656492610); it is not counted as PASS until terminal success.
-- [x] Historical live outputs and real Gradio callbacks: AudioGen [40497104972](https://github.com/xflexwork/OEC/actions/runs/40497104972), MusicGen [40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443), standalone and combined TRELLIS callbacks [40498778247](https://github.com/xflexwork/OEC/actions/runs/40498778247), and composite FLUX PNG to TRELLIS GLB [40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341). These are historical candidate-level PASS evidence, not a current full-suite PASS.
-- [x] Storage lock policy hardened: an old .storage_pause.lock is no longer removed solely due to age. It is preserved until the host/PID/lease-aware recovery tool proves recovery is safe. A legacy model lock was observed with PID 2036305; that process cannot be proven dead from scn28-mn.
-- [x] Background monitor workflow committed: [workflow source](https://github.com/xflexwork/OEC/blob/fix/media-stack-supervision-20261019/.github/workflows/oec-storage-manager-background.yml), start run [40656492574](https://github.com/xflexwork/OEC/actions/runs/40656492574). It targets the co-located oec-2 runner with a strict scn28-mn hostname guard, uses the existing phase2_3d environment, and verifies that the persistent service stays alive.
+### Completed and evidence-backed
+- [x] **StorageManager background service is running.** Current-head workflow [40656971189](https://github.com/xflexwork/OEC/actions/runs/40656971189) completed SUCCESS on runner oec-2, host scn28-mn (same compute node as oec-1). It reported STORAGE_MANAGER_BACKGROUND=ACTIVE backend=detached pid=4034934 and STORAGE_MANAGER_BACKGROUND_VERIFIED=true after the verification delay. Log: /nlsasfs/home/lmedge/rahkus/.local/state/oec-storage-manager/monitor-0d68ab61a535a39d961ab52b0dbd518c2a2f74b4.log. The PID is the last verified start; future idempotent workflow runs may replace it, so use the newest run's log for the current PID.
+- [x] The service uses the pre-existing phase2_3d Conda environment. No package installations, environment removals, or environment replacements occurred.
+- [x] The storage-admission/static regression workflow passed on the same code head: [40656971220](https://github.com/xflexwork/OEC/actions/runs/40656971220), conclusion SUCCESS.
+- [x] The regression test test_expired_legacy_pause_lock_is_preserved_for_host_verified_recovery passed: an aged legacy pause lock is preserved rather than auto-deleted by age.
+- [x] Live StorageManager status at latest service start: models NORMAL, 57.02 GB of 230 GB, reserve 28.11 GB with 5 GiB target; outputs NORMAL, 314.90 MB of 1 GB, reserve 512 MB with 0.5 GiB target. Live Lustre quota sample: 1.89 TB used, soft 2.00 TB, hard 2.10 TB, hard headroom about 219.77 GB and write headroom about 117.37 GB. These are timestamped snapshots, not permanent capacity guarantees.
+- [x] Historical model PASS evidence is retained: AudioGen live Gradio WAV [40497104972](https://github.com/xflexwork/OEC/actions/runs/40497104972); MusicGen CLI and Gradio WAV [40491715443](https://github.com/xflexwork/OEC/actions/runs/40491715443); standalone and combined TRELLIS Gradio callbacks with valid GLB [40498778247](https://github.com/xflexwork/OEC/actions/runs/40498778247); FLUX PNG to TRELLIS GLB pipeline [40498778341](https://github.com/xflexwork/OEC/actions/runs/40498778341). These historical model passes are not a full current-head acceptance pass.
 
-### Current active/pending status
-- [ ] **StorageManager background daemon: PENDING.** Run [40656492574](https://github.com/xflexwork/OEC/actions/runs/40656492574) has not yet been assigned a job/runner, so there is no verified PID or running daemon to report. Do not call it started until workflow logs report STORAGE_MANAGER_BACKGROUND=ACTIVE and STORAGE_MANAGER_BACKGROUND_VERIFIED=true.
-- [ ] **Current storage-lock regression suite: RUNNING.** [Run 40656492610](https://github.com/xflexwork/OEC/actions/runs/40656492610) is exercising the stale-lock guard. Await terminal result before marking the test PASS.
-- [ ] **Latest whole model acceptance: NOT YET ACCEPTED.** The prior exact-head acceptance stopped at storage-lock recovery because the workflow runner is on scn28-mn, while the one legacy pause-lock recovery tool requires oec-1/scn30-mn. The newer read-only audit [40655747439](https://github.com/xflexwork/OEC/actions/runs/40655747439) also failed safely during environment audit: a phase1 Torch import hit an HPC libgomp undefined-symbol error and Qwen2-VL import probes timed out. No dependency install was attempted.
-- [ ] **Runtime model lock:** model cache inventory reported a remote-or-unknown lock on scn30-mn, PID 770804. Preserve that lock/cache until its owner or approved host verifies it; never force-purge.
-- [ ] **Still unverified on current source:** FLUX standalone Gradio; both LTX MP4 callback modes; Wan notebook video generation; current-head Kokoro, Whisper, Qwen3-ASR and ACE-Step. AudioGen, MusicGen and TRELLIS have successful historical live output evidence, so do not rerun them merely to repeat a successful test.
-- [ ] **Canonical root sync:** latest [40656492581](https://github.com/xflexwork/OEC/actions/runs/40656492581) was blocked by the explicit approved-origin guard because the checkout origin is not CalamityStriker/OEC. Do not bypass without the canonical repository owner's approval.
-- [ ] **Deployment/encrypted-HF:** deployment Torch/NCCL import failure remains open; encrypted-HF read-back stays BLOCKED until real repository/manifest/hash/key/decryptor inputs are supplied.
+### Current blockers / not yet accepted
+- [ ] **Overall model acceptance remains NOT YET ACCEPTED.** The standard full acceptance workflow calls the host/PID/lease recovery helper, but the required recovery host scn30-mn is unavailable to the current runner labels on scn28-mn. Do not bypass this boundary.
+- [ ] **Legacy model-storage pause lock stays preserved.** The recorded legacy lock has PID 2036305 and lacks enough host identity to prove that PID is dead on the shared filesystem. The background manager honors the lock; it has not cleared it or downloaded into the protected models directory.
+- [ ] Model cache inventory previously reported a remote-or-unknown runtime lock on scn30-mn, PID 770804. The exact cache remains protected until the approved host or owner verifies the lock.
+- [ ] Read-only setup audit [40655747439](https://github.com/xflexwork/OEC/actions/runs/40655747439) failed on existing environment imports (HPC libgomp undefined symbol in phase1; Qwen2-VL import probes timed out). No install was attempted.
+- [ ] Not yet verified on current source: standalone FLUX Gradio; LTX text-to-video and image-to-video MP4 callbacks; Wan notebook MP4 generation; current-head Kokoro, Whisper, Qwen3-ASR and ACE-Step. Run only once a safe cache-only path or authorized StorageManager download admission is available.
+- [ ] Deployment Torch/NCCL import failure remains open. Encrypted-HF readback remains BLOCKED until real repository/manifest/hash/key/decryptor inputs are configured.
+- [ ] Canonical root sync remains blocked by the explicit approved-origin guard because this fork's origin is not CalamityStriker/OEC. Do not bypass without the canonical repository owner's approval.
 
-**Overall: NOT YET ACCEPTED.** No Conda package/environment changes were made. Cache cleanup continues to respect live or remote/unknown runtime locks. The StorageManager start workflow is queued but not yet verified running.
+**Current status: StorageManager service PASS; static/storage regression suite PASS; complete model acceptance NOT YET ACCEPTED.**
 
-### Next steps
-1. Complete the oec-2 / scn28-mn StorageManager background workflow and record actual backend, PID, and health evidence.
-2. Confirm the stale-lock unit test passes; keep the legacy model lock unresolved until the scn30-mn owner/host verification is available.
-3. Continue with the model outputs not yet verified: LTX text-to-video, LTX image-to-video, Wan, FLUX standalone, then speech/ACE-Step as runner and storage admission allow. Do not retest previously passed model paths unless their executable source changed.
-4. A model PASS requires a live Gradio callback, a valid decoded/reopened output asset, service shutdown, and cache purge or confirmation the cache was already absent.
+### Next work
+1. Do not repeat AudioGen, MusicGen, or TRELLIS runs just to reproduce already validated assets; reuse their historical evidence unless their model code changes.
+2. Continue with the remaining unverified Gradio assets in order: standalone FLUX PNG, LTX text-to-video MP4, LTX image-to-video MP4, then Wan MP4. Before each model download, require an available cache or a fresh successful StorageManager admission; the unresolved legacy pause lock currently prevents the latter.
+3. Continue speech/ACE-Step after owner-safe runtime-lock recovery is available. Preserve remote/unknown cache locks and report blocked checks as BLOCKED, not PASS.
+4. Each model PASS requires real Gradio callback inference, valid decoded/reopened asset, confirmed service shutdown, and cache purge or already-absent confirmation.
 
 ---
 ## Historical verified state — 2026-10-21 (superseded by current snapshot)
