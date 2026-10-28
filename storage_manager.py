@@ -191,10 +191,12 @@ def get_actual_folder_size(folder_path):
 
 
 def _pause_lock_active(folder_path, lock_ttl_seconds):
-    """Return true for live locks or any unresolved lease manifest.
+    """Preserve unresolved legacy pause locks until host/PID/lease-aware recovery.
 
-    A manifest is a recovery barrier, not a stale lock to time out.
+    The legacy lock has no host identity. Its age alone cannot prove the owner
+    process is dead on a shared filesystem, so the monitor must never remove it.
     """
+
     manifest_file = os.path.join(folder_path, LEASE_MANIFEST_FILENAME)
     if os.path.lexists(manifest_file):
         logging.critical(
@@ -211,13 +213,12 @@ def _pause_lock_active(folder_path, lock_ttl_seconds):
     except OSError:
         return False
     if age > lock_ttl_seconds:
-        logging.warning("Stale storage pause lock detected in %s (age %.0fs); removing it.", folder_path, age)
-        try:
-            os.remove(lock_file)
-        except OSError as exc:
-            logging.error("Could not remove stale pause lock in %s: %s", folder_path, type(exc).__name__)
-            return True
-        return False
+        logging.critical(
+            "Legacy storage pause lock in %s is %.0fs old (TTL %.0fs) but remains unresolved; "
+            "preserving it until tools/recover_dead_storage_locks.py validates host, PID and lease state.",
+            folder_path, age, lock_ttl_seconds,
+        )
+        return True
     return True
 
 

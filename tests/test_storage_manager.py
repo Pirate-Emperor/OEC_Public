@@ -176,6 +176,18 @@ class StorageManagerTests(unittest.TestCase):
             self.assertTrue(payload.exists())
             self.assertLess(reserve.stat().st_size, before)
 
+    def test_expired_legacy_pause_lock_is_preserved_for_host_verified_recovery(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            lock = root / storage_manager.LOCK_FILENAME
+            lock.write_text("pid=2036305\\ntime=1\\n", encoding="utf-8")
+            old = time.time() - 12 * 60 * 60
+            storage_manager.os.utime(lock, (old, old))
+            with mock.patch.object(storage_manager.os, "remove") as remove:
+                self.assertTrue(storage_manager._pause_lock_active(str(root), lock_ttl_seconds=1))
+            self.assertTrue(lock.is_file())
+            remove.assert_not_called()
+
     def test_lease_manifest_blocks_automatic_reserve_resize(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
