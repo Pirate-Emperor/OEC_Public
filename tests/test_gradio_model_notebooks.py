@@ -181,6 +181,16 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertEqual(len(ui_ports), len(set(ui_ports)), f"Gradio UI port collision: {ui_ports}")
         self.assertFalse(set(ui_ports) & api_ports, f"Gradio UI/API port collision: {set(ui_ports) & api_ports}")
 
+    def test_gradio_ui_only_runner_supports_wan_without_loading_weights(self):
+        runner = (ROOT / "tools" / "run_gradio_model_notebook_smokes.py").read_text(encoding="utf-8")
+        notebook = json.loads((ROOT / "pipeline_wan_video.ipynb").read_text(encoding="utf-8"))
+        source = "\\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+        self.assertIn('"wan": ("pipeline_wan_video.ipynb", "phase2_3d", "generate_wan_video")', runner)
+        self.assertIn('parser.add_argument("--ui-only"', runner)
+        self.assertIn('result["status"] = "PASS_UI_ONLY"', runner)
+        self.assertIn('if os.environ.get("OEC_WAN_UI_ONLY_SMOKE") != "1":', source)
+        self.assertNotIn('select_idle_a100_gpu(caller="WAN_VIDEO_NOTEBOOK")', source.split("class WanVideoWorker")[0])
+
     def test_musicgen_acceptance_copies_the_actual_metadata_sidecar(self):
         workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
         self.assertIn('METADATA="${OUT%.wav}.info.json"', workflow)

@@ -1,0 +1,101 @@
+name: OEC Gradio notebook UI launch smoke
+
+on:
+  push:
+    branches:
+      - fix/media-stack-supervision-20261019
+    paths:
+      - "pipeline_audiogen_gradio.ipynb"
+      - "pipeline_musicgen_gradio.ipynb"
+      - "pipeline_acestep_gradio.ipynb"
+      - "pipeline_kokoro_gradio.ipynb"
+      - "pipeline_whisper_gradio.ipynb"
+      - "pipeline_qwen3_asr_gradio.ipynb"
+      - "pipeline_flux_only.ipynb"
+      - "pipeline_trellis_3d_only.ipynb"
+      - "pipeline_trellis_3d.ipynb"
+      - "pipeline_ltx_video.ipynb"
+      - "pipeline_wan_video.ipynb"
+      - "tools/run_gradio_model_notebook_smokes.py"
+      - "tools/wan_xpu_compat.py"
+      - ".github/workflows/oec-gradio-ui-launch-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-gradio-ui-launch-smoke
+  cancel-in-progress: true
+
+jobs:
+  ui-launch:
+    name: Launch model notebook Gradio UIs without loading weights
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout exact candidate source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Find existing Conda installation
+        run: |
+          set -euo pipefail
+          ACCOUNT_HOME="$(getent passwd "$(id -un)" | cut -d: -f6 || true)"
+          if [[ -z "$ACCOUNT_HOME" ]]; then ACCOUNT_HOME="$HOME"; fi
+          CONDA_EXE=""
+          for candidate in "$HOME/Conda/condabin/conda" "$ACCOUNT_HOME/Conda/condabin/conda"; do
+            if [[ -x "$candidate" ]]; then CONDA_EXE="$candidate"; break; fi
+          done
+          test -n "$CONDA_EXE" && test -x "$CONDA_EXE"
+          echo "CONDA_EXE=$CONDA_EXE" >> "$GITHUB_ENV"
+          printf 'RUNNER=%s HOST=%s\n' "$RUNNER_NAME" "$(hostname -s)"
+          "$CONDA_EXE" env list
+
+      - name: Launch each Gradio frontend and verify HTTP 200
+        id: ui_launch
+        run: |
+          set -uo pipefail
+          ROOT_REPORT="$RUNNER_TEMP/oec-gradio-ui-launch-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -p "$ROOT_REPORT"
+          failures=0
+          run_case() {
+            local env_name="$1" provider="$2" report_dir="$ROOT_REPORT/$2"
+            mkdir -p "$report_dir"
+            echo "UI_ONLY_CASE_START provider=$provider env=$env_name"
+            timeout --signal=INT --kill-after=5s 120s "$CONDA_EXE" run --no-capture-output -n "$env_name" \
+              python tools/run_gradio_model_notebook_smokes.py --provider "$provider" --ui-only --report-dir "$report_dir" \
+              2>&1 | tee "$report_dir/ui-launch.log"
+            local rc=${PIPESTATUS[0]}
+            echo "UI_ONLY_CASE_END provider=$provider rc=$rc"
+            if [[ "$rc" -ne 0 ]]; then failures=$((failures + 1)); fi
+          }
+          run_case phase1 audiogen
+          run_case phase1 musicgen
+          run_case phase2_3d ace-step
+          run_case phase2_3d kokoro
+          run_case phase2_3d whisper
+          run_case phase2_3d qwen3-asr
+          run_case phase2_3d flux
+          run_case phase2_3d flux-combined
+          run_case phase2_3d trellis-only
+          run_case phase2_3d trellis-combined
+          run_case phase1_ltx ltx-text-video
+          run_case phase1_ltx ltx-image-video
+          run_case phase2_3d wan
+          echo "GRADIO_UI_ONLY_FAILURES=$failures"
+          echo "$failures" > "$ROOT_REPORT/failure-count.txt"
+          exit "$(( failures > 0 ? 1 : 0 ))"
+
+      - name: Upload UI launch reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-gradio-ui-launch-${{ github.run_id }}
+          path: ${{ runner.temp }}/oec-gradio-ui-launch-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          retention-days: 7

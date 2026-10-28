@@ -36,6 +36,7 @@ NOTEBOOKS = {
     "qwen3-asr": ("pipeline_qwen3_asr_gradio.ipynb", "phase2_3d", "transcribe_audio"),
     "ltx-text-video": ("pipeline_ltx_video.ipynb", "phase1_ltx", "generate_video"),
     "ltx-image-video": ("pipeline_ltx_video.ipynb", "phase1_ltx", "generate_video"),
+    "wan": ("pipeline_wan_video.ipynb", "phase2_3d", "generate_wan_video"),
 }
 AUDIO_PROVIDERS = {"audiogen", "musicgen", "ace-step", "kokoro"}
 IMAGE_PROVIDERS = {"flux", "flux-combined"}
@@ -233,6 +234,8 @@ def main() -> int:
     parser.add_argument("--provider", choices=tuple(NOTEBOOKS), required=True)
     parser.add_argument("--report-dir", type=Path, required=True)
     parser.add_argument("--audio-file", type=Path, help="Required for Whisper/Qwen3-ASR callbacks.")
+    parser.add_argument("--ui-only", action="store_true",
+                        help="Verify the real Gradio page opens without invoking model inference.")
     args = parser.parse_args()
     provider = args.provider
     report_dir = args.report_dir.expanduser().resolve()
@@ -256,6 +259,10 @@ def main() -> int:
         "status": "FAIL",
     }
     os.environ["OEC_GRADIO_HEADLESS_SMOKE"] = "1"
+    if provider == "wan":
+        os.environ["OEC_WAN_HEADLESS_SMOKE"] = "0"
+        os.environ["OEC_WAN_UI_ONLY_SMOKE"] = "1" if args.ui_only else "0"
+        os.environ.setdefault("OEC_WAN_ALLOW_DOWNLOAD", "0")
     # Hosted A100 runners inherit an outbound HTTP proxy. Explicitly bypass it for
     # loopback so Gradio's internal localhost-health check and local API clients
     # never try to reach 127.0.0.1 through that proxy.
@@ -302,6 +309,14 @@ def main() -> int:
         )
         result["ui_http_status"], result["ui_html_prefix"] = wait_for_ui(ui_url)
         result["ui_launch"] = "PASS"
+        if args.ui_only:
+            result["callback"] = "SKIPPED_UI_ONLY"
+            result["status"] = "PASS_UI_ONLY"
+            result["details"] = "Gradio served HTTP 200 HTML; model inference was deliberately not invoked."
+            result["finished_unix"] = time.time()
+            report_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            print("GRADIO_NOTEBOOK_ACCEPTANCE " + json.dumps(result, ensure_ascii=False), flush=True)
+            return 0
 
         # Generate a small local input only for image-conditioned model callbacks.
         callback_input = args.audio_file.expanduser().resolve() if args.audio_file else None
