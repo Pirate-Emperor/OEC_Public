@@ -52,7 +52,8 @@ printf 'OEC_SYNC_MUTEX=ACQUIRED path=%s\\n' "$SYNC_LOCK"
 origin="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
 case "$origin" in
   *github.com/CalamityStriker/OEC.git|*github.com/CalamityStriker/OEC|*github.com:CalamityStriker/OEC.git|*github.com:CalamityStriker/OEC) ;;
-  *) fail "origin does not identify the approved CalamityStriker/OEC repository" 13 ;;
+  *github.com/xflexwork/OEC.git|*github.com/xflexwork/OEC|*github.com:xflexwork/OEC.git|*github.com:xflexwork/OEC) ;;
+  *) fail "origin does not identify an approved CalamityStriker/OEC or xflexwork/OEC repository" 13 ;;
 esac
 
 [[ -x "$CONDA" ]] || fail "Conda executable is missing" 14

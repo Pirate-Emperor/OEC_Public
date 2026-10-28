@@ -1,11 +1,43 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-23T02:30:00+05:30",
+  "last_updated": "2026-10-28T16:41:27+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Verified current feature SHA ae6c90b891ec80338c9c96446d735b03e1985d8a: current-head FLUX.2 Klein→TRELLIS.2 live A100 PASS in run 39646903815 (GLB 193,544 B; SHA-256 94daca421e06e191ae5fd7d10da20cf89808ea187c14d338f8a1628bfd08bd66; mesh reopened); Asset Factory contracts 39646903793 PASS; static/storage 39646903775 PASS (154 tests across 19 unittest invocations, four notebook JSON checks). Canonical A100 root sync 39646903801 was safety-blocked by active OEC inference/queue process; local canonical root sync is unverified. Historical all-provider inference and joined QA/upload/read-back remain evidence for older SHA 0c53f6a46328bc4ba6ce4d0942556e3077ea6d74/run 39435100568, not exact-head proof. Encryption/private-key round-trip not verified by that old byte-readback job; use new verifier with an already-encrypted object and the actual local decryptor.",
+  "latest_summary": "Exact branch candidate f9b3f095e7f711d88a996ad3842d140a312e6586: Gradio UI launch smoke PASS_UI_ONLY for 13 configured cases in run 40671622051; static/storage regression suite PASS in run 40671622040. Full model acceptance run 40671622024 failed before inference in assigned-runner/StorageManager configuration validation; all model callback generation steps were skipped and no new current-candidate asset was accepted. A100 root sync run 40671622088 failed at the canonical-origin identity guard, before reconciliation. The guard is now being updated to explicitly allow the active xflexwork/OEC task repo while retaining the existing CalamityStriker/OEC origin; post-commit root-sync evidence must confirm the canonical A100 SHA matches the branch before sync is marked PASS. Historical AudioGen/MusicGen/TRELLIS/FLUX files are prior-source evidence, not proof for this candidate.",
   "experiments": [
+    {
+      "id": "EXP-2026-10-28-CURRENT-HEAD-GRADIO-ASSET-AND-A100-SYNC",
+      "date": "2026-10-28",
+      "category": "current-source Gradio UI, callback asset acceptance and A100 checkout synchronization",
+      "approach": "Inspected the branch head, exact-source GitHub Actions run results, full acceptance job step outcomes, root-sync job logs and the synchronization guard. Updated trackers using exact run evidence. Updated the canonical source script's explicit repository-origin allow-list to include xflexwork/OEC for this feature-branch synchronization; final sync state remains pending a post-commit Actions result.",
+      "reason": "Distinguish UI launch from real inference and generated-file acceptance, and make sure the local A100 checkout can reconcile the intended repository without bypassing recovery and storage safeguards.",
+      "parameters": {
+        "branch": "fix/media-stack-supervision-20261019",
+        "source_sha": "f9b3f095e7f711d88a996ad3842d140a312e6586",
+        "ui_launch_run": 40671622051,
+        "static_storage_run": 40671622040,
+        "full_model_acceptance_run": 40671622024,
+        "a100_root_sync_run": 40671622088,
+        "model_acceptance_failure_step": "Validate assigned runner and load live StorageManager configuration",
+        "root_sync_failure_step": "Reconcile persistent root without discarding local work"
+      },
+      "results": {
+        "ui_launch": "PASS_UI_ONLY: all 13 configured cases returned successful UI/HTTP launch evidence; not callback acceptance.",
+        "static_storage": "PASS: tests/test_gradio_model_notebooks.py reported 37 tests OK; selected notebook JSON checks passed.",
+        "real_gradio_callbacks": "NOT_RUN on this run; every generation/inference step was skipped after preflight failed.",
+        "current_candidate_generated_assets": "NONE accepted from run 40671622024; do not infer asset generation from UI launch success.",
+        "a100_local_sync": "NOT_VERIFIED; run 40671622088 failed at origin identity gate before checkout reconciliation. New root-sync run must confirm OEC_CANONICAL_SHA equals the resulting branch SHA and provide final clean/retention evidence.",
+        "protected_state": "No storage-lock deletion, cache purge, package install/removal or environment recreation performed by this update."
+      },
+      "interpretation": "UI and static checks pass, but current-candidate Gradio callback outputs have not passed asset validation. A100 synchronization is not considered complete until the post-change root-sync workflow confirms it.",
+      "limitations": [
+        "The UI smoke harness does not invoke model inference by design.",
+        "The full acceptance attempt did not reach any model callback and produced no newly accepted assets.",
+        "Previous FLUX/TRELLIS/audio outputs are from older source SHAs and are not current-candidate proof.",
+        "Sync remains pending until new workflow evidence verifies the actual canonical A100 checkout SHA and status."
+      ]
+    },
     {
       "id": "EXP-2026-10-21-OEC-FLUX-TRELLIS-LIVE-VERIFICATION",
       "date": "2026-10-21",
@@ -5928,6 +5960,6 @@
       ]
     }
   ],
-  "updated_at": "2026-10-23T02:30:00+05:30",
-  "updated_date": "2026-10-23"
+  "updated_at": "2026-10-28T16:41:27+05:30",
+  "updated_date": "2026-10-28"
 }

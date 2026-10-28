@@ -1,3 +1,11 @@
+## 2026-10-28 — Gradio callback asset acceptance and A100 source-sync status
+
+- Candidate `f9b3f095e7f711d88a996ad3842d140a312e6586` on `fix/media-stack-supervision-20261019`: [Gradio UI launch run 40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051) passed all 13 UI-only cases; [static/storage tests 40671622040](https://github.com/xflexwork/OEC/actions/runs/40671622040) passed.
+- Current-candidate inference was **not reached**: [full acceptance run 40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) stopped during assigned-runner/StorageManager validation, so no new asset is accepted from that run.
+- [A100 root-sync run 40671622088](https://github.com/xflexwork/OEC/actions/runs/40671622088) stopped at the repository-origin guard before reconciliation. The guard is updated to explicitly allow `xflexwork/OEC` while retaining `CalamityStriker/OEC`; sync is pending post-commit runner verification.
+- Future PASS requires an actual callback-generated file plus format-specific validation, and successful evidence that the persistent A100 checkout SHA matches the branch SHA.
+- No Conda environment replacement/package installation and no storage-lock/cache safety bypass was performed.
+
 ## 2026-10-23 — OEC presentation runbook and encrypted read-back
 
 - [Daily changelog](CHANGELOG-2026-10-23.md) records exact-head evidence, new presentation notebooks, ciphertext verification helper and current blockers.
