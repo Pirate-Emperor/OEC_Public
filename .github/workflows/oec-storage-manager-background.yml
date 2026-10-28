@@ -1,0 +1,187 @@
+name: OEC Storage Manager persistent background monitor
+
+on:
+  push:
+    branches:
+      - fix/media-stack-supervision-20261019
+    paths:
+      - ".github/workflows/oec-storage-manager-background.yml"
+      - "storage_manager.py"
+      - "storage_policy.py"
+      - "core_config.py"
+      - "tests/test_storage_manager.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-storage-manager-background
+  cancel-in-progress: false
+
+jobs:
+  ensure-background-monitor:
+    name: Ensure StorageManager stays running on oec-1
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout exact branch source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install or verify the persistent StorageManager monitor
+        id: manager
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-1" || { echo "::error::Expected oec-1, got $RUNNER_NAME"; exit 2; }
+          HOST="$(hostname -s)"
+          ACCOUNT_HOME="$(getent passwd "$(id -u)" | cut -d: -f6)"
+          CONDA_EXE=""
+          for candidate in "$HOME/Conda/condabin/conda" "$ACCOUNT_HOME/Conda/condabin/conda"; do
+            if [[ -x "$candidate" ]]; then CONDA_EXE="$candidate"; break; fi
+          done
+          test -x "$CONDA_EXE" || { echo "::error::Existing Conda installation not found; no installation attempted."; exit 2; }
+
+          STORAGE_CONFIG=""
+          for candidate in "$HOME/OEC/storage_config.json" "$ACCOUNT_HOME/OEC/storage_config.json"; do
+            if [[ -f "$candidate" && ! -L "$candidate" ]]; then STORAGE_CONFIG="$candidate"; break; fi
+          done
+          test -n "$STORAGE_CONFIG" || { echo "::error::Trusted host storage_config.json is missing."; exit 2; }
+          python3 - "$STORAGE_CONFIG" <<'PY'
+          import json, sys
+          from pathlib import Path
+          payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          names = [str(row.get("name", "")) for row in payload.get("directories", []) if isinstance(row, dict)]
+          if not {"models", "outputs"}.issubset(names):
+              raise SystemExit("trusted configuration must contain models and outputs")
+          print("STORAGE_CONFIG_VALID=true directories=" + ",".join(names))
+          PY
+
+          STATE_ROOT="$HOME/.local/state/oec-storage-manager"
+          RELEASE_ROOT="$HOME/.local/share/oec-storage-manager/releases"
+          RELEASE="$RELEASE_ROOT/$GITHUB_SHA"
+          LOG="$STATE_ROOT/monitor-$GITHUB_SHA.log"
+          UNIT_BASE="oec-storage-manager-oec1"
+          UNIT="$UNIT_BASE.service"
+          PID_FILE="$STATE_ROOT/manager.pid"
+          mkdir -p "$STATE_ROOT" "$RELEASE"
+          chmod 700 "$STATE_ROOT" "$HOME/.local/share/oec-storage-manager" "$RELEASE_ROOT" "$RELEASE"
+          install -m 644 storage_manager.py storage_policy.py core_config.py "$RELEASE/"
+          install -m 600 "$STORAGE_CONFIG" "$RELEASE/storage_config.json"
+          printf 'RUNNER=%s\nHOST=%s\nSOURCE_SHA=%s\nRELEASE=%s\n' "$RUNNER_NAME" "$HOST" "$GITHUB_SHA" "$RELEASE" | tee "$STATE_ROOT/last-start.txt"
+
+          # Record current quota/reserve state without mutating it before launch.
+          "$CONDA_EXE" run --no-capture-output -n phase2_3d python "$RELEASE/storage_manager.py" --status 2>&1 | tee "$STATE_ROOT/status-before-$GITHUB_SHA.log"
+
+          BACKEND=""
+          if command -v systemctl >/dev/null 2>&1 && command -v systemd-run >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+            if systemctl --user is-active --quiet "$UNIT"; then
+              EXEC_START="$(systemctl --user show "$UNIT" --property=ExecStart --value 2>/dev/null || true)"
+              if [[ "$EXEC_START" != *"$HOME/.local/share/oec-storage-manager/releases/"*"/storage_manager.py"* ]]; then
+                echo "::error::The named unit is active but is not an OEC StorageManager release; refusing to replace it."
+                exit 3
+              fi
+              if [[ "$EXEC_START" != *"$RELEASE/storage_manager.py"* ]]; then
+                echo "STORAGE_MANAGER_OLD_RELEASE_DETECTED=true"
+                systemctl --user stop "$UNIT"
+                for attempt in $(seq 1 20); do
+                  systemctl --user is-active --quiet "$UNIT" || break
+                  sleep 1
+                done
+                systemctl --user is-active --quiet "$UNIT" && { echo "::error::Previous managed service did not stop."; exit 4; }
+                systemctl --user reset-failed "$UNIT" >/dev/null 2>&1 || true
+              else
+                BACKEND="systemd-user"
+                echo "STORAGE_MANAGER_ALREADY_RUNNING=true backend=$BACKEND unit=$UNIT"
+              fi
+            fi
+
+            if [[ -z "$BACKEND" ]]; then
+              LOAD_STATE="$(systemctl --user show "$UNIT" --property=LoadState --value 2>/dev/null || true)"
+              if [[ "$LOAD_STATE" == "loaded" ]]; then
+                EXEC_START="$(systemctl --user show "$UNIT" --property=ExecStart --value 2>/dev/null || true)"
+                if [[ "$EXEC_START" != *"$HOME/.local/share/oec-storage-manager/releases/"*"/storage_manager.py"* ]]; then
+                  echo "::error::An unrelated unit collides with $UNIT; refusing to replace it."
+                  exit 3
+                fi
+                systemctl --user reset-failed "$UNIT" >/dev/null 2>&1 || true
+              fi
+              if systemd-run --user --unit="$UNIT_BASE" --description="OEC StorageManager background monitor" --property="Restart=on-failure" --property="RestartSec=15s" --property="WorkingDirectory=$RELEASE" --property="Environment=PYTHONUNBUFFERED=1" --property="StandardOutput=journal" --property="StandardError=journal" "$CONDA_EXE" run --no-capture-output -n phase2_3d python "$RELEASE/storage_manager.py"; then
+                BACKEND="systemd-user"
+              else
+                if systemctl --user is-active --quiet "$UNIT" 2>/dev/null; then
+                  EXEC_START="$(systemctl --user show "$UNIT" --property=ExecStart --value 2>/dev/null || true)"
+                  [[ "$EXEC_START" == *"$RELEASE/storage_manager.py"* ]] || { echo "::error::Systemd start outcome is ambiguous."; exit 5; }
+                  BACKEND="systemd-user"
+                else
+                  echo "SYSTEMD_USER_START=UNAVAILABLE; using a detached session"
+                fi
+              fi
+            fi
+          fi
+
+          if [[ "$BACKEND" != "systemd-user" ]]; then
+            if [[ -s "$PID_FILE" ]]; then
+              OLD_PID="$(cat "$PID_FILE" 2>/dev/null || true)"
+              if [[ "$OLD_PID" =~ ^[0-9]+$ ]] && kill -0 "$OLD_PID" 2>/dev/null; then
+                OLD_CMD="$(tr '\0' ' ' < "/proc/$OLD_PID/cmdline" 2>/dev/null || true)"
+                if [[ "$OLD_CMD" != *"$HOME/.local/share/oec-storage-manager/releases/"*"/storage_manager.py"* ]]; then
+                  echo "::error::PID marker exists but does not identify a managed StorageManager; refusing to signal it."
+                  exit 3
+                fi
+                if [[ "$OLD_CMD" == *"$RELEASE/storage_manager.py"* ]]; then
+                  BACKEND="detached"
+                  echo "STORAGE_MANAGER_ALREADY_RUNNING=true backend=$BACKEND pid=$OLD_PID"
+                else
+                  kill -TERM "$OLD_PID"
+                  for attempt in $(seq 1 20); do kill -0 "$OLD_PID" 2>/dev/null || break; sleep 1; done
+                  kill -0 "$OLD_PID" 2>/dev/null && { echo "::error::Previous detached monitor did not stop."; exit 4; }
+                fi
+              fi
+            fi
+            if [[ "$BACKEND" != "detached" ]]; then
+              nohup setsid "$CONDA_EXE" run --no-capture-output -n phase2_3d python "$RELEASE/storage_manager.py" >>"$LOG" 2>&1 </dev/null &
+              PID="$!"
+              printf '%s\n' "$PID" >"$PID_FILE"
+              chmod 600 "$PID_FILE"
+              sleep 4
+              kill -0 "$PID" 2>/dev/null || { echo "::error::Detached StorageManager exited; see $LOG"; tail -n 80 "$LOG" || true; exit 5; }
+              CMDLINE="$(tr '\0' ' ' < "/proc/$PID/cmdline" 2>/dev/null || true)"
+              [[ "$CMDLINE" == *"$RELEASE/storage_manager.py"* ]] || { echo "::error::Detached process command mismatch."; exit 5; }
+              BACKEND="detached"
+            fi
+          fi
+
+          sleep 3
+          if [[ "$BACKEND" == "systemd-user" ]]; then
+            systemctl --user is-active --quiet "$UNIT" || { echo "::error::StorageManager systemd service is not active."; exit 6; }
+            PID="$(systemctl --user show "$UNIT" --property=MainPID --value)"
+            [[ "$PID" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Service has no MainPID."; exit 6; }
+            EXEC_START="$(systemctl --user show "$UNIT" --property=ExecStart --value)"
+            [[ "$EXEC_START" == *"$RELEASE/storage_manager.py"* ]] || { echo "::error::ExecStart source mismatch."; exit 6; }
+          else
+            PID="$(cat "$PID_FILE")"
+            kill -0 "$PID" 2>/dev/null || { echo "::error::Detached StorageManager is not alive."; exit 6; }
+            CMDLINE="$(tr '\0' ' ' < "/proc/$PID/cmdline" 2>/dev/null || true)"
+            [[ "$CMDLINE" == *"$RELEASE/storage_manager.py"* ]] || { echo "::error::Detached StorageManager command mismatch."; exit 6; }
+          fi
+          printf 'STORAGE_MANAGER_BACKGROUND=ACTIVE backend=%s pid=%s\n' "$BACKEND" "$PID" | tee -a "$STATE_ROOT/last-start.txt"
+          printf 'STORAGE_MANAGER_SOURCE_SHA=%s\nSTORAGE_MANAGER_LOG=%s\n' "$GITHUB_SHA" "$LOG" | tee -a "$STATE_ROOT/last-start.txt"
+          printf 'STORAGE_MANAGER_PID=%s\nSTORAGE_MANAGER_BACKEND=%s\n' "$PID" "$BACKEND" >> "$GITHUB_ENV"
+
+      - name: Verify the monitor remains alive while the action finishes
+        run: |
+          set -euo pipefail
+          sleep 10
+          if [[ "$STORAGE_MANAGER_BACKEND" == "systemd-user" ]]; then
+            systemctl --user is-active --quiet oec-storage-manager-oec1.service
+            systemctl --user show oec-storage-manager-oec1.service --property=ActiveState --property=MainPID --no-pager
+          else
+            kill -0 "$STORAGE_MANAGER_PID"
+            tr '\0' ' ' < "/proc/$STORAGE_MANAGER_PID/cmdline" | grep -F 'storage_manager.py' >/dev/null
+          fi
+          echo "STORAGE_MANAGER_BACKGROUND_VERIFIED=true"
