@@ -35,7 +35,7 @@ The ChatGPT task scheduler supports one-time, daily, weekly and monthly schedule
 
 At audit time the scheduler reported **3 enabled tasks out of a plan limit of 3**. Those existing slots belong to two Full Model/D2E daily tasks and one Full Model checkpoint task, outside this OEC task's ownership. An attempt to create the first new OEC checkpoint at 23:12 IST returned `too_many_active_automations` (`current_count=3`, `plan_limit=3`). No event was created, and no existing automation was disabled, repurposed or changed. Do not retry repeatedly or manipulate another chat's tasks to bypass this limit.
 
-After an authorized slot becomes available, use one OEC daily coordinator plus a bounded one-time checkpoint chain only if the scheduler permits it. Suggested next checkpoint batch, because 23:09 has already passed: **23:12, 23:25, 23:40, 23:52 IST, then 00:05 IST on 2026-10-30 for the scheduler checkpoint**. Before scheduling any exact time, read the current time and omit past times. Each event must independently contain the standing rules in §1.
+After an authorized slot becomes available, use one OEC daily coordinator plus a bounded one-time checkpoint chain only if the scheduler permits it. Suggested shifted checkpoint batch (current local-time check: 23:15 IST; 23:09 and 23:12 have passed): **23:25, 23:40, 23:52 IST on 2026-10-29, then 00:05 and 00:17 IST on 2026-10-30**. These are proposed times only, not created schedules. Before scheduling, read the current time again and skip any newly elapsed times. Before scheduling any exact time, read the current time and omit past times. Each event must independently contain the standing rules in §1.
 
 ### Five-stage checkpoint responsibilities
 
