@@ -1,3 +1,16 @@
+# OEC actual Gradio callback and asset validation — 2026-10-29 10:02 IST
+
+**Status: PENDING; not complete yet.**
+
+- Source candidate tested: `662f8225f110163cbd8e2f60c9548c4839ce8566` on `fix/media-stack-supervision-20261019`; current source branch tip is documentation-only commit `70b51f79aa35d5962f575df195a5a8c0a1516f35`.
+- Latest workflow: [run 40817769289](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817769289) on `xflexwork/OEC_AireOS_Full_Model`, branch `work/oec-gradio-callback-acceptance-20261029`, runner label `oec-train-2`.
+- Runner owner queue: D2E training [40813924732](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40813924732) is still in progress; EDA [40815451090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40815451090) is queued. No callback result logs or generated assets are available yet.
+- Latest workflow update adds a trusted existing config-path fallback to `$HOME/OEC_feature_sync` (validated, never synthesized) and limits dead-lock recovery to the authorized runner/host. On other hosts a storage pause lock/lease causes fail-closed refusal. Cache deletion and environment-installation paths remain disabled.
+- Prior attempt [40817297589](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817297589) was superseded while the workflow was being hardened; latest accepted attempt to monitor is 40817769289.
+
+Completion requires actual Gradio submissions plus inspected output files, hashes and decoder/parse reports. No asset is marked accepted at this time.
+
+---
 # OEC current callback-acceptance update — 2026-10-29 09:52 IST
 
 **Status: PENDING — no current-source callback or asset has passed yet.**

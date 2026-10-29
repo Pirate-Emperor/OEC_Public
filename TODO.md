@@ -1,14 +1,14 @@
-## CURRENT STATUS — 2026-10-29 09:52 IST
+## CURRENT STATUS — 2026-10-29 10:02 IST
 
-**OEC source branch/head used for callback acceptance:** 662f8225f110163cbd8e2f60c9548c4839ce8566 on fix/media-stack-supervision-20261019.
+**Pinned executable source candidate:** `662f8225f110163cbd8e2f60c9548c4839ce8566` from `fix/media-stack-supervision-20261019` (branch tip `70b51f79aa35d5962f575df195a5a8c0a1516f35` contains docs-only tracker changes after that source SHA).
 
-- [ ] **Actual Gradio callback + asset validation — PENDING, not passed.** The corrected provider-wide job is [run 40817297589](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817297589), queued for runner oec-train-2 on branch work/oec-gradio-callback-acceptance-20261029. It pins the OEC source SHA above and exercises real Gradio event/API callbacks with format-aware output checks. No output artifact has been accepted from this run yet.
-- [x] **Runner ownership routed correctly without mutation.** The runner is registered under xflexwork/OEC_AireOS_Full_Model, so the acceptance workflow is hosted there rather than trying to relabel or re-register it under xflexwork/OEC.
-- [ ] **Hardware execution is waiting for runner availability.** D2E training [run 40813924732](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40813924732) is still in progress on oec-train-2; D2E EDA [run 40815451090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40815451090) is queued. The callback run is queued behind this work.
-- [x] **Preservation controls:** the bridge has no model-cache purge commands, no --purge-after flags, and no ACE-Step environment installer. Existing Conda runtimes are reused; any missing model weights can only be requested through StorageManager-admitted preparation steps. The job fails closed if trusted storage configuration or fresh storage/GPU admission is unavailable.
-- [ ] **Acceptance criteria still outstanding:** real callback receipt for each applicable provider, non-empty output, content/decoder/format validation (WAV, transcript, PNG, GLB, MP4/FLAC as applicable), artifact hashes and per-provider result JSON. Historical UI-only launch is not a substitute.
+- [ ] **Actual Gradio callback + asset validation — PENDING.** Latest full-provider acceptance [run 40817769289](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817769289) is queued in `xflexwork/OEC_AireOS_Full_Model` on `work/oec-gradio-callback-acceptance-20261029`, targeting `oec-train-2`. No callback has been accepted and no current-run output hashes/decoder reports exist.
+- [x] **Runner ownership:** acceptance runs on the repository that owns the designated runner; no relabel or re-registration has been performed.
+- [ ] **Runner availability:** D2E training [40813924732](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40813924732) remains in progress on `oec-train-2`; EDA [40815451090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40815451090) remains queued. The acceptance run is waiting in the same runner queue.
+- [x] **Safety refinements in the queued workflow:** source checkout is pinned; storage config lookup also checks the already-existing `$HOME/OEC_feature_sync` / account-home worktree (only a regular, non-symlink file with valid schema is accepted); lock/lease recovery is attempted only on its authorized `oec-train` + `scn30-mn` identity. Other runner identities fail closed if a pause lock/lease exists. Model-cache purge and package/environment installer commands remain disabled.
+- [ ] **Acceptance evidence still needed:** real Gradio HTTP/event callback submissions, generated files plus format-specific validation and SHA-256, and per-provider result reports for applicable WAV/FLAC/TXT/PNG/GLB/MP4 outputs. UI-only passes and queued jobs are not proof.
 
-The first bridge revision produced no job record and was superseded after correcting checkout workspace handling. The currently tracked run is 40817297589; its terminal result has not yet been observed. No protected cache/lock was removed and no Conda package/environment was changed by this workflow setup.
+The prior revision was cancelled when newer workflow fixes were pushed. The currently monitored run is 40817769289. Its terminal result has not been observed because the designated runner is occupied by the ongoing training job. No protected storage lock/cache was deleted and no Conda environment was recreated.
 
 ---
 

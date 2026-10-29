@@ -1,3 +1,9 @@
+## 2026-10-29 10:02 IST — hardening queued actual Gradio callback acceptance
+
+- Latest job [run 40817769289](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817769289) is queued on `oec-train-2`; real callback/asset acceptance is still pending.
+- Updated runner-side workflow to also check the existing `$HOME/OEC_feature_sync/storage_config.json` path if provisioned (never create defaults), validate the trusted config, and run dead-lock recovery only under the authorized `oec-train` / `scn30-mn` identity. Unknown lock/lease ownership fails closed.
+- No caches/locks were deleted, no package/environment installers were run, and no WAV/FLAC/TXT/PNG/GLB/MP4 is accepted from the current attempt.
+
 ## 2026-10-29 09:52 IST — real Gradio callback acceptance routed to the runner-owning repository
 
 - Added an acceptance workflow at [run 40817297589](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817297589) on xflexwork/OEC_AireOS_Full_Model, branch work/oec-gradio-callback-acceptance-20261029, pinned to OEC source SHA 662f8225f110163cbd8e2f60c9548c4839ce8566.

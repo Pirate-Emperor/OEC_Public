@@ -10,6 +10,12 @@ Candidate before tracker/sync correction: `f9b3f095e7f711d88a996ad3842d140a312e6
 - Status is QUEUED, not accepted. D2E training run [40813924732](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40813924732) is in progress on the same runner and prepared-data EDA [40815451090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40815451090) is queued ahead. Trusted StorageManager configuration and GPU admission have not yet been checked by this job.
 - Cache deletion and package/environment installation paths were disabled for this bridge; model weights, if needed, may only be prepared through StorageManager. No cache/lock was deleted, no Conda environment was recreated, and no new output is marked accepted.
 
+## Follow-up — 2026-10-29 10:02 IST: storage-config and lock-scope guard corrections
+
+- Runner-side workflow revision `3a7ce66c1796200d37b2a5a5415a7f90f2fefbeb` now checks both `$HOME/OEC` and the already-existing `$HOME/OEC_feature_sync` worktree for trusted `storage_config.json`, validates a regular non-symlink config with models/outputs and quota snapshot settings, and copies only the validated file into the temporary job checkout. It does not synthesize configuration.
+- Dead storage-lock recovery now runs only with its explicit authorized runner/host identity (`oec-train` / `scn30-mn`). If a pause lock or lease is present on another runner, the job fails closed instead of mutating it.
+- Latest acceptance [run 40817769289](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817769289) remains queued behind training [40813924732](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40813924732). Actual callback and asset validation is still NOT VERIFIED.
+
 ## Evidence
 
 - Gradio UI launch: [40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051) — all 13 configured cases passed in UI-only mode; does not assert model callback success.
