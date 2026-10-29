@@ -604,3 +604,14 @@ Detailed evidence is in changelog/CHANGELOG-2026-10-15.md and test.json. Keep ma
 - [ ] Re-run joined QA/HF remote hash read-back and retain full successful artifact evidence.
 - [ ] Reconcile feature branch (345 ahead / 11 behind at last compare) with current main before merging; preserve main-only changes and review the full diff.
 - [ ] Do not claim A100 local directory synchronization from GitHub Actions logs alone; verify actual local checkout SHA/status through the designated runner workflow.
+
+
+## OEC Gradio acceptance scope and scheduling — 2026-10-29 23:10 IST
+
+**Ownership rule:** write only to `xflexwork/OEC` and permitted local OEC root paths. Never modify `xflexwork/OEC_AireOS_Full_Model` (another chat owns it), and never alter local `OEC/oec_deploy` or `OEC/oec_train` submodules. See [schedule/safety policy](docs/OEC_GRADIO_SCHEDULE_COORDINATION.md).
+
+- OEC's actual model acceptance workflow runner labels are `[self-hosted, linux, x64, gpu, a100, oec-train]`; verify actual registration and host separately.
+- Latest OEC runner-root sync [40818428276](https://github.com/xflexwork/OEC/actions/runs/40818428276) failed runner-identity validation; OEC callback acceptance [40802365390](https://github.com/xflexwork/OEC/actions/runs/40802365390) was cancelled with zero artifacts. Current Actions queues were empty at the 2026-10-29 23:10 IST read, but local EDA/host state is unverified.
+- Do not clear the legacy storage pause lock, recover remote locks without authorized host/PID/lease proof, install/recreate Conda environments, purge caches, change trusted StorageManager configuration, or bypass admission.
+- Scheduler currently allows 3 enabled tasks; all 3 are occupied by another chat's Full Model/D2E jobs. One create attempt failed with `too_many_active_automations`; no other task was changed. Hourly recurrence is unsupported.
+- Keep all model statuses evidence-led. Historical AudioGen/MusicGen/TRELLIS/FLUX outputs belong to earlier source revisions; preserve them and do not duplicate unchanged outputs. LTX and current WAN generation remain unverified. Continue from the earliest safe missing gate, not from assumptions.
