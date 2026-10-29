@@ -1,3 +1,10 @@
+## 2026-10-29 10:03 IST — callback workflow isolated; runner still occupied
+
+- Latest acceptance [run 40818187983](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40818187983) is still queued with no runner assigned; actual Gradio callbacks have not started.
+- EDA [40815451090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40815451090) completed SUCCESS. A newer D2E training run [40817880090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817880090) remains in progress on `oec-train-2`, with quality-gated iteration [40817912672](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817912672) queued.
+- Latest bridge commit `2684cd3b881302db658af86e554147e0c6fb82ca` moves the checkout into a per-run temporary directory, checks out the pinned candidate SHA, includes safe local config fallback and only runs dead-lock recovery on its authorized runner/host. Cache deletion and environment installation paths stay disabled.
+- No current-run generated WAV/FLAC/TXT/PNG/GLB/MP4 is accepted.
+
 ## 2026-10-29 10:02 IST — hardening queued actual Gradio callback acceptance
 
 - Latest job [run 40817769289](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817769289) is queued on `oec-train-2`; real callback/asset acceptance is still pending.

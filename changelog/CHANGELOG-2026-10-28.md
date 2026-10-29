@@ -16,6 +16,13 @@ Candidate before tracker/sync correction: `f9b3f095e7f711d88a996ad3842d140a312e6
 - Dead storage-lock recovery now runs only with its explicit authorized runner/host identity (`oec-train` / `scn30-mn`). If a pause lock or lease is present on another runner, the job fails closed instead of mutating it.
 - Latest acceptance [run 40817769289](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817769289) remains queued behind training [40813924732](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40813924732). Actual callback and asset validation is still NOT VERIFIED.
 
+## Follow-up — 2026-10-29 10:03 IST: isolate source checkout and reconcile runner queue
+
+- Bridge workflow commit `2684cd3b881302db658af86e554147e0c6fb82ca` places pinned OEC source in `$RUNNER_TEMP/oec-gradio-source-$GITHUB_RUN_ID` and explicitly sets the working directory for each step; it fetches branch ancestry and detaches at exact candidate `662f8225f110163cbd8e2f60c9548c4839ce8566`.
+- Callback acceptance [run 40818187983](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40818187983) is still queued with no runner assignment. EDA [40815451090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40815451090) passed, but newer training [40817880090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817880090) is active and automatic iteration [40817912672](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817912672) is queued on the designated training runner.
+- The job still fails closed on missing/invalid trusted storage config or an unowned storage pause lock/lease. No cache/lock removal, environment creation or package install is performed by the bridge.
+- Actual Gradio output files and format-specific validation remain NOT VERIFIED.
+
 ## Evidence
 
 - Gradio UI launch: [40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051) — all 13 configured cases passed in UI-only mode; does not assert model callback success.

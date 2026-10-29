@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-29T10:02:00+05:30",
+  "last_updated": "2026-10-29T10:03:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Pinned executable OEC source 662f8225f110163cbd8e2f60c9548c4839ce8566 from fix/media-stack-supervision-20261019. Runner bridge workflow latest run 40817769289 at xflexwork/OEC_AireOS_Full_Model/work/oec-gradio-callback-acceptance-20261029 is QUEUED on oec-train-2. Training run 40813924732 remains in progress and EDA 40815451090 is queued. Added trusted existing configuration fallback to OEC_feature_sync and restricted storage-lock recovery to its authorized runner/host; otherwise the job fails closed. Cache purge and environment installer paths remain disabled. No actual Gradio callback-generated asset has been accepted yet.",
+  "latest_summary": "Pinned executable OEC candidate 662f8225f110163cbd8e2f60c9548c4839ce8566 on fix/media-stack-supervision-20261019 (source HEAD ee8e79bb6826f4f2d97c64d04bd65ae0efa92929 is tracker-only). The cross-repository Gradio acceptance workflow run 40818187983 (xflexwork/OEC_AireOS_Full_Model/work/oec-gradio-callback-acceptance-20261029) remains QUEUED on oec-train-2 with runner_id null, no callbacks begun. EDA run 40815451090 succeeded. Newer D2E training 40817880090 is in progress on oec-train-2 and quality-gated iteration 40817912672 is queued. The bridge now uses a unique temporary checkout and trusted existing config paths, and limits lock recovery to its authorized host; cache purges/installers remain disabled.",
   "experiments": [
     {
       "id": "EXP-2026-10-29-GRADIO-CALLBACK-ACCEPTANCE-BRIDGE",
@@ -18,29 +18,31 @@
         "source_sha": "662f8225f110163cbd8e2f60c9548c4839ce8566",
         "runner_repository": "xflexwork/OEC_AireOS_Full_Model",
         "runner_branch": "work/oec-gradio-callback-acceptance-20261029",
-        "callback_acceptance_run": 40817769289,
+        "callback_acceptance_run": 40818187983,
         "runner": "oec-train-2",
         "cache_purge_enabled": false,
-        "environment_installer_enabled": false
+        "environment_installer_enabled": false,
+        "bridge_workflow_commit": "2684cd3b881302db658af86e554147e0c6fb82ca"
       },
       "results": {
         "workflow_committed": true,
-        "workflow_status": "QUEUED",
-        "callback_invocations": "NOT_STARTED / NO RUN LOGS YET",
+        "workflow_status": "QUEUED / no runner assigned",
+        "callback_invocations": "NOT STARTED; job runner_id is null",
         "generated_asset_validation": "NOT VERIFIED; no artifact accepted",
-        "training_run": "40813924732 remains in progress on oec-train-2",
-        "eda_run": "40815451090 remains queued on oec-train-2",
+        "training_run": "40817880090 in progress on oec-train-2",
+        "eda_run": "40815451090 completed success",
         "caches_deleted": false,
         "conda_environments_or_packages_changed": false,
-        "last_workflow_commit": "3a7ce66c1796200d37b2a5a5415a7f90f2fefbeb",
+        "last_workflow_commit": "2684cd3b881302db658af86e554147e0c6fb82ca",
         "prior_run_cancelled": "40817297589 was superseded when trusted-config-path and lock-scope guards were added",
-        "preservation_controls": "Cache-purge and package/environment installer commands disabled; authorized lock recovery only; fail-closed elsewhere"
+        "preservation_controls": "Cache-purge and package/environment installer commands disabled; authorized lock recovery only; fail-closed elsewhere; checkout in unique RUNNER_TEMP",
+        "iteration_run": "40817912672 queued on oec-train-2"
       },
       "interpretation": "This is an execution attempt wired to the correct runner-owning repository, not an acceptance pass. Mark the task complete only after the run terminates and each real callback result and generated file has been independently verified.",
       "limitations": [
-        "The acceptance run is queued behind D2E training run 40813924732 on oec-train-2.",
-        "The local trusted StorageManager configuration, active lock/lease status, fresh quota, and GPU admission have not yet been checked because the job has not started.",
-        "The canonical persistent $HOME/OEC sync SHA remains a separate, unverified gate; this workflow fetches the pinned source into the clean job workspace."
+        "The acceptance run is queued because oec-train-2 is servicing a newer D2E training run; another quality-gated iteration is queued behind it.",
+        "Trusted StorageManager configuration, live lock/lease state, fresh quota and GPU admission have not been evaluated by the acceptance job because no runner has been assigned.",
+        "The canonical persistent $HOME/OEC checkout SHA remains a separate, unverified gate; the callback workflow fetches the pinned source into a temporary job checkout."
       ]
     },
     {

@@ -1,3 +1,16 @@
+# OEC actual Gradio callback and asset validation — 2026-10-29 10:03 IST
+
+**Status: PENDING; not complete.**
+
+- Executable OEC candidate SHA: `662f8225f110163cbd8e2f60c9548c4839ce8566` on `fix/media-stack-supervision-20261019`; source branch head `ee8e79bb6826f4f2d97c64d04bd65ae0efa92929` only adds tracker updates after the pinned code candidate.
+- Latest bridge workflow revision: `2684cd3b881302db658af86e554147e0c6fb82ca`; latest job [run 40818187983](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40818187983) is queued with `runner_id=null`.
+- EDA [run 40815451090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40815451090) passed. However D2E training [run 40817880090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817880090) is in progress on `oec-train-2` and automatic iteration [40817912672](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817912672) is queued. Actual callbacks have not started.
+- Latest workflow hardening isolates the pinned source in a unique temporary directory, uses a validated existing trusted storage config only, limits lock recovery to its authorized runner/host, and keeps model-cache purges/environment installers disabled.
+- Prior workflow attempt [40817769289](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817769289) was cancelled by the latest safety/checkout fix. Latest monitored attempt: 40818187983.
+
+Completion requires successful real Gradio submissions and independent inspection of generated files, hashes and format-specific decoder/parse reports. No current-run asset is accepted yet.
+
+---
 # OEC actual Gradio callback and asset validation — 2026-10-29 10:02 IST
 
 **Status: PENDING; not complete yet.**
