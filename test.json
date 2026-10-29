@@ -1,11 +1,45 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-29T07:18:00+05:30",
+  "last_updated": "2026-10-29T09:52:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Current head 367d097417c33eff63f419c83c91c0d1a8b927af. Root-sync workflow run 40802549636: cutoff succeeded; runner label audit failed before mutation because local runner oec-train's .runner metadata identifies repository Killer4K-N/OEC_AireOS_Full_Model rather than xflexwork/OEC; canonical sync was skipped. Model acceptance 40802365390 and static/storage suite 40802365318 were cancelled before current-head proof. No actual current-head Gradio callback-generated asset has been accepted. Previous UI-only pass 40671622051 is older source and not output validation. No runner label or protected cache/lock mutation was made.",
+  "latest_summary": "Source branch fix/media-stack-supervision-20261019 executable candidate 662f8225f110163cbd8e2f60c9548c4839ce8566. A runner bridge was added on xflexwork/OEC_AireOS_Full_Model/work/oec-gradio-callback-acceptance-20261029, pinned to source SHA 662f8225f110163cbd8e2f60c9548c4839ce8566; current callback acceptance run 40817297589 is QUEUED on oec-train-2. D2E training run 40813924732 remains in progress and EDA run 40815451090 is queued on that runner, so no real Gradio callback asset is accepted yet. The bridge checks out the exact source in a clean Actions workspace, performs StorageManager-gated preparation, preserves model caches and existing environments, and refuses inference when trusted storage configuration/admission is missing.",
   "experiments": [
+    {
+      "id": "EXP-2026-10-29-GRADIO-CALLBACK-ACCEPTANCE-BRIDGE",
+      "date": "2026-10-29",
+      "category": "Actual Gradio callback and generated-asset acceptance",
+      "approach": "Created an acceptance workflow on the repository that owns the designated oec-train/oec-train-2 runner registration, pinned to OEC source commit 662f8225f110163cbd8e2f60c9548c4839ce8566. The workflow covers model-provider paths and invokes real notebook Gradio HTTP/event callbacks with format-specific asset validation. It contains no model-cache purge commands or --purge-after flags and does not run the ACE-Step environment installer; all weight preparation remains routed through StorageManager.",
+      "reason": "The OEC source repository runner audit proved the designated local runner is registered to xflexwork/OEC_AireOS_Full_Model, not xflexwork/OEC. The bridge avoids changing runner ownership while executing the actual source tree on the existing runner repository.",
+      "parameters": {
+        "source_repository": "xflexwork/OEC",
+        "source_branch": "fix/media-stack-supervision-20261019",
+        "source_sha": "662f8225f110163cbd8e2f60c9548c4839ce8566",
+        "runner_repository": "xflexwork/OEC_AireOS_Full_Model",
+        "runner_branch": "work/oec-gradio-callback-acceptance-20261029",
+        "callback_acceptance_run": 40817297589,
+        "runner": "oec-train-2",
+        "cache_purge_enabled": false,
+        "environment_installer_enabled": false
+      },
+      "results": {
+        "workflow_committed": true,
+        "workflow_status": "QUEUED",
+        "callback_invocations": "NOT_STARTED / NO RUN LOGS YET",
+        "generated_asset_validation": "NOT VERIFIED; no artifact accepted",
+        "training_run": "40813924732 remains in progress on oec-train-2",
+        "eda_run": "40815451090 remains queued on oec-train-2",
+        "caches_deleted": false,
+        "conda_environments_or_packages_changed": false
+      },
+      "interpretation": "This is an execution attempt wired to the correct runner-owning repository, not an acceptance pass. Mark the task complete only after the run terminates and each real callback result and generated file has been independently verified.",
+      "limitations": [
+        "The acceptance run is queued behind existing training and EDA work on the single designated runner.",
+        "The local StorageManager configuration and GPU admission checks have not yet executed because the job has not started.",
+        "The canonical persistent $HOME/OEC sync SHA remains a separate, unverified gate; this workflow fetches the pinned source into the clean job workspace."
+      ]
+    },
     {
       "id": "EXP-2026-10-29-RUNNER-REPOSITORY-IDENTITY-MISMATCH",
       "date": "2026-10-29",

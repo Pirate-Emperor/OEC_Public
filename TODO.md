@@ -1,14 +1,14 @@
-## CURRENT STATUS — 2026-10-29 07:18 IST
+## CURRENT STATUS — 2026-10-29 09:52 IST
 
-**Current branch head:** `367d097417c33eff63f419c83c91c0d1a8b927af` (`fix/media-stack-supervision-20261019`).
+**OEC source branch/head used for callback acceptance:** 662f8225f110163cbd8e2f60c9548c4839ce8566 on fix/media-stack-supervision-20261019.
 
-- [x] **Workflow dependency graph:** fixed and committed in `fd73717f`; the new root-sync workflow parsed and executed its jobs.
-- [ ] **A100 sync — FAILED at runner identity audit.** [Run 40802549636](https://github.com/xflexwork/OEC/actions/runs/40802549636): cutoff passed, runner-label audit failed, and canonical sync was skipped. The log reports runner `oec-train` has local `.runner` identity repository `Killer4K-N/OEC_AireOS_Full_Model`, not `xflexwork/OEC`. The audit stopped before changing labels. It is unsafe to relabel or re-register that runner automatically from this checkout without confirming the intended repository ownership.
-- [ ] **Actual Gradio callback + generated asset acceptance — NOT VERIFIED.** The model acceptance run [40802365390](https://github.com/xflexwork/OEC/actions/runs/40802365390) was cancelled before executing inference. The last completed full acceptance [40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) failed during runner/StorageManager preflight before inference. No current-head WAV, transcript, PNG, GLB or MP4 is accepted.
-- [ ] **Static/storage regression on current head:** [run 40802365318](https://github.com/xflexwork/OEC/actions/runs/40802365318) was cancelled; the previous pass [40671622040](https://github.com/xflexwork/OEC/actions/runs/40671622040) tested older source only.
-- [x] **Historical UI launch only:** [run 40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051) launched all 13 configured interfaces on older source; it did not generate/validate assets.
-- [ ] **Exact acceptance criteria still outstanding:** either use/register the designated `oec-train` and `oec-train-2` runners under `xflexwork/OEC` or identify the intended repository they should serve; then verify canonical `$HOME/OEC` SHA equality and final status; then invoke each actual Gradio callback and validate its returned file/result (WAV decode, transcript content, PNG decode, GLB parse/reopen, MP4 decode/playability).
-- No Conda environment was recreated; no packages, model caches or storage locks were removed. The current label audit made no label changes and the lock-recovery safeguards remain intact.
+- [ ] **Actual Gradio callback + asset validation — PENDING, not passed.** The corrected provider-wide job is [run 40817297589](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817297589), queued for runner oec-train-2 on branch work/oec-gradio-callback-acceptance-20261029. It pins the OEC source SHA above and exercises real Gradio event/API callbacks with format-aware output checks. No output artifact has been accepted from this run yet.
+- [x] **Runner ownership routed correctly without mutation.** The runner is registered under xflexwork/OEC_AireOS_Full_Model, so the acceptance workflow is hosted there rather than trying to relabel or re-register it under xflexwork/OEC.
+- [ ] **Hardware execution is waiting for runner availability.** D2E training [run 40813924732](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40813924732) is still in progress on oec-train-2; D2E EDA [run 40815451090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40815451090) is queued. The callback run is queued behind this work.
+- [x] **Preservation controls:** the bridge has no model-cache purge commands, no --purge-after flags, and no ACE-Step environment installer. Existing Conda runtimes are reused; any missing model weights can only be requested through StorageManager-admitted preparation steps. The job fails closed if trusted storage configuration or fresh storage/GPU admission is unavailable.
+- [ ] **Acceptance criteria still outstanding:** real callback receipt for each applicable provider, non-empty output, content/decoder/format validation (WAV, transcript, PNG, GLB, MP4/FLAC as applicable), artifact hashes and per-provider result JSON. Historical UI-only launch is not a substitute.
+
+The first bridge revision produced no job record and was superseded after correcting checkout workspace handling. The currently tracked run is 40817297589; its terminal result has not yet been observed. No protected cache/lock was removed and no Conda package/environment was changed by this workflow setup.
 
 ---
 

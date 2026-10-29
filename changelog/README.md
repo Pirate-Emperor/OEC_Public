@@ -1,3 +1,10 @@
+## 2026-10-29 09:52 IST — real Gradio callback acceptance routed to the runner-owning repository
+
+- Added an acceptance workflow at [run 40817297589](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817297589) on xflexwork/OEC_AireOS_Full_Model, branch work/oec-gradio-callback-acceptance-20261029, pinned to OEC source SHA 662f8225f110163cbd8e2f60c9548c4839ce8566.
+- The runner is queued behind D2E training [40813924732](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40813924732) and EDA [40815451090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40815451090). This is pending, not an asset-validation pass.
+- The workflow targets actual Gradio callbacks and validates provider outputs; it preserves caches and existing environments, skips model-cache purge actions, and refuses to install/recreate the ACE-Step environment. All model-weight preparation remains StorageManager-gated.
+- No current-source WAV/FLAC/TXT/PNG/GLB/MP4 has been accepted from this attempt yet.
+
 ## 2026-10-29 — A100 runner registration identity mismatch
 
 - Root-sync run [40802549636](https://github.com/xflexwork/OEC/actions/runs/40802549636): cutoff passed; runner-label audit failed because local `oec-train` metadata points to `Killer4K-N/OEC_AireOS_Full_Model`, not `xflexwork/OEC`. No label changed; canonical sync was skipped.

@@ -1,3 +1,16 @@
+# OEC current callback-acceptance update — 2026-10-29 09:52 IST
+
+**Status: PENDING — no current-source callback or asset has passed yet.**
+
+- Pinned OEC source: 662f8225f110163cbd8e2f60c9548c4839ce8566 from fix/media-stack-supervision-20261019.
+- Corrected acceptance workflow: [run 40817297589](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817297589), queued on oec-train-2 in xflexwork/OEC_AireOS_Full_Model, the repository that actually owns the runner.
+- The runner is occupied by D2E training [40813924732](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40813924732); EDA [40815451090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40815451090) is also queued. No inference logs or output files have been produced by the new run.
+- The bridge has exact-source checkout verification, actual Gradio event/API callback acceptance and per-output format checks. Cache-purge commands and the ACE-Step environment installer were disabled. StorageManager remains a hard prerequisite; no storage lock is bypassed.
+- The previous bridge run [40817097423](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817097423) failed before producing a job record; run [40817226583](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817226583) was superseded after the workspace correction. The live attempt to watch is 40817297589.
+
+No asset should be marked accepted until the job completes and the actual generated files, hashes and decoder/parse reports are available.
+
+---
 # OEC cumulative result update — 2026-10-23
 
 Source candidate inspected: `ae6c90b891ec80338c9c96446d735b03e1985d8a` on `fix/media-stack-supervision-20261019`.

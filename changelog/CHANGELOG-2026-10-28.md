@@ -3,6 +3,13 @@
 Branch: `fix/media-stack-supervision-20261019`
 Candidate before tracker/sync correction: `f9b3f095e7f711d88a996ad3842d140a312e6586`
 
+## Follow-up — 2026-10-29 09:52 IST: pinned current-source callback acceptance
+
+- The xflexwork/OEC_AireOS_Full_Model repository owns the registered oec-train / oec-train-2 runners. To avoid changing registration or labels, the acceptance workflow was added there on branch work/oec-gradio-callback-acceptance-20261029.
+- Workflow run [40817297589](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817297589) fetches OEC source commit 662f8225f110163cbd8e2f60c9548c4839ce8566 into a clean Actions workspace and requests actual Gradio callback plus asset validation for the configured model providers.
+- Status is QUEUED, not accepted. D2E training run [40813924732](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40813924732) is in progress on the same runner and prepared-data EDA [40815451090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40815451090) is queued ahead. Trusted StorageManager configuration and GPU admission have not yet been checked by this job.
+- Cache deletion and package/environment installation paths were disabled for this bridge; model weights, if needed, may only be prepared through StorageManager. No cache/lock was deleted, no Conda environment was recreated, and no new output is marked accepted.
+
 ## Evidence
 
 - Gradio UI launch: [40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051) — all 13 configured cases passed in UI-only mode; does not assert model callback success.
