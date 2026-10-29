@@ -1,11 +1,41 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-29T07:16:00+05:30",
+  "last_updated": "2026-10-29T07:18:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Current head fd73717fd38d9fca4b5058ac909703ea68c202c3 fixes the root-sync workflow self-dependency. Latest root-sync run 40802365371 has started; cutoff/watchdog was still running when polled, so canonical sync SHA/status is not confirmed. Current full model acceptance 40802365390 is queued/pending and static/storage suite 40802365318 is queued. No current-head Gradio callback-generated asset has been accepted. Last full acceptance 40671622024 stopped before inference; older UI launch success 40671622051 is UI-only. Prior auth and workflow DAG defects have been corrected in code but no successful live validation yet.",
+  "latest_summary": "Current head 367d097417c33eff63f419c83c91c0d1a8b927af. Root-sync workflow run 40802549636: cutoff succeeded; runner label audit failed before mutation because local runner oec-train's .runner metadata identifies repository Killer4K-N/OEC_AireOS_Full_Model rather than xflexwork/OEC; canonical sync was skipped. Model acceptance 40802365390 and static/storage suite 40802365318 were cancelled before current-head proof. No actual current-head Gradio callback-generated asset has been accepted. Previous UI-only pass 40671622051 is older source and not output validation. No runner label or protected cache/lock mutation was made.",
   "experiments": [
+    {
+      "id": "EXP-2026-10-29-RUNNER-REPOSITORY-IDENTITY-MISMATCH",
+      "date": "2026-10-29",
+      "category": "Self-hosted A100 runner ownership and repository sync",
+      "approach": "Reviewed root-sync run 40802549636 and the runner-label audit job logs. The audit reached the registered runner identity check and reported local oec-train as registered to Killer4K-N/OEC_AireOS_Full_Model, not xflexwork/OEC. The job stopped before label mutation; canonical-root-sync was skipped. Refreshed the current checklist and experiment log with exact status and acceptance gates.",
+      "reason": "Avoid mutating a runner belonging to a different repository and stop repeating failed canonical-sync attempts under an incorrect runner identity assumption.",
+      "parameters": {
+        "branch": "fix/media-stack-supervision-20261019",
+        "source_sha": "367d097417c33eff63f419c83c91c0d1a8b927af",
+        "root_sync_run": 40802549636,
+        "model_run": 40802365390,
+        "static_run": 40802365318,
+        "expected_repository": "xflexwork/OEC",
+        "observed_runner_repository": "Killer4K-N/OEC_AireOS_Full_Model"
+      },
+      "results": {
+        "cutoff": "PASS",
+        "runner_identity_audit": "FAIL / BLOCKED: oec-train .runner repo identity differs from expected xflexwork/OEC.",
+        "labels_mutated": false,
+        "canonical_sync": "SKIPPED because audit failed; local A100 SHA equality remains unverified.",
+        "model_acceptance": "Cancelled before inference; no current-head asset accepted.",
+        "static_storage": "Cancelled on the tested candidate."
+      },
+      "interpretation": "Runner label creation/re-registration must not be attempted until the owner confirms the intended repository association. Use the designated runners only after their registration is correct for the active repository.",
+      "limitations": [
+        "No current-head Gradio callback asset validation exists.",
+        "The historical UI-only pass is not generation proof.",
+        "Protected caches/locks and Conda environments remain untouched."
+      ]
+    },
     {
       "id": "EXP-2026-10-29-STATUS-AFTER-DAG-FIX",
       "date": "2026-10-29",
@@ -6073,6 +6103,6 @@
       ]
     }
   ],
-  "updated_at": "2026-10-29T07:16:00+05:30",
+  "updated_at": "2026-10-29T07:18:00+05:30",
   "updated_date": "2026-10-29"
 }

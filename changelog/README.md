@@ -1,3 +1,9 @@
+## 2026-10-29 — A100 runner registration identity mismatch
+
+- Root-sync run [40802549636](https://github.com/xflexwork/OEC/actions/runs/40802549636): cutoff passed; runner-label audit failed because local `oec-train` metadata points to `Killer4K-N/OEC_AireOS_Full_Model`, not `xflexwork/OEC`. No label changed; canonical sync was skipped.
+- Model acceptance [40802365390](https://github.com/xflexwork/OEC/actions/runs/40802365390) and static/storage [40802365318](https://github.com/xflexwork/OEC/actions/runs/40802365318) were cancelled without current-head pass evidence.
+- Actual Gradio callback-generated assets and canonical A100 SHA read-back remain unverified. Do not silently re-register a runner or claim launch-only checks as model acceptance.
+
 ## 2026-10-29 — Progress after root-sync DAG correction
 
 - Current source: `fd73717fd38d9fca4b5058ac909703ea68c202c3`.
