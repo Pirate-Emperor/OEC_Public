@@ -1,3 +1,4 @@
+| [2026-10-29](CHANGELOG-2026-10-29.md) | OEC-only schedule and safety rules documented on a non-triggering docs branch; OEC runner labels reaffirmed; current runner-identity/storage gates and scheduler capacity block recorded | [Schedule policy](../docs/OEC_GRADIO_SCHEDULE_COORDINATION.md) · [OEC root sync 40818428276](https://github.com/xflexwork/OEC/actions/runs/40818428276) · [OEC callback attempt 40802365390](https://github.com/xflexwork/OEC/actions/runs/40802365390) |
 ## 2026-10-29 10:03 IST — callback workflow isolated; runner still occupied
 
 - Latest acceptance [run 40818187983](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40818187983) is still queued with no runner assigned; actual Gradio callbacks have not started.
