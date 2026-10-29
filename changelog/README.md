@@ -1,3 +1,10 @@
+## 2026-10-29 — Progress after root-sync DAG correction
+
+- Current source: `fd73717fd38d9fca4b5058ac909703ea68c202c3`.
+- Root-sync run [40802365371](https://github.com/xflexwork/OEC/actions/runs/40802365371) started; watchdog/cutoff step was in progress at last poll, so the actual A100 checkout SHA is not yet confirmed.
+- Model acceptance [40802365390](https://github.com/xflexwork/OEC/actions/runs/40802365390) was queued/pending and static/storage tests [40802365318](https://github.com/xflexwork/OEC/actions/runs/40802365318) were queued.
+- Current-head Gradio callback-generated assets are NOT VERIFIED. A UI launch pass on older source is not generation acceptance.
+
 ## 2026-10-29 — Progress status and root-sync dependency correction
 
 - Root-sync run [40680899602](https://github.com/xflexwork/OEC/actions/runs/40680899602) failed before job evidence; static inspection found the runner-label audit job was self-dependent.

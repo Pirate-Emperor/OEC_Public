@@ -1,11 +1,38 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-29T07:12:00+05:30",
+  "last_updated": "2026-10-29T07:16:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "At 2026-10-29 07:12 IST, branch fix/media-stack-supervision-20261019 is at 9e41ef4952cc2887268b8654519e0fcda6b8b268 before a dependency correction. Root-sync run 40680899602 failed before creating jobs after the runner-label audit accidentally depended on itself; corrective blob b4f18c4d87010aaf5c285d88be8f0eed925408f7 fixes the DAG (audit waits for cutoff only; sync waits for cutoff+audit). Current model acceptance run 40680901503 is pending and static/storage run 40680901706 is queued. Actual current-head Gradio callback assets and canonical A100 SHA sync remain NOT VERIFIED. Last full acceptance 40671622024 failed before inference; UI-only run 40671622051 is not generation proof.",
+  "latest_summary": "Current head fd73717fd38d9fca4b5058ac909703ea68c202c3 fixes the root-sync workflow self-dependency. Latest root-sync run 40802365371 has started; cutoff/watchdog was still running when polled, so canonical sync SHA/status is not confirmed. Current full model acceptance 40802365390 is queued/pending and static/storage suite 40802365318 is queued. No current-head Gradio callback-generated asset has been accepted. Last full acceptance 40671622024 stopped before inference; older UI launch success 40671622051 is UI-only. Prior auth and workflow DAG defects have been corrected in code but no successful live validation yet.",
   "experiments": [
+    {
+      "id": "EXP-2026-10-29-STATUS-AFTER-DAG-FIX",
+      "date": "2026-10-29",
+      "category": "Current-head runner, A100 sync and Gradio asset acceptance status",
+      "approach": "Verified current branch head and queried latest Actions job states after the dependency-correction commit. Updated tracker top sections to report latest live state rather than earlier pending snapshots.",
+      "reason": "Keep the project record tied to the exact current SHA and avoid equating queued/in-progress jobs with successful model generation or synchronization.",
+      "parameters": {
+        "branch": "fix/media-stack-supervision-20261019",
+        "source_sha": "fd73717fd38d9fca4b5058ac909703ea68c202c3",
+        "root_sync_run": 40802365371,
+        "static_suite_run": 40802365318,
+        "model_acceptance_run": 40802365390
+      },
+      "results": {
+        "workflow_graph": "Corrected and committed in fd73717; new root-sync run started and cutoff/watchdog was in progress at last query.",
+        "a100_sync": "Not yet confirmed; root sync had not reached final reconciliation or emitted exact SHA/status.",
+        "gradio_generation": "Not verified on current head; model acceptance is queued/pending.",
+        "static_storage": "Queued; no pass result yet for fd73717.",
+        "prior_evidence": "Run 40671622051 was UI-only pass on older source; run 40671622024 failed before inference."
+      },
+      "interpretation": "The workflow dependency fix is committed, but both A100 checkout synchronization and current-source callback asset validation are still pending actual completed Actions evidence.",
+      "limitations": [
+        "Do not infer artifact generation from a launched interface.",
+        "Do not claim local checkout sync until canonical SHA and final status are explicitly reported.",
+        "Keep storage recovery safeguards and existing environments untouched."
+      ]
+    },
     {
       "id": "EXP-2026-10-29-ROOT-SYNC-DAG-CORRECTION",
       "date": "2026-10-29",
@@ -6046,6 +6073,6 @@
       ]
     }
   ],
-  "updated_at": "2026-10-29T07:12:00+05:30",
+  "updated_at": "2026-10-29T07:16:00+05:30",
   "updated_date": "2026-10-29"
 }

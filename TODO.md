@@ -1,14 +1,14 @@
-## CURRENT STATUS — 2026-10-29 07:12 IST
+## CURRENT STATUS — 2026-10-29 07:16 IST
 
-**Branch head inspected:** `9e41ef4952cc2887268b8654519e0fcda6b8b268` on `fix/media-stack-supervision-20261019`. A dependency correction is being applied after the root-sync workflow failed to create jobs.
+**Current branch head:** `fd73717fd38d9fca4b5058ac909703ea68c202c3` (`fix/media-stack-supervision-20261019`).
 
-- [x] **Gradio UI launch only:** [run 40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051) passed all 13 configured interfaces on older source. It did not run inference callbacks or prove generated files.
-- [x] **Static notebook tests on older source:** [run 40671622040](https://github.com/xflexwork/OEC/actions/runs/40671622040) passed 37 tests and selected notebook JSON checks on an older candidate.
-- [ ] **Actual Gradio callbacks + generated assets — NOT VERIFIED on current head.** [Model acceptance run 40680901503](https://github.com/xflexwork/OEC/actions/runs/40680901503) was pending; the last completed full acceptance [40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) failed at runner/StorageManager preflight before inference. No current-head WAV, transcription, PNG, GLB or MP4 artifact is accepted from that run.
-- [ ] **A100 local checkout sync — NOT VERIFIED.** [Root-sync run 40680899602](https://github.com/xflexwork/OEC/actions/runs/40680899602) failed before job evidence. The workflow has a self-dependency in `runner-label-alias-audit`; the current corrective change makes the audit depend only on the cutoff job and canonical sync depend on both cutoff and audit.
-- [ ] **Current static/storage regression:** [run 40680901706](https://github.com/xflexwork/OEC/actions/runs/40680901706) was queued when last inspected. New sync-contract tests must pass after the correction.
-- [ ] **Final acceptance evidence required:** sync must show canonical `$HOME/OEC` SHA equals the branch SHA and report final status; each applicable callback must generate a non-empty file/result and pass relevant validation (WAV decode, transcription output, PNG decode, GLB parse/reopen, MP4 decode/playability). HTTP 200/UI launch alone is not acceptance.
-- Existing Conda environments and protected model caches/locks remain untouched. No lock/cache bypass or package installation/removal was performed. The explicit storage lock host/PID/lease safeguards remain in place.
+- [x] **Workflow dependency defect corrected and committed.** Root-sync run [40802365371](https://github.com/xflexwork/OEC/actions/runs/40802365371) has started; at the last poll its independent cutoff/watchdog step was still in progress. The corrected DAG has the label audit depend only on the cutoff job; canonical sync depends on both.
+- [ ] **Actual Gradio callbacks + generated assets — NOT YET VERIFIED on current head.** Full model acceptance [40802365390](https://github.com/xflexwork/OEC/actions/runs/40802365390) is pending/queued. The last completed full acceptance [40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) failed before inference at runner/StorageManager preflight. No current-head WAV, transcription, PNG, GLB or MP4 is accepted from that run.
+- [ ] **A100 local checkout sync — NOT VERIFIED.** The latest workflow has not reached its canonical sync step or emitted exact checkout SHA/final status. Earlier sync failures included missing Git authentication and the invalid dependency graph; both corrections are in the current branch but have not yet been confirmed by a successful root-sync run.
+- [ ] **Static/storage regression:** [run 40802365318](https://github.com/xflexwork/OEC/actions/runs/40802365318) is queued and has not passed yet on this head.
+- [x] **Historical UI launch evidence:** [run 40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051) passed all 13 interface launches on older source. This remains UI-only and is not callback or asset acceptance.
+- Final acceptance requires actual callback-generated non-empty outputs plus relevant validation: WAV decode, transcription content, PNG decode, GLB parse/reopen, MP4 decode/playability; and a successful A100 sync showing canonical `$HOME/OEC` SHA equals the branch SHA plus final local status.
+- No Conda environment was recreated, no packages were installed/removed, and no protected model cache or storage lock was deleted. Storage-lock host/PID/lease safeguards remain intact.
 
 ---
 
