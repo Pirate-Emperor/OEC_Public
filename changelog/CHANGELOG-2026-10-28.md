@@ -36,3 +36,10 @@ Candidate before tracker/sync correction: `f9b3f095e7f711d88a996ad3842d140a312e6
 - Reconciliation now authenticates from the read-only workflow token without persisting credentials and fetches the explicit `xflexwork/OEC` target branch, rather than assuming the canonical checkout's legacy origin is the feature source.
 - Main model acceptance now uses the specified `oec-train` runner; root-sync and other relevant A100 workflows use `oec-train-2`. Legacy lock recovery is still confined to `oec-train/scn30-mn`, with owner PID, lock age and lease checks intact.
 - Run evidence is still required before marking sync or current-candidate asset generation as PASS.
+
+
+## 2026-10-29 07:12 IST follow-up — progress status and workflow correction
+
+At inspection, branch head was `9e41ef4952cc2887268b8654519e0fcda6b8b268`. [Root-sync run 40680899602](https://github.com/xflexwork/OEC/actions/runs/40680899602) failed before job evidence because the runner-label audit job was self-dependent. The candidate correction (workflow blob `b4f18c4d87010aaf5c285d88be8f0eed925408f7`) makes the audit depend on the cutoff job only and canonical sync depend on both the cutoff and audit jobs. A separate static contract-test correction (blob `6652ff259697fdf41c3b8f1cf3e3e11f2eac210b`) asserts the intended DAG.
+
+The current model acceptance [40680901503](https://github.com/xflexwork/OEC/actions/runs/40680901503) was pending and the static/storage run [40680901706](https://github.com/xflexwork/OEC/actions/runs/40680901706) was queued when inspected. Neither is a pass. Actual Gradio callbacks and generated assets remain unverified on the current head; the last full acceptance [40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) failed before inference. The previous UI-only success [40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051) proves launch only. Canonical A100 sync still requires a successful run reporting the checkout SHA and final status.

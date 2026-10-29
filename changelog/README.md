@@ -1,3 +1,10 @@
+## 2026-10-29 — Progress status and root-sync dependency correction
+
+- Root-sync run [40680899602](https://github.com/xflexwork/OEC/actions/runs/40680899602) failed before job evidence; static inspection found the runner-label audit job was self-dependent.
+- The correction now has audit depend on the cutoff job only, and root sync depend on cutoff plus audit. Regression assertions were adjusted.
+- Model acceptance [40680901503](https://github.com/xflexwork/OEC/actions/runs/40680901503) was pending; static/storage [40680901706](https://github.com/xflexwork/OEC/actions/runs/40680901706) was queued.
+- Current-head Gradio callback outputs and canonical A100 checkout SHA are not yet verified.
+
 ## 2026-10-28 — A100 runner routing, sync authentication, and Gradio asset acceptance
 
 - Root-sync failures are recorded: [40678285024](https://github.com/xflexwork/OEC/actions/runs/40678285024) lacked Git authentication; [40678737412](https://github.com/xflexwork/OEC/actions/runs/40678737412) rejected the incorrectly escaped credential variable.

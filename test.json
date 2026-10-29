@@ -1,11 +1,38 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-28T16:45:00+05:30",
+  "last_updated": "2026-10-29T07:12:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "On branch fix/media-stack-supervision-20261019, current reviewed candidate 0eb3562689e50ca2756fb4980913b4874ef15970 had two A100 sync failures after the origin-allowlist change: run 40678285024 reached live storage preflight but failed Git authentication; run 40678737412 failed because an earlier credential patch escaped shell variable expansion. Current patch fixes token quoting, fetches branch explicitly from xflexwork/OEC with ephemeral GITHUB_TOKEN Git config, and aligns model/sync runner selectors with oec-train/oec-train-2. Current-source Gradio callback asset acceptance remains unproved: run 40671622024 stopped before inference. Successful UI-only and historical asset evidence is not current-candidate callback proof.",
+  "latest_summary": "At 2026-10-29 07:12 IST, branch fix/media-stack-supervision-20261019 is at 9e41ef4952cc2887268b8654519e0fcda6b8b268 before a dependency correction. Root-sync run 40680899602 failed before creating jobs after the runner-label audit accidentally depended on itself; corrective blob b4f18c4d87010aaf5c285d88be8f0eed925408f7 fixes the DAG (audit waits for cutoff only; sync waits for cutoff+audit). Current model acceptance run 40680901503 is pending and static/storage run 40680901706 is queued. Actual current-head Gradio callback assets and canonical A100 SHA sync remain NOT VERIFIED. Last full acceptance 40671622024 failed before inference; UI-only run 40671622051 is not generation proof.",
   "experiments": [
+    {
+      "id": "EXP-2026-10-29-ROOT-SYNC-DAG-CORRECTION",
+      "date": "2026-10-29",
+      "category": "A100 workflow dependency correction and current acceptance status",
+      "approach": "Inspected branch head and latest Actions run. Root-sync workflow run 40680899602 failed before jobs/evidence. Found runner-label-alias-audit self-dependent in workflow YAML. Prepared correction: audit depends on enforce-30-minute-cutoff only; canonical-root-sync depends on cutoff and successful audit. Updated checklist/TODO/test log to state current outcomes and distinguish queue from pass.",
+      "reason": "Restore a valid workflow DAG and keep current asset/sync status accurate.",
+      "parameters": {
+        "branch": "fix/media-stack-supervision-20261019",
+        "prior_head": "9e41ef4952cc2887268b8654519e0fcda6b8b268",
+        "workflow_failure_run": 40680899602,
+        "pending_model_run": 40680901503,
+        "queued_static_run": 40680901706
+      },
+      "results": {
+        "workflow_failure": "Failed before useful job evidence because the label-audit dependency graph was invalid.",
+        "correction": "Blob b4f18c4d87010aaf5c285d88be8f0eed925408f7 fixes audit dependency; blob 6652ff259697fdf41c3b8f1cf3e3e11f2eac210b strengthens regression assertions.",
+        "model_acceptance": "Pending in run 40680901503; not a pass.",
+        "generated_assets": "No current-head generated asset accepted.",
+        "canonical_sync": "Not verified; no exact canonical A100 SHA/status pass."
+      },
+      "interpretation": "The dependency correction needs to be committed and validated by the next Actions runs. It does not constitute sync or model-generation acceptance.",
+      "limitations": [
+        "Actions labels/runner availability remain unverified until the new run executes.",
+        "Do not bypass storage guards.",
+        "The previous UI-only pass is not current-head callback evidence."
+      ]
+    },
     {
       "id": "EXP-2026-10-28-ROOT-SYNC-AND-RUNNER-IDENTITY-CORRECTION",
       "date": "2026-10-28",
@@ -6019,6 +6046,6 @@
       ]
     }
   ],
-  "updated_at": "2026-10-28T16:45:00+05:30",
-  "updated_date": "2026-10-28"
+  "updated_at": "2026-10-29T07:12:00+05:30",
+  "updated_date": "2026-10-29"
 }

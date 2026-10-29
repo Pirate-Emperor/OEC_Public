@@ -195,8 +195,8 @@ jobs:
 
   runner-label-alias-audit:
     name: Audit and enable designated runner labels
-    needs: [enforce-30-minute-cutoff, runner-label-alias-audit]
-    if: ${{ needs.enforce-30-minute-cutoff.result == 'success' && needs.runner-label-alias-audit.result == 'success' }}
+    needs: enforce-30-minute-cutoff
+    if: ${{ needs.enforce-30-minute-cutoff.result == 'success' }}
     # Use the already-registered legacy runner only for a small admin/label check;
     # this job does not load models or touch model storage.
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
@@ -282,8 +282,8 @@ jobs:
 
   canonical-root-sync:
     name: Sync A100's canonical OEC checkout to GitHub
-    needs: enforce-30-minute-cutoff
-    if: ${{ needs.enforce-30-minute-cutoff.result == 'success' }}
+    needs: [enforce-30-minute-cutoff, runner-label-alias-audit]
+    if: ${{ needs.enforce-30-minute-cutoff.result == 'success' && needs.runner-label-alias-audit.result == 'success' }}
     concurrency:
       group: oec-canonical-source-reconcile
       # Serialize changes to the persistent canonical checkout; never cancel a live Git operation.

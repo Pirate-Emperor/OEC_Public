@@ -11,13 +11,13 @@ class A100RootSyncContractTests(unittest.TestCase):
         script = (ROOT / "tools" / "reconcile_a100_oec_root.sh").read_text(encoding="utf-8")
         workflow = (ROOT / ".github" / "workflows" / "oec-root-sync.yml").read_text(encoding="utf-8")
         self.assertIn('if [[ -n "${GITHUB_TOKEN:-}" ]]; then', script)
-        self.assertNotIn('\\${GITHUB_TOKEN', script)
+        self.assertNotIn(r'\${GITHUB_TOKEN', script)
         self.assertIn('SOURCE_REPOSITORY="${OEC_SOURCE_REPOSITORY:-${GITHUB_REPOSITORY:-}}"', script)
         self.assertIn('[[ "$SOURCE_REPOSITORY" == "xflexwork/OEC" ]]', script)
         self.assertIn("refs/remotes/oec-sync/$EXPECTED_BRANCH", script)
         self.assertIn("GITHUB_TOKEN: ${{ github.token }}", workflow)
         self.assertIn("OEC_SOURCE_REPOSITORY: ${{ github.repository }}", workflow)
-        self.assertNotIn('GITHUB_TOKEN: \\${{ github.token }}', workflow)
+        self.assertNotIn(r'GITHUB_TOKEN: \${{ github.token }}', workflow)
         self.assertIn("tr -d '\\n'", script)
 
     def test_model_and_sync_workflows_use_named_oec_train_runners(self):
