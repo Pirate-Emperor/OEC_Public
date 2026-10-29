@@ -1,4 +1,10 @@
-| [2026-10-29](CHANGELOG-2026-10-29.md) | OEC-only schedule and safety rules documented on a non-triggering docs branch; OEC runner labels reaffirmed; current runner-identity/storage gates and scheduler capacity block recorded | [Schedule policy](../docs/OEC_GRADIO_SCHEDULE_COORDINATION.md) · [OEC root sync 40818428276](https://github.com/xflexwork/OEC/actions/runs/40818428276) · [OEC callback attempt 40802365390](https://github.com/xflexwork/OEC/actions/runs/40802365390) |
+## 2026-10-29 23:10 IST — Gradio schedule coordination and scope correction
+
+- Recorded the strict OEC-only write boundary, protected submodules, and required OEC Actions labels `[self-hosted, linux, x64, gpu, a100, oec-train]`.
+- Reconciled latest OEC runner-sync and cancelled acceptance evidence; local host/EDA remains unverified and the legacy storage pause lock must not be bypassed.
+- Documented the daily-coordinator/one-time checkpoint synchronization rule and all mandatory per-event guardrails in [OEC Gradio schedule coordination](../docs/OEC_GRADIO_SCHEDULE_COORDINATION.md).
+- ChatGPT scheduler rejected a new OEC checkpoint because 3 of 3 automation slots are in use by another chat. No existing task was modified, and no GPU workflow was launched.
+
 ## 2026-10-29 10:03 IST — callback workflow isolated; runner still occupied
 
 - Latest acceptance [run 40818187983](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40818187983) is still queued with no runner assigned; actual Gradio callbacks have not started.
