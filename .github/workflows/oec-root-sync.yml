@@ -213,6 +213,7 @@ jobs:
           test "$RUNNER_NAME" = "oec-2"
           test "$GITHUB_REPOSITORY" = "xflexwork/OEC"
           OEC_ROOT="$HOME/OEC" PYTHONPATH="$GITHUB_WORKSPACE" python3 - <<'PY'
+          import os
           from tools.runner_control import _github_repo_from_server_url, _runner_identity, runner_dir_from_name
 
           expected_name = "oec-2"

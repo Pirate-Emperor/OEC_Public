@@ -34,6 +34,7 @@ class A100RootSyncContractTests(unittest.TestCase):
         audit = root_sync.split("  core-runner-identity-audit:", 1)[1].split("  canonical-root-sync:", 1)[0]
         script = (ROOT / "tools" / "reconcile_a100_oec_root.sh").read_text(encoding="utf-8")
         self.assertIn('"Killer4K-N/OEC"', audit)
+        self.assertIn("legacy_transfer_alias", audit)
         self.assertIn('GITHUB_REPOSITORY', audit)
         self.assertIn("Killer4K-N/OEC.git", script)
         self.assertIn("xflexwork/OEC.git", script)
