@@ -29,6 +29,12 @@ class A100RootSyncContractTests(unittest.TestCase):
         self.assertIn('test "$RUNNER_NAME" = "oec-1"', model_acceptance)
         self.assertNotIn("oec-train", root_sync)
 
+    def test_sync_stash_pathspec_does_not_duplicate_git_separator(self):
+        script = (ROOT / "tools" / "reconcile_a100_oec_root.sh").read_text(encoding="utf-8")
+        self.assertIn("local -a stash_pathspec=(.)", script)
+        self.assertIn('git -C "$worktree" stash push -m "OEC pre-sync recovery $RUN_ID ($label)" -- "${stash_pathspec[@]}"', script)
+        self.assertNotIn("local -a stash_pathspec=(-- .)", script)
+
     def test_deadline_watchdog_tolerates_force_cancel_conflict(self):
         workflow = (ROOT / ".github" / "workflows" / "oec-root-sync.yml").read_text(encoding="utf-8")
         self.assertGreaterEqual(workflow.count('method="POST", allow_conflict=True)'), 2)

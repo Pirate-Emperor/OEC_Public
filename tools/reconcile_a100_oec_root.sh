@@ -183,7 +183,7 @@ move_captured_paths() {
 stash_tracked_changes() {
   local worktree="$1" label="$2"
   local changed stash_sha entry mode type sha path
-  local -a stash_pathspec=(-- .)
+  local -a stash_pathspec=(.)
 
   # A changed child HEAD is not an OEC-root source edit. In particular, a dirty
   # OEC-Deploy submodule must not make the parent stash try to capture its gitlink;
