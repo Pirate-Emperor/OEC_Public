@@ -1,3 +1,13 @@
+## 2026-10-30 23:52 IST — static acceptance and canonical A100 sync verified; callbacks still blocked
+
+- Current branch head: `875350ff1ad6f98fde07793ae3b66c3851c837ea`.
+- [Gradio UI run 41101748877](https://github.com/xflexwork/OEC/actions/runs/41101748877): 13/13 configured UI modes served HTTP 200 on `oec-1/scn28-mn`; all JSON records are `PASS_UI_ONLY` with `callback=SKIPPED_UI_ONLY`. Artifact 12999037568 has 27 files.
+- [Notebook/callback run 41103554752](https://github.com/xflexwork/OEC/actions/runs/41103554752): structural audit passed 18/18 notebooks, 80/88 code cells syntax checked, zero saved error outputs. Its callback preflight failed closed before any provider callback due to `models/.storage_pause.lock`; zero generated artifacts were accepted.
+- [Current-head static regression run 41105142772](https://github.com/xflexwork/OEC/actions/runs/41105142772): SUCCESS on `oec-2/scn28-mn`; 23 unittest groups / 229 logged cases passed; Python compilation and four targeted notebook JSON checks passed.
+- [Current-head canonical root-sync run 41105142713](https://github.com/xflexwork/OEC/actions/runs/41105142713): SUCCESS across watchdog, OEC runner identity and canonical sync jobs; final `OEC_CANONICAL_SYNC=PASS`, branch `fix/media-stack-supervision-20261019`, exact SHA `875350ff1ad6f98fde07793ae3b66c3851c837ea`. All four submodule pins verified. Previous local tracked changes were preserved in stash `fda1c72a5e82d852a695eb1b06d4ef22e62e1bf8`; two loose files were preserved in run recovery metadata.
+- Callback gate diagnostics: lock PID 2036305 at `/nlsasfs/home/lmedge/rahkus/aireos_models/.storage_pause.lock`; recovery was refused on `oec-1/scn28-mn` because the legacy path allows only `oec-train/scn30-mn`. PID owner/liveness was not checked on that host. Fresh telemetry showed NORMAL storage areas, about 89.06 GB quota write headroom and two idle A100s, so this is not a capacity shortage. The lock/reserve/cache/checkpoint/environment were not modified.
+- Remaining acceptance: authorized inspection of the protected lock on its owner host, then actual execution of all 13 Gradio callbacks and SHA-256 + format-specific output validation. No pipeline is marked generated/accepted on UI-only evidence.
+
 ## 2026-10-30 23:02 IST — OEC core runner routing corrected; live generation pending
 
 - Source fix `76fb34cbf51d112acee1b545c274e8e606326748` routes OEC model/UI acceptance to its registered `oec-1` and canonical root sync to its registered `oec-2`; it removes the root-sync audit's invalid dependency on Full_Model's training runners.

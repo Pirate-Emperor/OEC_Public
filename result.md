@@ -1,17 +1,30 @@
-# OEC Gradio runner-routing correction and current acceptance state — 2026-10-30 23:02 IST
+# OEC Gradio acceptance and pipeline status — 2026-10-30 23:52 IST
 
-**Code change:** `76fb34cbf51d112acee1b545c274e8e606326748` on `fix/media-stack-supervision-20261019`.  
-**Overall status: PARTIAL — live callback/asset acceptance is still not complete.**
+**Repository:** `xflexwork/OEC`  
+**Branch:** `fix/media-stack-supervision-20261019`  
+**Verified current head:** `875350ff1ad6f98fde07793ae3b66c3851c837ea`  
+**Overall: PARTIAL. UI launch and static contracts pass; actual callback-generated assets are not accepted yet.**
 
-- Corrected the active OEC acceptance/UI/FLUX workflow routing to registered OEC core runners: model/UI workflows use `oec-1`; root-sync audit and canonical checkout use `oec-2`.
-- Root-sync no longer attempts to inspect or relabel `oec-train` and `oec-train-2`, which belong to the separate `xflexwork/OEC_AireOS_Full_Model` registration.
-- The static notebook contract step is now allowed to run after a failed preflight but is skipped on cancellation. Model inference still requires a successful preflight and retains all existing storage/lock/GPU gates.
-- Historical UI evidence [40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051): 13/13 UI-only modes passed HTTP 200; all records say `PASS_UI_ONLY` and `callback=SKIPPED_UI_ONLY`. This is not generation evidence.
-- Bridge failure [40818187983](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40818187983): job ran on `oec-train-2` / `scn28-mn`, received HTTP 403 while fetching private `xflexwork/OEC`, then skipped all inference steps. No artifact was produced.
-- OEC-native attempt [40802365390](https://github.com/xflexwork/OEC/actions/runs/40802365390) was cancelled. Earlier full acceptance [40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) stopped at preflight because observed `oec-1/scn28-mn` did not match the permitted `scn30-mn` lock-recovery host. The inference guard remains unchanged.
-- No caches, checkpoints, storage locks/reserves, Conda environments or shared runtime processes were modified.
+## Verified evidence
+- **13/13 UI launch modes:** [run 41101748877](https://github.com/xflexwork/OEC/actions/runs/41101748877), runner `oec-1/scn28-mn`; all Gradio pages HTTP 200, `GRADIO_UI_ONLY_FAILURES=0`. All 13 results say `callback=SKIPPED_UI_ONLY`. Artifact `12999037568` contains 27 result/log files.
+- **Notebook structural audit:** [run 41103554752](https://github.com/xflexwork/OEC/actions/runs/41103554752), SHA `62f880c`; 18/18 notebooks parsed/audited, 88 code cells, 80 syntax checked, zero saved errors. The job as a whole failed at the separate live-inference preflight; the notebook audit passed.
+- **Current-head regressions:** [run 41105142772](https://github.com/xflexwork/OEC/actions/runs/41105142772), SHA `875350ff1ad6f98fde07793ae3b66c3851c837ea`, `oec-2/scn28-mn`; 23 unittest groups / 229 cases passed; compilation and targeted notebook JSON checks passed.
+- **Canonical source synchronization:** [run 41105142713](https://github.com/xflexwork/OEC/actions/runs/41105142713), SHA `875350ff1ad6f98fde07793ae3b66c3851c837ea`; watchdog, OEC runner identity audit and canonical checkout sync all succeeded. Final markers: `OEC_CANONICAL_SYNC=PASS`, branch `fix/media-stack-supervision-20261019`, SHA `875350ff1ad6f98fde07793ae3b66c3851c837ea`. Four OEC submodules matched pinned commits.
+- Sync preservation evidence: prior canonical root HEAD `21d8b1f915a72edd2c20c9bde026373672d99c52`; tracked local changes preserved in Git stash ref `fda1c72a5e82d852a695eb1b06d4ef22e62e1bf8`; two non-ignored loose files preserved in run-scoped recovery directory `/nlsasfs/home/lmedge/rahkus/OEC/.git/oec-sync-recovery/41105142713-20261030234921`.
 
-**Still required:** inspect the newly triggered job results; then achieve real callback submissions and independently verify the generated WAV/FLAC/TXT/PNG/GLB/MP4 outputs and hashes on the exact branch SHA. Do not record a provider as passed from UI launch, skipped steps, or historical outputs alone.
+## Actual asset acceptance — NOT PASSED
+The actual callback attempt [run 41103554752](https://github.com/xflexwork/OEC/actions/runs/41103554752) used source SHA `62f880c`. It stopped at preflight before any of the 13 model callbacks. The gate found `/nlsasfs/home/lmedge/rahkus/aireos_models/.storage_pause.lock` (diagnostic PID `2036305`, timestamp `1793107308.942003`). The recovery helper refused on `oec-1/scn28-mn`; its legacy recovery policy permits only `oec-train/scn30-mn`. PID ownership/liveness was not checked on the designated host, and the lock was not modified. Thus zero callback invocations and zero accepted WAV, FLAC, TXT, PNG, GLB or MP4 assets are recorded.
+
+This is not a capacity shortage: the run's fresh live quota showed NORMAL model/output areas and approximately 89.06 GB quota write headroom; the post-gate GPU snapshot showed two idle A100s. Do not bypass the lock or infer it is stale from its timestamp. The authorized lock-owner/host check is the remaining prerequisite before actual inference can safely run.
+
+## Implementation changes delivered
+- Corrected OEC workflow routing to registered core runners and retained fail-closed inference admission.
+- Added transfer-alias handling for verified `Killer4K-N/OEC` → `xflexwork/OEC`; the live job must still identify as `xflexwork/OEC`.
+- Hardened watchdog cancellation races (HTTP 409) and corrected the duplicate `git stash` pathspec separator.
+- Updated regression tests for runner ownership, transfer alias, watchdog conflict, stash pathspec and storage-guard runner assignment.
+- No `main` merge, destructive broad cleanup, reserve/lock/cache/checkpoint modification, package install, environment mutation or process kill.
+
+**Next acceptance:** authorized owner-host inspection on `scn30-mn`, then rerun all 13 real callbacks and independently validate each run-scoped artifact and hash. Do not mark the OEC pipeline complete until those outputs exist and pass format-specific checks.
 
 ---
 

@@ -1,26 +1,30 @@
-## CURRENT STATUS — 2026-10-30 23:02 IST
+## CURRENT STATUS — 2026-10-30 23:52 IST
 
 **Active branch:** `fix/media-stack-supervision-20261019`  
-**Routing/test change:** `76fb34cbf51d112acee1b545c274e8e606326748`
+**Verified head:** `875350ff1ad6f98fde07793ae3b66c3851c837ea`  
+**Priority:** complete actual callback-to-asset acceptance; do not treat UI launch or static tests as generated output.
 
-### Completed in this work cycle
-- Corrected active Gradio, FLUX→TRELLIS, and canonical root-sync workflows to use OEC's own registered core runners (`oec-1` for model/UI acceptance; `oec-2` for root sync).
-- Removed the root-sync audit's incorrect dependency on Full_Model's `oec-train` / `oec-train-2` runner registrations and removed its runner-label mutation.
-- Made the static notebook contract step execute after preflight failure, while retaining all inference-stage preflight requirements.
-- Added regression tests for runner ownership, lock-owner guarding, root-sync routing, and post-preflight static contracts.
+### Completed this work cycle
+- [x] Routed Gradio UI/model acceptance to OEC-owned `oec-1`, root sync and static storage-guard tests to OEC-owned `oec-2`; removed cross-repository Full_Model training-runner inspection from OEC root sync.
+- [x] Added a verified `Killer4K-N/OEC` legacy repository-transfer alias while retaining exact live job repository validation as `xflexwork/OEC`.
+- [x] Hardened the 30-minute watchdog against GitHub Actions HTTP 409 cancellation races without claiming an active run was cancelled.
+- [x] Fixed the persistent root-sync Git stash pathspec duplication and added regression coverage.
+- [x] Passed 13/13 UI-only Gradio launch modes (HTTP 200; callbacks explicitly skipped) in [run 41101748877](https://github.com/xflexwork/OEC/actions/runs/41101748877).
+- [x] Passed 18/18 top-level notebook JSON/schema audits and syntax-checked 80/88 code cells in [run 41103554752](https://github.com/xflexwork/OEC/actions/runs/41103554752); no saved error outputs.
+- [x] Passed current-head static/storage/GPU/media/service regression suite in [run 41105142772](https://github.com/xflexwork/OEC/actions/runs/41105142772): 23 logged unittest groups / 229 test cases, py_compile and four targeted notebook JSON checks.
+- [x] Passed canonical A100 checkout sync in [run 41105142713](https://github.com/xflexwork/OEC/actions/runs/41105142713): exact target branch/SHA verified, all four OEC submodule pins passed, prior tracked/loose local changes preserved in recovery metadata.
 
-### Remaining work — priority order
-1. [ ] Verify latest GitHub Actions triggered by this branch update: root-sync audit/sync, static notebook contracts, and all 13 UI-only modes. Record exact run/job IDs, runner/host, logs and artifacts.
-2. [ ] Complete actual Gradio callback acceptance for every provider and notebook mode. Require real callback invocation, non-empty output, SHA-256, file reopen/decoder/parser validation and exact source SHA.
-3. [ ] Re-run the full integrated FLUX→TRELLIS path and LTX T2V/I2V + Wan video paths when their admission checks permit; do not infer success from UI launch.
-4. [ ] Reconcile current core runner host with the existing lock-owner restriction through the authorized runner/host process. Do not bypass or edit the lock/reserve to force inference.
-5. [ ] After provider-level results, update the tracker with exact accepted assets and remaining provider failures. Do not mark the entire pipeline complete until all configured modes pass.
+### Remaining work — execute in this order
+1. [ ] Resolve callback preflight owner gate through the authorized `scn30-mn` lock-owner procedure. Current `oec-1/scn28-mn` cannot perform legacy lock recovery. Do not delete, move, rewrite or bypass the pause lock/reserve.
+2. [ ] Rerun all 13 Gradio callbacks on the correct OEC compute runner. Require real callback invocation, non-empty output, SHA-256 and format-specific WAV/FLAC/TXT/PNG/GLB/MP4 decoder/parser reopen.
+3. [ ] Verify combined FLUX→TRELLIS, standalone FLUX and TRELLIS, LTX T2V/I2V and Wan video as real output pipelines; capture latency, GPU memory and exact artifact metadata.
+4. [ ] Complete separate gated notebook checks: login-node control-plane notebook on its correct runner; encrypted-HF read-back with authorized credentials; OEC-Deploy launch/World Creator/gameplay as distinct integration checks.
+5. [ ] Update checklist, `result.md` and `test.json` after each actual provider result. Do not mark all OEC pipelines complete until every configured mode has accepted output evidence.
 
-### Current evidence / limits
-- [x] Historical OEC UI run [40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051): 13/13 HTTP-200 Gradio UI-only checks; all callbacks deliberately skipped.
-- [ ] Current full callback suite: NOT VERIFIED. Full-model bridge [40818187983](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40818187983) failed with HTTP 403 before private OEC checkout; zero callback invocations and zero acceptance artifacts.
-- [ ] OEC native model acceptance [40802365390](https://github.com/xflexwork/OEC/actions/runs/40802365390) was cancelled; [40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) failed preflight on the runner-host identity guard before callbacks.
-- [x] No storage/cache deletion, Conda package/environment change, runner re-registration, or lock bypass was performed.
+### Current acceptance blocker, stated narrowly
+- Latest actual callback attempt [41103554752](https://github.com/xflexwork/OEC/actions/runs/41103554752) stopped before any callback. It encountered `models/.storage_pause.lock` (diagnostic PID `2036305`, timestamp `1793107308.942003`) and failed the legacy owner-host gate: current `oec-1/scn28-mn`, permitted recovery identity `oec-train/scn30-mn`. PID liveness/owner was not established.
+- This is **not a disk-capacity problem**: fresh quota, NORMAL model/output state, about 89.06 GB write headroom, and two idle A100s were recorded after the gate. The lock remains untouched.
+- Current branch is synchronized to the A100 canonical checkout by successful [run 41105142713](https://github.com/xflexwork/OEC/actions/runs/41105142713). No need to repeat root sync unless branch changes.
 
 ---
 

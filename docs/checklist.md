@@ -1,17 +1,30 @@
-## CURRENT STATUS — 2026-10-30 23:02 IST
+## CURRENT STATUS — 2026-10-30 23:52 IST
 
-**OEC branch:** `fix/media-stack-supervision-20261019`  
-**Runner-routing source commit:** `76fb34cbf51d112acee1b545c274e8e606326748` (the current branch update will include this commit plus the tracker refresh).
+**Repository:** `xflexwork/OEC`  
+**Branch:** `fix/media-stack-supervision-20261019`  
+**Current branch head:** `875350ff1ad6f98fde07793ae3b66c3851c837ea`  
+**Overall Gradio asset acceptance: PARTIAL — UI/static checks pass; live callback-generated assets are NOT VERIFIED.**
 
-- [x] **Runner ownership corrected in the active Gradio paths.** Full notebook/model acceptance and UI-only launch now target the OEC-registered `oec-1`; FLUX→TRELLIS smoke targets `oec-1` and retains its strict `scn30-mn` lock-owner guard. Canonical root sync and its identity audit target the OEC-registered `oec-2`. The audit no longer reads or attempts to relabel the separate Full_Model `oec-train`/`oec-train-2` runners.
-- [x] **Static notebook contracts decoupled from model preflight.** The contracts step now runs after a failed preflight (but not after workflow cancellation). Every actual model/server inference step still requires successful preflight; this does not bypass storage, lock, GPU, or service guards.
-- [x] **Historical UI-only evidence:** [run 40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051), source SHA `f9b3f095e7f711d88a996ad3842d140a312e6586`, ran on OEC `oec-1` / `scn28-mn`. All 13 configured modes returned Gradio HTTP 200 with `PASS_UI_ONLY`; the runner reported `GRADIO_UI_ONLY_FAILURES=0`. These runs explicitly **skipped callbacks and model inference**.
-- [ ] **Current-branch callback/asset acceptance remains NOT VERIFIED.** No WAV, FLAC, TXT, PNG, GLB, or MP4 asset has been accepted from the current branch head. The latest cross-repository bridge [run 40818187983](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40818187983) failed before checkout: the Full_Model runner received HTTP 403 fetching private `xflexwork/OEC`; every callback step was skipped and no artifacts were uploaded.
-- [ ] **Latest OEC native acceptance remained blocked/cancelled.** [Run 40802365390](https://github.com/xflexwork/OEC/actions/runs/40802365390) was cancelled. Earlier [run 40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) stopped in preflight: `oec-1` was observed on `scn28-mn`, while the legacy lock-recovery path only permits `scn30-mn`. No model inference step ran in that attempt. The host/lock checks remain fail-closed.
-- [x] **Preservation:** no cache, model checkpoint, storage lock/reserve, Conda environment, or shared runtime was modified by this source-routing change.
-- [ ] **Next acceptance:** verify the newly triggered OEC-native static, UI-only, and root-sync jobs at the new SHA. Then run model callbacks only when the existing, authorized host/storage/GPU admission succeeds; inspect each output file, SHA-256 and format-specific decoder/parser report before marking a provider PASS.
+### Verified and completed
+- [x] **OEC runner ownership corrected.** Gradio UI/model acceptance runs on OEC-owned `oec-1`; canonical root sync and storage/static regression run on OEC-owned `oec-2`. OEC workflows no longer inspect or relabel the separate Full_Model `oec-train` runners.
+- [x] **13/13 Gradio UI launch modes pass.** [Run 41101748877](https://github.com/xflexwork/OEC/actions/runs/41101748877), runner `oec-1` / host `scn28-mn`: every mode returned HTTP 200, `PASS_UI_ONLY`, zero UI failures. All records deliberately say `callback=SKIPPED_UI_ONLY`; this proves launch only, not inference. Artifact ID `12999037568` contains 27 UI logs/JSON files.
+- [x] **All 18 top-level notebooks pass structural audit.** [Run 41103554752](https://github.com/xflexwork/OEC/actions/runs/41103554752), source SHA `62f880c02fb488c7a94f88ee77700c68ad7f10bf`: 18/18 JSON/schema audit PASS, 88 code cells, 80 syntax-checked cells, zero saved error outputs. The login-node notebook remains a login-runner control-plane item; it was audited, not executed on the compute runner. Encrypted-HF and deployment notebooks remain credential-/deployment-gated diagnostics.
+- [x] **Static/runtime regression suites pass at current source SHA.** [Run 41105142772](https://github.com/xflexwork/OEC/actions/runs/41105142772), job `124232798164`, runner `oec-2` / `scn28-mn`: 23 focused unittest groups (229 test cases in logged `Ran N tests` summaries) passed; Python compilation checks and four targeted notebook JSON checks passed. The suite includes runner transfer, watchdog conflict, safe Git stash pathspec, storage admission, GPU admission, FLUX/TRELLIS, upload, and service-manager contracts.
+- [x] **Canonical A100 checkout sync passes at current branch head.** [Run 41105142713](https://github.com/xflexwork/OEC/actions/runs/41105142713): all three jobs passed, including runner identity and sync on `oec-2` / `scn28-mn`. Log confirms `OEC_CANONICAL_SYNC=PASS`, branch `fix/media-stack-supervision-20261019`, exact SHA `875350ff1ad6f98fde07793ae3b66c3851c837ea`, and successful Freezed, Full_Model, MOE and OEC_Deploy submodule pin checks.
+- [x] **Local runner changes preserved during sync.** Pre-sync local HEAD `21d8b1f915a72edd2c20c9bde026373672d99c52`; tracked changes stashed at recovery ref `fda1c72a5e82d852a695eb1b06d4ef22e62e1bf8`; two non-ignored loose files preserved in the run-scoped recovery directory. No broad clean/reset was used.
+- [x] **Storage capacity is not the active failure.** Callback preflight captured live, age-zero quota telemetry; models and outputs areas were NORMAL, with about 89.06 GB quota write headroom. Post-gate GPU snapshot showed two idle A100s. No reserve file, cache, checkpoint, Conda package/environment, model pause lock or shared service was changed by this work.
 
-Historical provider results remain in the sections below; do not treat them as current-head acceptance.
+### Still NOT verified — acceptance gates
+- [ ] **Live Gradio callbacks and generated assets.** The latest complete callback attempt [run 41103554752](https://github.com/xflexwork/OEC/actions/runs/41103554752) failed closed before invoking any of the 13 provider/mode callbacks. The protected models pause lock was present at `/nlsasfs/home/lmedge/rahkus/aireos_models/.storage_pause.lock`; diagnostic PID `2036305`, timestamp `1793107308.942003`. Recovery explicitly refused on `oec-1/scn28-mn` because the legacy recovery path is restricted to `oec-train/scn30-mn`. **Zero callbacks ran and zero WAV/FLAC/TXT/PNG/GLB/MP4 artifacts were accepted.** Do not infer the PID is stale; owner/liveness was not checked on the designated host.
+- [ ] **Integrated model pipelines.** UI checks, notebook syntax, CLI contracts and service-manager tests do not prove real FLUX→TRELLIS output, AudioGen/MusicGen audio, ACE-Step generation, Kokoro speech, Whisper/Qwen transcription, LTX T2V/I2V or Wan video artifacts. Each remains subject to callback execution and file-level SHA/decoder/parser checks.
+- [ ] **Deployment and protected-data diagnostics.** Actual OEC-Deploy GUI/World Creator/gameplay launch and credential-authorized encrypted-HF read-back are not established by the notebook structural audit.
+
+### Next acceptance action
+1. Have the authorized owner/administrator inspect the exact pause-lock PID and lock state on designated `scn30-mn`. Preserve the lock unless that host's supported recovery procedure independently proves recovery is safe.
+2. Once authorized preflight passes, rerun the 13 actual Gradio callbacks from the OEC runner and require non-empty output, SHA-256, format-specific reopen/decode/parse validation, and run-scoped artifacts for every mode.
+3. Only then mark each provider/mode complete. Do not mark the whole pipeline complete from UI-only or static test results.
+
+The pipeline/notebook source files were not changed between callback run SHA `62f880c` and current head `875350ff1ad6f98fde07793ae3b66c3851c837ea`; the four files changed since that acceptance source were root-sync workflow, storage-guard workflow, root-sync test contract and root-sync script. The callback evidence remains relevant to the unchanged model harness but is not a pass at the latest head.
 
 ---
 
