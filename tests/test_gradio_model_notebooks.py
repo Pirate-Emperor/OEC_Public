@@ -478,7 +478,7 @@ class ModelNotebookTests(unittest.TestCase):
 
     def test_static_notebook_contracts_run_even_when_model_preflight_is_blocked(self):
         workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
-        block = workflow.split("id: contracts", 1)[1].split("\\n      - name:", 1)[0]
+        block = workflow.split("id: contracts", 1)[1].split("\n      - name:", 1)[0]
         self.assertIn("always()", block)
         self.assertIn("!cancelled()", block)
         self.assertIn("continue-on-error: true", block)
