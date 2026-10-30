@@ -217,14 +217,23 @@ jobs:
 
           expected_name = "oec-2"
           expected_repo = "xflexwork/OEC"
+          # GitHub confirmed that Killer4K-N/OEC permanently redirects to this
+          # same repository (ID 1407696204) after the ownership transfer.
+          accepted_repo_aliases = {expected_repo, "Killer4K-N/OEC"}
           runner_path = runner_dir_from_name(expected_name)
           actual_name, server_url = _runner_identity(runner_path)
           actual_repo = _github_repo_from_server_url(server_url)
-          if actual_name != expected_name or actual_repo != expected_repo:
+          if actual_name != expected_name or actual_repo not in accepted_repo_aliases:
               raise SystemExit(
                   f"CORE_RUNNER_IDENTITY=BLOCKED name={actual_name!r} repo={actual_repo!r}"
               )
-          print(f"CORE_RUNNER_IDENTITY=PASS name={actual_name} repo={actual_repo}")
+          legacy_transfer_alias = actual_repo != expected_repo
+          print(
+              f"CORE_RUNNER_IDENTITY=PASS name={actual_name} "
+              f"job_repository={os.environ['GITHUB_REPOSITORY']} "
+              f"runner_repository={actual_repo} "
+              f"legacy_transfer_alias={str(legacy_transfer_alias).lower()}"
+          )
           PY
 
   canonical-root-sync:

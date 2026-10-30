@@ -20,13 +20,24 @@ class A100RootSyncContractTests(unittest.TestCase):
         self.assertNotIn(r'GITHUB_TOKEN: \${{ github.token }}', workflow)
         self.assertIn("tr -d '\\n'", script)
 
-    def test_model_and_sync_workflows_use_named_oec_train_runners(self):
+    def test_root_sync_uses_oec_core_runners(self):
         root_sync = (ROOT / ".github" / "workflows" / "oec-root-sync.yml").read_text(encoding="utf-8")
         model_acceptance = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
-        self.assertIn("a100, oec-train-2]", root_sync)
-        self.assertIn('test "$RUNNER_NAME" = "oec-train-2"', root_sync)
-        self.assertIn("a100, oec-train]", model_acceptance)
-        self.assertIn('test "$RUNNER_NAME" = "oec-train"', model_acceptance)
+        self.assertIn("a100, oec-2]", root_sync)
+        self.assertIn('test "$RUNNER_NAME" = "oec-2"', root_sync)
+        self.assertIn("a100, oec-1]", model_acceptance)
+        self.assertIn('test "$RUNNER_NAME" = "oec-1"', model_acceptance)
+        self.assertNotIn("oec-train", root_sync)
+
+    def test_runner_identity_accepts_verified_pre_transfer_repo_slug(self):
+        root_sync = (ROOT / ".github" / "workflows" / "oec-root-sync.yml").read_text(encoding="utf-8")
+        audit = root_sync.split("  core-runner-identity-audit:", 1)[1].split("  canonical-root-sync:", 1)[0]
+        script = (ROOT / "tools" / "reconcile_a100_oec_root.sh").read_text(encoding="utf-8")
+        self.assertIn('"Killer4K-N/OEC"', audit)
+        self.assertIn('GITHUB_REPOSITORY', audit)
+        self.assertIn("Killer4K-N/OEC.git", script)
+        self.assertIn("xflexwork/OEC.git", script)
+        self.assertIn('SOURCE_REPOSITORY == "xflexwork/OEC"', script)
 
 if __name__ == "__main__":
     unittest.main()

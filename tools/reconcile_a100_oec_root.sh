@@ -69,8 +69,9 @@ fi
 origin="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
 case "$origin" in
   *github.com/CalamityStriker/OEC.git|*github.com/CalamityStriker/OEC|*github.com:CalamityStriker/OEC.git|*github.com:CalamityStriker/OEC) ;;
+  *github.com/Killer4K-N/OEC.git|*github.com/Killer4K-N/OEC|*github.com:Killer4K-N/OEC.git|*github.com:Killer4K-N/OEC) ;;
   *github.com/xflexwork/OEC.git|*github.com/xflexwork/OEC|*github.com:xflexwork/OEC.git|*github.com:xflexwork/OEC) ;;
-  *) fail "origin does not identify an approved CalamityStriker/OEC or xflexwork/OEC repository" 13 ;;
+  *) fail "origin does not identify the transferred OEC repository (Killer4K-N/OEC, CalamityStriker/OEC, or xflexwork/OEC)" 13 ;;
 esac
 
 [[ -x "$CONDA" ]] || fail "Conda executable is missing" 14
