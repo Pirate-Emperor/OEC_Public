@@ -193,102 +193,49 @@ jobs:
                       print(f"OEC_DEADLINE_FORCE_CANCEL_NOT_TERMINAL run={run_id} last_status={state.get('status')}")
           PY
 
-  runner-label-alias-audit:
-    name: Audit and enable designated runner labels
+  core-runner-identity-audit:
+    name: Verify OEC-owned core runner identity
     needs: enforce-30-minute-cutoff
     if: ${{ needs.enforce-30-minute-cutoff.result == 'success' }}
-    # Use the already-registered legacy runner only for a small admin/label check;
-    # this job does not load models or touch model storage.
     runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 5
     defaults:
       run:
         shell: bash
     steps:
-      - name: Checkout runner label audit source
+      - name: Checkout runner identity audit source
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Verify runner identity and add only missing exact-name labels
+      - name: Verify the registered OEC core runner without mutating labels
         run: |
           set -euo pipefail
           test "$RUNNER_NAME" = "oec-2"
+          test "$GITHUB_REPOSITORY" = "xflexwork/OEC"
           OEC_ROOT="$HOME/OEC" PYTHONPATH="$GITHUB_WORKSPACE" python3 - <<'PY'
-          import json
-          import urllib.request
-          from tools.runner_control import (
-              _github_auth_token, _github_repo_from_server_url,
-              _github_runner_record, _runner_identity, runner_dir_from_name,
-          )
+          from tools.runner_control import _github_repo_from_server_url, _runner_identity, runner_dir_from_name
 
+          expected_name = "oec-2"
           expected_repo = "xflexwork/OEC"
-          token = _github_auth_token()
-          if not token:
-              raise SystemExit("RUNNER_LABEL_AUDIT=BLOCKED reason=runner-admin-token-unavailable")
-
-          def add_label(runner_id, label):
-              url = f"https://api.github.com/repos/{expected_repo}/actions/runners/{runner_id}/labels"
-              request = urllib.request.Request(
-                  url,
-                  data=json.dumps({"labels": [label]}).encode("utf-8"),
-                  method="POST",
-                  headers={
-                      "Accept": "application/vnd.github+json",
-                      "Authorization": f"Bearer {token}",
-                      "X-GitHub-Api-Version": "2022-11-28",
-                      "User-Agent": "OEC-runner-label-audit",
-                      "Content-Type": "application/json",
-                  },
+          runner_path = runner_dir_from_name(expected_name)
+          actual_name, server_url = _runner_identity(runner_path)
+          actual_repo = _github_repo_from_server_url(server_url)
+          if actual_name != expected_name or actual_repo != expected_repo:
+              raise SystemExit(
+                  f"CORE_RUNNER_IDENTITY=BLOCKED name={actual_name!r} repo={actual_repo!r}"
               )
-              with urllib.request.urlopen(request, timeout=20) as response:
-                  return json.loads(response.read().decode("utf-8"))
-
-          for expected_name in ("oec-train", "oec-train-2"):
-              runner_path = runner_dir_from_name(expected_name)
-              if not (runner_path / ".runner").is_file():
-                  print(json.dumps({"name": expected_name, "status": "NOT_CONFIGURED", "path": str(runner_path)}))
-                  raise SystemExit(f"RUNNER_LABEL_AUDIT=BLOCKED reason=runner-config-missing name={expected_name}")
-              actual_name, server_url = _runner_identity(runner_path)
-              source_repo = _github_repo_from_server_url(server_url)
-              if actual_name != expected_name or source_repo != expected_repo:
-                  print(json.dumps({
-                      "name": expected_name, "status": "IDENTITY_MISMATCH",
-                      "actual_name": actual_name, "repository": source_repo,
-                  }))
-                  raise SystemExit(f"RUNNER_LABEL_AUDIT=BLOCKED reason=identity-mismatch name={expected_name}")
-              record = _github_runner_record(runner_path, token=token)
-              if not record or str(record.get("name")) != expected_name:
-                  raise SystemExit(f"RUNNER_LABEL_AUDIT=BLOCKED reason=not-registered-in-target-repository name={expected_name}")
-              runner_id = int(record["id"])
-              label_names = {str(item.get("name", "")) for item in record.get("labels", [])}
-              action = "PRESENT"
-              if expected_name not in label_names:
-                  add_label(runner_id, expected_name)
-                  action = "ADDED"
-                  record = _github_runner_record(runner_path, token=token)
-                  label_names = {str(item.get("name", "")) for item in (record or {}).get("labels", [])}
-                  if expected_name not in label_names:
-                      raise SystemExit(f"RUNNER_LABEL_AUDIT=FAIL reason=label-not-confirmed name={expected_name}")
-              print(json.dumps({
-                  "name": expected_name, "id": runner_id,
-                  "status": (record or {}).get("status"),
-                  "busy": (record or {}).get("busy"),
-                  "label_action": action,
-                  "labels": sorted(label_names),
-                  "credential": "not-printed",
-              }, sort_keys=True))
-          print("RUNNER_LABEL_AUDIT=PASS")
+          print(f"CORE_RUNNER_IDENTITY=PASS name={actual_name} repo={actual_repo}")
           PY
 
   canonical-root-sync:
     name: Sync A100's canonical OEC checkout to GitHub
-    needs: [enforce-30-minute-cutoff, runner-label-alias-audit]
-    if: ${{ needs.enforce-30-minute-cutoff.result == 'success' && needs.runner-label-alias-audit.result == 'success' }}
+    needs: [enforce-30-minute-cutoff, core-runner-identity-audit]
+    if: ${{ needs.enforce-30-minute-cutoff.result == 'success' && needs.core-runner-identity-audit.result == 'success' }}
     concurrency:
       group: oec-canonical-source-reconcile
       # Serialize changes to the persistent canonical checkout; never cancel a live Git operation.
       cancel-in-progress: false
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train-2]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 12
     defaults:
       run:
@@ -305,6 +252,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-train-2"
+          test "$RUNNER_NAME" = "oec-2"
           bash -n tools/reconcile_a100_oec_root.sh tools/sync_feature_branch_a100.sh
           timeout --signal=INT --kill-after=15s 600s bash tools/reconcile_a100_oec_root.sh

@@ -450,5 +450,38 @@ class ModelNotebookTests(unittest.TestCase):
         self.assertIn('OEC_DEADLINE_CANCEL_SUPERSEDED', root_sync)
         self.assertIn('".github/workflows/oec-root-sync.yml"', acceptance)
 
+    def test_core_gradio_workflows_use_oec_owned_runners(self):
+        acceptance = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
+        ui = (ROOT / ".github" / "workflows" / "oec-gradio-ui-launch-smoke.yml").read_text(encoding="utf-8")
+        flux = (ROOT / ".github" / "workflows" / "oec-flux-pipeline-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn("runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]", acceptance)
+        self.assertIn('test "$RUNNER_NAME" = "oec-1"', acceptance)
+        self.assertIn("runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]", ui)
+        self.assertIn('test "$RUNNER_NAME" = "oec-1"', ui)
+        self.assertIn("runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]", flux)
+        self.assertIn('test "$RUNNER_NAME" = "oec-1"', flux)
+        # Keep the dedicated shared-storage lock-owner check. Runner labels
+        # alone must never authorize lock recovery on the wrong host.
+        self.assertIn('test "$HOST_SHORT" = "scn30-mn"', flux)
+
+    def test_root_sync_uses_oec_core_runner_not_full_model_training_runners(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-root-sync.yml").read_text(encoding="utf-8")
+        audit = workflow.split("  core-runner-identity-audit:", 1)[1].split("  canonical-root-sync:", 1)[0]
+        sync = workflow.split("  canonical-root-sync:", 1)[1]
+        self.assertIn("runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]", audit)
+        self.assertIn('test "$RUNNER_NAME" = "oec-2"', audit)
+        self.assertIn('test "$GITHUB_REPOSITORY" = "xflexwork/OEC"', audit)
+        self.assertNotIn("oec-train", audit)
+        self.assertIn("runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]", sync)
+        self.assertIn('test "$RUNNER_NAME" = "oec-2"', sync)
+        self.assertNotIn("runner-label-alias-audit", workflow)
+
+    def test_static_notebook_contracts_run_even_when_model_preflight_is_blocked(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-demo-notebook-acceptance.yml").read_text(encoding="utf-8")
+        block = workflow.split("id: contracts", 1)[1].split("\\n      - name:", 1)[0]
+        self.assertIn("always()", block)
+        self.assertIn("!cancelled()", block)
+        self.assertIn("continue-on-error: true", block)
+
 if __name__ == "__main__":
     unittest.main()

@@ -31,7 +31,7 @@ concurrency:
 jobs:
   ui-launch:
     name: Launch model notebook Gradio UIs without loading weights
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
     timeout-minutes: 35
     defaults:
       run:
@@ -45,6 +45,7 @@ jobs:
       - name: Find existing Conda installation
         run: |
           set -euo pipefail
+          test "$RUNNER_NAME" = "oec-1"
           ACCOUNT_HOME="$(getent passwd "$(id -un)" | cut -d: -f6 || true)"
           if [[ -z "$ACCOUNT_HOME" ]]; then ACCOUNT_HOME="$HOME"; fi
           CONDA_EXE=""

@@ -34,7 +34,7 @@ concurrency:
 
 jobs:
   flux-trellis-inference:
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-1]
     timeout-minutes: 30
     defaults:
       run:
@@ -53,7 +53,7 @@ jobs:
           if [[ -z "$ACCOUNT_HOME" ]]; then ACCOUNT_HOME="$HOME"; fi
           HOST_SHORT="$(hostname -s)"
           printf 'RUNNER=%s\nHOST=%s\nUSER=%s\nHOME=%s\nACCOUNT_HOME=%s\n' "$RUNNER_NAME" "$HOST_SHORT" "$(id -un)" "$HOME" "$ACCOUNT_HOME"
-          test "$RUNNER_NAME" = "oec-train" || { echo "::error::Expected oec-train, got $RUNNER_NAME"; exit 2; }
+          test "$RUNNER_NAME" = "oec-1" || { echo "::error::Expected oec-train, got $RUNNER_NAME"; exit 2; }
           test "$HOST_SHORT" = "scn30-mn" || { echo "::error::Expected shared-storage lock owner scn30-mn, got $HOST_SHORT"; exit 2; }
           CONDA_EXE=""
           for candidate in "$HOME/Conda/condabin/conda" "$ACCOUNT_HOME/Conda/condabin/conda"; do
