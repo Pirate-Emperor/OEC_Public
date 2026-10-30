@@ -52,7 +52,7 @@ class A100RootSyncContractTests(unittest.TestCase):
         self.assertIn('GITHUB_REPOSITORY', audit)
         self.assertIn("Killer4K-N/OEC.git", script)
         self.assertIn("xflexwork/OEC.git", script)
-        self.assertIn('SOURCE_REPOSITORY == "xflexwork/OEC"', script)
+        self.assertIn('[[ "$SOURCE_REPOSITORY" == "xflexwork/OEC" ]]', script)
 
 if __name__ == "__main__":
     unittest.main()
