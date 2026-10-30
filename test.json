@@ -1,11 +1,55 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-29T10:03:00+05:30",
+  "last_updated": "2026-10-30T23:02:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Pinned executable OEC candidate 662f8225f110163cbd8e2f60c9548c4839ce8566 on fix/media-stack-supervision-20261019 (source HEAD ee8e79bb6826f4f2d97c64d04bd65ae0efa92929 is tracker-only). The cross-repository Gradio acceptance workflow run 40818187983 (xflexwork/OEC_AireOS_Full_Model/work/oec-gradio-callback-acceptance-20261029) remains QUEUED on oec-train-2 with runner_id null, no callbacks begun. EDA run 40815451090 succeeded. Newer D2E training 40817880090 is in progress on oec-train-2 and quality-gated iteration 40817912672 is queued. The bridge now uses a unique temporary checkout and trusted existing config paths, and limits lock recovery to its authorized host; cache purges/installers remain disabled.",
+  "latest_summary": "OEC Gradio workflow routing corrected in source commit 76fb34cbf51d112acee1b545c274e8e606326748 on fix/media-stack-supervision-20261019: UI and model acceptance use OEC-owned oec-1; root sync uses OEC-owned oec-2; Full_Model oec-train runner checks removed from OEC root sync. Static notebook contracts now run after preflight failure but never bypass inference guards. Historical UI-only run 40671622051 passed 13/13 HTTP-200 modes with callbacks skipped. Full_Model bridge run 40818187983 failed HTTP 403 during private OEC fetch; zero callbacks and zero artifacts. OEC-native full acceptance remains unverified; previous attempt 40671622024 failed before inference on host/lock guard. Current callback-generated asset acceptance remains PENDING; no caches, locks, reserves or Conda environments were modified.",
   "experiments": [
+    {
+      "id": "EXP-2026-10-30-GRADIO-CORE-RUNNER-ROUTING",
+      "date": "2026-10-30",
+      "category": "Gradio acceptance workflow routing and runner ownership",
+      "approach": "Inspected the current OEC branch workflows, GitHub Actions jobs and raw logs. Confirmed OEC UI job 40671622051 ran on oec-1/scn28-mn and was UI-only; confirmed root-sync job 123264981530 ran on oec-2/scn28-mn and failed because the audit inspected oec-train metadata registered to xflexwork/OEC_AireOS_Full_Model. Confirmed cross-repository bridge run 40818187983 on oec-train-2/scn28-mn failed HTTP 403 fetching the private xflexwork/OEC source. Updated core workflow runner selectors, root-sync identity audit, and static-contract step conditions.",
+      "reason": "OEC core model/UI workflows must use runners registered to xflexwork/OEC. The oec-train runners are owned by the separate Full_Model repository, and the private-source bridge did not have usable cross-repository read credentials. Static notebook contracts should remain testable even when live model admission is refused.",
+      "parameters": {
+        "repository": "xflexwork/OEC",
+        "branch": "fix/media-stack-supervision-20261019",
+        "source_commit": "76fb34cbf51d112acee1b545c274e8e606326748",
+        "model_and_ui_runner": "oec-1",
+        "root_sync_runner": "oec-2",
+        "full_model_runner_labels_removed_from_root_audit": [
+          "oec-train",
+          "oec-train-2"
+        ],
+        "host_lock_recovery_guard_preserved": "scn30-mn",
+        "static_contract_step_if": "always() && !cancelled()",
+        "prior_ui_run": 40671622051,
+        "prior_ui_run_sha": "f9b3f095e7f711d88a996ad3842d140a312e6586",
+        "failed_root_sync_run": 40818428276,
+        "failed_root_sync_job": 123264981530,
+        "failed_bridge_run": 40818187983,
+        "failed_bridge_job": 123264150263
+      },
+      "results": {
+        "code_changes_committed": true,
+        "current_branch_ref_updated": false,
+        "latest_ui_evidence": "13/13 PASS_UI_ONLY, HTTP 200, callback skipped",
+        "full_model_bridge": "FAILED before source checkout: HTTP 403 from private OEC fetch; no callback ran; no artifacts",
+        "root_sync_audit_before_fix": "FAILED due inspecting Full_Model oec-train registration from OEC workflow",
+        "current_live_callback_acceptance": "NOT VERIFIED",
+        "cache_or_checkpoint_changes": false,
+        "storage_lock_or_reserve_changes": false,
+        "conda_environment_or_package_changes": false
+      },
+      "interpretation": "This is a workflow-routing and test-isolation correction, not an inference acceptance pass. Mark model modes complete only after the new OEC-native jobs run and each generated artifact is independently inspected.",
+      "limitations": [
+        "The OEC runner observed as oec-1 at the latest UI smoke was on scn28-mn, whereas legacy storage-lock recovery remains explicitly restricted to scn30-mn; that guard was deliberately retained.",
+        "The newly changed workflows have not yet run at the updated branch SHA.",
+        "No current-branch callback-generated WAV, FLAC, TXT, PNG, GLB, or MP4 has been accepted.",
+        "The cross-repository bridge requires a supported private-repository credential before it can be used; no secret was assumed or fabricated."
+      ]
+    },
     {
       "id": "EXP-2026-10-29-GRADIO-CALLBACK-ACCEPTANCE-BRIDGE",
       "date": "2026-10-29",
@@ -6142,6 +6186,6 @@
       ]
     }
   ],
-  "updated_at": "2026-10-29T07:18:00+05:30",
-  "updated_date": "2026-10-29"
+  "updated_at": "2026-10-30T23:02:00+05:30",
+  "updated_date": "2026-10-30"
 }

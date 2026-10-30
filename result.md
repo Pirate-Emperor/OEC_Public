@@ -1,14 +1,19 @@
-# OEC actual Gradio callback and asset validation — 2026-10-29 10:03 IST
+# OEC Gradio runner-routing correction and current acceptance state — 2026-10-30 23:02 IST
 
-**Status: PENDING; not complete.**
+**Code change:** `76fb34cbf51d112acee1b545c274e8e606326748` on `fix/media-stack-supervision-20261019`.  
+**Overall status: PARTIAL — live callback/asset acceptance is still not complete.**
 
-- Executable OEC candidate SHA: `662f8225f110163cbd8e2f60c9548c4839ce8566` on `fix/media-stack-supervision-20261019`; source branch head `ee8e79bb6826f4f2d97c64d04bd65ae0efa92929` only adds tracker updates after the pinned code candidate.
-- Latest bridge workflow revision: `2684cd3b881302db658af86e554147e0c6fb82ca`; latest job [run 40818187983](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40818187983) is queued with `runner_id=null`.
-- EDA [run 40815451090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40815451090) passed. However D2E training [run 40817880090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817880090) is in progress on `oec-train-2` and automatic iteration [40817912672](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817912672) is queued. Actual callbacks have not started.
-- Latest workflow hardening isolates the pinned source in a unique temporary directory, uses a validated existing trusted storage config only, limits lock recovery to its authorized runner/host, and keeps model-cache purges/environment installers disabled.
-- Prior workflow attempt [40817769289](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817769289) was cancelled by the latest safety/checkout fix. Latest monitored attempt: 40818187983.
+- Corrected the active OEC acceptance/UI/FLUX workflow routing to registered OEC core runners: model/UI workflows use `oec-1`; root-sync audit and canonical checkout use `oec-2`.
+- Root-sync no longer attempts to inspect or relabel `oec-train` and `oec-train-2`, which belong to the separate `xflexwork/OEC_AireOS_Full_Model` registration.
+- The static notebook contract step is now allowed to run after a failed preflight but is skipped on cancellation. Model inference still requires a successful preflight and retains all existing storage/lock/GPU gates.
+- Historical UI evidence [40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051): 13/13 UI-only modes passed HTTP 200; all records say `PASS_UI_ONLY` and `callback=SKIPPED_UI_ONLY`. This is not generation evidence.
+- Bridge failure [40818187983](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40818187983): job ran on `oec-train-2` / `scn28-mn`, received HTTP 403 while fetching private `xflexwork/OEC`, then skipped all inference steps. No artifact was produced.
+- OEC-native attempt [40802365390](https://github.com/xflexwork/OEC/actions/runs/40802365390) was cancelled. Earlier full acceptance [40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) stopped at preflight because observed `oec-1/scn28-mn` did not match the permitted `scn30-mn` lock-recovery host. The inference guard remains unchanged.
+- No caches, checkpoints, storage locks/reserves, Conda environments or shared runtime processes were modified.
 
-Completion requires successful real Gradio submissions and independent inspection of generated files, hashes and format-specific decoder/parse reports. No current-run asset is accepted yet.
+**Still required:** inspect the newly triggered job results; then achieve real callback submissions and independently verify the generated WAV/FLAC/TXT/PNG/GLB/MP4 outputs and hashes on the exact branch SHA. Do not record a provider as passed from UI launch, skipped steps, or historical outputs alone.
+
+---
 
 ---
 # OEC actual Gradio callback and asset validation — 2026-10-29 10:02 IST

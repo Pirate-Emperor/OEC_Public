@@ -1,14 +1,17 @@
-## CURRENT STATUS — 2026-10-29 10:03 IST
+## CURRENT STATUS — 2026-10-30 23:02 IST
 
-**Pinned executable candidate:** OEC commit `662f8225f110163cbd8e2f60c9548c4839ce8566` from `fix/media-stack-supervision-20261019`; later source-branch commits through `ee8e79bb6826f4f2d97c64d04bd65ae0efa92929` are tracker-only.
+**OEC branch:** `fix/media-stack-supervision-20261019`  
+**Runner-routing source commit:** `76fb34cbf51d112acee1b545c274e8e606326748` (the current branch update will include this commit plus the tracker refresh).
 
-- [ ] **Actual Gradio callback + asset validation — PENDING.** Latest full-provider job [run 40818187983](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40818187983) remains queued on `oec-train-2` (`runner_id=null`; no callback steps have started). Workflow revision `2684cd3b881302db658af86e554147e0c6fb82ca` pins the source SHA and runs each command from an isolated temporary checkout.
-- [x] **EDA — SUCCESS.** [Run 40815451090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40815451090) finished successfully: regression tests, prepared-recording/data EDA, and report/plot upload all succeeded.
-- [ ] **A100 runner still occupied / not assigned to callback job.** A newer D2E training run [40817880090](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817880090) is in progress on `oec-train-2`; the quality-gated iteration [40817912672](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40817912672) is queued for the same runner. The acceptance job remains queued rather than overlapping GPU/storage work.
-- [x] **Safety refinements in the bridge:** uses a unique temporary checkout outside the persistent runner workspace; fetches branch ancestry then checks out the pinned OEC SHA; accepts only a regular, schema-valid existing `storage_config.json` from trusted local worktree paths; storage-lock recovery runs only on `oec-train` + `scn30-mn` and other identities fail closed when locks/leases exist. Model-cache purges and environment installer commands remain disabled.
-- [ ] **Acceptance evidence still needed:** successful actual Gradio HTTP/event submissions, non-empty generated files, hashes and format-specific parsing/decoding reports for applicable WAV/FLAC/TXT/PNG/GLB/MP4 outputs. No asset has been accepted from this attempt.
+- [x] **Runner ownership corrected in the active Gradio paths.** Full notebook/model acceptance and UI-only launch now target the OEC-registered `oec-1`; FLUX→TRELLIS smoke targets `oec-1` and retains its strict `scn30-mn` lock-owner guard. Canonical root sync and its identity audit target the OEC-registered `oec-2`. The audit no longer reads or attempts to relabel the separate Full_Model `oec-train`/`oec-train-2` runners.
+- [x] **Static notebook contracts decoupled from model preflight.** The contracts step now runs after a failed preflight (but not after workflow cancellation). Every actual model/server inference step still requires successful preflight; this does not bypass storage, lock, GPU, or service guards.
+- [x] **Historical UI-only evidence:** [run 40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051), source SHA `f9b3f095e7f711d88a996ad3842d140a312e6586`, ran on OEC `oec-1` / `scn28-mn`. All 13 configured modes returned Gradio HTTP 200 with `PASS_UI_ONLY`; the runner reported `GRADIO_UI_ONLY_FAILURES=0`. These runs explicitly **skipped callbacks and model inference**.
+- [ ] **Current-branch callback/asset acceptance remains NOT VERIFIED.** No WAV, FLAC, TXT, PNG, GLB, or MP4 asset has been accepted from the current branch head. The latest cross-repository bridge [run 40818187983](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40818187983) failed before checkout: the Full_Model runner received HTTP 403 fetching private `xflexwork/OEC`; every callback step was skipped and no artifacts were uploaded.
+- [ ] **Latest OEC native acceptance remained blocked/cancelled.** [Run 40802365390](https://github.com/xflexwork/OEC/actions/runs/40802365390) was cancelled. Earlier [run 40671622024](https://github.com/xflexwork/OEC/actions/runs/40671622024) stopped in preflight: `oec-1` was observed on `scn28-mn`, while the legacy lock-recovery path only permits `scn30-mn`. No model inference step ran in that attempt. The host/lock checks remain fail-closed.
+- [x] **Preservation:** no cache, model checkpoint, storage lock/reserve, Conda environment, or shared runtime was modified by this source-routing change.
+- [ ] **Next acceptance:** verify the newly triggered OEC-native static, UI-only, and root-sync jobs at the new SHA. Then run model callbacks only when the existing, authorized host/storage/GPU admission succeeds; inspect each output file, SHA-256 and format-specific decoder/parser report before marking a provider PASS.
 
-Prior acceptance attempts were superseded by safety/workspace fixes; latest tracked run is 40818187983. No caches or locks were deleted and no Conda environment was recreated by these workflow changes.
+Historical provider results remain in the sections below; do not treat them as current-head acceptance.
 
 ---
 

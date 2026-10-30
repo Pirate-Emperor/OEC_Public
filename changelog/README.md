@@ -1,3 +1,12 @@
+## 2026-10-30 23:02 IST — OEC core runner routing corrected; live generation pending
+
+- Source fix `76fb34cbf51d112acee1b545c274e8e606326748` routes OEC model/UI acceptance to its registered `oec-1` and canonical root sync to its registered `oec-2`; it removes the root-sync audit's invalid dependency on Full_Model's training runners.
+- Static notebook contracts now execute after preflight failure (but not cancellation); live inference remains gated by successful admission.
+- Prior UI-only run [40671622051](https://github.com/xflexwork/OEC/actions/runs/40671622051) passed all 13 configured Gradio launch modes with HTTP 200. The callback field is explicitly skipped in all 13 reports.
+- Full-model bridge [40818187983](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40818187983) failed before checkout with HTTP 403 fetching private OEC; no callbacks or artifacts. OEC-native actual callback/asset acceptance remains pending.
+- Root-sync's latest runner audit failure is [40818428276](https://github.com/xflexwork/OEC/actions/runs/40818428276); it inspected Full_Model `oec-train` metadata while running in OEC. The source correction removes that cross-repository inspection.
+- No model caches, checkpoints, storage locks/reserves, Conda environments or shared processes were changed.
+
 ## 2026-10-29 10:03 IST — callback workflow isolated; runner still occupied
 
 - Latest acceptance [run 40818187983](https://github.com/xflexwork/OEC_AireOS_Full_Model/actions/runs/40818187983) is still queued with no runner assigned; actual Gradio callbacks have not started.
