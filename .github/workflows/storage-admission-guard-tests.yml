@@ -20,7 +20,7 @@ permissions:
 jobs:
   static-write-guard-regressions:
     name: Static notebook, CLI and storage-admission regressions
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]
     timeout-minutes: 15
     steps:
       - name: Checkout isolated candidate branch
@@ -28,6 +28,8 @@ jobs:
       - name: Validate existing Conda environment and trusted StorageManager config
         run: |
           set -euo pipefail
+          test "$RUNNER_NAME" = "oec-2"
+          test "$GITHUB_REPOSITORY" = "xflexwork/OEC"
           CONDA_EXE="$HOME/Conda/condabin/conda"
           test -x "$CONDA_EXE"
           test -f "$HOME/OEC/storage_config.json"
@@ -39,6 +41,7 @@ jobs:
           set -euo pipefail
           CONDA_EXE="$HOME/Conda/condabin/conda"
           python() { "$CONDA_EXE" run --no-capture-output -n phase2_3d python "$@"; }
+          python -m unittest discover -s tests -p 'test_a100_root_sync_contract.py' -v
           python -m unittest discover -s tests -p 'test_trellis_notebook_static.py' -v
           python -m unittest discover -s tests -p 'test_trellis_easy_run.py' -v
           python -m unittest discover -s tests -p 'test_flux_trellis_pipeline.py' -v

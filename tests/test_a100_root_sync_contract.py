@@ -29,6 +29,13 @@ class A100RootSyncContractTests(unittest.TestCase):
         self.assertIn('test "$RUNNER_NAME" = "oec-1"', model_acceptance)
         self.assertNotIn("oec-train", root_sync)
 
+    def test_storage_guard_workflow_uses_oec_core_runner(self):
+        workflow = (ROOT / ".github" / "workflows" / "storage-admission-guard-tests.yml").read_text(encoding="utf-8")
+        self.assertIn("runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]", workflow)
+        self.assertIn('test "$RUNNER_NAME" = "oec-2"', workflow)
+        self.assertIn('test "$GITHUB_REPOSITORY" = "xflexwork/OEC"', workflow)
+        self.assertNotIn("a100, oec-train]", workflow)
+
     def test_runner_identity_accepts_verified_pre_transfer_repo_slug(self):
         root_sync = (ROOT / ".github" / "workflows" / "oec-root-sync.yml").read_text(encoding="utf-8")
         audit = root_sync.split("  core-runner-identity-audit:", 1)[1].split("  canonical-root-sync:", 1)[0]
