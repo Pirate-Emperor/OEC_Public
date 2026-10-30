@@ -29,6 +29,13 @@ class A100RootSyncContractTests(unittest.TestCase):
         self.assertIn('test "$RUNNER_NAME" = "oec-1"', model_acceptance)
         self.assertNotIn("oec-train", root_sync)
 
+    def test_deadline_watchdog_tolerates_force_cancel_conflict(self):
+        workflow = (ROOT / ".github" / "workflows" / "oec-root-sync.yml").read_text(encoding="utf-8")
+        self.assertGreaterEqual(workflow.count('method="POST", allow_conflict=True)'), 2)
+        self.assertIn("OEC_DEADLINE_FORCE_CANCEL_CONFLICT_TERMINAL", workflow)
+        self.assertIn("OEC_DEADLINE_FORCE_CANCEL_CONFLICT_ACTIVE", workflow)
+        self.assertIn("action=leave_for_checkout_guard", workflow)
+
     def test_storage_guard_workflow_uses_oec_core_runner(self):
         workflow = (ROOT / ".github" / "workflows" / "storage-admission-guard-tests.yml").read_text(encoding="utf-8")
         self.assertIn("runs-on: [self-hosted, linux, x64, gpu, a100, oec-2]", workflow)
