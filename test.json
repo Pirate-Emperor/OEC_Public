@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-30T23:52:00+05:30",
+  "last_updated": "2026-10-30T23:54:00+05:30",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "OEC core source is at 875350ff1ad6f98fde07793ae3b66c3851c837ea on fix/media-stack-supervision-20261019 and canonical A100 checkout sync passed at the same SHA (run 41105142713, oec-2). Static/storage/media regression workflow passed at the same SHA (run 41105142772): 23 unittest groups/229 cases, py_compile and four targeted notebook JSON checks. Latest UI launch evidence run 41101748877 passed all 13 configured modes HTTP 200 but explicitly skipped callbacks. Notebook structural audit run 41103554752 passed 18/18 notebooks, 80/88 code cells syntax-checked, zero saved errors; its separate callback gate stopped before inference. Protected models pause lock recovery refused on oec-1/scn28-mn; legacy recovery is restricted to oec-train/scn30-mn. Zero Gradio callbacks and zero current accepted WAV/FLAC/TXT/PNG/GLB/MP4 assets. Fresh live quota/area status was normal with about 89.06 GB write headroom and two idle A100s; no lock/reserve/cache/checkpoint/environment was modified. Overall Gradio asset acceptance remains PARTIAL until authorized owner-host inspection and actual callback outputs pass format validation.",
+  "latest_summary": "OEC implementation SHA 875350ff1ad6f98fde07793ae3b66c3851c837ea on fix/media-stack-supervision-20261019 and canonical A100 checkout sync passed at the same SHA (run 41105142713, oec-2). Static/storage/media regression workflow passed at the same SHA (run 41105142772): 23 unittest groups/229 cases, py_compile and four targeted notebook JSON checks. Latest UI launch evidence run 41101748877 passed all 13 configured modes HTTP 200 but explicitly skipped callbacks. Notebook structural audit run 41103554752 passed 18/18 notebooks, 80/88 code cells syntax-checked, zero saved errors; its separate callback gate stopped before inference. Protected models pause lock recovery refused on oec-1/scn28-mn; legacy recovery is restricted to oec-train/scn30-mn. Zero Gradio callbacks and zero current accepted WAV/FLAC/TXT/PNG/GLB/MP4 assets. Fresh live quota/area status was normal with about 89.06 GB write headroom and two idle A100s; no lock/reserve/cache/checkpoint/environment was modified. Overall Gradio asset acceptance remains PARTIAL until authorized owner-host inspection and actual callback outputs pass format validation.",
   "experiments": [
     {
       "id": "EXP-2026-10-30-OEC-GRADIO-ASSET-ACCEPTANCE-ROOTSYNC",
@@ -15,7 +15,6 @@
       "parameters": {
         "repository": "xflexwork/OEC",
         "branch": "fix/media-stack-supervision-20261019",
-        "current_head": "875350ff1ad6f98fde07793ae3b66c3851c837ea",
         "ui_launch_run": 41101748877,
         "ui_launch_source_sha": "4d29561223327f4b5c58f5ca355b87582603f757",
         "ui_launch_runner": "oec-1",
@@ -53,7 +52,8 @@
         "allowed_legacy_lock_recovery_identity": "oec-train/scn30-mn",
         "observed_quota_write_headroom_gb": 89.06,
         "post_gate_idle_a100_count": 2,
-        "accepted_generated_assets": 0
+        "accepted_generated_assets": 0,
+        "verified_implementation_sha": "875350ff1ad6f98fde07793ae3b66c3851c837ea"
       },
       "results": {
         "ui_launch": "PASS 13/13 HTTP 200; all callbacks skipped",
@@ -6256,6 +6256,6 @@
       ]
     }
   ],
-  "updated_at": "2026-10-30T23:52:00+05:30",
+  "updated_at": "2026-10-30T23:54:00+05:30",
   "updated_date": "2026-10-30"
 }

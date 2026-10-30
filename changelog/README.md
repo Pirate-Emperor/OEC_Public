@@ -1,6 +1,6 @@
 ## 2026-10-30 23:52 IST — static acceptance and canonical A100 sync verified; callbacks still blocked
 
-- Current branch head: `875350ff1ad6f98fde07793ae3b66c3851c837ea`.
+- Latest implementation SHA exercised by passing Actions: `875350ff1ad6f98fde07793ae3b66c3851c837ea` (the tracker refresh is a later docs-only commit).
 - [Gradio UI run 41101748877](https://github.com/xflexwork/OEC/actions/runs/41101748877): 13/13 configured UI modes served HTTP 200 on `oec-1/scn28-mn`; all JSON records are `PASS_UI_ONLY` with `callback=SKIPPED_UI_ONLY`. Artifact 12999037568 has 27 files.
 - [Notebook/callback run 41103554752](https://github.com/xflexwork/OEC/actions/runs/41103554752): structural audit passed 18/18 notebooks, 80/88 code cells syntax checked, zero saved error outputs. Its callback preflight failed closed before any provider callback due to `models/.storage_pause.lock`; zero generated artifacts were accepted.
 - [Current-head static regression run 41105142772](https://github.com/xflexwork/OEC/actions/runs/41105142772): SUCCESS on `oec-2/scn28-mn`; 23 unittest groups / 229 logged cases passed; Python compilation and four targeted notebook JSON checks passed.

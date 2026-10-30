@@ -2,7 +2,7 @@
 
 **Repository:** `xflexwork/OEC`  
 **Branch:** `fix/media-stack-supervision-20261019`  
-**Verified current head:** `875350ff1ad6f98fde07793ae3b66c3851c837ea`  
+**Latest implementation SHA exercised by passing Actions:** `875350ff1ad6f98fde07793ae3b66c3851c837ea`  
 **Overall: PARTIAL. UI launch and static contracts pass; actual callback-generated assets are not accepted yet.**
 
 ## Verified evidence
