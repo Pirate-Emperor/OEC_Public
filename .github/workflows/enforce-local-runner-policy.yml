@@ -31,28 +31,27 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
           import sys
 
           workflow_root = Path(".github/workflows")
-          hosted_label = re.compile(r"\\b(ubuntu|windows|macos)(?:-[A-Za-z0-9._]+)?\\b", re.IGNORECASE)
-          selector = re.compile(r"^\\s*runs-on\\s*:\\s*(.*?)\\s*$")
           violations = []
 
           for path in sorted(workflow_root.rglob("*")):
               if path.suffix.lower() not in {".yml", ".yaml"}:
                   continue
               for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-                  match = selector.match(line)
-                  if not match:
+                  stripped = line.lstrip()
+                  if not stripped.lower().startswith("runs-on:"):
                       continue
-                  value = match.group(1).split("#", 1)[0].strip()
-                  if "self-hosted" not in value.lower() or hosted_label.search(value):
+                  value = stripped.partition(":")[2].split("#", 1)[0].strip().lower()
+                  hosted_selector = any(token in value for token in ("ubuntu", "windows", "macos"))
+                  if "self-hosted" not in value or hosted_selector:
                       violations.append(f"{path}:{line_number}: {value or '<empty runs-on>'}")
 
           if violations:
               print("GitHub-hosted or non-self-hosted runner selectors are forbidden:")
-              print("\\n".join(violations))
+              for violation in violations:
+                  print(violation)
               sys.exit(1)
 
           print("Runner policy passed: every workflow job explicitly targets self-hosted runners.")
