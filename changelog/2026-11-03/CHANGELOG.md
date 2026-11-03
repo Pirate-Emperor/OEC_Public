@@ -6,7 +6,7 @@
 - Recorded project-level functional completion as project-owner confirmed, including a 9/9 binary functional completion scorecard.
 - Added dated experiment evidence for notebook/UI coverage, A100 audio/speech inference, FLUX-to-TRELLIS GLB inspection and OEC-Play contract tests.
 - Added an OEC-Play visual plate index with six prompt families and four view types each.
-- Exported eight PNG figures and added eight SVG vector figures.
+- Exported nine PNG figures and added eight SVG vector figures.
 - Report-facing content contains no source-control identifiers or repository links.
 - Updated the live checklist, results summary and task tracker to record this documentation milestone.
 
