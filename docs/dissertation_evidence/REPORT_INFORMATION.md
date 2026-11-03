@@ -143,6 +143,14 @@ The reviewed OEC-Play source/contract workflow recorded **56 passing server-side
 
 The project owner confirms that subsequent local changes resolved the runtime issues and that OEC-Play functionality is working. Accordingly, the project-level functional outcomes are recorded as completed on that basis. The historical workflow remains a dated record of the exact test it executed and is not rewritten as a different result.
 
+
+
+### 6.5 Workflow and runner evidence map
+
+The workflow catalogue is retained in `tables/workflow_evidence_catalogue.csv`. It maps the major OEC and OEC-Play workflows to their purpose and report interpretation: model notebook acceptance; Gradio UI launch; canonical A100 synchronization; storage-admission guard tests; read-only model setup audit; interactive-world contracts; mouse-only desktop acceptance; local runner policy; and application source/release packaging.
+
+The project owner confirms that subsequent local changes made the integrated OEC-Play functionality work. Historical workflow outcomes remain attached to their original test scope. A historical desktop runner without an X11 display did not produce a camera sweep in that run; this does not overwrite the project owner's later local completion confirmation.
+
 ## 7. OEC-Play visual evaluation index
 
 The visual-plate index contains six prompt families and four distinct view types per family, providing a **24-plate qualitative evaluation structure**:
