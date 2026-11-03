@@ -86,3 +86,8 @@ Update the checklist and daily changelog after meaningful work. Report:
 7. the single most important next step.
 
 Do not stop at a plan when safe work is possible. Do not start a shared-state operation while its approval, StorageManager admission, runner, network or license gates are unresolved. The prior $0-only Actions veto is retired; use Actions when it materially advances model setup and inference.
+
+
+## Dissertation evidence material
+
+The maintained report-information source pack is under `docs/dissertation_evidence/`. Read its `README.md`, then `REPORT_INFORMATION.md`, `COMPLETION_AND_EVIDENCE_BASIS.md` and `VISUALS_AND_TABLES_GUIDE.md` before preparing dissertation chapters or figures. The tables contain the component catalogue, dated evidence registry, five-stage/nine-metric framework, project-owner-confirmed functional completion scorecard and OEC-Play visual-plate index. Keep this material separate from the dissertation's final authored prose.
