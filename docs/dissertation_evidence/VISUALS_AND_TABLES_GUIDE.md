@@ -10,6 +10,7 @@ This folder contains dissertation source figures and result tables.
 | five_stage_workflow.svg | Methodology | Five-stage generation, interaction and evidence chain |
 | nine_layer_evaluation_framework.svg | Evaluation methodology | Nine evidence dimensions |
 | nine_metric_completion_scorecard.svg | Results summary | Nine project-owner-confirmed functional completion layers |
+| five_stage_nine_metric_matrix.svg | Evaluation methodology | Maps nine evidence layers across five workflow stages |
 | nine_metric_completion_scorecard.svg | Results summary | Nine functional layers recorded complete by project-owner confirmation |
 | notebook_and_gradio_coverage.svg | Implementation verification | Notebook and UI launch coverage, with scope stated |
 | historical_a100_smoke_timings.svg | Runtime observations | Historical A100 smoke timings with timing-scope caveat |
