@@ -105,7 +105,7 @@ The nine evidence dimensions are:
 8. Interactive control and event response.
 9. Repeatability and inspectable evidence.
 
-The project owner confirms functional completion across all nine dimensions. The accompanying scorecard records **9/9 completed functional layers on project-owner confirmation**. This is a binary functional completion result, not a model-quality score. Runtime quality, accuracy, latency and throughput remain separate measured quantities.
+The project owner confirms functional completion across all nine dimensions. The accompanying scorecard records **9/9 completed functional layers on project-owner confirmation**. This is a binary functional completion result, not a model-quality score. Runtime quality, accuracy, latency and throughput remain separate measured quantities. The five-stage/nine-metric matrix shows which verification layers apply to each step; its checkmarks indicate coverage, not performance.
 
 Use nine_layer_evaluation_framework.svg for metric definitions and nine_metric_completion_scorecard.svg for completion coverage. A detailed five-stage/nine-metric mapping is retained in the associated CSV table.
 
