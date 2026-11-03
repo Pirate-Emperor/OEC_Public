@@ -1,0 +1,6 @@
+stage,description,applicable_metric_layers
+"1. Intent and setup","Prompt/schema validation; settings; seed; model/backend selection.","M1 · M2 · M7 · M9"
+"2. Seed authoring","Prompt enrichment; image generation/editing; safety and seed handling.","M1 · M2 · M3 · M4 · M5 · M6 · M7 · M9"
+"3. Interactive rollout","Frame-history-conditioned model generation and presentation.","M2 · M3 · M4 · M6 · M7 · M8 · M9"
+"4. World interaction","Controls; scene events; state transitions; audio; pause/reset; recording.","M1 · M3 · M6 · M7 · M8 · M9"
+"5. Evidence and delivery","Format checks; metadata; logs; QA; manifest; read-back.","M4 · M5 · M6 · M7 · M9"
