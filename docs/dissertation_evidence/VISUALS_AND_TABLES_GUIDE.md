@@ -9,6 +9,7 @@ This folder contains dissertation source figures and result tables.
 | oec_multimodal_architecture.svg | System architecture | OEC-Play and OEC Core as related but distinct workflows |
 | five_stage_workflow.svg | Methodology | Five-stage generation, interaction and evidence chain |
 | nine_layer_evaluation_framework.svg | Evaluation methodology | Nine evidence dimensions |
+| nine_metric_completion_scorecard.svg | Results summary | Nine project-owner-confirmed functional completion layers |
 | nine_metric_completion_scorecard.svg | Results summary | Nine functional layers recorded complete by project-owner confirmation |
 | notebook_and_gradio_coverage.svg | Implementation verification | Notebook and UI launch coverage, with scope stated |
 | historical_a100_smoke_timings.svg | Runtime observations | Historical A100 smoke timings with timing-scope caveat |
