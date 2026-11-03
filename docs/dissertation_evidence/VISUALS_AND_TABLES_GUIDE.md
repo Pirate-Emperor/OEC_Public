@@ -25,6 +25,7 @@ This folder contains dissertation source figures and result tables.
 | five_stage_nine_metric_framework.csv | Methodology and evaluation framework |
 | nine_metric_owner_confirmed_scorecard.csv | Functional completion summary |
 | oec_play_visual_plate_index.csv | Qualitative evaluation and figure catalogue |
+| workflow_evidence_catalogue.csv | Cross-repository CI, A100 runner and validation workflow summary |
 
 ## Figure and screenshot rules
 
