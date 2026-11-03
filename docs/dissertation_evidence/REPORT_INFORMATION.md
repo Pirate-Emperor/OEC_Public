@@ -208,4 +208,4 @@ OEC implements a modular multimodal environment-creation workflow connecting sce
 - Do not call a GLB reopen test a topology-quality evaluation.
 - Distinguish the OEC-Play Waypoint runtime from the LTX video-asset generator.
 - Check exact model licence and commercial-use conditions before describing commercial deployment.
-- Report-facing files in this folder intentionally omit repository URLs, hashes, commit identifiers, pull-request identifiers and workflow/run identifiers.
+- The report-facing material is written as dissertation source content; detailed engineering traceability remains in the project's operational records.
