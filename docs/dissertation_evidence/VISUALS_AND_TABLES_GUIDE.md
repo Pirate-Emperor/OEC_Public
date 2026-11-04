@@ -1,35 +1,35 @@
-# Visuals and tables guide
+# OEC Core — Visuals and Tables Guide
 
-This folder contains dissertation source figures and result tables.
+This package stores plot-ready source data only. No new charts are created. Existing vector figures are left unchanged.
 
-## Figures
+## Recommended plot inputs
 
-| Figure | Recommended placement | Main point |
-|---|---|---|
-| oec_multimodal_architecture.svg | System architecture | OEC-Play and OEC Core as related but distinct workflows |
-| five_stage_workflow.svg | Methodology | Five-stage generation, interaction and evidence chain |
-| nine_layer_evaluation_framework.svg | Evaluation methodology | Nine evidence dimensions |
-| nine_metric_completion_scorecard.svg | Results summary | Nine project-owner-confirmed functional completion layers |
-| five_stage_nine_metric_matrix.svg | Evaluation methodology | Maps nine evidence layers across five workflow stages |
-| nine_metric_completion_scorecard.svg | Results summary | Nine functional layers recorded complete by project-owner confirmation |
-| notebook_and_gradio_coverage.svg | Implementation verification | Notebook and UI launch coverage, with scope stated |
-| historical_a100_smoke_timings.svg | Runtime observations | Historical A100 smoke timings with timing-scope caveat |
-| flux_trellis_glb_validation.svg | Image-to-3D results | GLB structural inspection values |
-| oec_play_scene_authoring_dimensions.svg | OEC-Play interface | Scene-authoring option dimensions |
+| Plot | Table | Suggested fields | Caveat |
+|---|---|---|---|
+| Notebook structural coverage | `notebook_gradio_coverage.csv` | notebook count, structural pass count, cell count, syntax checked, saved errors | Syntax coverage is not full execution |
+| Gradio UI launch coverage | `notebook_gradio_coverage.csv`, `metric_observations.csv` | mode count, HTTP 200 count, launch rate | 30 October sweep skipped callbacks |
+| Regression-test coverage | `evidence_registry.csv`, `metric_observations.csv` | test groups, test cases, pass rate | Do not pool dated suites as independent samples |
+| Model artifact sizes | `model_inference_measurements.csv` | provider, output format, bytes | Different modalities are not comparable in quality |
+| Pure generation timings | `model_inference_measurements.csv` | provider, generation seconds | Compare only compatible setups |
+| Startup-inclusive timings | `model_inference_measurements.csv` | startup-plus-inference/job seconds | Plot separately from pure generation |
+| Audio properties | `model_inference_measurements.csv` | duration, sample rate, channels, bytes | Smoke samples only; no perceptual study |
+| Video properties | `model_inference_measurements.csv` | duration, width, height, generation time | No temporal-quality score |
+| Image properties | `model_inference_measurements.csv` | dimensions, generation time, bytes | No visual-quality score |
+| 3D structural properties | `model_inference_measurements.csv` | mesh, primitive, vertices, faces, indices, bytes | No watertightness or semantic score |
+| Historical resource profile | `resource_observations.csv` | model usage, hard quota headroom, idle A100s, VRAM | Historical snapshots only |
+| Functional completion | `nine_metric_owner_confirmed_scorecard.csv` | metric code, completion status | Categorical functional completion, not accuracy |
+| Stage status | `pipeline_stage_observations.csv` | stage, owner-confirmed status, historical evidence | Keep the evidence layers separate |
+| Delivery example | `delivery_and_qa_observations.csv` | asset bytes, part count, read-back | One accepted asset, not throughput |
 
-## Tables
+## Plot preparation rules
 
-| Table | Recommended placement |
-|---|---|
-| model_and_component_catalogue.csv | Model architecture and integration |
-| evidence_registry.csv | Experimental results and reproducibility |
-| five_stage_nine_metric_framework.csv | Methodology and evaluation framework |
-| nine_metric_owner_confirmed_scorecard.csv | Functional completion summary |
-| oec_play_visual_plate_index.csv | Qualitative evaluation and figure catalogue |
-| workflow_evidence_catalogue.csv | Cross-repository CI, A100 runner and validation workflow summary |
+1. Filter by evidence class before aggregating. Measured runs, derived counts, tests and owner confirmation are distinct evidence types.
+2. Preserve date and sample count. Do not average unlike models, modalities or runtime configurations.
+3. Keep generation-only timing separate from startup-inclusive time.
+4. Keep output format and provider in grouping keys.
+5. Put sample count and evidence caveat in each caption.
+6. Omit blank/NA observations or show them as unavailable; do not replace them with zero.
+7. Show derived ratios alongside numerator and denominator.
+8. Quality measures not present as measured values are listed in the measurement-gap table.
 
-## Figure and screenshot rules
-
-Keep plots tied to explicit measured values, include units and measurement scope, and move long explanations to captions. The audio timing chart intentionally distinguishes generation-only timing from startup-plus-inference timing.
-
-For OEC-Play, the visual-plate index defines six prompt families and four distinct views for each. Use original OEC-Play playback/recording frames for the corresponding prompt and settings. A seed image, menu background or AI illustration is not a gameplay screenshot.
+No gameplay capture or separate client-deployment metric belongs in this OEC core dataset.

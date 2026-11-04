@@ -1,0 +1,5 @@
+"observation_date","workflow","asset_type","asset_bytes","remote_part_count","qa_outcome","upload_outcome","readback_outcome","evidence_basis","interpretation"
+"2026-10-20","LTX → Qwen2-VL QA → approved upload → read-back","Remote chunked artifact","228845","3","PASS","PASS","PASS","Historical single asset","Manifest and remote chunks read back/reassembled; not sustained throughput"
+"2026-10-20","Qwen2-VL visual QA","Selected generated asset","228845","","PASS","PASS","","Historical joined workflow","Automated QA decision, not independently benchmarked against human labels"
+"2026-10-30","Provider callback preflight","WAV/FLAC/TXT/PNG/GLB/MP4","","","NOT_RUN","NOT_RUN","","Callback gate stopped before inference","This is a blocked diagnostic attempt"
+"2026-11-04","OEC core integrated workflow","Multimodal asset routes","","","COMPLETED — project-owner confirmed","COMPLETED — project-owner confirmed","COMPLETED — project-owner confirmed","Current project-level confirmation","No new byte count or latency was supplied in the confirmation; historical values remain separate"

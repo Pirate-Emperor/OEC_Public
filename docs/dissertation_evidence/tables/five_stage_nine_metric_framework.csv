@@ -1,6 +1,6 @@
-stage,description,applicable_metric_layers
-"1. Intent and setup","Prompt/schema validation; settings; seed; model/backend selection.","M1 · M2 · M7 · M9"
-"2. Seed authoring","Prompt enrichment; image generation/editing; safety and seed handling.","M1 · M2 · M3 · M4 · M5 · M6 · M7 · M9"
-"3. Interactive rollout","Frame-history-conditioned model generation and presentation.","M2 · M3 · M4 · M6 · M7 · M8 · M9"
-"4. World interaction","Controls; scene events; state transitions; audio; pause/reset; recording.","M1 · M3 · M6 · M7 · M8 · M9"
-"5. Evidence and delivery","Format checks; metadata; logs; QA; manifest; read-back.","M4 · M5 · M6 · M7 · M9"
+"stage_number","stage","description","applicable_metric_layers"
+"1","Request and configuration","Validate request schema, parameters, task and provider selection, output format and job metadata","M1; M2; M6; M9"
+"2","Runtime and resource readiness","Resolve model/runtime; verify cache/checkpoint, environment, device eligibility, service readiness and fresh storage admission","M2; M7; M9"
+"3","Model execution","Invoke the actual notebook/Gradio callback/worker and record model output, timing and resource values","M2; M3; M4; M7; M9"
+"4","Artifact and QA validation","Check non-empty output, decode/parse media, inspect structural metadata and record QA/compliance result","M4; M5; M6; M8; M9"
+"5","Delivery and reproducibility","Retain provenance and manifest, upload approved output, verify remote read-back/reassembly and keep run evidence","M5; M6; M7; M8; M9"
