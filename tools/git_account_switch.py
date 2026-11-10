@@ -119,7 +119,17 @@ def show_status(remote: str) -> int:
 
 def login() -> int:
     gh = require_gh()
-    run([gh, "auth", "login", "--hostname", "github.com", "--git-protocol", "https", "--web"])
+    # gh auth login is interactive/device-flow; inherit the user's terminal so
+    # the one-time code and browser instructions remain visible.
+    try:
+        result = subprocess.run(
+            [gh, "auth", "login", "--hostname", "github.com", "--git-protocol", "https", "--web"],
+            check=False,
+        )
+    except OSError as exc:
+        raise SwitchError(f"could not start GitHub CLI login: {type(exc).__name__}") from exc
+    if result.returncode != 0:
+        raise SwitchError(f"GitHub CLI login did not complete (exit code {result.returncode})")
     run([gh, "auth", "setup-git"])
     print(f"GitHub HTTPS credential helper configured for account: {gh_login(gh)}")
     return 0
@@ -140,27 +150,33 @@ def set_identity(name: str, email: str, root: str) -> None:
 
 def switch_account(login_name: str, name: str, email: str, remote: str, convert_ssh: bool) -> int:
     root = repo_root()
-    protocol, owner_repo = remote_details(remote)
-    if protocol == "ssh":
-        if not convert_ssh:
-            raise SwitchError(
-                f"{remote} uses SSH; GitHub CLI account switching controls HTTPS credentials. "
-                "Re-run with --convert-ssh-to-https to change this remote to "
-                f"https://github.com/{owner_repo}.git, or switch the SSH key configured for this remote."
-            )
-        run(["git", "remote", "set-url", remote, f"https://github.com/{owner_repo}.git"], cwd=root)
-
-    gh = require_gh()
+    validate_identity(name, email)
+    if not re.fullmatch(r"[A-Za-z0-9-]+", login_name):
+        raise SwitchError("provide a valid GitHub login name")
     if any(os.environ.get(key) for key in TOKEN_ENV_VARS):
         raise SwitchError(
             "a GitHub token environment variable is active; unset it in this shell before "
             "switching so it cannot override the selected saved account"
         )
 
+    protocol, owner_repo = remote_details(remote)
+    if protocol == "ssh" and not convert_ssh:
+        raise SwitchError(
+            f"{remote} uses SSH; GitHub CLI account switching controls HTTPS credentials. "
+            "Re-run with --convert-ssh-to-https to change this remote to "
+            f"https://github.com/{owner_repo}.git, or switch the SSH key configured for this remote."
+        )
+
+    gh = require_gh()
     run([gh, "auth", "switch", "--hostname", "github.com", "--user", login_name])
     active = gh_login(gh)
     if active.casefold() != login_name.casefold():
         raise SwitchError(f"GitHub account verification mismatch: requested {login_name!r}, active {active!r}")
+
+    # Only convert the remote after the selected account is verified. This
+    # avoids leaving a changed remote behind when account switching fails.
+    if protocol == "ssh":
+        run(["git", "remote", "set-url", remote, f"https://github.com/{owner_repo}.git"], cwd=root)
 
     # Configure gh as Git's HTTPS credential helper. No token is placed in the
     # repository, remote URL, or local Git config.
