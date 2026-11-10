@@ -1,4 +1,4 @@
-name: OEC storage lock recovery and Git identity preflight
+name: OEC Git identity and account preflight
 
 on:
   push:
@@ -13,155 +13,104 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: oec-storage-lock-recovery-preflight-${{ github.run_id }}
-  cancel-in-progress: false
-
 jobs:
-  runner-preflight:
-    name: Inspect storage recovery helper and GitHub identity
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train]
-    timeout-minutes: 10
+  inspect-oec-runner:
+    name: Inspect OEC Git identity on ${ matrix.runner_label }
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        runner_label: [oec-1, oec-2]
+    runs-on: [self-hosted, "${ matrix.runner_label }"]
+    timeout-minutes: 8
     defaults:
       run:
         shell: bash
     steps:
-      - name: Checkout isolated diagnostic branch
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Validate helper and inspect runner Git identity (read-only)
+      - name: Confirm runner, A100 and persistent OEC checkout
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-train"
-          test "$(hostname -s)" = "scn30-mn"
+          test "$RUNNER_NAME" = "${ matrix.runner_label }"
+          test "$RUNNER_OS" = "Linux"
+          test "$RUNNER_ARCH" = "X64"
           nvidia-smi -L | grep -q "A100"
-          REPORT="$GITHUB_WORKSPACE/oec-storage-git-preflight.txt"
+          test -d "$HOME/OEC/.git"
+          REPORT="$RUNNER_TEMP/oec-git-account-${ matrix.runner_label }.txt"
           {
             echo "RUNNER_NAME=$RUNNER_NAME"
             echo "HOST=$(hostname -f 2>/dev/null || hostname)"
             echo "TIME=$(date -Is)"
-            echo "WORKSPACE=$GITHUB_WORKSPACE"
+            echo "OEC_ROOT=$(git -C "$HOME/OEC" rev-parse --show-toplevel)"
+            echo "OEC_HEAD=$(git -C "$HOME/OEC" rev-parse HEAD)"
+            echo "OEC_BRANCH=$(git -C "$HOME/OEC" branch --show-current)"
+            echo "LAST_COMMIT=$(git -C "$HOME/OEC" log -1 --format='%h %an <%ae> | %cn <%ce>')"
             echo
-            echo "=== GPU inventory (read-only) ==="
-            if command -v nvidia-smi >/dev/null 2>&1; then nvidia-smi -L; else echo "nvidia-smi unavailable"; fi
-
-            for REPO_PATH in "$GITHUB_WORKSPACE" "$HOME/OEC"; do
-              echo
-              echo "=== Git checkout: $REPO_PATH ==="
-              if git -C "$REPO_PATH" rev-parse --show-toplevel >/dev/null 2>&1; then
-                echo "HEAD=$(git -C "$REPO_PATH" rev-parse HEAD)"
-                echo "BRANCH=$(git -C "$REPO_PATH" branch --show-current)"
-                echo "LAST_COMMIT=$(git -C "$REPO_PATH" log -1 --format='%h %an <%ae> | %cn <%ce>')"
-                for KEY in user.name user.email; do
-                  echo "-- effective $KEY --"
-                  git -C "$REPO_PATH" config --show-origin --get "$KEY" || echo "(unset)"
-                  echo "-- global $KEY --"
-                  git -C "$REPO_PATH" config --global --show-origin --get "$KEY" || echo "(unset)"
-                done
-                echo "-- credential helper --"
-                git -C "$REPO_PATH" config --show-origin --get-all credential.helper || echo "(unset)"
-                echo "-- origin (credentials stripped) --"
-                python3 - "$REPO_PATH" <<'PY'
+            echo "=== Git commit identity ==="
+            for KEY in user.name user.email; do
+              echo "-- effective $KEY --"
+              git -C "$HOME/OEC" config --show-origin --get "$KEY" || echo "(unset)"
+              echo "-- global $KEY --"
+              git -C "$HOME/OEC" config --global --show-origin --get "$KEY" || echo "(unset)"
+            done
+            echo
+            echo "=== Authentication mechanism (metadata only; no credentials printed) ==="
+            echo "GitHub CLI:"
+            if command -v gh >/dev/null 2>&1; then gh auth status --hostname github.com 2>&1 || true; else echo "not installed"; fi
+            echo "Credential helpers:"
+            git -C "$HOME/OEC" config --show-origin --get-all credential.helper || echo "(none configured)"
+            for FILE in "$HOME/.git-credentials" "$HOME/.config/gh/hosts.yml" "$HOME/.netrc" "$HOME/.ssh/config" "$HOME/.ssh/known_hosts"; do
+              if test -f "$FILE"; then echo "PRESENT $FILE"; else echo "ABSENT $FILE"; fi
+            done
+            if command -v ssh-add >/dev/null 2>&1; then
+              echo "SSH agent identities:"
+              ssh-add -l 2>&1 || true
+            else
+              echo "ssh-add: unavailable"
+            fi
+            echo
+            echo "=== Remote URL (credentials stripped) ==="
+            python3 - "$HOME/OEC" <<'PY'
           import subprocess, sys
           from urllib.parse import urlsplit, urlunsplit
-          repo = sys.argv[1]
-          p = subprocess.run(["git", "-C", repo, "remote", "get-url", "origin"], capture_output=True, text=True)
+          repo=sys.argv[1]
+          p=subprocess.run(["git","-C",repo,"remote","get-url","origin"],capture_output=True,text=True)
           if p.returncode:
               print("(origin unavailable)")
           else:
-              raw = p.stdout.strip()
+              raw=p.stdout.strip()
               if "://" in raw:
-                  u = urlsplit(raw)
-                  host = u.netloc.rsplit("@", 1)[-1]
-                  print(urlunsplit((u.scheme, host, u.path, "", "")))
+                  u=urlsplit(raw)
+                  print(urlunsplit((u.scheme,u.netloc.rsplit("@",1)[-1],u.path,"","")))
               elif "@" in raw and ":" in raw:
-                  print(raw.split("@", 1)[-1])
+                  print(raw.split("@",1)[-1])
               else:
                   print(raw)
           PY
-                echo "-- worktree state (tracked paths only) --"
-                git -C "$REPO_PATH" status --short --untracked-files=no || true
-              else
-                echo "No Git checkout at this path."
-              fi
-            done
-
             echo
-            echo "=== GitHub CLI authenticated account ==="
-            if command -v gh >/dev/null 2>&1; then
-              gh auth status --hostname github.com 2>&1 || true
-              gh api user --jq .login 2>&1 || true
-            else
-              echo "gh CLI not installed."
-            fi
-
+            echo "=== Existing local account access test (read-only; no prompts) ==="
+            set +e
+            timeout 20s env GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=Never git -C "$HOME/OEC" ls-remote origin HEAD >/dev/null 2>"$RUNNER_TEMP/oec-git-auth-test.err"
+            AUTH_RC=$?
+            set -e
+            echo "GIT_LS_REMOTE_EXIT=$AUTH_RC"
+            if test "$AUTH_RC" -eq 0; then echo "LOCAL_ORIGIN_ACCESS=PASS"; else echo "LOCAL_ORIGIN_ACCESS=FAIL_OR_NO_NONINTERACTIVE_CREDENTIAL"; tail -n 8 "$RUNNER_TEMP/oec-git-auth-test.err"; fi
             echo
-            echo "=== Existing dead-lock recovery helper (source inspection only) ==="
-            FOUND=0
-            for HELPER in "$HOME/OEC/tools/recover_dead_storage_locks.py" "$GITHUB_WORKSPACE/tools/recover_dead_storage_locks.py"; do
-              if test -f "$HELPER"; then
-                FOUND=1
-                echo "--- $HELPER ---"
-                python3 -m py_compile "$HELPER"
-                sed -n '1,500p' "$HELPER"
-                echo "--- helper CLI help (no recovery invoked) ---"
-                python3 "$HELPER" --help
-              fi
-            done
-            if test "$FOUND" = "0"; then
-              echo "recover_dead_storage_locks.py not found in either checkout."
-              echo "Potential helper filenames:"
-              find "$HOME/OEC/tools" -maxdepth 1 -type f -iname '*storage*lock*' -printf '%p\n' 2>/dev/null || true
-            fi
-
+            echo "=== Persistent checkout worktree state ==="
+            git -C "$HOME/OEC" status --short --untracked-files=no
             echo
-            echo "=== Installed storage manager source identity ==="
-            if test -f "$HOME/OEC/storage_manager.py"; then
-              sha256sum "$HOME/OEC/storage_manager.py"
-              grep -nE 'LOCK_FILENAME|LEASE_MANIFEST_FILENAME|def _pause_lock_active|def managed_storage_operation|def resume_reserve' "$HOME/OEC/storage_manager.py" || true
-            else
-              echo "No persistent ~/OEC/storage_manager.py"
-            fi
-            echo
-            echo "PREFLIGHT_ONLY=TRUE"
-            echo "No storage lock, lease, reserve, model cache or runtime process was modified."
+            echo "No Git config, remote, credential file or checkout state was modified."
           } | tee "$REPORT"
 
-      - name: Upload read-only preflight report
+      - name: Verify safe account-switch helper
+        run: |
+          set -euo pipefail
+          python3 -m py_compile "$GITHUB_WORKSPACE/tools/git_account_switch.py" "$GITHUB_WORKSPACE/tests/test_git_account_switch.py"
+          python3 -m unittest discover -s "$GITHUB_WORKSPACE/tests" -p 'test_git_account_switch.py' -v
+
+      - name: Upload runner identity report
         uses: actions/upload-artifact@v4
         with:
-          name: oec-storage-git-preflight
-          path: oec-storage-git-preflight.txt
+          name: oec-git-account-preflight-${ matrix.runner_label }
+          path: ${ runner.temp }/oec-git-account-${ matrix.runner_label }.txt
           if-no-files-found: error
           retention-days: 14
-
-
-      - name: Run guarded models pause-lock recovery on the recorded owner host
-        run: |
-          set -euo pipefail
-          test "$RUNNER_NAME" = "oec-train"
-          test "$(hostname -s)" = "scn30-mn"
-          test -f "$HOME/OEC/tools/recover_dead_storage_locks.py"
-          test -f "$HOME/OEC/storage_manager.py"
-          timeout 60s python3 "$HOME/OEC/tools/recover_dead_storage_locks.py" models \
-            | tee "$GITHUB_WORKSPACE/oec-models-lock-recovery.jsonl"
-          python3 "$HOME/OEC/storage_manager.py" --status \
-            | tee "$GITHUB_WORKSPACE/oec-storage-status-after-recovery.txt"
-
-      - name: Upload guarded recovery result
-        uses: actions/upload-artifact@v4
-        with:
-          name: oec-models-dead-lock-recovery
-          path: |
-            oec-models-lock-recovery.jsonl
-            oec-storage-status-after-recovery.txt
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Compile and unit-test account switch helper
-        run: |
-          set -euo pipefail
-          python3 -m py_compile tools/git_account_switch.py tests/test_git_account_switch.py
-          python3 -m unittest discover -s tests -p 'test_git_account_switch.py' -v
