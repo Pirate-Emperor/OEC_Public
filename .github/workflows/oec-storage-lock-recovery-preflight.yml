@@ -20,7 +20,7 @@ concurrency:
 jobs:
   runner-preflight:
     name: Inspect storage recovery helper and GitHub identity
-    runs-on: [self-hosted, linux, x64, gpu, a100, oec-deploy]
+    runs-on: [self-hosted, linux, x64, gpu, a100, oec-train]
     timeout-minutes: 10
     defaults:
       run:
@@ -34,7 +34,9 @@ jobs:
       - name: Validate helper and inspect runner Git identity (read-only)
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = "oec-deploy"
+          test "$RUNNER_NAME" = "oec-train"
+          test "$(hostname -s)" = "scn30-mn"
+          nvidia-smi -L | grep -q "A100"
           REPORT="$GITHUB_WORKSPACE/oec-storage-git-preflight.txt"
           {
             echo "RUNNER_NAME=$RUNNER_NAME"
@@ -134,6 +136,29 @@ jobs:
           path: oec-storage-git-preflight.txt
           if-no-files-found: error
           retention-days: 14
+
+
+      - name: Run guarded models pause-lock recovery on the recorded owner host
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-train"
+          test "$(hostname -s)" = "scn30-mn"
+          test -f "$HOME/OEC/tools/recover_dead_storage_locks.py"
+          test -f "$HOME/OEC/storage_manager.py"
+          timeout 60s python3 "$HOME/OEC/tools/recover_dead_storage_locks.py" models \
+            | tee "$GITHUB_WORKSPACE/oec-models-lock-recovery.jsonl"
+          python3 "$HOME/OEC/storage_manager.py" --status \
+            | tee "$GITHUB_WORKSPACE/oec-storage-status-after-recovery.txt"
+
+      - name: Upload guarded recovery result
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-models-dead-lock-recovery
+          path: |
+            oec-models-lock-recovery.jsonl
+            oec-storage-status-after-recovery.txt
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Compile and unit-test account switch helper
         run: |
