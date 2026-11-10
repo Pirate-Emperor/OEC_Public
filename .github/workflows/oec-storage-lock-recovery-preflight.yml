@@ -27,6 +27,11 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Checkout the exact helper version being tested
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - name: Confirm runner, A100 and persistent OEC checkout
         run: |
           set -euo pipefail
