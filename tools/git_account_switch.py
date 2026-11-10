@@ -45,11 +45,15 @@ def remote_details_from_url(url: str) -> tuple[str, str]:
         parsed = urlparse(url)
         if parsed.hostname != "github.com":
             raise SwitchError("remote is not hosted on github.com")
-        if parsed.username or parsed.password:
-            raise SwitchError("remote URL contains embedded credentials; remove them before switching accounts")
         if parsed.scheme in ("http", "https"):
+            if parsed.username or parsed.password:
+                raise SwitchError("remote URL contains embedded credentials; remove them before switching accounts")
             protocol, path = "https", parsed.path.lstrip("/")
         elif parsed.scheme == "ssh":
+            # The conventional SSH transport identity is literally "git";
+            # this is not an embedded GitHub account or password.
+            if parsed.username not in (None, "git") or parsed.password:
+                raise SwitchError("SSH remote must use the standard git@github.com transport user")
             protocol, path = "ssh", parsed.path.lstrip("/")
         else:
             raise SwitchError(f"unsupported remote URL scheme: {parsed.scheme or '<none>'}")
