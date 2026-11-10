@@ -112,6 +112,33 @@ jobs:
           python3 -m py_compile "$GITHUB_WORKSPACE/tools/git_account_switch.py" "$GITHUB_WORKSPACE/tests/test_git_account_switch.py"
           python3 -m unittest discover -s "$GITHUB_WORKSPACE/tests" -p 'test_git_account_switch.py' -v
 
+      - name: Install account-switch helper into the shared A100 OEC checkout once
+        if: matrix.runner_label == 'oec-1'
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "oec-1"
+          SRC="$GITHUB_WORKSPACE/tools"
+          DST="$HOME/OEC/tools"
+          test -d "$DST"
+          for FILE in git_account_switch.py git-credential-gh-account.sh; do
+            if test -e "$DST/$FILE"; then
+              if cmp -s "$SRC/$FILE" "$DST/$FILE"; then
+                echo "UNCHANGED: $DST/$FILE already matches tested source"
+              else
+                echo "CONFLICT: refusing to overwrite existing $DST/$FILE" >&2
+                exit 73
+              fi
+            else
+              TEMP="$DST/.${FILE}.install.$"
+              install -m 0644 "$SRC/$FILE" "$TEMP"
+              mv "$TEMP" "$DST/$FILE"
+              echo "INSTALLED: $DST/$FILE"
+            fi
+          done
+          echo "=== Preserved existing OEC worktree changes ==="
+          git -C "$HOME/OEC" status --short --untracked-files=all -- storage_config.json tools/git_account_switch.py tools/git-credential-gh-account.sh
+          echo "No existing file was overwritten; no Git identity, remote, credential or user worktree change was made."
+
       - name: Upload runner identity report
         uses: actions/upload-artifact@v4
         with:
