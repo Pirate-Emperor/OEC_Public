@@ -139,6 +139,18 @@ jobs:
           git -C "$HOME/OEC" status --short --untracked-files=all -- storage_config.json tools/git_account_switch.py tools/git-credential-gh-account.sh
           echo "No existing file was overwritten; no Git identity, remote, credential or user worktree change was made."
 
+      - name: Verify installed helper from the persistent OEC checkout
+        if: matrix.runner_label == 'oec-1'
+        run: |
+          set -euo pipefail
+          test -f "$HOME/OEC/tools/git_account_switch.py"
+          test -f "$HOME/OEC/tools/git-credential-gh-account.sh"
+          python3 -m py_compile "$HOME/OEC/tools/git_account_switch.py"
+          bash -n "$HOME/OEC/tools/git-credential-gh-account.sh"
+          python3 "$HOME/OEC/tools/git_account_switch.py" status --remote origin
+          echo "=== Preserve all existing local OEC work ==="
+          git -C "$HOME/OEC" status --short --untracked-files=all
+
       - name: Upload runner identity report
         uses: actions/upload-artifact@v4
         with:
