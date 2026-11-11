@@ -310,27 +310,25 @@ def set_reserve_size(dir_name, reserve_gb):
         return False
 
 def reconcile_reserve_target(config, dir_cfg):
-    """Reconcile an existing reserve to its configured positive target.
+    """Keep the model allocation's unused capacity physically reserved.
 
-    Shrinks release allocated blocks immediately without quota headroom. Growth
-    is attempted only after a fresh quota admission check with a restore margin.
-    Missing reserves and unresolved lease manifests are never auto-repaired.
+    The reserve is the residual of the directory allocation, not a fixed
+    emergency-buffer setting: target allocation minus actual payload usage.
+    Growth requires fresh quota admission and a restore margin. Missing
+    reserves and unresolved lease manifests are never auto-repaired.
     """
-    if "reserve_target_gb" not in dir_cfg:
-        return False
     dir_name = str(dir_cfg["name"])
     folder_path = SYSTEM_DIRS.get(dir_name, dir_name)
-    target_gb = float(dir_cfg["reserve_target_gb"])
+    allocation_gb = float(dir_cfg["target_allocation_gb"])
     minimum_gb = float(dir_cfg.get("minimum_reserve_gb", config.get("minimum_reserve_gb", 0.25)))
-    if target_gb <= 0 or target_gb < minimum_gb:
+    if allocation_gb <= 0 or minimum_gb <= 0:
         logging.error(
-            "[%s] Invalid reserve target %.3f GB; minimum is %.3f GB. No change.",
-            dir_name, target_gb, minimum_gb,
+            "[%s] Invalid allocation/minimum reserve (%.3f/%.3f GB). No change.",
+            dir_name, allocation_gb, minimum_gb,
         )
         return False
 
     reserve_path = os.path.join(folder_path, RESERVE_FILENAME)
-    target_bytes = int(target_gb * BYTES_PER_GB)
     tolerance_bytes = int(float(config.get("reserve_resize_tolerance_mb", 64)) * BYTES_PER_MB)
     ttl_seconds = float(config.get("lock_ttl_seconds", DEFAULT_LOCK_TTL_SECONDS))
     margin_bytes = int(max(0.0, float(config.get("reserve_restore_headroom_gb", 2.0))) * BYTES_PER_GB)
@@ -347,6 +345,25 @@ def reconcile_reserve_target(config, dir_cfg):
             if current_bytes <= 0:
                 logging.critical("[%s] Empty reserve; refusing automatic recreation.", dir_name)
                 return False
+
+            actual_bytes = directory_size_bytes(
+                folder_path,
+                (RESERVE_FILENAME, LOCK_FILENAME, MANAGER_LOCK_FILENAME, LEASE_MANIFEST_FILENAME),
+            )
+            allocation_bytes = int(allocation_gb * BYTES_PER_GB)
+            residual_bytes = allocation_bytes - actual_bytes
+            minimum_bytes = int(minimum_gb * BYTES_PER_GB)
+            if residual_bytes < minimum_bytes:
+                logging.warning(
+                    "[%s] Payload usage %.3f GB leaves %.3f GB under the %.3f GB allocation; "
+                    "retaining minimum reserve %.3f GB (directory allocation is effectively full/over target).",
+                    dir_name, actual_bytes / BYTES_PER_GB,
+                    residual_bytes / BYTES_PER_GB, allocation_gb, minimum_gb,
+                )
+                target_bytes = minimum_bytes
+            else:
+                target_bytes = residual_bytes
+
             if abs(current_bytes - target_bytes) <= tolerance_bytes:
                 return False
 
@@ -355,7 +372,7 @@ def reconcile_reserve_target(config, dir_cfg):
                 after_bytes = os.path.getsize(reserve_path)
                 if changed:
                     logging.warning(
-                        "[%s] Reserve shrunk %.3f -> %.3f GiB; released %.3f GiB of allocated blocks.",
+                        "[%s] Residual reserve shrunk %.3f -> %.3f GiB; released %.3f GiB.",
                         dir_name, current_bytes / BYTES_PER_GB, after_bytes / BYTES_PER_GB,
                         max(0, current_bytes - after_bytes) / BYTES_PER_GB,
                     )
@@ -369,13 +386,17 @@ def reconcile_reserve_target(config, dir_cfg):
                 require_fresh_quota=True,
             )
             if not ok:
-                logging.warning("[%s] Reserve growth deferred; %s", dir_name, reason)
+                logging.warning(
+                    "[%s] Residual reserve growth deferred: needs %.3f GB additional allocation; %s",
+                    dir_name, needed_bytes / BYTES_PER_GB, reason,
+                )
                 return False
             changed = ensure_reserve_file(reserve_path, target_bytes, tolerance_bytes=0)
             if changed:
                 logging.info(
-                    "[%s] Reserve grown %.3f -> %.3f GiB after quota admission; %s",
-                    dir_name, current_bytes / BYTES_PER_GB, target_gb, reason,
+                    "[%s] Residual reserve grown %.3f -> %.3f GiB (allocation %.3f GB - payload %.3f GB); %s",
+                    dir_name, current_bytes / BYTES_PER_GB, target_bytes / BYTES_PER_GB,
+                    allocation_gb, actual_bytes / BYTES_PER_GB, reason,
                 )
             return changed
     except (OSError, RuntimeError, ValueError) as exc:
