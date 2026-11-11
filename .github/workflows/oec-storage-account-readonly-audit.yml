@@ -1,0 +1,207 @@
+name: OEC storage and Git identity read-only A100 audit
+
+on:
+  push:
+    branches:
+      - fix/storage-policy-regression-200gb-20261112
+    paths:
+      - ".github/workflows/oec-storage-account-readonly-audit.yml"
+      - "storage_manager.py"
+      - "storage_policy.py"
+      - "storage_config.json"
+      - "core_config.py"
+      - "tools/git_account_switch.py"
+      - "tools/git-credential-gh-account.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oec-readonly-a100-audit-${{ matrix.runner_label }}
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: Read-only audit on ${{ matrix.runner_label }}
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        runner_label: [oec-1, oec-2, oec-3]
+    runs-on: [self-hosted, "${{ matrix.runner_label }}"]
+    timeout-minutes: 8
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout the candidate OEC source in an isolated Actions workspace
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Inspect runner, shared checkout, identities and active workloads without changing them
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "${{ matrix.runner_label }}"
+          test "$RUNNER_OS" = Linux
+          test "$RUNNER_ARCH" = X64
+          REPORT="$RUNNER_TEMP/oec-readonly-audit-${{ matrix.runner_label }}.txt"
+          python3 - "$HOME/OEC" "$REPORT" <<'PY'
+          import json
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+          from urllib.parse import urlsplit, urlunsplit
+
+          root = Path(sys.argv[1])
+          report = Path(sys.argv[2])
+          lines = []
+          def emit(key, value):
+              lines.append(f"{key}={value}")
+
+          def run(argv, timeout=15):
+              try:
+                  p = subprocess.run(argv, text=True, capture_output=True,
+                                     check=False, timeout=timeout)
+                  return p.returncode, p.stdout.strip(), p.stderr.strip()
+              except Exception as exc:
+                  return 999, "", type(exc).__name__
+
+          emit("RUNNER_NAME", os.environ.get("RUNNER_NAME", "unknown"))
+          emit("HOST", subprocess.getoutput("hostname -f 2>/dev/null || hostname"))
+          emit("UTC_TIME", subprocess.getoutput("date -u +%Y-%m-%dT%H:%M:%SZ"))
+          emit("PERSISTENT_OEC_PATH", str(root))
+          emit("PERSISTENT_OEC_EXISTS", root.is_dir())
+          if root.is_dir():
+              rc, value, _ = run(["git", "-C", str(root), "rev-parse", "--show-toplevel"])
+              emit("PERSISTENT_GIT_ROOT", value if rc == 0 else "unavailable")
+              for key, argv in (
+                  ("PERSISTENT_HEAD", ["git","-C",str(root),"rev-parse","HEAD"]),
+                  ("PERSISTENT_BRANCH", ["git","-C",str(root),"branch","--show-current"]),
+                  ("PERSISTENT_GIT_COMMON_DIR", ["git","-C",str(root),"rev-parse","--git-common-dir"]),
+                  ("PERSISTENT_AUTHOR_NAME", ["git","-C",str(root),"config","--get","user.name"]),
+                  ("PERSISTENT_AUTHOR_EMAIL", ["git","-C",str(root),"config","--get","user.email"]),
+              ):
+                  rc, value, _ = run(argv)
+                  emit(key, value if rc == 0 else "(unset/unavailable)")
+              rc, remote, _ = run(["git","-C",str(root),"remote","get-url","origin"])
+              if rc == 0:
+                  if "://" in remote:
+                      u=urlsplit(remote)
+                      remote=urlunsplit((u.scheme,u.netloc.rsplit("@",1)[-1],u.path,"",""))
+                  elif "@" in remote and ":" in remote:
+                      remote=remote.split("@",1)[-1]
+              emit("ORIGIN_CREDENTIALS_STRIPPED", remote if rc == 0 else "(unavailable)")
+              rc, status, _ = run(["git","-C",str(root),"status","--short","--untracked-files=all"])
+              emit("PERSISTENT_WORKTREE_STATUS", json.dumps(status.splitlines()) if rc == 0 else "unavailable")
+              for key, argv in (
+                  ("LOCAL_USER_NAME", ["git","-C",str(root),"config","--local","--get","user.name"]),
+                  ("LOCAL_USER_EMAIL", ["git","-C",str(root),"config","--local","--get","user.email"]),
+              ):
+                  rc, value, _=run(argv)
+                  emit(key, value if rc == 0 else "(not repository-local)")
+              # Report only whether helpers exist and their count, never their values.
+              for scope, argv in (
+                  ("LOCAL",["git","-C",str(root),"config","--local","--get-all","credential.helper"]),
+                  ("GLOBAL",["git","-C",str(root),"config","--global","--get-all","credential.helper"]),
+              ):
+                  rc, value, _=run(argv)
+                  emit(f"{scope}_CREDENTIAL_HELPER_COUNT",
+                       len(value.splitlines()) if rc == 0 and value else 0)
+              common = Path(run(["git","-C",str(root),"rev-parse","--git-common-dir"])[1])
+              if not common.is_absolute():
+                  common = (root / common).resolve()
+              common = common.resolve()
+              emit("GIT_COMMON_DIR_REALPATH", str(common))
+              for label, path in (
+                  ("CHECKOUT_GIT_COMMON_DIR", common),
+                  ("HOME_GITCONFIG", Path.home()/".gitconfig"),
+                  ("HOME_GIT_CREDENTIALS", Path.home()/".git-credentials"),
+                  ("HOME_GH_HOSTS", Path.home()/".config"/"gh"/"hosts.yml"),
+              ):
+                  try:
+                      st=path.stat()
+                      emit(label+"_FILE_ID", f"{st.st_dev}:{st.st_ino}")
+                      emit(label+"_REALPATH", str(path.resolve()))
+                  except OSError:
+                      emit(label+"_FILE_ID", "ABSENT")
+              emit("GH_CLI", subprocess.getoutput("command -v gh || true") or "NOT_INSTALLED")
+              gh=subprocess.run(["bash","-lc","command -v gh"],text=True,capture_output=True)
+              if gh.returncode == 0:
+                  ghbin=gh.stdout.strip()
+                  rc, login, _=run([ghbin,"api","user","--jq",".login"],timeout=20)
+                  emit("GH_API_USER_LOGIN", login if rc == 0 else "NOT_AUTHENTICATED_OR_UNAVAILABLE")
+                  rc, push, _=run([ghbin,"api","repos/xflexwork/OEC","--jq",".permissions.push"],timeout=20)
+                  emit("GH_OEC_PUSH_PERMISSION", push if rc == 0 else "NOT_VERIFIED")
+                  rc, auth, _=run([ghbin,"auth","status","--hostname","github.com"],timeout=20)
+                  # Do not put raw CLI output in the artifact: it may contain token metadata.
+                  if rc == 0:
+                      account_line=next((x.strip() for x in auth.splitlines() if "Logged in to github.com account" in x), "")
+                      protocol_line=next((x.strip() for x in auth.splitlines() if "Git operations protocol" in x), "")
+                      emit("GH_AUTH_STATUS", "authenticated" if account_line else "status-command-succeeded")
+                      emit("GH_AUTH_ACCOUNT_LINE", account_line or "not reported")
+                      emit("GH_AUTH_GIT_PROTOCOL_LINE", protocol_line or "not reported")
+                  else:
+                      emit("GH_AUTH_STATUS", "not authenticated or status unavailable")
+              else:
+                  emit("GH_API_USER_LOGIN", "NOT_VERIFIED_GH_NOT_INSTALLED")
+                  emit("GH_OEC_PUSH_PERMISSION", "NOT_VERIFIED_GH_NOT_INSTALLED")
+                  emit("GH_AUTH_STATUS", "NOT_VERIFIED_GH_NOT_INSTALLED")
+              # Non-interactive read-only origin test. Suppress stderr because old helpers
+              # can include account names; never show credential material.
+              env=os.environ.copy()
+              env["GIT_TERMINAL_PROMPT"]="0"
+              rc, _, _=run(["git","-C",str(root),"ls-remote","origin","HEAD"],timeout=20)
+              emit("PERSISTENT_ORIGIN_LS_REMOTE", "PASS" if rc == 0 else "FAIL_OR_UNAUTHENTICATED")
+          else:
+              emit("PERSISTENT_CHECKOUT", "MISSING")
+
+          # Read-only process inventory: no signals, kills, service stops or command-line dumps.
+          watched_roots=[str(root.resolve()),str((Path.home()/"aireos_models").resolve()),
+                         str((Path.home()/"aireos_cache").resolve()),
+                         str((Path.home()/"aireos_output").resolve())]
+          matched=[]
+          for entry in Path("/proc").iterdir():
+              if not entry.name.isdigit():
+                  continue
+              try:
+                  comm=(entry/"comm").read_text().strip()
+                  cwd=os.readlink(entry/"cwd")
+                  if any(cwd == p or cwd.startswith(p.rstrip("/")+"/") for p in watched_roots):
+                      matched.append(f"{entry.name}:{comm}:{cwd}")
+              except (OSError, PermissionError):
+                  continue
+          emit("PROCESSES_WITH_OEC_OR_MODEL_CWD", json.dumps(matched))
+          rc, gpu, err=run(["nvidia-smi","--query-compute-apps=pid,process_name,used_gpu_memory",
+                            "--format=csv,noheader"],timeout=15)
+          emit("GPU_COMPUTE_PROCESSES", json.dumps(gpu.splitlines()) if rc == 0 else "UNAVAILABLE")
+          rc, util, _=run(["nvidia-smi","--query-gpu=index,utilization.gpu,memory.used,memory.free",
+                           "--format=csv,noheader"],timeout=15)
+          emit("GPU_UTILIZATION_AND_MEMORY", json.dumps(util.splitlines()) if rc == 0 else "UNAVAILABLE")
+          report.write_text("\n".join(lines)+"\n",encoding="utf-8")
+          print("\n".join(lines))
+          PY
+
+      - name: Read current quota and reserve state using StorageManager only
+        run: |
+          set -euo pipefail
+          REPORT="$RUNNER_TEMP/oec-storage-status-${{ matrix.runner_label }}.txt"
+          # Status command is run from the isolated source checkout, against the
+          # existing OEC storage roots. Do not invoke --once or any mutating CLI.
+          if test -d "$HOME/aireos_models" && test -d "$HOME/aireos_output"; then
+            timeout 30s python3 "$GITHUB_WORKSPACE/storage_manager.py" --status 2>&1 | tee "$REPORT"
+          else
+            echo "STATUS_NOT_RUN: expected existing models/output roots were not both present" | tee "$REPORT"
+          fi
+
+      - name: Upload read-only diagnostic reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: oec-readonly-audit-${{ matrix.runner_label }}
+          path: |
+            ${{ runner.temp }}/oec-readonly-audit-${{ matrix.runner_label }}.txt
+            ${{ runner.temp }}/oec-storage-status-${{ matrix.runner_label }}.txt
+          if-no-files-found: error
+          retention-days: 14

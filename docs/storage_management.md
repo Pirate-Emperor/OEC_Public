@@ -1,77 +1,80 @@
-# OEC Storage Manager v2026-10-17
+# OEC Storage Manager — reserve, quota and write-admission policy
 
-The manager separates live quota measurement, per-operation admission and reserve reconciliation. Use `--preflight-path PATH --required-gb N --minimum-free-gb M --require-fresh-quota` for build or temporary paths on the same group quota; this omits an OEC logical-directory target. **`--status` is read-only.** The continuous manager and `--once` apply each configured `reserve_target_gb`.
+The storage manager separates per-directory allocation targets, live group-quota telemetry, ordinary write admission and reserve reconciliation. Use the current source in this repository; do not rely on older fixed-reserve instructions or a previous runner log.
+
+## Current allocation policy
+
+The OEC model directory has a **200 GiB allocation target**. Its physical reserve is residual capacity:
+
+`models reserve = models allocation target − actual model payload usage`
+
+The size of the model reserve is therefore **dynamic**, not a fixed 5 GiB emergency buffer. The calculation excludes OEC control files (reserve, pause lock, manager lock and lease manifest) from the payload size. A residual smaller than the configured minimum is not forced upward if doing so would exceed the model allocation.
+
+The outputs directory has a **1 GiB allocation target** and a **fixed 0.5 GiB reserve** (minimum 0.25 GiB). The outputs reserve is not calculated from residual allocation.
+
+The checked-in policy in `storage_config.json` is authoritative for the model/output allocation targets. The last completed live reconciliation reported the following values:
+
+| Item | Last verified value |
+|---|---:|
+| Models allocation target | 200 GiB |
+| Actual model payload | approximately 64.68 GiB |
+| Physically allocated models reserve | approximately 135.321 GiB |
+| Models reserve logical file size | 145,299,319,502 bytes |
+| Models reserve allocated blocks | 145,299,353,600 bytes |
+| Outputs reserve | 0.5 GiB, unchanged |
+| Pause lock | absent at completion |
+| Lease manifest | absent at completion |
+
+Those values describe the completed reserve operation; they are not a current quota reading. **Do not repeat reserve growth, shrink, model downloads, or other large writes merely to reproduce them.** Use `--status` to obtain a fresh read-only observation first.
 
 ## Quota source and admission
 
-- On Lustre compute nodes, the manager prefers a live, read-only `lfs quota -g GROUP PATH` query, preserving used blocks, soft quota, hard limit and grace separately.
-- A fresh JSON quota snapshot is the fallback. Filesystem-wide free space is only a fallback warning metric; it is never treated as group-quota headroom when fresh quota is required.
-- Below soft quota, admission uses soft-quota headroom.
-- Above soft quota, admission is permitted **only when grace is explicitly active, a hard limit is present and not exceeded, and the operation plus safety margin fits inside hard-limit headroom**. Unknown/expired grace or usage over the hard limit blocks new writes.
-- Shrinking reserve blocks does not need free quota. Growing the reserve requires live/fresh quota admission and a configured restore margin.
+- On Lustre, the manager prefers a live, read-only `lfs quota -g GROUP PATH` query. The parser keeps used bytes, soft quota, hard limit and grace separate, and accepts the trailing `*` usage marker which Lustre emits during soft-quota grace.
+- A fresh structured quota snapshot is the fallback. A missing or stale snapshot is not silently treated as a current group quota when fresh telemetry is required.
+- Below the soft quota, ordinary writes use the remaining soft-quota headroom.
+- Above the soft quota, ordinary writes follow the standard conservative grace rule: they are admitted only while Lustre explicitly reports active grace, a hard limit exists, usage is below that hard limit, and the write plus required margin fits within hard-limit headroom.
+- Usage at or above the hard limit, unknown/expired grace while above soft quota, or missing fresh quota for an operation that requires it blocks ordinary writes.
+- A narrowly scoped `allow_soft_quota_overage=True` parameter exists only for **residual model-reserve growth**. It requires fresh quota telemetry and a known hard limit, and it uses hard-limit headroom for that reserve-growth request. It does not relax normal model downloads, output writes, dataset writes, or explicit `set_reserve_size` growth.
+- The configured restore/free-space margin is included in admission. A request is rejected if the required bytes plus margin do not fit.
+- Filesystem-wide free space is not a substitute for group-quota headroom where fresh quota is required.
 
-## Normal use
+## Read-only inspection
 
-Read status without mutation:
-
-```bash
-source "$HOME/Conda/bin/activate"
-conda activate oec_deploy
-export OEC_ROOT="$HOME/OEC"
-python "$OEC_ROOT/storage_manager.py" --status
-```
-
-Apply the configured reserve targets once; this may shrink oversized existing reserves but never creates a missing reserve:
+Use the current OEC source and read status only:
 
 ```bash
-python "$OEC_ROOT/storage_manager.py" --once
-python "$OEC_ROOT/storage_manager.py" --status
+python3 storage_manager.py --status
 ```
 
-Run continuously for monitoring and reconciliation:
+The status output includes the live quota source and age, usage, soft and hard limits, hard headroom, grace state, directory payload size, allocation target, reserve size and filesystem capacity. It is an observation, not permission to write.
 
-```bash
-python "$OEC_ROOT/storage_manager.py"
-```
+The CLI's `--status` path returns before the reconciliation loop. Do **not** use `--once`, the default continuous manager, `--set-reserve-gb`, `--resume` or any reserve-mutating command as part of a status check.
 
-Configuration keeps a 5 GiB model reserve (minimum 1 GiB) and a 0.5 GiB output reserve (minimum 0.25 GiB). A prior runner log showed a 31.27 GB model reserve; if still that size, one cycle will release about 26 GiB of allocated blocks. Verify with live status; historical logs are not a current measurement.
+## Reserve and managed-operation safeguards
 
-Explicit positive reserve sizing remains available:
+- Reserve files must remain regular, non-sparse and positive-sized. A missing/unsafe reserve is not silently recreated.
+- Growth allocates the new tail before relying on it and requires a fresh quota preflight; shrink only releases the tail after the reviewed code path is invoked.
+- The directory manager lock serializes reserve changes. An active pause lock or unresolved lease manifest is a recovery barrier; automatic reconciliation stops rather than bypassing it.
+- `managed_storage_operation(...)` rechecks normal storage admission while holding the directory lock immediately before the write body, and verifies the reserve has not changed during the operation.
+- The bounded `temporary_download_reservation` lease is only for ephemeral staging that will be removed before the original reserve is restored. Do not use it for persistent model or dataset downloads.
+- Never manipulate `.storage_reserve.bin` directly. Do not delete, truncate, sparsify, move, or manually allocate it. Use only the reviewed StorageManager lease/pause and explicit reserve interfaces, after a fresh quota reading and appropriate authorization.
 
-```bash
-python "$OEC_ROOT/storage_manager.py" --set-reserve-gb models --reserve-gb 5
-```
+## Recent live quota warning
 
-Explicit shrink is quota-independent; growth is denied without live/fresh quota and sufficient headroom. A missing reserve is never recreated implicitly.
+The last confirmed group-quota snapshot associated with the reserve operation was approximately:
 
-## Managed writes and temporary staging
+| Item | Reading |
+|---|---:|
+| Group use | 2.06 TB |
+| Soft quota | 2.00 TB |
+| Hard quota | 2.10 TB |
+| Hard-quota headroom | 39.63 GB |
+| Grace | active, approximately seven days at that observation |
 
-Use `managed_storage_operation(...)` around persistent model, dataset, checkpoint or output writes. It rechecks admission **under the directory lock** immediately before entering the write body. For persistent artifacts, first let `--once` reconcile the configured reserve target, then use the final model/dataset path only after quota preflight passes. **Do not use a temporary lease for a model or dataset that must remain on disk.** The lease deletes its scratch directory and attempts to restore the original reserve before returning.
+That observation is historical, not live. It confirms that the soft quota was crossed by explicit authorization but the hard quota was not exceeded. Do not assume the remaining headroom is still available. Refresh it with `--status` before any operation that can write.
 
-The bounded lease is for *ephemeral staging data that should be discarded on exit*, such as a temporary reassembly payload or intermediate shard that will be removed after use:
+## Test interpretation
 
-```python
-from storage_reservation import temporary_download_reservation
+The storage regression suites cover reserve residual calculation, output fixed reserve behavior, soft/grace/hard quota rules, hard-limit fail-closed behavior, fresh quota handling, lease/pause barriers, sparse reserve protection and managed-write admission. Unit tests that use a synthetic quota JSON file must set `live_lustre_quota=False`; otherwise the code intentionally prefers live Lustre telemetry on an A100 runner and may correctly ignore the fixture.
 
-with temporary_download_reservation(
-    "models",
-    reserve_release_gb=4,
-    max_download_gb=3,
-    minimum_reserve_gb=1,
-    minimum_quota_headroom_gb=2,
-) as scratch:
-    create_ephemeral_stage_files(scratch)
-    consume_then_discard_stage_files(scratch)
-```
-
-These parameters are examples, not an automatic approval for a particular operation. Size the release to cover the real peak staging footprint. The lease checks quota, logical directory target, remaining reserve and maximum scratch size; scratch is removed before reserve restoration. For persistent model downloads, the long-term reserve target—not a temporary lease—is the intended capacity mechanism.
-
-
-## Interruption recovery
-
-- An unresolved `.storage_lease.json` manifest and pause lock are recovery barriers. The manager will not resize while a lease/recovery state exists.
-- If a download crashes or cleanup/restoration fails, the markers intentionally remain. Do not run `--resume` blindly. Verify no process is active, inspect the manifest's exact scratch path, remove only that recorded scratch payload, restore the exact `original_reserve_bytes` with allocated blocks, verify it, then clear markers.
-- Reserve files must be regular, non-sparse and positive-sized. Growth allocates the tail before touching the old reserve; shrinking truncates the tail.
-- These locks coordinate OEC processes, not unrelated cluster jobs sharing the same quota. Margins and immediate preflight reduce but do not eliminate that race.
-
-Hosted unit/static tests validate quota parsing/admission, reserve resizing and lease cleanup. They do not prove the shared OEC checkout has been updated or that fresh A100 measurements have completed.
+A passing temporary-worktree suite proves only the exact source revision and isolated test data used by that run. It does not prove that the persistent `$HOME/OEC` checkout has been synchronized.
