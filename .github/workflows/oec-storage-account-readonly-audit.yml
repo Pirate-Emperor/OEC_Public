@@ -96,6 +96,21 @@ jobs:
               emit("ORIGIN_CREDENTIALS_STRIPPED", remote if rc == 0 else "(unavailable)")
               rc, status, _ = run(["git","-C",str(root),"status","--short","--untracked-files=all"])
               emit("PERSISTENT_WORKTREE_STATUS", json.dumps(status.splitlines()) if rc == 0 else "unavailable")
+              rc, config_diff, _ = run(["git","-C",str(root),"diff","--","storage_config.json"])
+              emit("LOCAL_STORAGE_CONFIG_DIFF", json.dumps(config_diff.splitlines()) if rc == 0 else "unavailable")
+              # Runner registration metadata only; never inspect runner credential files.
+              for runner_name in ("oec-1", "oec-2", "oec-3"):
+                  for dirname in (runner_name.replace("-", "_"), runner_name):
+                      metadata = Path.home()/"OEC"/"gpu"/dirname/"actions-runner"/".runner"
+                      if metadata.is_file():
+                          try:
+                              info=json.loads(metadata.read_text(encoding="utf-8-sig"))
+                              emit(f"RUNNER_{runner_name}_REGISTERED_NAME", info.get("name", "unknown"))
+                              emit(f"RUNNER_{runner_name}_LABELS", json.dumps(info.get("labels", [])))
+                              emit(f"RUNNER_{runner_name}_REPOSITORY", info.get("gitHubUrl", "unknown"))
+                          except Exception as exc:
+                              emit(f"RUNNER_{runner_name}_METADATA", type(exc).__name__)
+                          break
               for key, argv in (
                   ("LOCAL_USER_NAME", ["git","-C",str(root),"config","--local","--get","user.name"]),
                   ("LOCAL_USER_EMAIL", ["git","-C",str(root),"config","--local","--get","user.email"]),
@@ -174,6 +189,24 @@ jobs:
               except (OSError, PermissionError):
                   continue
           emit("PROCESSES_WITH_OEC_OR_MODEL_CWD", json.dumps(matched))
+          # Inspect command-line markers in memory but emit only the matching marker,
+          # never the command line itself (which may contain private arguments).
+          runtime_markers=("oec_deploy", "oec-play", "biome", "server-components",
+                           "worker_ltx_video", "pipeline_audiogen", "pipeline_flux",
+                           "pipeline_trellis", "gradio")
+          runtime_matches=[]
+          for entry in Path("/proc").iterdir():
+              if not entry.name.isdigit():
+                  continue
+              try:
+                  comm=(entry/"comm").read_text().strip()
+                  cmd=(entry/"cmdline").read_bytes().decode("utf-8",errors="ignore").lower()
+                  found=[marker for marker in runtime_markers if marker in cmd]
+                  if found:
+                      runtime_matches.append(f"{entry.name}:{comm}:{','.join(found)}")
+              except (OSError, PermissionError):
+                  continue
+          emit("OEC_CLIENT_SERVER_OR_MODEL_PROCESS_MARKERS", json.dumps(runtime_matches))
           rc, gpu, err=run(["nvidia-smi","--query-compute-apps=pid,process_name,used_gpu_memory",
                             "--format=csv,noheader"],timeout=15)
           emit("GPU_COMPUTE_PROCESSES", json.dumps(gpu.splitlines()) if rc == 0 else "UNAVAILABLE")
