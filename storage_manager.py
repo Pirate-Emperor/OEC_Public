@@ -360,11 +360,11 @@ def reconcile_reserve_target(config, dir_cfg):
                 if residual_bytes < minimum_bytes:
                     logging.warning(
                         "[%s] Payload usage %.3f GB leaves %.3f GB under the %.3f GB allocation; "
-                        "retaining minimum reserve %.3f GB (directory allocation is effectively full/over target).",
+                        "not growing reserve to minimum %.3f GB because that would exceed the allocation.",
                         dir_name, actual_bytes / BYTES_PER_GB,
                         residual_bytes / BYTES_PER_GB, allocation_gb, minimum_gb,
                     )
-                    target_bytes = minimum_bytes
+                    target_bytes = min(current_bytes, minimum_bytes)
                 else:
                     target_bytes = residual_bytes
             else:
