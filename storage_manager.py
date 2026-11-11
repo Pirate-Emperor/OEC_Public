@@ -320,13 +320,16 @@ def reconcile_reserve_target(config, dir_cfg):
     dir_name = str(dir_cfg["name"])
     folder_path = SYSTEM_DIRS.get(dir_name, dir_name)
     allocation_gb = float(dir_cfg["target_allocation_gb"])
+    dynamic_residual = dir_name == "models"
+    fixed_target_gb = float(dir_cfg.get("reserve_target_gb", 0.0))
     minimum_gb = float(dir_cfg.get("minimum_reserve_gb", config.get("minimum_reserve_gb", 0.25)))
-    if allocation_gb <= 0 or minimum_gb <= 0:
+    if allocation_gb <= 0 or minimum_gb <= 0 or (not dynamic_residual and fixed_target_gb <= 0):
         logging.error(
-            "[%s] Invalid allocation/minimum reserve (%.3f/%.3f GB). No change.",
-            dir_name, allocation_gb, minimum_gb,
+            "[%s] Invalid allocation/reserve policy (allocation %.3f GB, fixed reserve %.3f GB, minimum %.3f GB). No change.",
+            dir_name, allocation_gb, fixed_target_gb, minimum_gb,
         )
         return False
+    fixed_target_bytes = int(fixed_target_gb * BYTES_PER_GB)
 
     reserve_path = os.path.join(folder_path, RESERVE_FILENAME)
     tolerance_bytes = int(float(config.get("reserve_resize_tolerance_mb", 64)) * BYTES_PER_MB)
@@ -346,23 +349,27 @@ def reconcile_reserve_target(config, dir_cfg):
                 logging.critical("[%s] Empty reserve; refusing automatic recreation.", dir_name)
                 return False
 
-            actual_bytes = directory_size_bytes(
-                folder_path,
-                (RESERVE_FILENAME, LOCK_FILENAME, MANAGER_LOCK_FILENAME, LEASE_MANIFEST_FILENAME),
-            )
-            allocation_bytes = int(allocation_gb * BYTES_PER_GB)
-            residual_bytes = allocation_bytes - actual_bytes
-            minimum_bytes = int(minimum_gb * BYTES_PER_GB)
-            if residual_bytes < minimum_bytes:
-                logging.warning(
-                    "[%s] Payload usage %.3f GB leaves %.3f GB under the %.3f GB allocation; "
-                    "retaining minimum reserve %.3f GB (directory allocation is effectively full/over target).",
-                    dir_name, actual_bytes / BYTES_PER_GB,
-                    residual_bytes / BYTES_PER_GB, allocation_gb, minimum_gb,
+            if dynamic_residual:
+                actual_bytes = directory_size_bytes(
+                    folder_path,
+                    (RESERVE_FILENAME, LOCK_FILENAME, MANAGER_LOCK_FILENAME, LEASE_MANIFEST_FILENAME),
                 )
-                target_bytes = minimum_bytes
+                allocation_bytes = int(allocation_gb * BYTES_PER_GB)
+                residual_bytes = allocation_bytes - actual_bytes
+                minimum_bytes = int(minimum_gb * BYTES_PER_GB)
+                if residual_bytes < minimum_bytes:
+                    logging.warning(
+                        "[%s] Payload usage %.3f GB leaves %.3f GB under the %.3f GB allocation; "
+                        "retaining minimum reserve %.3f GB (directory allocation is effectively full/over target).",
+                        dir_name, actual_bytes / BYTES_PER_GB,
+                        residual_bytes / BYTES_PER_GB, allocation_gb, minimum_gb,
+                    )
+                    target_bytes = minimum_bytes
+                else:
+                    target_bytes = residual_bytes
             else:
-                target_bytes = residual_bytes
+                actual_bytes = 0
+                target_bytes = fixed_target_bytes
 
             if abs(current_bytes - target_bytes) <= tolerance_bytes:
                 return False
