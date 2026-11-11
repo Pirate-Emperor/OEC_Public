@@ -256,6 +256,9 @@ class StorageManagerTests(unittest.TestCase):
                 "warning_free_gb": 0,
                 "critical_free_gb": 0,
                 "quota_snapshot_path": str(root / "missing.json"),
+                # This fixture tests the critical threshold branch; do not let
+                # the A100 runner's live shared Lustre quota override it.
+                "live_lustre_quota": False,
                 "directories": [{"name": "models", "target_allocation_gb": 0.0000001}],
             }
 
