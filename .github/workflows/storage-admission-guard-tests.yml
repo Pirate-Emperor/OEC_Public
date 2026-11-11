@@ -44,7 +44,9 @@ jobs:
           python -m unittest discover -s tests -p 'test_storage_policy.py' -v
           python -m unittest discover -s tests -p 'test_quota_snapshot.py' -v
           python -m unittest discover -s tests -p 'test_storage_reservation.py' -v
-          python -m py_compile pipeline_trellis_3d.py storage_manager.py storage_policy.py storage_reservation.py tools/quota_snapshot.py
+          python -m py_compile pipeline_trellis_3d.py storage_manager.py storage_policy.py storage_reservation.py tools/quota_snapshot.py tools/git_account_switch.py tests/test_git_account_switch.py
+          bash -n tools/git-credential-gh-account.sh
+          python -m unittest discover -s tests -p 'test_git_account_switch.py' -v
           python - <<'PY'
           import json
           from pathlib import Path
