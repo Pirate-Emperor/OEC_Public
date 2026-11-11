@@ -571,8 +571,16 @@ class StoragePolicy:
         minimum_free_bytes: int = 0,
         require_fresh_quota: bool = False,
         target_bytes: Optional[int] = None,
+        allow_soft_quota_overage: bool = False,
     ) -> tuple[bool, str]:
-        """Admit one write using directory targets and quota-aware headroom."""
+        """Admit one write using directory targets and quota-aware headroom.
+
+        allow_soft_quota_overage is reserved for the explicitly authorized
+        residual model-reserve expansion path. It requires a fresh, configured
+        hard limit and never admits a write that reaches or exceeds that limit.
+        All ordinary model/output writes continue to use the conservative
+        soft-quota/grace policy.
+        """
         required_bytes = max(0, int(required_bytes))
         minimum_free_bytes = max(0, int(minimum_free_bytes))
         needed = required_bytes + minimum_free_bytes
@@ -590,11 +598,17 @@ class StoragePolicy:
                 )
 
         if quota is not None:
-            available, detail = self.quota_write_headroom(quota)
             if quota.hard_limit_exceeded:
                 return False, "quota is already above hard limit; refusing write admission"
-            if quota.soft_quota_exceeded and not quota.grace_active:
-                return False, detail
+            if allow_soft_quota_overage:
+                if quota.hard_limit_bytes is None:
+                    return False, "explicit hard-quota ceiling is unavailable; refusing authorized soft-quota overage"
+                available = int(quota.hard_limit_headroom_bytes or 0)
+                detail = "explicit reserve-growth admission uses hard-quota headroom; soft quota may be crossed"
+            else:
+                available, detail = self.quota_write_headroom(quota)
+                if quota.soft_quota_exceeded and not quota.grace_active:
+                    return False, detail
             source = f"{detail} (source={quota.source}, age={quota.age_seconds:.0f}s)"
         else:
             if require_fresh_quota:
