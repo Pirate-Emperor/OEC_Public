@@ -166,7 +166,7 @@ class StoragePolicyTests(unittest.TestCase):
             self.assertTrue(ok, reason)
 
             # No hard limit means the authorized exception fails closed.
-            del payload["hard_limit_bytes"]
+            payload["hard_limit_bytes"] = 0
             payload["timestamp"] = time.time()
             quota_path.write_text(json.dumps(payload), encoding="utf-8")
             ok, reason = policy.preflight(
