@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import time
 import unittest
@@ -143,16 +144,16 @@ class StorageManagerTests(unittest.TestCase):
                 self.assertFalse(storage_manager.set_reserve_size("models", 16 / 1024))
             self.assertEqual(reserve.stat().st_size, original)
 
-    def test_allocation_cycle_shrinks_existing_reserve_to_target(self):
+    def test_reconcile_reserve_uses_allocation_minus_payload_usage(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             model_dir = root / "models"
             model_dir.mkdir()
             reserve = model_dir / storage_manager.RESERVE_FILENAME
-            storage_manager.ensure_reserve_file(reserve, 16 * 1024**2, 0)
+            storage_manager.ensure_reserve_file(reserve, 8 * 1024**2, 0)
             payload = model_dir / "payload.bin"
-            payload.write_bytes(b"keep")
-            before = reserve.stat().st_size
+            payload.write_bytes(b"x" * (20 * 1024**2))
+            allocation_bytes = 100 * 1024**2
             config = {
                 "lock_ttl_seconds": 3600,
                 "reserve_resize_tolerance_mb": 0,
@@ -160,21 +161,54 @@ class StorageManagerTests(unittest.TestCase):
                 "reserve_restore_headroom_gb": 1,
                 "quota_snapshot_path": str(root / "missing.json"),
                 "live_lustre_quota": False,
-                "warning_free_gb": 0,
-                "critical_free_gb": 0,
                 "directories": [{
                     "name": "models",
-                    "target_allocation_gb": 2,
-                    "reserve_target_gb": 8 / 1024,
-                    "minimum_reserve_gb": 4 / 1024,
+                    "target_allocation_gb": allocation_bytes / storage_manager.BYTES_PER_GB,
+                    "minimum_reserve_gb": 1 / 1024,
+                }],
+            }
+
+            def fake_allocate(path, required_bytes, tolerance_bytes=0):
+                Path(path).touch(exist_ok=True)
+                os.truncate(path, required_bytes)
+                return True
+
+            with mock.patch.object(storage_manager, "SYSTEM_DIRS", {"models": str(model_dir)}), \
+                 mock.patch.object(storage_manager.StoragePolicy, "preflight", return_value=(True, "test quota admission")), \
+                 mock.patch.object(storage_manager, "ensure_reserve_file", side_effect=fake_allocate):
+                changed = storage_manager.reconcile_reserve_target(config, config["directories"][0])
+
+            expected = allocation_bytes - payload.stat().st_size
+            self.assertTrue(changed)
+            self.assertEqual(reserve.stat().st_size, expected)
+            self.assertTrue(payload.exists())
+
+    def test_reconcile_reserve_preserves_old_reserve_when_quota_denies_growth(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            model_dir = root / "models"
+            model_dir.mkdir()
+            reserve = model_dir / storage_manager.RESERVE_FILENAME
+            storage_manager.ensure_reserve_file(reserve, 8 * 1024**2, 0)
+            original = reserve.stat().st_size
+            (model_dir / "payload.bin").write_bytes(b"x" * (20 * 1024**2))
+            config = {
+                "lock_ttl_seconds": 3600,
+                "reserve_resize_tolerance_mb": 0,
+                "minimum_reserve_gb": 0.001,
+                "quota_snapshot_path": str(root / "missing.json"),
+                "live_lustre_quota": False,
+                "directories": [{
+                    "name": "models",
+                    "target_allocation_gb": 100 / 1024,
+                    "minimum_reserve_gb": 1 / 1024,
                 }],
             }
             with mock.patch.object(storage_manager, "SYSTEM_DIRS", {"models": str(model_dir)}), \
-                 mock.patch.object(storage_manager, "send_discord_alert"):
-                storage_manager.perform_allocation_cycle(config, {"models": False})
-            self.assertEqual(reserve.stat().st_size, 8 * 1024**2)
-            self.assertTrue(payload.exists())
-            self.assertLess(reserve.stat().st_size, before)
+                 mock.patch.object(storage_manager.StoragePolicy, "preflight", return_value=(False, "insufficient quota")):
+                changed = storage_manager.reconcile_reserve_target(config, config["directories"][0])
+            self.assertFalse(changed)
+            self.assertEqual(reserve.stat().st_size, original)
 
     def test_lease_manifest_blocks_automatic_reserve_resize(self):
         with tempfile.TemporaryDirectory() as temp:
