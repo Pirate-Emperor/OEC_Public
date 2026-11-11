@@ -1,5 +1,49 @@
 # OEC project continuation checklist
 
+## 2026-11-12 — Storage reserve reconciliation and Git identity handoff
+
+**Current source baseline:** OEC `main` remains at the source inspected for this handoff. Review branch `fix/storage-policy-regression-200gb-20261112` is five commits ahead, zero behind, and is not merged. The production files `storage_manager.py`, `storage_policy.py` and `storage_config.json` on the candidate are byte-for-byte identical to current main; the candidate changes tests, storage documentation, account-switch helper/tests, and Actions audit/regression workflows only.
+
+### Storage reserve and live quota
+
+- [x] The already completed, user-authorized StorageManager workflow ran in an isolated temporary worktree against the live model directory. It set models allocation target to 200 GiB and reconciled the model reserve to residual capacity (`allocation − actual payload`). Final recorded payload was approximately 64.68 GiB; physically allocated reserve approximately 135.321 GiB; reserve logical size 145,299,319,502 bytes; allocated blocks 145,299,353,600 bytes.
+- [x] Outputs reserve remained fixed at 0.5 GiB (512 MiB). At completion, `.storage_pause.lock` and `.storage_lease.json` were absent.
+- [x] The earlier isolated StorageManager suite recorded 36 passed tests. This was a temporary worktree based on the older persistent checkout, not current-main regression evidence.
+- [x] A newer read-only audit executed current-main `storage_manager.py --status` on `oec-1` and `oec-2` (11 November 2026, 20:16 UTC). Both observed models payload 64.68 GB / 200 GB target, 135.32 GB reserve, outputs reserve 512 MB, group use 2.06 TB, soft 2.00 TB, hard 2.10 TB, and 39.39/39.38 GB hard-limit headroom with grace active for approximately 6d22h28m. This is a timestamped reading, not write permission.
+- [ ] No further reserve expansion/shrink, model download or large write. Refresh live quota and use the regular StorageManager admission before any future write. Never exceed the 2.10 TB hard quota or manipulate `.storage_reserve.bin` directly.
+
+### Code regression and tests
+
+- [x] Reviewed current-main residual-reserve logic and scoped `allow_soft_quota_overage`: it is only passed by residual model-reserve growth, requires fresh quota and a hard ceiling, and uses hard headroom; ordinary writes continue to use soft/grace admission.
+- [x] Fixed two test-fixture isolation errors on the candidate branch by adding `live_lustre_quota=False` to the synthetic quota fixtures in `tests/test_storage_policy.py` and `tests/test_storage_manager.py`. Production live-quota-first behavior is unchanged.
+- [x] Candidate regression workflow passed on the intermediate source revision after these two fixes (run [43095020135](https://github.com/xflexwork/OEC/actions/runs/43095020135)). The workflow ran the prescribed notebook/CLI/storage suites, Python compilation and notebook JSON checks. Exact aggregate test count could not be retrieved from the Actions log endpoint; do not claim an unverified total.
+- [ ] The latest candidate regression run, which also includes the account-helper tests, is queued and has not yet run. The final source revision must pass before the branch is treated as fully verified.
+- [ ] Main’s earlier regression failure is preserved in history: its synthetic quota test was overridden by live Lustre telemetry, and a separate synthetic critical-monitor fixture also used live quota. Both candidate fixtures now isolate test quota.
+
+### Persistent A100 checkout — not yet synchronized
+
+- [x] Read-only evidence confirms that `oec-1` and `oec-2` use the same persistent checkout `$HOME/OEC`, the same Git common directory, and the same home-level `.gitconfig` and `.git-credentials` files.
+- [x] Last complete identity/worktree preflight (10 November) observed the persistent checkout on `fix/media-stack-supervision-20261019`, at the old project revision, with exactly: modified `storage_config.json`; untracked `tools/git_account_switch.py`; untracked `tools/git-credential-gh-account.sh`. These files must be preserved.
+- [x] The preflight observed Git commit identity `xflexwork <xflexwork@gmail.com>`; `gh` was not installed; no repository-local credential helper was configured; non-interactive `git ls-remote origin HEAD` failed using the previous saved Git credential identity.
+- [ ] Do not change the shared checkout yet. The updated read-only audit which checks the exact `storage_config.json` diff, runner registration metadata and OEC/Deploy/Play process markers is queued. Confirm there are no protected client/server/inference processes before any checkout change. The `oec-3` inspection has not yet completed.
+- [ ] After the process audit and final candidate CI pass, preserve all three local-only paths in an explicit backup and Git stash, preserve the old branch/ref, fetch the candidate non-destructively, and switch only if the persistent checkout is safe to update. Never reset/clean or drop the stash. Reconcile the local storage config intentionally; do not overwrite it blindly.
+
+### GitHub account authentication — not yet transferred
+
+- [x] The GitHub connector identity is `xflexwork` and its repository permission for OEC is `admin`. This is **not** proof of the A100 CLI login.
+- [x] The existing account helper and credential script were reviewed and added to the candidate branch. The candidate helper now requires exact `gh api user` identity, repository `.permissions.push=true`, read access and a non-mutating `git push --dry-run` before changing repo-local settings. Auth-status output is filtered; credentials are not put in remote URLs or logs.
+- [ ] The intended A100 GitHub login must be explicitly confirmed; do not infer the username from `xflexwork@gmail.com` or from the ChatGPT connector identity.
+- [ ] Complete GitHub device authorization interactively on the A100 host once `gh` is available; verify `gh auth status`, `gh api user`, OEC push permission, and HTTPS read/write dry-run. Do not paste a personal token or expose device codes/tokens in Action logs.
+- [ ] Do not change the shared home-level credential helper/config until the shared oec-1/oec-2 effect is understood and target login is confirmed. The repository-local helper is still a shared-checkout setting.
+
+### Current priority
+
+1. Let the queued final storage/account-helper regression workflow complete.
+2. Let the expanded three-runner read-only audit complete; verify process markers and exact local config diff.
+3. Only then decide whether a safe persistent checkout sync is possible.
+4. Complete A100 interactive GitHub login only after the intended login is confirmed.
+
+
 **Snapshot timestamp:** 2026-10-19T18:28:04+05:30 (Asia/Kolkata)  
 **Project:** OEC / AIREOS — core implementation, full-model research, product demonstration and academic deliverables  
 **Purpose:** Current status and next actions. Refresh GitHub refs, jobs, logs, trackers and quota before treating this as live state. Permanent rules are in [`Prompt.md`](Prompt.md).  

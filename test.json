@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "OEC",
-  "last_updated": "2026-10-16T21:15:20.823+05:30",
+  "last_updated": "2026-11-12",
   "timezone": "Asia/Kolkata",
   "purpose": "Single cumulative record of validations and runtime experiments, including method, rationale, parameters, environment, results and blockers.",
-  "latest_summary": "Latest-cell validation run 38912593770 passed four targeted OEC notebook modes on oec-1: FLUX-only PNG generation, TRELLIS-only GLB generation, combined-notebook FLUX generation, and combined TRELLIS startup only. All are cache-only/local-scratch checks; combined TRELLIS generation and a joined end-to-end world-generation path remain unverified. Frozen-weight read-only audit 38924202279 completed with semantic status BLOCKED; no training or downloads started. Main is tracking-only; OEC code changes remain on fix/flux-trellis-pipeline-20261015.",
+  "latest_summary": "Storage reserve policy is now based on residual model allocation (200 GiB model target minus actual payload), with outputs reserve fixed at 0.5 GiB. A previously completed live run recorded ~64.68 GiB model payload and ~135.321 GiB physically allocated reserve; a later read-only audit measured ~39.39 GiB hard-quota headroom above soft quota under active grace. No further reserve mutation was run. Current main storage source was verified and two synthetic-quota tests were isolated from live Lustre lookup on review branch fix/storage-policy-regression-200gb-20261112. An intermediate candidate regression workflow passed on source revision c1a4b4d92aabd7a6c2713568765857cfe9da3333; the final account-helper-inclusive tests and expanded process audit remain queued. The persistent A100 checkout is not yet synchronized. Git commit author identity is xflexwork <xflexwork@gmail.com>; actual A100 GitHub CLI login remains unverified.",
   "experiments": [
     {
       "id": "EXP-2026-10-09-TRELLIS-ISOLATED-SMOKE",
@@ -2738,6 +2738,165 @@
         "https://github.com/Killer4K-N/OEC_AireOS_Freezed/actions/runs/38924202279"
       ],
       "follow_up": "Keep the result as component-level cache-only evidence. The combined TRELLIS notebook needs a separate live generate request and exact output inspection before the combined path is claimed. Continue blocking managed storage writes and model/data downloads until a fresh quota snapshot and normal storage admission are approved. Resolve the independent oec-freeze blockers before any real-model PEFT experiment."
+    },
+    {
+      "id": "EXP-2026-11-12-LIVE-MODEL-RESERVE-RECONCILIATION",
+      "date": "2026-11-12",
+      "category": "authorized live storage reserve reconciliation",
+      "approach": "Run the reviewed StorageManager residual-reserve policy in an isolated temporary worktree against the actual model directory. Do not directly manipulate the reserve file. Reserve sizing is model allocation minus actual model payload; output reserve remains fixed.",
+      "reason": "Replace the previous fixed model reserve target with residual-capacity accounting while remaining within the authorized hard quota.",
+      "parameters": {
+        "model_allocation_target_gib": 200,
+        "output_reserve_gib": 0.5,
+        "admission": "narrow hard-quota admission exception for residual model-reserve growth only",
+        "ordinary_writes": "regular soft-quota / grace admission",
+        "user_authorized_soft_quota_crossing": true,
+        "hard_quota_must_not_be_exceeded": true
+      },
+      "results": {
+        "workflow": "PASS",
+        "models_payload_gib_approx": 64.68,
+        "models_reserve_gib_allocated_approx": 135.321,
+        "models_reserve_logical_bytes": 145299319502,
+        "models_reserve_allocated_blocks_bytes": 145299353600,
+        "outputs_reserve_gib": 0.5,
+        "pause_lock_absent_at_completion": true,
+        "lease_manifest_absent_at_completion": true,
+        "storage_regression_tests_passed": 36,
+        "artifact": "https://github.com/xflexwork/OEC_Deploy/actions/runs/43080429670/artifacts/13883856980",
+        "workflow_url": "https://github.com/xflexwork/OEC_Deploy/actions/runs/43080429670"
+      },
+      "limitations": [
+        "This was an isolated temporary worktree based on the older local OEC source state, not the later current-main regression.",
+        "No second reserve expansion/shrink is authorized by this record.",
+        "The reserve values are historical; use a fresh read-only StorageManager status before any subsequent write."
+      ]
+    },
+    {
+      "id": "EXP-2026-11-12-READONLY-LIVE-QUOTA-AUDIT",
+      "date": "2026-11-12",
+      "category": "read-only OEC StorageManager quota and reserve status",
+      "approach": "Run the current-main StorageManager --status command in isolated Actions workspaces on the two assigned A100 runners. No reserve mutation, model download, output write or GPU process change was requested.",
+      "reason": "Refresh the hard-quota headroom after the authorized reserve reconciliation.",
+      "parameters": {
+        "source": "current OEC main storage source",
+        "runners": [
+          "oec-1",
+          "oec-2"
+        ],
+        "status_command": "python3 storage_manager.py --status",
+        "mutation_performed": false
+      },
+      "results": {
+        "oec_1": {
+          "group_usage_tb_approx": 2.06,
+          "soft_quota_tb": 2,
+          "hard_quota_tb": 2.1,
+          "hard_headroom_gb_approx": 39.39,
+          "grace_active": true,
+          "grace_remaining": "approximately 6d22h28m at capture",
+          "models_payload_gb": 64.68,
+          "models_target_gb": 200,
+          "models_reserve_gb": 135.32,
+          "outputs_reserve_mb": 512,
+          "gpu_compute_processes": 0
+        },
+        "oec_2": {
+          "group_usage_tb_approx": 2.06,
+          "soft_quota_tb": 2,
+          "hard_quota_tb": 2.1,
+          "hard_headroom_gb_approx": 39.38,
+          "grace_active": true,
+          "models_payload_gb": 64.68,
+          "models_target_gb": 200,
+          "models_reserve_gb": 135.32,
+          "outputs_reserve_mb": 512,
+          "gpu_compute_processes": 0
+        },
+        "workflow": "PASS",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/43094879745",
+        "artifacts": [
+          "https://github.com/xflexwork/OEC/actions/runs/43094879745/artifacts/13889014864",
+          "https://github.com/xflexwork/OEC/actions/runs/43094879745/artifacts/13891110375"
+        ]
+      },
+      "limitations": [
+        "This is a timestamped read-only sample, not a permanent reservation or future write approval.",
+        "oec-3 remained queued in this audit; no three-runner status claim is made.",
+        "A later audit that inspects client/server process command-line markers and local storage_config diff is queued."
+      ]
+    },
+    {
+      "id": "EXP-2026-11-12-STORAGE-POLICY-CANDIDATE-REGRESSION",
+      "date": "2026-11-12",
+      "category": "storage policy, notebooks and write-admission regression",
+      "approach": "Run the candidate OEC storage-admission workflow after adding live_lustre_quota=false to the two synthetic quota fixtures. The production live quota lookup and hard/soft admission behavior were not changed.",
+      "reason": "Make tests deterministic on live A100 runners so their synthetic fixtures cannot be overridden by the real shared Lustre quota.",
+      "parameters": {
+        "branch": "fix/storage-policy-regression-200gb-20261112",
+        "tested_source_revision": "c1a4b4d92aabd7a6c2713568765857cfe9da3333",
+        "suites": [
+          "test_trellis_notebook_static.py",
+          "test_trellis_easy_run.py",
+          "test_audiocraft_notebook_static.py",
+          "test_storage_write_admission.py",
+          "test_storage_manager.py",
+          "test_storage_policy.py",
+          "test_quota_snapshot.py",
+          "test_storage_reservation.py"
+        ],
+        "compile_checks": "pipeline_trellis_3d.py, storage_manager.py, storage_policy.py, storage_reservation.py, tools/quota_snapshot.py",
+        "notebook_checks": "pipeline_trellis_3d.ipynb, pipeline_trellis_3d_only.ipynb, pipeline_flux_only.ipynb, pipeline_audiocraft.ipynb"
+      },
+      "results": {
+        "conclusion": "SUCCESS",
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/43095020135",
+        "job_id": 130781479701,
+        "test_count": "aggregate count not retrieved because Actions job log retrieval timed out; do not invent a total"
+      },
+      "limitations": [
+        "This successful run is on the intermediate candidate revision before the GitHub account helper and its tests were added.",
+        "The final helper-inclusive test run is queued and must be verified separately."
+      ]
+    },
+    {
+      "id": "EXP-2026-11-12-A100-GIT-IDENTITY-PREFLIGHT",
+      "date": "2026-11-12",
+      "category": "read-only persistent checkout and GitHub authentication preflight",
+      "approach": "Use the OEC read-only Actions audit to inspect the shared persistent checkout, git identity, remotes, gh availability, credential-helper counts and non-interactive origin access without reading credential contents or changing configuration.",
+      "reason": "Establish whether the persistent A100 checkout can be reconciled and which GitHub identity is currently authenticated before changing local settings.",
+      "parameters": {
+        "persistent_checkout": "$HOME/OEC",
+        "runners": [
+          "oec-1",
+          "oec-2"
+        ],
+        "read_only": true
+      },
+      "results": {
+        "checkout_path": "/nlsasfs/home/lmedge/rahkus/OEC",
+        "branch": "fix/media-stack-supervision-20261019",
+        "source_head": "b5947feca6bb6171e38cfa5a86a5715b283710b1",
+        "local_status": [
+          "M storage_config.json",
+          "?? tools/git_account_switch.py",
+          "?? tools/git-credential-gh-account.sh"
+        ],
+        "git_author_name": "xflexwork",
+        "git_author_email": "xflexwork@gmail.com",
+        "gh_cli": "NOT_INSTALLED",
+        "repository_local_credential_helper": "NONE",
+        "origin_read": "FAIL_NONINTERACTIVE_USING_OLD_SAVED_ACCOUNT",
+        "shared_checkout_between_oec_1_and_oec_2": true,
+        "global_gitconfig_and_credentials_shared": true,
+        "workflow_url": "https://github.com/xflexwork/OEC/actions/runs/42904759525"
+      },
+      "limitations": [
+        "This preflight does not establish the authenticated GitHub login via gh api user.",
+        "No credential file contents, tokens or passwords were read.",
+        "No persistent checkout sync, Git identity change or GitHub account change was performed.",
+        "oec-3 remains unverified until its read-only job completes."
+      ]
     }
   ]
 }
