@@ -1,5 +1,8 @@
 # OEC Work Changelog
 
+- [2026-11-12 — storage-manager correction and A100 Git identity handoff](CHANGELOG-2026-11-12.md)
+  - Recorded the completed 200 GiB residual model-reserve reconciliation and fresh hard-quota warning. Candidate branch isolates two live-quota-dependent test fixtures and adds account-helper verification; persistent checkout remains unchanged pending a read-only process/config audit and final candidate CI.
+
 - [2026-10-19 — continuation entry point and media-inference handoff](CHANGELOG-2026-10-19.md)
   - Added `docs/Prompt.md`, refreshed `docs/checklist.md` and `TODO.md`, and created `docs/MODEL_PIPELINE_CONTINUATION_PROMPT.md`. The user confirmed Actions runner quota reset and withdrew the prior $0-only prerequisite. Current model status: AudioGen and standalone TRELLIS/LTX pass; MusicGen is blocked before inference by cache/egress; FLUX→TRELLIS failed on path-guard test fixtures; ACE-Step guard is committed but not yet A100-verified. See the dated record and task prompt for run links and next steps.
 

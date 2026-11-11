@@ -1,5 +1,21 @@
 # OEC Active TODO
 
+## 2026-11-12 — storage-manager and Git-account handoff
+
+- [x] Confirm current-main residual models reserve is allocation minus payload; outputs reserve remains fixed at 0.5 GiB.
+- [x] Record completed live reserve result: 200 GiB models allocation, ~64.68 GiB payload, ~135.321 GiB physically allocated model reserve; outputs reserve 0.5 GiB unchanged.
+- [x] Refresh live quota with read-only StorageManager status on oec-1/oec-2: 2.06 TB used, 2.00 TB soft, 2.10 TB hard, ~39.39 GB hard headroom, grace active. No reserve mutation in this audit.
+- [x] Isolate synthetic quota fixtures in `test_storage_policy.py` and `test_storage_manager.py`; production quota behavior is unchanged.
+- [x] Add current storage policy documentation and a read-only A100/checkout audit workflow on `fix/storage-policy-regression-200gb-20261112`.
+- [x] Add/review a repository-scoped Git account helper that verifies selected GitHub login, OEC push permission, read access and `git push --dry-run` before changing repository-local auth settings.
+- [ ] Wait for final candidate tests, including account-helper unit tests, to pass on the latest candidate revision.
+- [ ] Wait for the expanded read-only audit of oec-1/oec-2/oec-3 to check client/server process markers, local storage config diff and runner registration metadata.
+- [ ] Synchronize persistent `$HOME/OEC` only after process safety is confirmed; preserve modified `storage_config.json` and both pre-existing untracked helper scripts. No reset/clean.
+- [ ] Confirm the intended A100 GitHub login; then complete interactive `gh auth login --web` and verify account + push permission + HTTPS dry-run. The Git author/email is already `xflexwork <xflexwork@gmail.com>`; this is distinct from GitHub authentication.
+
+**Evidence:** Storage live workflow [43080429670](https://github.com/xflexwork/OEC_Deploy/actions/runs/43080429670), artifact [13883856980](https://github.com/xflexwork/OEC_Deploy/actions/runs/43080429670/artifacts/13883856980); current-main read-only quota audit [43094879745](https://github.com/xflexwork/OEC/actions/runs/43094879745); intermediate candidate regression pass [43095020135](https://github.com/xflexwork/OEC/actions/runs/43095020135). Latest final-source candidate runs remain queued.
+
+
 **Continuation entry point — 2026-10-19T18:28:04+05:30:** Read [`docs/Prompt.md`](docs/Prompt.md) first, then refresh [`docs/checklist.md`](docs/checklist.md). For the active model-inference workstream, use [`docs/MODEL_PIPELINE_CONTINUATION_PROMPT.md`](docs/MODEL_PIPELINE_CONTINUATION_PROMPT.md). See [today's daily changelog](changelog/CHANGELOG-2026-10-19.md). The user confirmed Actions runner quota reset and removed the previous $0-only prerequisite; use Actions as needed for model setup/inference. Keep StorageManager admission and model-storage safeguards separate. The original start date/deadline for the 15-day project window remains unverified; do not guess or reset it.
 
 ## 2026-10-16 — latest notebook acceptance and frozen-weight audit

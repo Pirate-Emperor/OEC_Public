@@ -1,5 +1,9 @@
 # OEC Significant Results
 
+## 2026-11-12 — storage-manager reserve reconciliation and Git account handoff
+
+The completed live reconciliation set the models allocation to 200 GiB and models reserve to residual capacity (~135.321 GiB for ~64.68 GiB payload); outputs reserve remains 0.5 GiB. A current-main read-only audit measured group usage ~2.06 TB, soft 2.00 TB, hard 2.10 TB and ~39.39 GB hard headroom with grace active. Do not repeat reserve mutation or large writes without a fresh quota reading. Candidate branch `fix/storage-policy-regression-200gb-20261112` contains deterministic synthetic-quota test fixtures, refreshed policy documentation, read-only A100 diagnostics and repository-scoped GitHub account helper/tests. An intermediate candidate CI run passed, but the final helper-inclusive run and expanded process audit remain queued. The persistent A100 checkout has not been synchronized; its local storage config change and untracked helper scripts are being preserved. Git author identity is `xflexwork <xflexwork@gmail.com>`; actual A100 GitHub CLI login is not verified and requires explicit target-account confirmation.
+
 **Last updated:** 2026-10-16T21:15:20.823+05:30 (Asia/Kolkata)
 **Branch:** `main` (tracking/results updated; OEC TRELLIS offline-loader source candidate is in open PR [#10](https://github.com/Killer4K-N/OEC/pull/10), not merged; candidate CI [38601987037](https://github.com/Killer4K-N/OEC/actions/runs/38601987037) passed 34 static tests)  
 **Policy:** This is one cumulative summary of material OEC results. Detailed run-by-run history is in `changelog/CHANGELOG-YYYY-MM-DD.md`; test approaches and parameters are in `test.json`; open work is in `TODO.md`.
