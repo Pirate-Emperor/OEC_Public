@@ -125,6 +125,70 @@ class StoragePolicyTests(unittest.TestCase):
             self.assertFalse(ok)
             self.assertIn("directory target", reason)
 
+    def test_explicit_reserve_growth_can_cross_soft_but_never_hard_quota(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            quota_path = root / "quota.json"
+            config = {
+                "quota_snapshot_path": str(quota_path),
+                "quota_snapshot_max_age_seconds": 600,
+                "live_lustre_quota": False,
+            }
+            payload = {
+                "schema_version": 2,
+                "used_bytes": 9 * BYTES_PER_GB,
+                "limit_bytes": 10 * BYTES_PER_GB,
+                "soft_quota_bytes": 10 * BYTES_PER_GB,
+                "hard_limit_bytes": 12 * BYTES_PER_GB,
+                "timestamp": time.time(),
+                "source": "unit-test quota",
+                "grace": "-",
+                "quota_kind": "group",
+                "quota_name": "lmedge",
+            }
+            quota_path.write_text(json.dumps(payload), encoding="utf-8")
+            policy = StoragePolicy(config)
+
+            # Ordinary writes still stop at the soft quota.
+            ok, _ = policy.preflight(
+                root, required_bytes=2 * BYTES_PER_GB,
+                minimum_free_bytes=1 * BYTES_PER_GB, require_fresh_quota=True,
+            )
+            self.assertFalse(ok)
+
+            # The explicitly authorized reserve path may cross soft quota,
+            # but must leave its requested hard-quota safety margin.
+            ok, reason = policy.preflight(
+                root, required_bytes=2 * BYTES_PER_GB,
+                minimum_free_bytes=1 * BYTES_PER_GB,
+                require_fresh_quota=True, allow_soft_quota_overage=True,
+            )
+            self.assertTrue(ok, reason)
+
+            # No hard limit means the authorized exception fails closed.
+            del payload["hard_limit_bytes"]
+            payload["timestamp"] = time.time()
+            quota_path.write_text(json.dumps(payload), encoding="utf-8")
+            ok, reason = policy.preflight(
+                root, required_bytes=1,
+                require_fresh_quota=True, allow_soft_quota_overage=True,
+            )
+            self.assertFalse(ok)
+            self.assertIn("hard-quota ceiling is unavailable", reason)
+
+            # Once at/above the hard quota, the exception cannot admit writes.
+            payload["hard_limit_bytes"] = 12 * BYTES_PER_GB
+            payload["used_bytes"] = 13 * BYTES_PER_GB
+            payload["limit_bytes"] = 10 * BYTES_PER_GB
+            payload["timestamp"] = time.time()
+            quota_path.write_text(json.dumps(payload), encoding="utf-8")
+            ok, reason = policy.preflight(
+                root, required_bytes=1,
+                require_fresh_quota=True, allow_soft_quota_overage=True,
+            )
+            self.assertFalse(ok)
+            self.assertIn("above hard limit", reason)
+
     def test_zero_reserve_size_is_rejected_and_existing_reserve_stays(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / ".storage_reserve.bin"
