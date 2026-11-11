@@ -391,6 +391,7 @@ def reconcile_reserve_target(config, dir_cfg):
                 required_bytes=needed_bytes,
                 minimum_free_bytes=margin_bytes,
                 require_fresh_quota=True,
+                allow_soft_quota_overage=dynamic_residual,
             )
             if not ok:
                 logging.warning(
