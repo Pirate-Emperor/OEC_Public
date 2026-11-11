@@ -30,7 +30,7 @@
 
 ## Current state
 
-- Candidate branch: `fix/storage-policy-regression-200gb-20261112`, five commits ahead of main at the last compare. Production storage manager, policy and config files are byte-identical to main; changes are tests, documentation, audit workflow and account helper/tests.
+- Candidate branch: `fix/storage-policy-regression-200gb-20261112`, ahead of main at the last comparison. Production storage manager, policy and config files are byte-identical to main; changes are tests, documentation, audit workflow and account helper/tests.
 - Main was not modified. No OEC_Deploy files were modified. No client, server, inference or GPU process was restarted, killed or interrupted.
 - Next order: final regression with account helper tests; read-only process/config audit across A100 runners; only then decide if safe non-destructive persistent checkout sync is possible; complete A100 device flow after intended login is confirmed.
 

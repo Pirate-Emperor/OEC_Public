@@ -2,7 +2,7 @@
 
 ## 2026-11-12 — Storage reserve reconciliation and Git identity handoff
 
-**Current source baseline:** OEC `main` remains at the source inspected for this handoff. Review branch `fix/storage-policy-regression-200gb-20261112` is five commits ahead, zero behind, and is not merged. The production files `storage_manager.py`, `storage_policy.py` and `storage_config.json` on the candidate are byte-for-byte identical to current main; the candidate changes tests, storage documentation, account-switch helper/tests, and Actions audit/regression workflows only.
+**Current source baseline:** OEC `main` remains at the source inspected for this handoff. Review branch `fix/storage-policy-regression-200gb-20261112` is ahead of main and is not merged; use the live branch/PR metadata for its current head. The production files `storage_manager.py`, `storage_policy.py` and `storage_config.json` on the candidate are byte-for-byte identical to current main; the candidate changes tests, storage documentation, account-switch helper/tests, and Actions audit/regression workflows only.
 
 ### Storage reserve and live quota
 
